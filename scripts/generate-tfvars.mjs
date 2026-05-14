@@ -29,14 +29,14 @@ function exitWithUsageError(message) {
 }
 
 function verifyArgs() {
-  const [varsPath, outPath, provider] = process.argv.slice(2);
+  const [varsPath, outPath, provider = ""] = process.argv.slice(2);
   if (!varsPath || !outPath) {
     exitWithUsageError("Missing required arguments.");
   }
   if (!existsSync(varsPath)) {
     exitWithUsageError(`Variables file does not exist: ${varsPath}`);
   }
-  return { varsPath, outPath, provider: provider || "" };
+  return { varsPath, outPath, provider };
 }
 
 function countBraces(line) {
