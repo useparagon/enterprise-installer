@@ -113,7 +113,7 @@ variable "cloudflare_tunnel_email_domain" {
 
 # postgres
 variable "postgres_redundant" {
-  description = "Whether zone redundant HA should be enabled"
+  description = "Enable zone-redundant HA. Recommended: true for production (requires GP/MO SKU, not Burstable)."
   type        = bool
   default     = false
 }
@@ -125,7 +125,7 @@ variable "postgres_sku_name" {
 }
 
 variable "postgres_base_sku_name" {
-  description = "Default PostgreSQL SKU name for instances that don't use the main postgres_sku_name (e.g. `B_Standard_B2s` or `GP_Standard_D2ds_v5`)"
+  description = "PostgreSQL SKU for secondary instances. Use GP_Standard_D2ads_v5 for HA support. SKU availability may vary by Azure region."
   type        = string
   default     = "B_Standard_B2s"
 }

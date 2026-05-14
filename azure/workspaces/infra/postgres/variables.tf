@@ -62,13 +62,13 @@ locals {
     cerberus = {
       name = "${var.workspace}-cerberus"
       db   = "cerberus"
-      ha   = false
+      ha   = var.postgres_redundant
       sku  = var.postgres_base_sku_name
     }
     eventlogs = {
       name = "${var.workspace}-eventlogs"
       db   = "eventlogs"
-      ha   = false
+      ha   = var.postgres_redundant
       sku  = var.postgres_base_sku_name
     }
     hermes = {
@@ -80,20 +80,20 @@ locals {
     triggerkit = {
       name = "${var.workspace}-triggerkit"
       db   = "triggerkit"
-      ha   = false
+      ha   = var.postgres_redundant
       sku  = var.postgres_base_sku_name
     }
     zeus = {
       name = "${var.workspace}-zeus"
       db   = "zeus"
-      ha   = false
+      ha   = var.postgres_redundant
       sku  = var.postgres_base_sku_name
     }
     }, var.managed_sync_enabled ? {
     managed_sync = {
       name = "${var.workspace}-managed-sync"
       db   = "managed_sync"
-      ha   = false
+      ha   = var.postgres_redundant
       sku  = var.postgres_base_sku_name
     }
     } : {}) : {
