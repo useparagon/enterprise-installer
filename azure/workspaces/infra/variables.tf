@@ -125,7 +125,7 @@ variable "postgres_sku_name" {
 }
 
 variable "postgres_base_sku_name" {
-  description = "PostgreSQL SKU for secondary instances. Use GP_Standard_D2ads_v5 for HA support."
+  description = "PostgreSQL SKU for secondary instances. Use GP_Standard_D2ads_v5 for HA support. SKU availability may vary by Azure region."
   type        = string
   default     = "B_Standard_B2s"
 }
