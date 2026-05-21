@@ -1,14 +1,9 @@
 terraform {
-  required_version = ">= 1.7.0"
-
   required_providers {
     google = {
       source  = "hashicorp/google"
+      # broker_capacity_config on google_managed_kafka_cluster requires >= 7.19.0
       version = ">= 7.19.0, < 8.0.0"
-    }
-    google-beta = {
-      source  = "hashicorp/google-beta"
-      version = "~> 7.0"
     }
   }
 }
