@@ -3,7 +3,7 @@
 # PARA-20444 — same semantics as o2-apply-uds.ts (GET, compare, single PUT).
 set -eu
 
-DESIRED_SCHEMA="${DESIRED_SCHEMA:-/schema/openobserve-uds-schema.json}"
+DESIRED_SCHEMA="${DESIRED_SCHEMA:-/uds/openobserve-uds-schema.json}"
 O2_HOST="${O2_HOST:-http://openobserve:5080}"
 O2_USER="${O2_USER:-${ZO_ROOT_USER_EMAIL:-}}"
 O2_PASS="${O2_PASS:-${ZO_ROOT_USER_PASSWORD:-}}"

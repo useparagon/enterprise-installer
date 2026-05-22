@@ -1,4 +1,12 @@
 {{- if .Values.uds.enabled }}
+{{- $schema := .Files.Get "files/openobserve-uds-schema.json" }}
+{{- $script := .Files.Get "files/apply-uds.sh" }}
+{{- if not $schema }}
+{{- fail "UDS schema missing: expected charts/openobserve/files/openobserve-uds-schema.json (run prepare.sh)" }}
+{{- end }}
+{{- if not $script }}
+{{- fail "UDS script missing: expected charts/openobserve/files/apply-uds.sh (run prepare.sh)" }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,7 +15,7 @@ metadata:
     {{- include "openobserve.labels" . | nindent 4 }}
 data:
   openobserve-uds-schema.json: |
-{{ .Files.Get "openobserve-uds-schema.json" | indent 4 }}
+{{ $schema | indent 4 }}
   apply-uds.sh: |
-{{ .Files.Get "apply-uds.sh" | indent 4 }}
+{{ $script | indent 4 }}
 {{- end }}

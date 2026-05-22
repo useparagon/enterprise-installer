@@ -25,7 +25,7 @@ Each application chart declares its subcharts as `file://` dependencies in `Char
 
 After `helm install` / `helm upgrade` of `paragon-logging`, the `openobserve` subchart runs a **post-install,post-upgrade** Helm hook `Job` that applies the user-defined schema for the `paragon` logs stream.
 
-- **Files**: `charts/paragon-logging/charts/openobserve/files/apply-uds.sh`, `openobserve-uds-schema.json`
+- **Files**: `charts/paragon-logging/charts/openobserve/files/apply-uds.sh`, `openobserve-uds-schema.json` (Helm loads them as `files/<name>` via `.Files.Get`, same as `service-inputs.json` elsewhere)
 - **Templates**: `uds-configmap.yaml`, `uds-apply-job.yaml`
 - **Auth**: same Kubernetes secret as the OpenObserve StatefulSet (`secretName`, keys `ZO_ROOT_USER_EMAIL` / `ZO_ROOT_USER_PASSWORD` from `paragon-secrets` unless overridden in `openobserve.secrets`)
 - **Idempotent**: GET schema → skip PUT if `defined_schema_fields` already matches desired JSON
