@@ -123,8 +123,7 @@ for chart in "${charts[@]}"
 do
     # sha256 hash of all files in the chart folder with paths sorted then stripped for consistency across providers
     hash=$(find $chart -type f | sort | xargs shasum -a 256 -b | awk '{print $1}' | shasum -a 256 | awk '{print $1}' | cut -c1-8)
-    # Do not sed-replace inside chart files/ (UDS JSON, shell scripts, service-inputs, etc.)
-    find $chart -type f ! -path '*/files/*' -exec sed -i '' -e "s/__PARAGON_VERSION__/$version-$hash/g" {} +
+    find $chart -type f -exec sed -i '' -e "s/__PARAGON_VERSION__/$version-$hash/g" {} +
     echo "$(basename "$chart"): $hash"
 done
 
