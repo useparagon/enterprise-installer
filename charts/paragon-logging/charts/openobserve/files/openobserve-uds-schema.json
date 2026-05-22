@@ -1,0 +1,1980 @@
+{
+  "schema": [
+    {
+      "name": "_timestamp",
+      "type": "Int64"
+    },
+    {
+      "name": "action",
+      "type": "Utf8"
+    },
+    {
+      "name": "activeinstanceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "activestepid",
+      "type": "Utf8"
+    },
+    {
+      "name": "code",
+      "type": "Utf8"
+    },
+    {
+      "name": "connectcredentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "crontriggersubscriptionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "currentcredentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "customintegrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "customintegrationname",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_customintegrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "deploymentid",
+      "type": "Utf8"
+    },
+    {
+      "name": "deploymentids",
+      "type": "Utf8"
+    },
+    {
+      "name": "email",
+      "type": "Utf8"
+    },
+    {
+      "name": "enduserid",
+      "type": "Utf8"
+    },
+    {
+      "name": "error",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_code",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_headers_req_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_headers_retry_after",
+      "type": "Utf8"
+    },
+    {
+      "name": "eventid",
+      "type": "Utf8"
+    },
+    {
+      "name": "executiongroupid",
+      "type": "Utf8"
+    },
+    {
+      "name": "feature",
+      "type": "Utf8"
+    },
+    {
+      "name": "groupid",
+      "type": "Utf8"
+    },
+    {
+      "name": "host",
+      "type": "Utf8"
+    },
+    {
+      "name": "hostname",
+      "type": "Utf8"
+    },
+    {
+      "name": "httpmethod",
+      "type": "Utf8"
+    },
+    {
+      "name": "httpstatus",
+      "type": "Int64"
+    },
+    {
+      "name": "httpstatuscode",
+      "type": "Int64"
+    },
+    {
+      "name": "id",
+      "type": "Utf8"
+    },
+    {
+      "name": "impersonated",
+      "type": "Boolean"
+    },
+    {
+      "name": "instanceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "integration",
+      "type": "Utf8"
+    },
+    {
+      "name": "integrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "integrationname",
+      "type": "Utf8"
+    },
+    {
+      "name": "intent",
+      "type": "Utf8"
+    },
+    {
+      "name": "interval",
+      "type": "Utf8"
+    },
+    {
+      "name": "isconnect",
+      "type": "Boolean"
+    },
+    {
+      "name": "isconnectproject",
+      "type": "Boolean"
+    },
+    {
+      "name": "isintegrationerror",
+      "type": "Boolean"
+    },
+    {
+      "name": "jobdatareferenceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "jobid",
+      "type": "Utf8"
+    },
+    {
+      "name": "jobname",
+      "type": "Utf8"
+    },
+    {
+      "name": "key",
+      "type": "Utf8"
+    },
+    {
+      "name": "kubernetes_container_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "kubernetes_pod_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "kubernetes_pod_ip",
+      "type": "Utf8"
+    },
+    {
+      "name": "kubernetes_pod_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "leaderid",
+      "type": "Utf8"
+    },
+    {
+      "name": "length",
+      "type": "Int64"
+    },
+    {
+      "name": "level",
+      "type": "Utf8"
+    },
+    {
+      "name": "log",
+      "type": "Utf8"
+    },
+    {
+      "name": "maxid",
+      "type": "Utf8"
+    },
+    {
+      "name": "memberid",
+      "type": "Utf8"
+    },
+    {
+      "name": "message",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_action",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_attempts",
+      "type": "Int64"
+    },
+    {
+      "name": "meta_code",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_connectcredentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_executionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_integrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_linenumber",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_plan",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_stepid",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_timelimit",
+      "type": "Int64"
+    },
+    {
+      "name": "meta_workflowid",
+      "type": "Utf8"
+    },
+    {
+      "name": "method",
+      "type": "Utf8"
+    },
+    {
+      "name": "migrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "minid",
+      "type": "Utf8"
+    },
+    {
+      "name": "msg",
+      "type": "Utf8"
+    },
+    {
+      "name": "name",
+      "type": "Utf8"
+    },
+    {
+      "name": "namespace",
+      "type": "Utf8"
+    },
+    {
+      "name": "nextstepid",
+      "type": "Utf8"
+    },
+    {
+      "name": "organizationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "ownerid",
+      "type": "Utf8"
+    },
+    {
+      "name": "paragonerrorcode",
+      "type": "Utf8"
+    },
+    {
+      "name": "paragonerrormessage",
+      "type": "Utf8"
+    },
+    {
+      "name": "path",
+      "type": "Utf8"
+    },
+    {
+      "name": "personaid",
+      "type": "Utf8"
+    },
+    {
+      "name": "pid",
+      "type": "Int64"
+    },
+    {
+      "name": "previnstanceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "projectids",
+      "type": "Utf8"
+    },
+    {
+      "name": "projecttype",
+      "type": "Utf8"
+    },
+    {
+      "name": "providerid",
+      "type": "Utf8"
+    },
+    {
+      "name": "releaseid",
+      "type": "Utf8"
+    },
+    {
+      "name": "releasejobid",
+      "type": "Utf8"
+    },
+    {
+      "name": "remaininginstances",
+      "type": "Int64"
+    },
+    {
+      "name": "req_url",
+      "type": "Utf8"
+    },
+    {
+      "name": "req_urlpattern",
+      "type": "Utf8"
+    },
+    {
+      "name": "request_path",
+      "type": "Utf8"
+    },
+    {
+      "name": "res_statuscode",
+      "type": "Int64"
+    },
+    {
+      "name": "resourceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "result",
+      "type": "Utf8"
+    },
+    {
+      "name": "s3path",
+      "type": "Utf8"
+    },
+    {
+      "name": "sql",
+      "type": "Utf8"
+    },
+    {
+      "name": "stackid",
+      "type": "Utf8"
+    },
+    {
+      "name": "stacktrace",
+      "type": "Utf8"
+    },
+    {
+      "name": "starttime",
+      "type": "Int64"
+    },
+    {
+      "name": "status",
+      "type": "Utf8"
+    },
+    {
+      "name": "statuscode",
+      "type": "Int64"
+    },
+    {
+      "name": "statustext",
+      "type": "Utf8"
+    },
+    {
+      "name": "step",
+      "type": "Utf8"
+    },
+    {
+      "name": "stepexecutionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "stepexecutiontime",
+      "type": "Int64"
+    },
+    {
+      "name": "stepid",
+      "type": "Utf8"
+    },
+    {
+      "name": "stepinstanceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "stepstatus",
+      "type": "Utf8"
+    },
+    {
+      "name": "steptype",
+      "type": "Utf8"
+    },
+    {
+      "name": "stream",
+      "type": "Utf8"
+    },
+    {
+      "name": "stripecustomerid",
+      "type": "Utf8"
+    },
+    {
+      "name": "stripesubscriptionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "subscribers",
+      "type": "Int64"
+    },
+    {
+      "name": "subscriptionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "subscriptionids",
+      "type": "Utf8"
+    },
+    {
+      "name": "syncinstanceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "team_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "team_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "team_organization_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "team_organization_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "team_organization_type",
+      "type": "Utf8"
+    },
+    {
+      "name": "team_organizationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "teamid",
+      "type": "Utf8"
+    },
+    {
+      "name": "teammembers",
+      "type": "Utf8"
+    },
+    {
+      "name": "timestamp",
+      "type": "Utf8"
+    },
+    {
+      "name": "title",
+      "type": "Utf8"
+    },
+    {
+      "name": "trace",
+      "type": "Utf8"
+    },
+    {
+      "name": "traceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "triggerintent",
+      "type": "Utf8"
+    },
+    {
+      "name": "type",
+      "type": "Utf8"
+    },
+    {
+      "name": "unit",
+      "type": "Utf8"
+    },
+    {
+      "name": "usedmemory",
+      "type": "Int64"
+    },
+    {
+      "name": "userid",
+      "type": "Utf8"
+    },
+    {
+      "name": "utilization",
+      "type": "Float64"
+    },
+    {
+      "name": "version",
+      "type": "Utf8"
+    },
+    {
+      "name": "versionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "worker_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "worker_queue",
+      "type": "Utf8"
+    },
+    {
+      "name": "workercount",
+      "type": "Int64"
+    },
+    {
+      "name": "workercountneeded",
+      "type": "Int64"
+    },
+    {
+      "name": "workerid",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflowexecutionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflowid",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflowmigrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflowteamid",
+      "type": "Utf8"
+    },
+    {
+      "name": "active",
+      "type": "Boolean"
+    },
+    {
+      "name": "attempts",
+      "type": "Int64"
+    },
+    {
+      "name": "authenticationtype",
+      "type": "Utf8"
+    },
+    {
+      "name": "authorization_model_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "authorizationstoreid",
+      "type": "Utf8"
+    },
+    {
+      "name": "authtype",
+      "type": "Utf8"
+    },
+    {
+      "name": "body_file_mimetype",
+      "type": "Utf8"
+    },
+    {
+      "name": "body_file_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "body_filename",
+      "type": "Utf8"
+    },
+    {
+      "name": "body_job_title",
+      "type": "Utf8"
+    },
+    {
+      "name": "body_state",
+      "type": "Utf8"
+    },
+    {
+      "name": "body_timestamp",
+      "type": "Utf8"
+    },
+    {
+      "name": "build_commit",
+      "type": "Utf8"
+    },
+    {
+      "name": "build_version",
+      "type": "Utf8"
+    },
+    {
+      "name": "category",
+      "type": "Utf8"
+    },
+    {
+      "name": "checkpoint",
+      "type": "Utf8"
+    },
+    {
+      "name": "clientstatus",
+      "type": "Utf8"
+    },
+    {
+      "name": "config_log_format",
+      "type": "Utf8"
+    },
+    {
+      "name": "config_log_level",
+      "type": "Utf8"
+    },
+    {
+      "name": "config_log_timestampformat",
+      "type": "Utf8"
+    },
+    {
+      "name": "configurationname",
+      "type": "Utf8"
+    },
+    {
+      "name": "context",
+      "type": "Utf8"
+    },
+    {
+      "name": "credential_credentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "credential_datecreated",
+      "type": "Utf8"
+    },
+    {
+      "name": "credential_dateupdated",
+      "type": "Utf8"
+    },
+    {
+      "name": "credential_integrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "credential_personaid",
+      "type": "Utf8"
+    },
+    {
+      "name": "credential_projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "credential_scheme",
+      "type": "Utf8"
+    },
+    {
+      "name": "credential_status",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_class",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_details",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_errors",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_innererror",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_status",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_integrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_intent",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_customintegrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_integrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_personaid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_method",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_operationtype",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_ownerid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_providerid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_queuedtime",
+      "type": "Int64"
+    },
+    {
+      "name": "data_releaseid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_sourceprojectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_starttime",
+      "type": "Int64"
+    },
+    {
+      "name": "data_status",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_statuscode",
+      "type": "Int64"
+    },
+    {
+      "name": "data_suberror",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_subscriptionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_testing",
+      "type": "Boolean"
+    },
+    {
+      "name": "data_timestamp",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_trace_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_type",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_version",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_workflowid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_workflowmigrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_workflowversion",
+      "type": "Int64"
+    },
+    {
+      "name": "database",
+      "type": "Utf8"
+    },
+    {
+      "name": "date",
+      "type": "Utf8"
+    },
+    {
+      "name": "datecreated",
+      "type": "Utf8"
+    },
+    {
+      "name": "datesubmitted",
+      "type": "Utf8"
+    },
+    {
+      "name": "dateupdated",
+      "type": "Utf8"
+    },
+    {
+      "name": "delay",
+      "type": "Int64"
+    },
+    {
+      "name": "delayed",
+      "type": "Int64"
+    },
+    {
+      "name": "deletedrecords",
+      "type": "Int64"
+    },
+    {
+      "name": "delta",
+      "type": "Int64"
+    },
+    {
+      "name": "description",
+      "type": "Utf8"
+    },
+    {
+      "name": "dir",
+      "type": "Utf8"
+    },
+    {
+      "name": "duration",
+      "type": "Int64"
+    },
+    {
+      "name": "encryptedsessionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "err_code",
+      "type": "Utf8"
+    },
+    {
+      "name": "err_file",
+      "type": "Utf8"
+    },
+    {
+      "name": "err_length",
+      "type": "Int64"
+    },
+    {
+      "name": "err_line",
+      "type": "Utf8"
+    },
+    {
+      "name": "err_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "err_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "err_routine",
+      "type": "Utf8"
+    },
+    {
+      "name": "err_severity",
+      "type": "Utf8"
+    },
+    {
+      "name": "err_where",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_action",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_bucketname",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_context",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_description",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_headers_date",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_hostname",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_output_error",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_requestid",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_resource",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_response",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_response_code",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_response_statuscode",
+      "type": "Int64"
+    },
+    {
+      "name": "error_stack",
+      "type": "Utf8"
+    },
+    {
+      "name": "error_statustext",
+      "type": "Utf8"
+    },
+    {
+      "name": "errorcode",
+      "type": "Utf8"
+    },
+    {
+      "name": "errorerror",
+      "type": "Utf8"
+    },
+    {
+      "name": "errormessage",
+      "type": "Utf8"
+    },
+    {
+      "name": "errormeta",
+      "type": "Utf8"
+    },
+    {
+      "name": "errormeta_correlationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "errormeta_error",
+      "type": "Utf8"
+    },
+    {
+      "name": "errormeta_error_description",
+      "type": "Utf8"
+    },
+    {
+      "name": "errormeta_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "errormeta_status",
+      "type": "Utf8"
+    },
+    {
+      "name": "errortype",
+      "type": "Utf8"
+    },
+    {
+      "name": "eventname",
+      "type": "Utf8"
+    },
+    {
+      "name": "execution_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "execution_projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "execution_status",
+      "type": "Utf8"
+    },
+    {
+      "name": "execution_stepcount",
+      "type": "Int64"
+    },
+    {
+      "name": "execution_workflowid",
+      "type": "Utf8"
+    },
+    {
+      "name": "executionids",
+      "type": "Utf8"
+    },
+    {
+      "name": "executions",
+      "type": "Utf8"
+    },
+    {
+      "name": "failedreason",
+      "type": "Utf8"
+    },
+    {
+      "name": "failuretype",
+      "type": "Utf8"
+    },
+    {
+      "name": "finalstepid",
+      "type": "Utf8"
+    },
+    {
+      "name": "headers_category",
+      "type": "Utf8"
+    },
+    {
+      "name": "headers_customerid",
+      "type": "Utf8"
+    },
+    {
+      "name": "headers_customername",
+      "type": "Utf8"
+    },
+    {
+      "name": "headers_x_paragon_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "headers_x_request_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "inactiveworkers",
+      "type": "Int64"
+    },
+    {
+      "name": "index",
+      "type": "Int64"
+    },
+    {
+      "name": "input_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "input_userid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_attemptsmade",
+      "type": "Int64"
+    },
+    {
+      "name": "job_data_action",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_activeinstanceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_activestepid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_connectcredentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_credentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_enduserid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_integrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_intent",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_operationtype",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_ownerid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_providerid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_queuedtime",
+      "type": "Int64"
+    },
+    {
+      "name": "job_data_starttime",
+      "type": "Int64"
+    },
+    {
+      "name": "job_data_testing",
+      "type": "Boolean"
+    },
+    {
+      "name": "job_data_type",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_workflowid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_workflowmigrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_data_workflowversion",
+      "type": "Int64"
+    },
+    {
+      "name": "job_delay",
+      "type": "Int64"
+    },
+    {
+      "name": "job_failedreason",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_finishedon",
+      "type": "Int64"
+    },
+    {
+      "name": "job_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_opts_attempts",
+      "type": "Int64"
+    },
+    {
+      "name": "job_opts_backoff",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_opts_delay",
+      "type": "Int64"
+    },
+    {
+      "name": "job_opts_jobid",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_opts_pause",
+      "type": "Boolean"
+    },
+    {
+      "name": "job_opts_priority",
+      "type": "Int64"
+    },
+    {
+      "name": "job_opts_pushtofanoutstack",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_opts_queuesamestep",
+      "type": "Boolean"
+    },
+    {
+      "name": "job_opts_removeoncomplete",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_opts_timeout",
+      "type": "Int64"
+    },
+    {
+      "name": "job_opts_timestamp",
+      "type": "Int64"
+    },
+    {
+      "name": "job_processedon",
+      "type": "Int64"
+    },
+    {
+      "name": "job_stacktrace",
+      "type": "Utf8"
+    },
+    {
+      "name": "job_timestamp",
+      "type": "Int64"
+    },
+    {
+      "name": "kubernetes_host",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_expected",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_isintegrationerror",
+      "type": "Boolean"
+    },
+    {
+      "name": "meta_meta_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_meta_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_method",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_param",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_response_category",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_response_correlationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_response_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_response_status",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_source",
+      "type": "Utf8"
+    },
+    {
+      "name": "meta_statuscode",
+      "type": "Int64"
+    },
+    {
+      "name": "meta_traceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "mime",
+      "type": "Utf8"
+    },
+    {
+      "name": "missing",
+      "type": "Utf8"
+    },
+    {
+      "name": "msg_sql",
+      "type": "Utf8"
+    },
+    {
+      "name": "next",
+      "type": "Utf8"
+    },
+    {
+      "name": "number",
+      "type": "Int64"
+    },
+    {
+      "name": "numberofdestinations",
+      "type": "Int64"
+    },
+    {
+      "name": "numdeployedworkflows",
+      "type": "Int64"
+    },
+    {
+      "name": "numofconsumerjobsinqueue",
+      "type": "Int64"
+    },
+    {
+      "name": "numofrepeatablejobs",
+      "type": "Int64"
+    },
+    {
+      "name": "numworkersoncurrenthost",
+      "type": "Int64"
+    },
+    {
+      "name": "oldcheckpoint_type",
+      "type": "Utf8"
+    },
+    {
+      "name": "oldcheckpoint_value",
+      "type": "Utf8"
+    },
+    {
+      "name": "opts_delay",
+      "type": "Int64"
+    },
+    {
+      "name": "opts_jobid",
+      "type": "Utf8"
+    },
+    {
+      "name": "opts_movetodedicatedqueue",
+      "type": "Boolean"
+    },
+    {
+      "name": "opts_pause",
+      "type": "Boolean"
+    },
+    {
+      "name": "opts_priority",
+      "type": "Int64"
+    },
+    {
+      "name": "opts_pushtofanoutstack_instanceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "opts_pushtofanoutstack_stepid",
+      "type": "Utf8"
+    },
+    {
+      "name": "opts_queuesamestep",
+      "type": "Boolean"
+    },
+    {
+      "name": "opts_removeoncomplete_age",
+      "type": "Int64"
+    },
+    {
+      "name": "opts_timeout",
+      "type": "Int64"
+    },
+    {
+      "name": "opts_timestamp",
+      "type": "Int64"
+    },
+    {
+      "name": "output_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "owner_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "pipeline",
+      "type": "Utf8"
+    },
+    {
+      "name": "port",
+      "type": "Int64"
+    },
+    {
+      "name": "query_end",
+      "type": "Utf8"
+    },
+    {
+      "name": "query_enduserid",
+      "type": "Utf8"
+    },
+    {
+      "name": "query_integrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "query_istest",
+      "type": "Boolean"
+    },
+    {
+      "name": "query_limit",
+      "type": "Int64"
+    },
+    {
+      "name": "query_page",
+      "type": "Int64"
+    },
+    {
+      "name": "query_sort",
+      "type": "Utf8"
+    },
+    {
+      "name": "query_start",
+      "type": "Utf8"
+    },
+    {
+      "name": "recordid",
+      "type": "Utf8"
+    },
+    {
+      "name": "remotecached",
+      "type": "Boolean"
+    },
+    {
+      "name": "replay",
+      "type": "Boolean"
+    },
+    {
+      "name": "request_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "requestname",
+      "type": "Utf8"
+    },
+    {
+      "name": "required",
+      "type": "Utf8"
+    },
+    {
+      "name": "resolved",
+      "type": "Utf8"
+    },
+    {
+      "name": "response_status",
+      "type": "Int64"
+    },
+    {
+      "name": "response_statuscode",
+      "type": "Int64"
+    },
+    {
+      "name": "response_suberror",
+      "type": "Utf8"
+    },
+    {
+      "name": "response_timestamp",
+      "type": "Utf8"
+    },
+    {
+      "name": "response_trace_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "result_error",
+      "type": "Utf8"
+    },
+    {
+      "name": "result_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "result_status",
+      "type": "Int64"
+    },
+    {
+      "name": "resultlength",
+      "type": "Int64"
+    },
+    {
+      "name": "results",
+      "type": "Utf8"
+    },
+    {
+      "name": "retentiondays",
+      "type": "Int64"
+    },
+    {
+      "name": "retriedon",
+      "type": "Int64"
+    },
+    {
+      "name": "retrycount",
+      "type": "Int64"
+    },
+    {
+      "name": "role",
+      "type": "Utf8"
+    },
+    {
+      "name": "scheme",
+      "type": "Utf8"
+    },
+    {
+      "name": "securitygroupid",
+      "type": "Utf8"
+    },
+    {
+      "name": "server_hostname",
+      "type": "Utf8"
+    },
+    {
+      "name": "server_pid",
+      "type": "Int64"
+    },
+    {
+      "name": "size",
+      "type": "Int64"
+    },
+    {
+      "name": "source",
+      "type": "Utf8"
+    },
+    {
+      "name": "source_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "source_remotecached",
+      "type": "Boolean"
+    },
+    {
+      "name": "source_start",
+      "type": "Int64"
+    },
+    {
+      "name": "source_stepid",
+      "type": "Utf8"
+    },
+    {
+      "name": "source_steptype",
+      "type": "Utf8"
+    },
+    {
+      "name": "source_type",
+      "type": "Utf8"
+    },
+    {
+      "name": "source_version",
+      "type": "Utf8"
+    },
+    {
+      "name": "sourceprojectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "subscriptions",
+      "type": "Utf8"
+    },
+    {
+      "name": "subscriptionstatus",
+      "type": "Utf8"
+    },
+    {
+      "name": "subscriptiontype",
+      "type": "Utf8"
+    },
+    {
+      "name": "targets",
+      "type": "Utf8"
+    },
+    {
+      "name": "test",
+      "type": "Utf8"
+    },
+    {
+      "name": "testing",
+      "type": "Boolean"
+    },
+    {
+      "name": "throttlingkey",
+      "type": "Utf8"
+    },
+    {
+      "name": "time",
+      "type": "Utf8"
+    },
+    {
+      "name": "time_minutes",
+      "type": "Int64"
+    },
+    {
+      "name": "time_timezone",
+      "type": "Utf8"
+    },
+    {
+      "name": "traffic",
+      "type": "Utf8"
+    },
+    {
+      "name": "ts",
+      "type": "Utf8"
+    },
+    {
+      "name": "updatedcheckpoint_type",
+      "type": "Utf8"
+    },
+    {
+      "name": "updatedcheckpoint_value",
+      "type": "Utf8"
+    },
+    {
+      "name": "updatetype",
+      "type": "Utf8"
+    },
+    {
+      "name": "url",
+      "type": "Utf8"
+    },
+    {
+      "name": "wal_dir",
+      "type": "Utf8"
+    },
+    {
+      "name": "wal_dir_dedicated",
+      "type": "Utf8"
+    },
+    {
+      "name": "weekday",
+      "type": "Utf8"
+    },
+    {
+      "name": "worker_count",
+      "type": "Int64"
+    },
+    {
+      "name": "workers",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_connectintegration_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_connectintegration_isactive",
+      "type": "Boolean"
+    },
+    {
+      "name": "workflow_connectintegration_projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_connectintegration_type",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_description",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_integrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_steps",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_teamid",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflow_workflowversion",
+      "type": "Int64"
+    },
+    {
+      "name": "workflowexecutionstarttime",
+      "type": "Int64"
+    },
+    {
+      "name": "workflowexecutiontime",
+      "type": "Utf8"
+    },
+    {
+      "name": "workflowmigrations",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_code",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_httpstatus",
+      "type": "Int64"
+    },
+    {
+      "name": "wrappederror_logoninitialization",
+      "type": "Boolean"
+    },
+    {
+      "name": "wrappederror_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_meta_action",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_meta_apierror",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_meta_baseid",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_meta_connectcredentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_meta_credentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_meta_info",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_meta_integrationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_meta_isconnect",
+      "type": "Boolean"
+    },
+    {
+      "name": "wrappederror_meta_personaid",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_meta_projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_name",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_response_code",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_response_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_response_meta",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_response_status",
+      "type": "Utf8"
+    },
+    {
+      "name": "wrappederror_status",
+      "type": "Int64"
+    },
+    {
+      "name": "wrappederror_traceid",
+      "type": "Utf8"
+    },
+    {
+      "name": "checkpoint_type",
+      "type": "Utf8"
+    },
+    {
+      "name": "checkpoint_value",
+      "type": "Utf8"
+    },
+    {
+      "name": "cluster_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "correlationid",
+      "type": "Int64"
+    },
+    {
+      "name": "data_accountusage_canexecutetasks",
+      "type": "Boolean"
+    },
+    {
+      "name": "data_accountusage_concurrency",
+      "type": "Int64"
+    },
+    {
+      "name": "data_accountusage_graceperiodminutes",
+      "type": "Int64"
+    },
+    {
+      "name": "data_accountusage_integrationslimitcount",
+      "type": "Int64"
+    },
+    {
+      "name": "data_accountusage_period",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_accountusage_plan",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_accountusage_releasesconnectuserslimitcount",
+      "type": "Int64"
+    },
+    {
+      "name": "data_accountusage_status",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_accountusage_subscriptionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_accountusage_tasksexecutedcount",
+      "type": "Int64"
+    },
+    {
+      "name": "data_accountusage_taskslimitcount",
+      "type": "Int64"
+    },
+    {
+      "name": "data_action",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_code",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_connectcredentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_correlation_id",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_correlationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_credentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_enduserid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_code",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_codes",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_description",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_message",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_error_uri",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_connectcredentialid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_errormessage",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_organizationid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_projectid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_property",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_requestid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_subscriptionid",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_subscriptiontype",
+      "type": "Utf8"
+    },
+    {
+      "name": "data_meta_workflowid",
+      "type": "Utf8"
+    }
+  ]
+}

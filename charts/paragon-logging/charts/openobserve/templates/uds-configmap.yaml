@@ -1,0 +1,13 @@
+{{- if .Values.uds.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openobserve.fullname" . }}-uds
+  labels:
+    {{- include "openobserve.labels" . | nindent 4 }}
+data:
+  openobserve-uds-schema.json: |
+{{ .Files.Get "openobserve-uds-schema.json" | indent 4 }}
+  apply-uds.sh: |
+{{ .Files.Get "apply-uds.sh" | indent 4 }}
+{{- end }}
