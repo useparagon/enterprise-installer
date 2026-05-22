@@ -1,55 +1,94 @@
 #!/bin/sh
-# Apply OpenObserve user-defined schema for the paragon logs stream (idempotent).
-# PARA-20444 — POSIX sh (Alpine /bin/sh); no bash-isms.
+# OpenObserve UDS apply hook (PARA-20444) — POSIX sh for Alpine /bin/sh.
+#
+# When to run: Helm post-install / post-upgrade on paragon-logging (OpenObserve must be up).
+#
+# Process:
+#   1. Load the desired field list from openobserve-uds-schema.json (chart files/).
+#   2. GET the live "paragon" logs stream schema from OpenObserve.
+#   3. If settings.defined_schema_fields already matches desired names, skip PUT (idempotent).
+#   4. Otherwise build a PUT body:
+#        - add: every desired field name + field definitions
+#        - remove: names/types present on the server but not in the desired list
+#   5. PUT stream settings, then GET again and fail unless counts match the JSON.
+#
+# All progress is written to stdout for hook Job logs (kubectl logs / cluster events).
 set -eu
 
+LOG_PREFIX="[openobserve-uds]"
 DESIRED_SCHEMA="${DESIRED_SCHEMA:-/uds/openobserve-uds-schema.json}"
 O2_HOST="${O2_HOST:-http://openobserve:5080}"
 O2_USER="${O2_USER:-${ZO_ROOT_USER_EMAIL:-}}"
 O2_PASS="${O2_PASS:-${ZO_ROOT_USER_PASSWORD:-}}"
 HEALTH_WAIT_SECONDS="${HEALTH_WAIT_SECONDS:-120}"
 
-if [ -z "$O2_USER" ] || [ -z "$O2_PASS" ]; then
-  echo "error: O2_USER/O2_PASS (or ZO_ROOT_USER_EMAIL/ZO_ROOT_USER_PASSWORD) required" >&2
+log() {
+  echo "${LOG_PREFIX} $*"
+}
+
+die() {
+  echo "${LOG_PREFIX} error: $*" >&2
   exit 1
+}
+
+if [ -z "$O2_USER" ] || [ -z "$O2_PASS" ]; then
+  die "O2_USER/O2_PASS (or ZO_ROOT_USER_EMAIL/ZO_ROOT_USER_PASSWORD) required"
 fi
 
 if [ ! -f "$DESIRED_SCHEMA" ]; then
-  echo "error: desired schema not found: $DESIRED_SCHEMA" >&2
-  exit 1
+  die "desired schema not found: ${DESIRED_SCHEMA}"
 fi
 
 O2_HOST="${O2_HOST%/}"
+
+expected_count="$(jq '.schema | length' "$DESIRED_SCHEMA")"
+log "starting UDS apply for stream paragon (desired fields: ${expected_count})"
+log "openobserve endpoint: ${O2_HOST}"
 
 auth_curl() {
   curl -sf -u "$O2_USER:$O2_PASS" "$@"
 }
 
-echo "Waiting for OpenObserve at ${O2_HOST}/healthz (max ${HEALTH_WAIT_SECONDS}s)..."
+schema_matches_desired() {
+  echo "$1" | jq -e --slurpfile d "$DESIRED_SCHEMA" '
+    (.settings.defined_schema_fields // []) as $cur |
+    [$d[0].schema[].name] as $want |
+    (($want | length) == ($cur | length)) and
+    ($want | all(. as $n | $cur | index($n) != null))
+  ' >/dev/null
+}
+
+print_schema_counts() {
+  _label="$1"
+  _json="$2"
+  _defined="$(echo "$_json" | jq '(.settings.defined_schema_fields // []) | length')"
+  _uds="$(echo "$_json" | jq '(.uds_schema // []) | length')"
+  log "${_label}: defined_schema_fields=${_defined}, uds_schema=${_uds} (expected ${expected_count})"
+}
+
+log "waiting for ${O2_HOST}/healthz (max ${HEALTH_WAIT_SECONDS}s)..."
 elapsed=0
 until auth_curl "${O2_HOST}/healthz" >/dev/null 2>&1; do
   if [ "$elapsed" -ge "$HEALTH_WAIT_SECONDS" ]; then
-    echo "error: OpenObserve not ready after ${HEALTH_WAIT_SECONDS}s" >&2
-    exit 1
+    die "OpenObserve not ready after ${HEALTH_WAIT_SECONDS}s"
   fi
   sleep 2
   elapsed=$((elapsed + 2))
 done
+log "openobserve is healthy"
 
-echo "Fetching current schema"
+log "fetching current schema"
 current="$(auth_curl "${O2_HOST}/api/default/streams/paragon/schema?type=logs")"
+print_schema_counts "before apply" "$current"
 
-if echo "$current" | jq -e --slurpfile d "$DESIRED_SCHEMA" '
-  (.settings.defined_schema_fields // []) as $cur |
-  [$d[0].schema[].name] as $want |
-  (($want | length) == ($cur | length)) and
-  ($want | all(. as $n | $cur | index($n) != null))
-' >/dev/null; then
-  echo "UDS already applied; skipping PUT"
+if schema_matches_desired "$current"; then
+  log "UDS already matches desired schema; skipping PUT"
+  log "done (no changes)"
   exit 0
 fi
 
-echo "Building UDS payload"
+log "schema drift detected; building PUT payload"
+# jq: compute add/remove vs desired list (same semantics as o2-apply-uds.ts).
 payload="$(echo "$current" | jq -c --slurpfile d "$DESIRED_SCHEMA" '
   . as $current |
   $d[0].schema as $desired |
@@ -68,15 +107,36 @@ payload="$(echo "$current" | jq -c --slurpfile d "$DESIRED_SCHEMA" '
   }
 ')"
 
-echo "Applying UDS schema"
+add_names="$(echo "$payload" | jq '.defined_schema_fields.add | length')"
+remove_names="$(echo "$payload" | jq '.defined_schema_fields.remove | length')"
+remove_fields="$(echo "$payload" | jq '.fields.remove | length')"
+log "PUT payload: add ${add_names} defined_schema_fields, remove ${remove_names} names, remove ${remove_fields} field objects"
+
+log "applying UDS via PUT ${O2_HOST}/api/default/streams/paragon/settings"
 auth_curl \
   -X PUT \
   -H "Content-Type: application/json" \
   -d "$payload" \
   "${O2_HOST}/api/default/streams/paragon/settings"
 
-echo "Verifying updated schema"
+log "verifying schema after PUT"
 updated="$(auth_curl "${O2_HOST}/api/default/streams/paragon/schema?type=logs")"
-uds_count="$(echo "$updated" | jq '(.uds_schema // []) | length')"
+print_schema_counts "after apply" "$updated"
+
 defined_count="$(echo "$updated" | jq '(.settings.defined_schema_fields // []) | length')"
-echo "UDS applied: ${uds_count} uds_schema fields, ${defined_count} defined_schema_fields"
+uds_count="$(echo "$updated" | jq '(.uds_schema // []) | length')"
+
+if [ "$defined_count" -ne "$expected_count" ]; then
+  die "post-PUT defined_schema_fields count ${defined_count} != expected ${expected_count}"
+fi
+
+if [ "$uds_count" -ne "$expected_count" ]; then
+  die "post-PUT uds_schema count ${uds_count} != expected ${expected_count}"
+fi
+
+if ! schema_matches_desired "$updated"; then
+  die "post-PUT schema field names do not match desired list"
+fi
+
+log "UDS apply succeeded: ${defined_count} defined_schema_fields, ${uds_count} uds_schema fields"
+log "done"
