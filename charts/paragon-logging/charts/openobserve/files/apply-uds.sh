@@ -1,6 +1,6 @@
 #!/bin/sh
 # Apply OpenObserve user-defined schema for the paragon logs stream (idempotent).
-# PARA-20444 — same semantics as o2-apply-uds.ts (GET, compare, single PUT).
+# PARA-20444 — POSIX sh (Alpine /bin/sh); no bash-isms.
 set -eu
 
 DESIRED_SCHEMA="${DESIRED_SCHEMA:-/uds/openobserve-uds-schema.json}"
@@ -19,7 +19,6 @@ if [ ! -f "$DESIRED_SCHEMA" ]; then
   exit 1
 fi
 
-# Strip trailing slash from O2_HOST
 O2_HOST="${O2_HOST%/}"
 
 auth_curl() {
@@ -40,18 +39,18 @@ done
 echo "Fetching current schema"
 current="$(auth_curl "${O2_HOST}/api/default/streams/paragon/schema?type=logs")"
 
-if jq -e --slurpfile d "$DESIRED_SCHEMA" '
+if echo "$current" | jq -e --slurpfile d "$DESIRED_SCHEMA" '
   (.settings.defined_schema_fields // []) as $cur |
   [$d[0].schema[].name] as $want |
   (($want | length) == ($cur | length)) and
   ($want | all(. as $n | $cur | index($n) != null))
-' <<<"$current" >/dev/null; then
+' >/dev/null; then
   echo "UDS already applied; skipping PUT"
   exit 0
 fi
 
 echo "Building UDS payload"
-payload="$(jq -c --slurpfile d "$DESIRED_SCHEMA" '
+payload="$(echo "$current" | jq -c --slurpfile d "$DESIRED_SCHEMA" '
   . as $current |
   $d[0].schema as $desired |
   ($desired | map(.name)) as $add_names |
@@ -67,7 +66,7 @@ payload="$(jq -c --slurpfile d "$DESIRED_SCHEMA" '
       remove: $remove_fields
     }
   }
-' <<<"$current")"
+')"
 
 echo "Applying UDS schema"
 auth_curl \
@@ -78,6 +77,6 @@ auth_curl \
 
 echo "Verifying updated schema"
 updated="$(auth_curl "${O2_HOST}/api/default/streams/paragon/schema?type=logs")"
-uds_count="$(jq '(.uds_schema // []) | length' <<<"$updated")"
-defined_count="$(jq '(.settings.defined_schema_fields // []) | length' <<<"$updated")"
+uds_count="$(echo "$updated" | jq '(.uds_schema // []) | length')"
+defined_count="$(echo "$updated" | jq '(.settings.defined_schema_fields // []) | length')"
 echo "UDS applied: ${uds_count} uds_schema fields, ${defined_count} defined_schema_fields"
