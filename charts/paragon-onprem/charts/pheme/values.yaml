@@ -77,7 +77,7 @@ ingress:
 
 probes:
   liveness:
-    failureThreshold: 18
+    failureThreshold: 12
 
 nodeSelector: {}
 
