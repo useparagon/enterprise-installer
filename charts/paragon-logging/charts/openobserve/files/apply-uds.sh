@@ -16,10 +16,8 @@
 set -eu
 
 LOG_PREFIX="[openobserve-uds]"
-DESIRED_SCHEMA="${DESIRED_SCHEMA:-/uds/openobserve-uds-schema.json}"
+DESIRED_SCHEMA_FILE="${DESIRED_SCHEMA_FILE:-/uds/openobserve-uds-schema.json}"
 O2_HOST="${O2_HOST:-http://openobserve:5080}"
-O2_USER="${O2_USER:-${ZO_ROOT_USER_EMAIL:-}}"
-O2_PASS="${O2_PASS:-${ZO_ROOT_USER_PASSWORD:-}}"
 HEALTH_WAIT_SECONDS="${HEALTH_WAIT_SECONDS:-120}"
 
 log() {
@@ -31,26 +29,26 @@ die() {
   exit 1
 }
 
-if [ -z "$O2_USER" ] || [ -z "$O2_PASS" ]; then
-  die "O2_USER/O2_PASS (or ZO_ROOT_USER_EMAIL/ZO_ROOT_USER_PASSWORD) required"
+if [ -z "$ZO_ROOT_USER_EMAIL" ] || [ -z "$ZO_ROOT_USER_PASSWORD" ]; then
+  die "ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD required"
 fi
 
-if [ ! -f "$DESIRED_SCHEMA" ]; then
-  die "desired schema not found: ${DESIRED_SCHEMA}"
+if [ ! -f "$DESIRED_SCHEMA_FILE" ]; then
+  die "desired schema not found: ${DESIRED_SCHEMA_FILE}"
 fi
 
 O2_HOST="${O2_HOST%/}"
 
-expected_count="$(jq '.schema | length' "$DESIRED_SCHEMA")"
+expected_count="$(jq '.schema | length' "$DESIRED_SCHEMA_FILE")"
 log "starting UDS apply for stream paragon (desired fields: ${expected_count})"
 log "openobserve endpoint: ${O2_HOST}"
 
 auth_curl() {
-  curl -sf -u "$O2_USER:$O2_PASS" "$@"
+  curl -sf -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" "$@"
 }
 
 schema_matches_desired() {
-  echo "$1" | jq -e --slurpfile d "$DESIRED_SCHEMA" '
+  echo "$1" | jq -e --slurpfile d "$DESIRED_SCHEMA_FILE" '
     (.settings.defined_schema_fields // []) as $cur |
     [$d[0].schema[].name] as $want |
     (($want | length) == ($cur | length)) and
@@ -89,7 +87,7 @@ fi
 
 log "schema drift detected; building PUT payload"
 # jq: compute add/remove vs desired list (same semantics as o2-apply-uds.ts).
-payload="$(echo "$current" | jq -c --slurpfile d "$DESIRED_SCHEMA" '
+payload="$(echo "$current" | jq -c --slurpfile d "$DESIRED_SCHEMA_FILE" '
   . as $current |
   $d[0].schema as $desired |
   ($desired | map(.name)) as $add_names |

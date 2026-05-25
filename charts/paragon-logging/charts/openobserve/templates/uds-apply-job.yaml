@@ -32,7 +32,7 @@ spec:
           env:
             - name: O2_HOST
               value: "http://{{ include "openobserve.fullname" . }}:{{ .Values.service.port }}"
-            - name: DESIRED_SCHEMA
+            - name: DESIRED_SCHEMA_FILE
               value: /uds/openobserve-uds-schema.json
             - name: HEALTH_WAIT_SECONDS
               value: {{ .Values.uds.healthWaitSeconds | quote }}
