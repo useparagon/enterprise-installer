@@ -1,0 +1,65 @@
+{{- if .Values.uds.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "openobserve.fullname" . }}-uds-apply
+  labels:
+    {{- include "openobserve.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.uds.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.uds.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "openobserve.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: uds-apply
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: uds-apply
+          image: "{{ .Values.uds.image.repository }}:{{ .Values.uds.image.tag }}"
+          imagePullPolicy: {{ .Values.uds.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              apk add --no-cache curl jq >/dev/null
+              exec /bin/sh /uds/apply-uds.sh
+          env:
+            - name: O2_HOST
+              value: "http://{{ include "openobserve.fullname" . }}:{{ .Values.service.port }}"
+            - name: DESIRED_SCHEMA_FILE
+              value: /uds/openobserve-uds-schema.json
+            - name: HEALTH_WAIT_SECONDS
+              value: {{ .Values.uds.healthWaitSeconds | quote }}
+            - name: ZO_ROOT_USER_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if and .Values.secrets (kindIs "map" .Values.secrets) (hasKey .Values.secrets "ZO_ROOT_USER_EMAIL") }}{{ .Values.secretName }}-{{ .Chart.Name }}{{ else }}{{ .Values.secretName }}{{ end }}
+                  key: ZO_ROOT_USER_EMAIL
+            - name: ZO_ROOT_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if and .Values.secrets (kindIs "map" .Values.secrets) (hasKey .Values.secrets "ZO_ROOT_USER_PASSWORD") }}{{ .Values.secretName }}-{{ .Chart.Name }}{{ else }}{{ .Values.secretName }}{{ end }}
+                  key: ZO_ROOT_USER_PASSWORD
+          volumeMounts:
+            - name: uds-files
+              mountPath: /uds
+              readOnly: true
+          resources:
+            {{- toYaml .Values.uds.resources | nindent 12 }}
+      volumes:
+        - name: uds-files
+          configMap:
+            name: {{ include "openobserve.fullname" . }}-uds
+            defaultMode: 0555
+            items:
+              - key: openobserve-uds-schema.json
+                path: openobserve-uds-schema.json
+              - key: apply-uds.sh
+                path: apply-uds.sh
+{{- end }}

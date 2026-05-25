@@ -107,3 +107,22 @@ persistence:
   size: 5Gi
 
 secrets: {}
+
+# Post-install/upgrade hook to apply user-defined schema (PARA-20444).
+# Uses the same paragon-secrets credentials as the OpenObserve StatefulSet.
+uds:
+  enabled: true
+  image:
+    repository: alpine
+    tag: "3.20"
+    pullPolicy: IfNotPresent
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  healthWaitSeconds: 120
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
