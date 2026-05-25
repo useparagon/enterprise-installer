@@ -32,7 +32,7 @@ include "probes.httpGet" (dict "root" $root "type" "liveness")
 {{- $overrides := index (get $values "probes" | default dict) $type | default dict -}}
 {{- $cfg := mergeOverwrite (index $defaultsByType $type) $overrides -}}
 httpGet:
-  path: {{ $path }}
+  path: {{ $path | quote }}
   port: http
-{{- toYaml $cfg }}
-{{- end -}}
+{{ toYaml $cfg }}
+{{- end }}
