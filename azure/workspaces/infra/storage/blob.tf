@@ -27,10 +27,10 @@ resource "azurerm_storage_account" "blob" {
   resource_group_name = var.resource_group.name
   location            = var.resource_group.location
 
-  account_kind                    = "BlockBlobStorage"
+  account_kind                    = var.storage_account_tier == "Premium" ? "BlockBlobStorage" : "StorageV2"
   account_replication_type        = "LRS"
-  account_tier                    = "Premium"
-  allow_nested_items_to_be_public = true
+  account_tier                    = var.storage_account_tier
+  allow_nested_items_to_be_public = false
   tags                            = merge(var.tags, { Name = local.storage_account_name })
 }
 
@@ -54,8 +54,8 @@ resource "azurerm_storage_container" "app" {
 
 resource "azurerm_storage_container" "cdn" {
   name                  = "${var.workspace}-cdn"
-  container_access_type = "container"
-  storage_account_id    = azurerm_storage_account.cdn_public.id
+  container_access_type = "private"
+  storage_account_id    = azurerm_storage_account.blob.id
 }
 
 resource "azurerm_storage_container" "logs" {

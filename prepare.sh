@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # version of charts, must be semver and doesn't have to match Paragon appVersion
-version="2026.03.30"
+version="2026.05.18"
 
 # defaults
 provider="aws"
@@ -155,7 +155,7 @@ if [[ "$provider" != "k8s" ]]; then
             return
         fi
 
-        node "$script_dir/scripts/generate-tfvars.mjs" "$vars_file" "$out_file"
+        node "$script_dir/scripts/generate-tfvars.mjs" "$vars_file" "$out_file" "$provider"
     }
 
     generate_tfvars "$workspaces/infra/variables.tf" "$workspaces/infra/vars.auto.tfvars"
