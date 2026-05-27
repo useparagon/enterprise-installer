@@ -233,6 +233,12 @@ variable "hoop_enabled" {
   default     = true
 }
 
+variable "hoop_grafana_connection" {
+  description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
+  type        = bool
+  default     = false
+}
+
 variable "hoop_k8s_connections" {
   description = "Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created."
   type = map(object({

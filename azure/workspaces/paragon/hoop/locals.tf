@@ -133,6 +133,32 @@ locals {
         }
       }
     },
+    # grafana (private monitoring UI; not exposed when listed in private_services)
+    var.hoop_grafana_connection ? {
+      "grafana" = {
+        name    = "${local.connection_prefix}-grafana"
+        type    = "application"
+        subtype = "tcp"
+        command = ["bash"]
+        secrets = {
+          "envvar:HOST" = "grafana.paragon"
+          "envvar:PORT" = "4500"
+        }
+        access_mode_runbooks = "enabled"
+        access_mode_exec     = "enabled"
+        access_mode_connect  = "enabled"
+        access_schema        = "disabled"
+        tags = {
+          environment     = local.connection_environment
+          customer_facing = var.customer_facing
+          criticality     = "normal"
+          access-level    = "private"
+          impact          = "low"
+          service-type    = "monitoring"
+          cloud           = local.detected_cloud
+        }
+      }
+    } : {},
     # redis-insight
     try(var.infra_vars.redis.value, null) != null ? {
       "redis-insight" = {
