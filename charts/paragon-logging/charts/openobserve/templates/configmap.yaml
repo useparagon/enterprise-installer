@@ -1,9 +1,12 @@
+{{- if .Values.credsJson }}
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
   name: {{ include "openobserve.fullname" . }}-creds
   labels:
     {{- include "openobserve.labels" . | nindent 4 }}
-data:
+type: Opaque
+stringData:
   creds.json: |
     {{- .Values.credsJson | b64dec | nindent 4 }}
+{{- end }}

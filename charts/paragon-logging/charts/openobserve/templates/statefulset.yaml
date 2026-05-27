@@ -6,6 +6,13 @@ metadata:
   name: {{ include "openobserve.fullname" . }}
   labels:
     {{- include "openobserve.labels" . | nindent 4 }}
+{{- $podAnnotations := dict -}}
+{{- if and .Values.global (kindIs "map" .Values.global) (hasKey .Values.global "podAnnotations") (kindIs "map" .Values.global.podAnnotations) -}}
+{{- $podAnnotations = merge $podAnnotations .Values.global.podAnnotations -}}
+{{- end -}}
+{{- if .Values.podAnnotations -}}
+{{- $podAnnotations = merge $podAnnotations .Values.podAnnotations -}}
+{{- end -}}
 spec:
   serviceName: {{ include "openobserve.fullname" . }}
   replicas: {{ .Values.replicaCount | default 1 }}
@@ -14,9 +21,9 @@ spec:
       {{- include "openobserve.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- if .Values.podAnnotations }}
+      {{- if $podAnnotations }}
       annotations:
-        {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- toYaml $podAnnotations | nindent 8 }}
       {{- end }}
       labels:
         {{- include "openobserve.selectorLabels" . | nindent 8 }}
@@ -69,15 +76,23 @@ spec:
           ports:
             - containerPort: {{ .Values.service.port }}
               name: http
+          {{- if or .Values.credsJson .Values.credsSecretName }}
           volumeMounts:
           - name: openobserve-data
             mountPath: /data
           - name: openobserve-creds
             mountPath: /creds
+          {{- else }}
+          volumeMounts:
+          - name: openobserve-data
+            mountPath: /data
+          {{- end }}
+      {{- if or .Values.credsJson .Values.credsSecretName }}
       volumes:
         - name: openobserve-creds
-          configMap:
-            name: openobserve-creds
+          secret:
+            secretName: {{ .Values.credsSecretName | default (printf "%s-creds" (include "openobserve.fullname" .)) }}
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: openobserve-data

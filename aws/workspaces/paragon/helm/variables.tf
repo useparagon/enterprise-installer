@@ -18,6 +18,11 @@ variable "docker_registry_server" {
   type        = string
 }
 
+variable "docker_cfg_secret_name" {
+  description = "Secrets Manager secret name for docker credentials."
+  type        = string
+}
+
 variable "docker_username" {
   description = "Docker username to pull images."
   type        = string
@@ -30,6 +35,16 @@ variable "docker_password" {
 
 variable "docker_email" {
   description = "Docker email to pull images."
+  type        = string
+}
+
+variable "env_secret_name" {
+  description = "Secrets Manager secret name for shared Paragon application secrets."
+  type        = string
+}
+
+variable "eso_role_arn" {
+  description = "IAM role ARN used by the External Secrets Operator."
   type        = string
 }
 
@@ -135,6 +150,18 @@ variable "managed_sync_enabled" {
 variable "managed_sync_version" {
   description = "The version of the Managed Sync helm chart to install."
   type        = string
+}
+
+variable "managed_sync_secret_name" {
+  description = "Secrets Manager secret name for managed-sync secrets."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_secret_name" {
+  description = "Secrets Manager secret name for OpenObserve credentials."
+  type        = string
+  default     = null
 }
 
 locals {

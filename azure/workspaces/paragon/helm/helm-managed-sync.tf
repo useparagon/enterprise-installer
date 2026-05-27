@@ -20,6 +20,11 @@ resource "helm_release" "managed_sync" {
   ]
 
   set {
+    name  = "secretName"
+    value = "paragon-managed-sync-secrets"
+  }
+
+  set {
     name  = "ingress.host"
     value = replace(replace(var.microservices["api-sync"].public_url, "https://", ""), "http://", "")
   }
@@ -41,7 +46,8 @@ resource "helm_release" "managed_sync" {
 
   depends_on = [
     helm_release.ingress,
-    kubernetes_secret.docker_login,
-    kubernetes_secret.paragon_secrets
+    kubectl_manifest.external_secret_docker,
+    kubectl_manifest.external_secret_paragon,
+    kubectl_manifest.external_secret_managed_sync
   ]
 }

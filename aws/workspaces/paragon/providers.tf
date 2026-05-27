@@ -18,6 +18,10 @@ terraform {
       source  = "hoophq/hoop"
       version = ">= 0.0.19"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
