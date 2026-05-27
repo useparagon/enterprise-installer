@@ -140,7 +140,7 @@ variable "elasticache_multi_az" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.34"
+  default     = "1.35"
   nullable    = false
 }
 
