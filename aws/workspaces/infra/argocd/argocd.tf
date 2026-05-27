@@ -77,7 +77,7 @@ resource "aws_ssm_document" "argocd_bootstrap" {
             "",
             "sudo -u ubuntu -H bash -s <<'EOS'",
             "set -euo pipefail",
-            "export PATH=\"/usr/local/bin:/usr/bin:/bin:${PATH:-}\"",
+            "export PATH=\"/usr/local/bin:/usr/bin:/bin:$${PATH:-}\"",
             "",
             "aws eks update-kubeconfig --name '{{ clusterName }}' --region '{{ awsRegion }}'",
             "",
