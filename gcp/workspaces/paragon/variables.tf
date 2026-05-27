@@ -362,7 +362,7 @@ variable "infra_json" {
 }
 
 variable "cluster_name_override" {
-  description = "Optional override for the GKE cluster name when it does not follow the default `${workspace}-cluster` naming."
+  description = "Optional override for the GKE cluster name when it does not follow the default $${workspace}-cluster naming."
   type        = string
   default     = null
 }
