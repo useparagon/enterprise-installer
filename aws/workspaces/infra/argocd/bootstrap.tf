@@ -153,7 +153,9 @@ locals {
     ]) : yamldecode(m)
   ]
 
-  external_secret_manifests = { for idx, doc in local.external_secret_docs : "es-${idx}" => doc }
+  # ExternalSecret manifests only contain secret *names* (not values); mark
+  # nonsensitive so they are valid for for_each keys.
+  external_secret_manifests = nonsensitive({ for idx, doc in local.external_secret_docs : "es-${idx}" => doc })
 
   gitops_bridge_annotations = merge(
     {
