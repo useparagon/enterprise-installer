@@ -142,28 +142,7 @@ module "eks_blueprints_addons" {
 
   enable_argocd           = var.argocd_enabled
   enable_external_secrets = var.argocd_enabled
-  external_secrets = var.argocd_enabled ? merge(
-    {
-      name             = "external-secrets"
-      namespace        = local.gitops_eso_namespace
-      create_namespace = true
-      chart_version    = var.eso_chart_version
-      create_role      = false
-      wait             = true
-      wait_for_jobs    = true
-      timeout          = 600
-      values = [yamlencode({
-        installCRDs = true
-        serviceAccount = {
-          name = local.gitops_eso_sa_name
-          annotations = {
-            "eks.amazonaws.com/role-arn" = aws_iam_role.gitops_eso[0].arn
-          }
-        }
-      })]
-    },
-    var.eso_addon_overrides
-  ) : {}
+  external_secrets        = local.gitops_external_secrets
   argocd = merge(
     {
       name             = "argo-cd"

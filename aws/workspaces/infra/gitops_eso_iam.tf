@@ -4,6 +4,31 @@
 locals {
   gitops_eso_namespace = "external-secrets"
   gitops_eso_sa_name   = "external-secrets"
+
+  # Always the same object shape; enable_external_secrets gates whether Blueprints
+  # installs the chart (avoids inconsistent conditional types on external_secrets).
+  gitops_external_secrets = merge(
+    {
+      name             = "external-secrets"
+      namespace        = local.gitops_eso_namespace
+      create_namespace = true
+      chart_version    = var.eso_chart_version
+      create_role      = false
+      wait             = true
+      wait_for_jobs    = true
+      timeout          = 600
+      values = var.argocd_enabled ? [yamlencode({
+        installCRDs = true
+        serviceAccount = {
+          name = local.gitops_eso_sa_name
+          annotations = {
+            "eks.amazonaws.com/role-arn" = aws_iam_role.gitops_eso[0].arn
+          }
+        }
+      })] : []
+    },
+    var.eso_addon_overrides
+  )
 }
 
 data "aws_iam_policy_document" "gitops_eso_assume" {
