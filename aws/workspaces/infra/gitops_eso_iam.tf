@@ -14,13 +14,21 @@ locals {
       create_namespace = true
       chart_version    = var.eso_chart_version
       create_role      = false
+      skip_crds        = false
       wait             = true
       wait_for_jobs    = true
       timeout          = 600
       values = var.argocd_enabled ? [yamlencode({
         installCRDs = true
+        crds = {
+          createClusterSecretStore    = true
+          createClusterExternalSecret = true
+          createClusterGenerator      = true
+          createPushSecret            = true
+        }
         serviceAccount = {
-          name = local.gitops_eso_sa_name
+          create = false
+          name   = local.gitops_eso_sa_name
           annotations = {
             "eks.amazonaws.com/role-arn" = aws_iam_role.gitops_eso[0].arn
           }

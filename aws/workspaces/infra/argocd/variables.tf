@@ -46,8 +46,8 @@ variable "eso_role_arn" {
   type        = string
 }
 
-variable "eso_crd_wait_trigger" {
-  description = "Changes when the ESO Helm install changes; gates ClusterSecretStore until CRDs exist."
+variable "eso_crds_ready" {
+  description = "Set when Blueprints ESO Helm + CRD wait have completed (time_sleep id from parent module)."
   type        = string
 }
 

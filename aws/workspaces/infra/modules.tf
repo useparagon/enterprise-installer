@@ -215,9 +215,9 @@ module "argocd" {
   workspace         = local.workspace
   aws_region        = var.aws_region
 
-  argocd_release_name  = "argo-cd"
-  eso_role_arn         = aws_iam_role.gitops_eso[0].arn
-  eso_crd_wait_trigger = var.eso_chart_version
+  argocd_release_name = "argo-cd"
+  eso_role_arn        = aws_iam_role.gitops_eso[0].arn
+  eso_crds_ready      = time_sleep.gitops_eso_crds[0].id
 
   secrets_manager_secret_arns = local.argocd_secrets_ready ? module.secrets[0].secret_arns : []
 
@@ -237,5 +237,6 @@ module "argocd" {
   depends_on = [
     module.cluster,
     module.eks_blueprints_addons,
+    time_sleep.gitops_eso_crds,
   ]
 }

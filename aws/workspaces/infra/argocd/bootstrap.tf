@@ -198,14 +198,10 @@ resource "kubernetes_storage_class_v1" "gp3" {
   }
 }
 
-# ESO is installed by eks-blueprints-addons (enable_external_secrets). Wait briefly
-# after that Helm release so ClusterSecretStore / ExternalSecret CRDs are registered.
-resource "time_sleep" "eso_crds" {
-  create_duration = "45s"
-
-  triggers = {
-    eso_install = var.eso_crd_wait_trigger
-  }
+# ESO is installed by eks-blueprints-addons. Parent module time_sleep.gitops_eso_crds
+# waits for the Helm release and CRD registration before this module applies manifests.
+resource "terraform_data" "eso_crds_ready" {
+  input = var.eso_crds_ready
 }
 
 # GitOps bridge metadata (EKS Blueprints pattern): annotate the in-cluster
@@ -222,7 +218,7 @@ resource "kubernetes_annotations" "gitops_bridge" {
 
   annotations = local.gitops_bridge_annotations
 
-  depends_on = [time_sleep.eso_crds]
+  depends_on = [terraform_data.eso_crds_ready]
 }
 
 resource "kubernetes_labels" "gitops_bridge" {
@@ -241,7 +237,7 @@ resource "kubernetes_labels" "gitops_bridge" {
     "enable_argocd"    = "true"
   }
 
-  depends_on = [time_sleep.eso_crds]
+  depends_on = [terraform_data.eso_crds_ready]
 }
 
 resource "kubernetes_manifest" "cluster_secret_store" {
@@ -269,7 +265,7 @@ resource "kubernetes_manifest" "cluster_secret_store" {
     }
   }
 
-  depends_on = [time_sleep.eso_crds]
+  depends_on = [terraform_data.eso_crds_ready]
 }
 
 resource "kubernetes_manifest" "app_of_apps" {
