@@ -1,24 +1,28 @@
-# ESO IAM lives at the infra root so eks-blueprints-addons can install the operator
-# (with IRSA) before the argocd bootstrap module applies ClusterSecretStore manifests.
+# ESO is installed and IRSA-bound by eks-blueprints-addons (enable_external_secrets).
+# The addon creates the IAM role, policy (scoped to the ARNs below), service account,
+# and the IRSA annotation. We only supply scoped Secrets Manager ARNs and chart overrides.
 
 locals {
   gitops_eso_namespace = "external-secrets"
   gitops_eso_sa_name   = "external-secrets"
 
-  # Always the same object shape; enable_external_secrets gates whether Blueprints
-  # installs the chart (avoids inconsistent conditional types on external_secrets).
+  # Secrets the operator may read. Prefer the concrete secret ARNs; fall back to the
+  # per-workspace prefix wildcard when the secrets module has not created them yet.
+  gitops_eso_secret_arns = var.argocd_enabled && local.argocd_secrets_ready ? module.secrets[0].secret_arns : [
+    "arn:aws:secretsmanager:${var.aws_region}:*:secret:paragon/${local.workspace}/*",
+  ]
+
   gitops_external_secrets = merge(
     {
       name             = "external-secrets"
       namespace        = local.gitops_eso_namespace
       create_namespace = true
       chart_version    = var.eso_chart_version
-      create_role      = false
       skip_crds        = false
       wait             = true
       wait_for_jobs    = true
       timeout          = 600
-      values = var.argocd_enabled ? [yamlencode({
+      values = [yamlencode({
         installCRDs = true
         crds = {
           createClusterSecretStore    = true
@@ -26,74 +30,8 @@ locals {
           createClusterGenerator      = true
           createPushSecret            = true
         }
-        serviceAccount = {
-          create = false
-          name   = local.gitops_eso_sa_name
-          annotations = {
-            "eks.amazonaws.com/role-arn" = aws_iam_role.gitops_eso[0].arn
-          }
-        }
-      })] : []
+      })]
     },
     var.eso_addon_overrides
   )
-}
-
-data "aws_iam_policy_document" "gitops_eso_assume" {
-  count = var.argocd_enabled ? 1 : 0
-
-  statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-
-    principals {
-      type        = "Federated"
-      identifiers = [module.cluster.eks_cluster.oidc_provider_arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${replace(module.cluster.eks_cluster.cluster_oidc_issuer_url, "https://", "")}:sub"
-      values   = ["system:serviceaccount:${local.gitops_eso_namespace}:${local.gitops_eso_sa_name}"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${replace(module.cluster.eks_cluster.cluster_oidc_issuer_url, "https://", "")}:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "gitops_eso" {
-  count = var.argocd_enabled ? 1 : 0
-
-  name               = "${local.workspace}-eso"
-  assume_role_policy = data.aws_iam_policy_document.gitops_eso_assume[0].json
-
-  tags = {
-    Name = "${local.workspace}-eso"
-  }
-}
-
-data "aws_iam_policy_document" "gitops_eso_secrets" {
-  count = var.argocd_enabled ? 1 : 0
-
-  statement {
-    effect = "Allow"
-    actions = [
-      "secretsmanager:GetSecretValue",
-      "secretsmanager:DescribeSecret",
-      "secretsmanager:ListSecretVersionIds",
-    ]
-    resources = var.argocd_enabled && local.argocd_secrets_ready ? module.secrets[0].secret_arns : ["arn:aws:secretsmanager:${var.aws_region}:*:secret:paragon/${local.workspace}/*"]
-  }
-}
-
-resource "aws_iam_role_policy" "gitops_eso" {
-  count = var.argocd_enabled ? 1 : 0
-
-  name   = "eso-secrets-access"
-  role   = aws_iam_role.gitops_eso[0].id
-  policy = data.aws_iam_policy_document.gitops_eso_secrets[0].json
 }

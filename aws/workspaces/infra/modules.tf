@@ -140,9 +140,10 @@ module "eks_blueprints_addons" {
   oidc_provider_arn = module.cluster.eks_cluster.oidc_provider_arn
   observability_tag = null
 
-  enable_argocd           = var.argocd_enabled
-  enable_external_secrets = var.argocd_enabled
-  external_secrets        = local.gitops_external_secrets
+  enable_argocd                         = var.argocd_enabled
+  enable_external_secrets               = var.argocd_enabled
+  external_secrets                      = local.gitops_external_secrets
+  external_secrets_secrets_manager_arns = local.gitops_eso_secret_arns
   argocd = merge(
     {
       name             = "argo-cd"
@@ -174,10 +175,7 @@ module "eks_blueprints_addons" {
 
   tags = local.default_tags
 
-  depends_on = [
-    module.cluster,
-    aws_iam_role_policy.gitops_eso,
-  ]
+  depends_on = [module.cluster]
 }
 
 module "secrets" {
@@ -216,7 +214,7 @@ module "argocd" {
   aws_region        = var.aws_region
 
   argocd_release_name = "argo-cd"
-  eso_role_arn        = aws_iam_role.gitops_eso[0].arn
+  eso_role_arn        = try(module.eks_blueprints_addons.external_secrets.iam_role_arn, null)
   eso_crds_ready      = time_sleep.gitops_eso_crds[0].id
 
   secrets_manager_secret_arns = local.argocd_secrets_ready ? module.secrets[0].secret_arns : []

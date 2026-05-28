@@ -240,8 +240,11 @@ resource "kubernetes_labels" "gitops_bridge" {
   depends_on = [terraform_data.eso_crds_ready]
 }
 
-resource "kubernetes_manifest" "cluster_secret_store" {
-  manifest = {
+# Custom resources use kubectl_manifest (server-side apply, applied at apply-time) so the
+# plan does not require the CRDs to already exist on the cluster. The CRDs are installed by
+# eks-blueprints-addons earlier in the same apply; terraform_data.eso_crds_ready gates ordering.
+resource "kubectl_manifest" "cluster_secret_store" {
+  yaml_body = yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ClusterSecretStore"
     metadata = {
@@ -263,27 +266,53 @@ resource "kubernetes_manifest" "cluster_secret_store" {
         }
       }
     }
-  }
+  })
+
+  server_side_apply = true
+  wait              = true
 
   depends_on = [terraform_data.eso_crds_ready]
 }
 
-resource "kubernetes_manifest" "app_of_apps" {
+resource "kubectl_manifest" "app_of_apps" {
   count = local.app_of_apps_manifest != null ? 1 : 0
 
-  manifest = yamldecode(local.app_of_apps_manifest)
+  yaml_body = local.app_of_apps_manifest
+
+  server_side_apply = true
 
   depends_on = [
-    kubernetes_manifest.cluster_secret_store,
+    kubectl_manifest.cluster_secret_store,
     kubernetes_annotations.gitops_bridge,
     kubernetes_labels.gitops_bridge,
   ]
 }
 
-resource "kubernetes_manifest" "external_secrets" {
+# ExternalSecrets live in the destination namespace. Create it (server-side apply adopts an
+# existing namespace on brownfield clusters) so the CRs have a namespace to land in.
+resource "kubectl_manifest" "destination_namespace" {
+  count = length(local.external_secret_manifests) > 0 ? 1 : 0
+
+  yaml_body = yamlencode({
+    apiVersion = "v1"
+    kind       = "Namespace"
+    metadata = {
+      name = var.destination_namespace
+    }
+  })
+
+  server_side_apply = true
+}
+
+resource "kubectl_manifest" "external_secrets" {
   for_each = local.external_secret_manifests
 
-  manifest = each.value
+  yaml_body = yamlencode(each.value)
 
-  depends_on = [kubernetes_manifest.cluster_secret_store]
+  server_side_apply = true
+
+  depends_on = [
+    kubectl_manifest.cluster_secret_store,
+    kubectl_manifest.destination_namespace,
+  ]
 }
