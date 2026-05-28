@@ -127,6 +127,8 @@ variable "infra_vars" {
         db_number      = optional(number, 0)
         ssl            = optional(bool, false)
         ca_certificate = optional(string, null)
+        password       = optional(string)
+        user           = optional(string)
       })), {})
     }))
   })

@@ -60,7 +60,9 @@ locals {
             "envvar:DB_NUMBER" = tostring(try(instance_config.db_number, 0))
           },
           try(instance_config.ssl, false) == true ? { "envvar:REDIS_TLS" = "1" } : {},
-          try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {}
+          try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {},
+          try(instance_config.password, "") != "" ? { "envvar:PASS" = instance_config.password } : {},
+          try(instance_config.user, "") != "" ? { "envvar:USER" = instance_config.user } : {}
         )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"
