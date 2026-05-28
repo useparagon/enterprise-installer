@@ -83,7 +83,7 @@ output "argocd_namespace" {
 
 output "eso_role_arn" {
   description = "IAM role ARN used by the External Secrets Operator."
-  value       = var.argocd_enabled ? module.argocd[0].eso_role_arn : null
+  value       = var.argocd_enabled ? aws_iam_role.gitops_eso[0].arn : null
 }
 
 output "secrets_manager_env_secret" {

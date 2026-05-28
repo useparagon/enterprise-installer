@@ -407,6 +407,13 @@ variable "eso_chart_version" {
   nullable    = false
 }
 
+variable "eso_addon_overrides" {
+  description = "Optional overrides for the Blueprints external-secrets addon (merged into the default external_secrets map)."
+  type        = map(any)
+  default     = {}
+  nullable    = false
+}
+
 variable "argocd_auto_sync" {
   description = "Whether ArgoCD Applications should auto-sync on git/chart changes."
   type        = bool

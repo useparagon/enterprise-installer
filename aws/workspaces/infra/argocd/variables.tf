@@ -41,10 +41,14 @@ variable "argocd_release_name" {
   default     = "argo-cd"
 }
 
-variable "eso_chart_version" {
-  description = "Helm chart version for external-secrets."
+variable "eso_role_arn" {
+  description = "IAM role ARN for the External Secrets Operator service account (installed via Blueprints)."
   type        = string
-  default     = "0.14.4"
+}
+
+variable "eso_crd_wait_trigger" {
+  description = "Changes when the ESO Helm install changes; gates ClusterSecretStore until CRDs exist."
+  type        = string
 }
 
 variable "secrets_manager_secret_arns" {

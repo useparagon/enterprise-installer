@@ -198,31 +198,14 @@ resource "kubernetes_storage_class_v1" "gp3" {
   }
 }
 
-resource "helm_release" "external_secrets" {
-  name             = "external-secrets"
-  repository       = "https://charts.external-secrets.io"
-  chart            = "external-secrets"
-  version          = var.eso_chart_version
-  namespace        = local.eso_namespace
-  create_namespace = true
-  timeout          = 600
-  wait             = true
-  wait_for_jobs    = true
+# ESO is installed by eks-blueprints-addons (enable_external_secrets). Wait briefly
+# after that Helm release so ClusterSecretStore / ExternalSecret CRDs are registered.
+resource "time_sleep" "eso_crds" {
+  create_duration = "45s"
 
-  values = [
-    yamlencode({
-      serviceAccount = {
-        name = local.eso_sa_name
-        annotations = {
-          "eks.amazonaws.com/role-arn" = aws_iam_role.eso.arn
-        }
-      }
-    })
-  ]
-
-  depends_on = [
-    aws_iam_role_policy.eso_secrets,
-  ]
+  triggers = {
+    eso_install = var.eso_crd_wait_trigger
+  }
 }
 
 # GitOps bridge metadata (EKS Blueprints pattern): annotate the in-cluster
@@ -239,7 +222,7 @@ resource "kubernetes_annotations" "gitops_bridge" {
 
   annotations = local.gitops_bridge_annotations
 
-  depends_on = [helm_release.external_secrets]
+  depends_on = [time_sleep.eso_crds]
 }
 
 resource "kubernetes_labels" "gitops_bridge" {
@@ -258,7 +241,7 @@ resource "kubernetes_labels" "gitops_bridge" {
     "enable_argocd"    = "true"
   }
 
-  depends_on = [helm_release.external_secrets]
+  depends_on = [time_sleep.eso_crds]
 }
 
 resource "kubernetes_manifest" "cluster_secret_store" {
@@ -286,7 +269,7 @@ resource "kubernetes_manifest" "cluster_secret_store" {
     }
   }
 
-  depends_on = [helm_release.external_secrets]
+  depends_on = [time_sleep.eso_crds]
 }
 
 resource "kubernetes_manifest" "app_of_apps" {

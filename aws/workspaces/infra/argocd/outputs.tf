@@ -5,7 +5,7 @@ output "argocd_namespace" {
 
 output "eso_role_arn" {
   description = "IAM role ARN used by the External Secrets Operator."
-  value       = aws_iam_role.eso.arn
+  value       = var.eso_role_arn
 }
 
 output "cluster_autoscaler_role_arn" {

@@ -140,7 +140,30 @@ module "eks_blueprints_addons" {
   oidc_provider_arn = module.cluster.eks_cluster.oidc_provider_arn
   observability_tag = null
 
-  enable_argocd = var.argocd_enabled
+  enable_argocd           = var.argocd_enabled
+  enable_external_secrets = var.argocd_enabled
+  external_secrets = var.argocd_enabled ? merge(
+    {
+      name             = "external-secrets"
+      namespace        = local.gitops_eso_namespace
+      create_namespace = true
+      chart_version    = var.eso_chart_version
+      create_role      = false
+      wait             = true
+      wait_for_jobs    = true
+      timeout          = 600
+      values = [yamlencode({
+        installCRDs = true
+        serviceAccount = {
+          name = local.gitops_eso_sa_name
+          annotations = {
+            "eks.amazonaws.com/role-arn" = aws_iam_role.gitops_eso[0].arn
+          }
+        }
+      })]
+    },
+    var.eso_addon_overrides
+  ) : {}
   argocd = merge(
     {
       name             = "argo-cd"
@@ -172,7 +195,10 @@ module "eks_blueprints_addons" {
 
   tags = local.default_tags
 
-  depends_on = [module.cluster]
+  depends_on = [
+    module.cluster,
+    aws_iam_role_policy.gitops_eso,
+  ]
 }
 
 module "secrets" {
@@ -210,8 +236,9 @@ module "argocd" {
   workspace         = local.workspace
   aws_region        = var.aws_region
 
-  eso_chart_version   = var.eso_chart_version
-  argocd_release_name = "argo-cd"
+  argocd_release_name  = "argo-cd"
+  eso_role_arn         = aws_iam_role.gitops_eso[0].arn
+  eso_crd_wait_trigger = var.eso_chart_version
 
   secrets_manager_secret_arns = local.argocd_secrets_ready ? module.secrets[0].secret_arns : []
 
