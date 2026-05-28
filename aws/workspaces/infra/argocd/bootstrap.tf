@@ -83,9 +83,31 @@ resource "helm_release" "argocd" {
           "server.insecure" = true
         }
       }
+      crds = {
+        install = true
+        keep    = true
+      }
     })
   ]
 
+}
+
+# Helm wait does not block until CRDs are Established; kubernetes_manifest needs the GVK.
+resource "time_sleep" "wait_for_argocd_crds" {
+  create_duration = "45s"
+
+  depends_on = [helm_release.argocd]
+}
+
+data "kubernetes_resource" "argocd_applications_crd" {
+  api_version = "apiextensions.k8s.io/v1"
+  kind        = "CustomResourceDefinition"
+
+  metadata {
+    name = "applications.argoproj.io"
+  }
+
+  depends_on = [time_sleep.wait_for_argocd_crds]
 }
 
 resource "helm_release" "external_secrets" {
@@ -185,7 +207,7 @@ resource "kubernetes_manifest" "argocd_applications" {
   manifest = each.value
 
   depends_on = [
-    helm_release.argocd,
+    data.kubernetes_resource.argocd_applications_crd,
     kubernetes_manifest.cluster_secret_store,
   ]
 }
