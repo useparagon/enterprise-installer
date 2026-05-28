@@ -1,6 +1,7 @@
 locals {
   eso_namespace = "external-secrets"
-  eso_sa_name   = "external-secrets"
+  # eks-blueprints-addons names the IRSA service account "{release-name}-sa".
+  eso_sa_name = "external-secrets-sa"
 
   sync_policy = {
     automated = var.auto_sync ? {
