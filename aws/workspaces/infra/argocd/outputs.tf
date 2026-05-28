@@ -18,7 +18,12 @@ output "cluster_secret_store_name" {
   value       = "aws-secrets-manager"
 }
 
-output "ssm_document_name" {
-  description = "Name of the SSM document used for bootstrap."
-  value       = aws_ssm_document.argocd_bootstrap.name
+output "argocd_helm_release" {
+  description = "Name of the Helm release that installs Argo CD."
+  value       = helm_release.argocd.name
+}
+
+output "gitops_bridge_secret_name" {
+  description = "ArgoCD in-cluster secret annotated with GitOps bridge metadata (EKS Blueprints pattern)."
+  value       = "${helm_release.argocd.name}-cluster"
 }

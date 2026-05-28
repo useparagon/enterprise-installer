@@ -164,17 +164,17 @@ module "argocd" {
   oidc_issuer_url   = module.cluster.eks_cluster.cluster_oidc_issuer_url
   workspace         = local.workspace
   aws_region        = var.aws_region
-  bastion_asg_name  = module.bastion.bastion_name
 
-  argocd_version    = var.argocd_version
-  eso_chart_version = var.eso_chart_version
-  slack_token       = var.argocd_slack_token
-  slack_channel     = var.argocd_slack_channel
+  argocd_version            = var.argocd_version
+  argocd_helm_chart_version = var.argocd_helm_chart_version
+  eso_chart_version         = var.eso_chart_version
+  slack_token               = var.argocd_slack_token
+  slack_channel             = var.argocd_slack_channel
 
   secrets_manager_secret_arns  = local.argocd_secrets_ready ? module.secrets[0].secret_arns : []
   argocd_application_manifests = local.argocd_secrets_ready ? module.argocd_apps[0].all_manifests : []
 
-  depends_on = [module.cluster, module.bastion]
+  depends_on = [module.cluster]
 }
 
 module "argocd_apps" {

@@ -23,11 +23,6 @@ variable "aws_region" {
   type        = string
 }
 
-variable "bastion_asg_name" {
-  description = "Name of the bastion Auto Scaling Group (used for SSM tag-based targeting)."
-  type        = string
-}
-
 variable "argocd_namespace" {
   description = "Namespace to install ArgoCD into."
   type        = string
@@ -35,9 +30,15 @@ variable "argocd_namespace" {
 }
 
 variable "argocd_version" {
-  description = "ArgoCD release version (e.g. v2.14.11). Used to download the install manifest."
+  description = "Argo CD container image tag (e.g. v3.4.3). Applied via the official argo-cd Helm chart."
   type        = string
   default     = "v2.14.11"
+}
+
+variable "argocd_helm_chart_version" {
+  description = "Version of the argo-cd Helm chart from https://argoproj.github.io/argo-helm."
+  type        = string
+  default     = "9.5.15"
 }
 
 variable "eso_chart_version" {

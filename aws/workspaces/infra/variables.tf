@@ -380,9 +380,16 @@ variable "migrated_passwords" {
 # ---------------------------------------------------------------------------
 
 variable "argocd_version" {
-  description = "ArgoCD release version (e.g. v2.14.11). Used to fetch the install manifest from GitHub."
+  description = "Argo CD container image tag (e.g. v3.4.3). Applied via the official argo-cd Helm chart."
   type        = string
   default     = "v2.14.11"
+  nullable    = false
+}
+
+variable "argocd_helm_chart_version" {
+  description = "Version of the argo-cd Helm chart from https://argoproj.github.io/argo-helm."
+  type        = string
+  default     = "9.5.15"
   nullable    = false
 }
 
