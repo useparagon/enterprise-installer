@@ -393,6 +393,13 @@ variable "argocd_helm_chart_version" {
   nullable    = false
 }
 
+variable "argocd_addon_overrides" {
+  description = "Optional overrides merged into the EKS Blueprints Argo CD addon map."
+  type        = map(any)
+  default     = {}
+  nullable    = false
+}
+
 variable "eso_chart_version" {
   description = "Helm chart version for external-secrets operator."
   type        = string
@@ -436,6 +443,27 @@ variable "argocd_app_chart_repository" {
   description = "Helm chart repository URL for Paragon application charts (e.g. OCI registry or HTTPS repo)."
   type        = string
   default     = "https://paragon-helm-production.s3.amazonaws.com"
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_url" {
+  description = "Git repository URL for Argo CD App-of-Apps bootstrap. Leave empty to skip creating the root Application."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_path" {
+  description = "Path inside argocd_bootstrap_repo_url containing child Application manifests."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_revision" {
+  description = "Git revision (branch, tag, or commit) for App-of-Apps bootstrap."
+  type        = string
+  default     = "HEAD"
   nullable    = false
 }
 
@@ -574,10 +602,6 @@ locals {
     password = random_password.openobserve_password[0].result
   } : null
 
-  # Resolved chart versions — only meaningful when argocd_enabled = true
-  paragon_chart_version        = var.paragon_chart_version
-  paragon_monitor_version      = var.paragon_monitor_version != null ? var.paragon_monitor_version : var.paragon_chart_version
-  paragon_managed_sync_version = var.paragon_managed_sync_version
 }
 
 resource "terraform_data" "validate_argocd_versions" {
@@ -585,16 +609,43 @@ resource "terraform_data" "validate_argocd_versions" {
 
   lifecycle {
     precondition {
-      condition     = var.paragon_chart_version != null
-      error_message = "paragon_chart_version is required when argocd_enabled is true."
+      condition     = var.paragon_chart_version == null || trimspace(var.paragon_chart_version) != ""
+      error_message = "paragon_chart_version cannot be empty when set."
     }
     precondition {
-      condition     = var.argocd_app_chart_repository != ""
-      error_message = "argocd_app_chart_repository must be a non-empty Helm repository URL when argocd_enabled is true."
+      condition     = trimspace(var.argocd_app_chart_repository) != ""
+      error_message = "argocd_app_chart_repository cannot be empty."
     }
     precondition {
-      condition     = !var.managed_sync_enabled || var.paragon_managed_sync_version != null
-      error_message = "paragon_managed_sync_version is required when argocd_enabled and managed_sync_enabled are both true."
+      condition     = var.paragon_managed_sync_version == null || trimspace(var.paragon_managed_sync_version) != ""
+      error_message = "paragon_managed_sync_version cannot be empty when set."
+    }
+    precondition {
+      condition     = !var.paragon_monitors_enabled || (var.paragon_monitor_version != null && trimspace(var.paragon_monitor_version) != "")
+      error_message = "paragon_monitor_version must be set when paragon_monitors_enabled is true."
+    }
+    precondition {
+      condition     = contains(["internet-facing", "internal"], var.argocd_ingress_scheme)
+      error_message = "argocd_ingress_scheme must be either 'internet-facing' or 'internal'."
+    }
+    precondition {
+      condition     = var.argocd_certificate_arn == "" || startswith(var.argocd_certificate_arn, "arn:aws:acm:")
+      error_message = "argocd_certificate_arn must be an ACM certificate ARN when provided."
+    }
+    precondition {
+      condition     = var.argocd_slack_token == null || trimspace(var.argocd_slack_channel) != ""
+      error_message = "argocd_slack_channel must be set when argocd_slack_token is provided."
+    }
+    precondition {
+      condition     = trimspace(var.argocd_slack_channel) == "" || var.argocd_slack_token != null
+      error_message = "argocd_slack_token must be set when argocd_slack_channel is provided."
+    }
+    precondition {
+      condition = (
+        (trimspace(var.argocd_bootstrap_repo_url) == "" && trimspace(var.argocd_bootstrap_repo_path) == "") ||
+        (trimspace(var.argocd_bootstrap_repo_url) != "" && trimspace(var.argocd_bootstrap_repo_path) != "")
+      )
+      error_message = "argocd_bootstrap_repo_url and argocd_bootstrap_repo_path must either both be empty or both be set."
     }
   }
 }

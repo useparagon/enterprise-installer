@@ -35,16 +35,10 @@ variable "create_gp3_storage_class" {
   default     = false
 }
 
-variable "argocd_version" {
-  description = "Argo CD container image tag (e.g. v3.4.3). Applied via the official argo-cd Helm chart."
+variable "argocd_release_name" {
+  description = "Argo CD Helm release name used for in-cluster secret discovery."
   type        = string
-  default     = "v2.14.11"
-}
-
-variable "argocd_helm_chart_version" {
-  description = "Version of the argo-cd Helm chart from https://argoproj.github.io/argo-helm."
-  type        = string
-  default     = "9.5.15"
+  default     = "argo-cd"
 }
 
 variable "eso_chart_version" {
@@ -59,21 +53,74 @@ variable "secrets_manager_secret_arns" {
   default     = []
 }
 
-variable "argocd_application_manifests" {
-  description = "List of YAML manifests (ArgoCD Applications + ExternalSecrets) to apply after bootstrap."
-  type        = list(string)
-  default     = []
+variable "destination_namespace" {
+  description = "Target namespace for Paragon workloads."
+  type        = string
+  default     = "paragon"
 }
 
-variable "slack_token" {
-  description = "Optional Slack bot token for ArgoCD notifications."
+variable "cluster_secret_store_name" {
+  description = "Name of the ClusterSecretStore for ExternalSecrets."
   type        = string
-  sensitive   = true
+  default     = "aws-secrets-manager"
+}
+
+variable "env_secret_name" {
+  description = "Secrets Manager secret name for environment config."
+  type        = string
   default     = null
 }
 
-variable "slack_channel" {
-  description = "Slack channel for ArgoCD sync notifications."
+variable "docker_cfg_secret_name" {
+  description = "Secrets Manager secret name for Docker credentials."
+  type        = string
+  default     = null
+}
+
+variable "managed_sync_secret_name" {
+  description = "Secrets Manager secret name for managed sync config (null if disabled)."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_secret_name" {
+  description = "Secrets Manager secret name for OpenObserve credentials (null if not created)."
+  type        = string
+  default     = null
+}
+
+variable "bootstrap_repo_url" {
+  description = "Git repository URL for App-of-Apps bootstrap."
   type        = string
   default     = ""
+}
+
+variable "bootstrap_repo_path" {
+  description = "Path inside bootstrap_repo_url containing child Application manifests."
+  type        = string
+  default     = ""
+}
+
+variable "bootstrap_repo_revision" {
+  description = "Git revision for App-of-Apps bootstrap."
+  type        = string
+  default     = "HEAD"
+}
+
+variable "auto_sync" {
+  description = "Whether to enable automatic sync on the bootstrap Application."
+  type        = bool
+  default     = true
+}
+
+variable "self_heal" {
+  description = "Whether to enable self-healing on the bootstrap Application."
+  type        = bool
+  default     = true
+}
+
+variable "app_of_apps_manifest" {
+  description = "Deprecated override for root Argo CD Application YAML."
+  type        = string
+  default     = null
 }

@@ -20,10 +20,10 @@ output "cluster_secret_store_name" {
 
 output "argocd_helm_release" {
   description = "Name of the Helm release that installs Argo CD."
-  value       = helm_release.argocd.name
+  value       = var.argocd_release_name
 }
 
 output "gitops_bridge_secret_name" {
   description = "ArgoCD in-cluster secret annotated with GitOps bridge metadata (EKS Blueprints pattern)."
-  value       = "${helm_release.argocd.name}-cluster"
+  value       = "${var.argocd_release_name}-cluster"
 }

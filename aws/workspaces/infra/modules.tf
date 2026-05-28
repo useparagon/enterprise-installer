@@ -130,6 +130,50 @@ module "cluster" {
 # ArgoCD / GitOps modules — only created when argocd_enabled = true
 # ---------------------------------------------------------------------------
 
+module "eks_blueprints_addons" {
+  source  = "aws-ia/eks-blueprints-addons/aws"
+  version = "~> 1.23"
+
+  cluster_name      = module.cluster.eks_cluster.name
+  cluster_endpoint  = module.cluster.eks_cluster.cluster_endpoint
+  cluster_version   = var.k8s_version
+  oidc_provider_arn = module.cluster.eks_cluster.oidc_provider_arn
+
+  enable_argocd = var.argocd_enabled
+  argocd = merge(
+    {
+      name             = "argo-cd"
+      namespace        = "argocd"
+      create_namespace = true
+      chart_version    = var.argocd_helm_chart_version
+      values = [yamlencode({
+        global = {
+          image = {
+            tag = var.argocd_version
+          }
+        }
+        configs = {
+          params = {
+            "server.insecure" = true
+          }
+        }
+        crds = {
+          install = true
+          keep    = true
+        }
+      })]
+      wait          = true
+      wait_for_jobs = true
+      timeout       = 600
+    },
+    var.argocd_addon_overrides
+  )
+
+  tags = local.default_tags
+
+  depends_on = [module.cluster]
+}
+
 module "secrets" {
   source = "./secrets"
   count  = var.argocd_enabled && local.argocd_secrets_ready ? 1 : 0
@@ -165,48 +209,26 @@ module "argocd" {
   workspace         = local.workspace
   aws_region        = var.aws_region
 
-  argocd_version            = var.argocd_version
-  argocd_helm_chart_version = var.argocd_helm_chart_version
-  eso_chart_version         = var.eso_chart_version
-  slack_token               = var.argocd_slack_token
-  slack_channel             = var.argocd_slack_channel
+  eso_chart_version   = var.eso_chart_version
+  argocd_release_name = "argo-cd"
 
-  secrets_manager_secret_arns  = local.argocd_secrets_ready ? module.secrets[0].secret_arns : []
-  argocd_application_manifests = nonsensitive(local.argocd_secrets_ready ? module.argocd_apps[0].all_manifests : [])
+  secrets_manager_secret_arns = local.argocd_secrets_ready ? module.secrets[0].secret_arns : []
 
-  depends_on = [module.cluster]
-}
-
-module "argocd_apps" {
-  source = "./argocd-apps"
-  count  = var.argocd_enabled && local.argocd_secrets_ready ? 1 : 0
-
-  argocd_namespace          = "argocd"
   destination_namespace     = "paragon"
-  workspace                 = local.workspace
-  cluster_name              = module.cluster.eks_cluster.name
   cluster_secret_store_name = "aws-secrets-manager"
+  env_secret_name           = local.argocd_secrets_ready ? module.secrets[0].env_secret_name : null
+  docker_cfg_secret_name    = local.argocd_secrets_ready ? module.secrets[0].docker_cfg_secret_name : null
+  managed_sync_secret_name  = local.argocd_secrets_ready ? module.secrets[0].managed_sync_secret_name : null
+  openobserve_secret_name   = local.argocd_secrets_ready ? module.secrets[0].openobserve_secret_name : null
 
-  cluster_autoscaler_role_arn = module.argocd[0].cluster_autoscaler_role_arn
-  chart_repository            = var.argocd_app_chart_repository
-  chart_version               = local.paragon_chart_version
-  aws_region                  = var.aws_region
-  logs_bucket                 = module.storage.s3.logs_bucket
+  bootstrap_repo_url      = var.argocd_bootstrap_repo_url
+  bootstrap_repo_path     = var.argocd_bootstrap_repo_path
+  bootstrap_repo_revision = var.argocd_bootstrap_repo_revision
+  auto_sync               = var.argocd_auto_sync
+  self_heal               = var.argocd_self_heal
 
-  ingress_scheme  = var.argocd_ingress_scheme
-  certificate_arn = var.argocd_certificate_arn
-
-  monitors_enabled = var.paragon_monitors_enabled
-  monitor_version  = local.paragon_monitor_version
-
-  managed_sync_enabled = var.managed_sync_enabled
-  managed_sync_version = local.paragon_managed_sync_version
-
-  auto_sync = var.argocd_auto_sync
-  self_heal = var.argocd_self_heal
-
-  env_secret_name          = module.secrets[0].env_secret_name
-  docker_cfg_secret_name   = module.secrets[0].docker_cfg_secret_name
-  managed_sync_secret_name = module.secrets[0].managed_sync_secret_name
-  openobserve_secret_name  = module.secrets[0].openobserve_secret_name
+  depends_on = [
+    module.cluster,
+    module.eks_blueprints_addons,
+  ]
 }

@@ -12,6 +12,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
+| <a name="requirement_time"></a> [time](#requirement\_time) | ~> 0.9 |
 
 ## Providers
 
@@ -26,10 +27,10 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | Name | Source | Version |
 | ---- | ------ | ------- |
 | <a name="module_argocd"></a> [argocd](#module\_argocd) | ./argocd | n/a |
-| <a name="module_argocd_apps"></a> [argocd\_apps](#module\_argocd\_apps) | ./argocd-apps | n/a |
 | <a name="module_bastion"></a> [bastion](#module\_bastion) | ./bastion | n/a |
 | <a name="module_cloudtrail"></a> [cloudtrail](#module\_cloudtrail) | ./cloudtrail | n/a |
 | <a name="module_cluster"></a> [cluster](#module\_cluster) | ./cluster | n/a |
+| <a name="module_eks_blueprints_addons"></a> [eks\_blueprints\_addons](#module\_eks\_blueprints\_addons) | aws-ia/eks-blueprints-addons/aws | ~> 1.23 |
 | <a name="module_kafka"></a> [kafka](#module\_kafka) | ./kafka | n/a |
 | <a name="module_network"></a> [network](#module\_network) | ./network | n/a |
 | <a name="module_postgres"></a> [postgres](#module\_postgres) | ./postgres | n/a |
@@ -53,14 +54,19 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | [random_string.openobserve_email](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [terraform_data.validate_argocd_versions](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
+| [aws_eks_cluster_auth.gitops](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/eks_cluster_auth) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_app_bucket_expiration"></a> [app\_bucket\_expiration](#input\_app\_bucket\_expiration) | The number of days to retain S3 app data before deleting | `number` | `90` | no |
+| <a name="input_argocd_addon_overrides"></a> [argocd\_addon\_overrides](#input\_argocd\_addon\_overrides) | Optional overrides merged into the EKS Blueprints Argo CD addon map. | `map(any)` | `{}` | no |
 | <a name="input_argocd_app_chart_repository"></a> [argocd\_app\_chart\_repository](#input\_argocd\_app\_chart\_repository) | Helm chart repository URL for Paragon application charts (e.g. OCI registry or HTTPS repo). | `string` | `"https://paragon-helm-production.s3.amazonaws.com"` | no |
 | <a name="input_argocd_auto_sync"></a> [argocd\_auto\_sync](#input\_argocd\_auto\_sync) | Whether ArgoCD Applications should auto-sync on git/chart changes. | `bool` | `true` | no |
+| <a name="input_argocd_bootstrap_repo_path"></a> [argocd\_bootstrap\_repo\_path](#input\_argocd\_bootstrap\_repo\_path) | Path inside argocd\_bootstrap\_repo\_url containing child Application manifests. | `string` | `""` | no |
+| <a name="input_argocd_bootstrap_repo_revision"></a> [argocd\_bootstrap\_repo\_revision](#input\_argocd\_bootstrap\_repo\_revision) | Git revision (branch, tag, or commit) for App-of-Apps bootstrap. | `string` | `"HEAD"` | no |
+| <a name="input_argocd_bootstrap_repo_url"></a> [argocd\_bootstrap\_repo\_url](#input\_argocd\_bootstrap\_repo\_url) | Git repository URL for Argo CD App-of-Apps bootstrap. Leave empty to skip creating the root Application. | `string` | `""` | no |
 | <a name="input_argocd_certificate_arn"></a> [argocd\_certificate\_arn](#input\_argocd\_certificate\_arn) | ACM certificate ARN for the ArgoCD-managed ingress. | `string` | `""` | no |
 | <a name="input_argocd_docker_email"></a> [argocd\_docker\_email](#input\_argocd\_docker\_email) | Docker email for ArgoCD image pulls. | `string` | `null` | no |
 | <a name="input_argocd_docker_password"></a> [argocd\_docker\_password](#input\_argocd\_docker\_password) | Docker password for ArgoCD image pulls. | `string` | `null` | no |
@@ -68,11 +74,12 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_argocd_docker_username"></a> [argocd\_docker\_username](#input\_argocd\_docker\_username) | Docker username for ArgoCD image pulls. | `string` | `null` | no |
 | <a name="input_argocd_enabled"></a> [argocd\_enabled](#input\_argocd\_enabled) | Enable ArgoCD-based GitOps deployment. When true, bootstraps ArgoCD and ESO on the cluster, writes config to Secrets Manager, and applies ArgoCD Application manifests. | `bool` | `false` | no |
 | <a name="input_argocd_env_config"></a> [argocd\_env\_config](#input\_argocd\_env\_config) | Pre-merged map of environment variables to store in Secrets Manager for the Paragon application. When null, secrets are not written (use for phased migration). | `map(string)` | `null` | no |
+| <a name="input_argocd_helm_chart_version"></a> [argocd\_helm\_chart\_version](#input\_argocd\_helm\_chart\_version) | Version of the argo-cd Helm chart from https://argoproj.github.io/argo-helm. | `string` | `"9.5.15"` | no |
 | <a name="input_argocd_ingress_scheme"></a> [argocd\_ingress\_scheme](#input\_argocd\_ingress\_scheme) | ALB scheme for ArgoCD-managed ingress: internet-facing or internal. | `string` | `"internet-facing"` | no |
 | <a name="input_argocd_self_heal"></a> [argocd\_self\_heal](#input\_argocd\_self\_heal) | Whether ArgoCD should auto-correct drift from desired state. | `bool` | `true` | no |
 | <a name="input_argocd_slack_channel"></a> [argocd\_slack\_channel](#input\_argocd\_slack\_channel) | Slack channel name for ArgoCD notifications. | `string` | `""` | no |
 | <a name="input_argocd_slack_token"></a> [argocd\_slack\_token](#input\_argocd\_slack\_token) | Optional Slack bot token for ArgoCD sync notifications. | `string` | `null` | no |
-| <a name="input_argocd_version"></a> [argocd\_version](#input\_argocd\_version) | ArgoCD release version (e.g. v2.14.11). Used to fetch the install manifest from GitHub. | `string` | `"v2.14.11"` | no |
+| <a name="input_argocd_version"></a> [argocd\_version](#input\_argocd\_version) | Argo CD container image tag (e.g. v3.4.3). Applied via the official argo-cd Helm chart. | `string` | `"v2.14.11"` | no |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to enable S3 Object Lock for the audit logs bucket. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
 | <a name="input_aws_access_key_id"></a> [aws\_access\_key\_id](#input\_aws\_access\_key\_id) | AWS Access Key for AWS account to provision resources on. | `string` | `null` | no |

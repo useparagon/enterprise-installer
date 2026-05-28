@@ -2,22 +2,158 @@ locals {
   eso_namespace = "external-secrets"
   eso_sa_name   = "external-secrets"
 
-  # Manifests only reference Secrets Manager keys, not secret values; nonsensitive()
-  # is required because the argocd_apps module output inherits sensitivity from
-  # other module inputs (for_each cannot use sensitive values).
-  application_docs = [
-    for m in nonsensitive(var.argocd_application_manifests) : nonsensitive(yamldecode(m))
+  sync_policy = {
+    automated = var.auto_sync ? {
+      selfHeal = var.self_heal
+      prune    = true
+    } : null
+    syncOptions = ["CreateNamespace=true"]
+    retry = var.auto_sync ? {
+      limit = 3
+      backoff = {
+        duration    = "30s"
+        factor      = 2
+        maxDuration = "5m"
+      }
+    } : null
+  }
+
+  app_of_apps_manifest = var.app_of_apps_manifest != null && trimspace(var.app_of_apps_manifest) != "" ? var.app_of_apps_manifest : (
+    trimspace(var.bootstrap_repo_url) != "" && trimspace(var.bootstrap_repo_path) != "" ? yamlencode({
+      apiVersion = "argoproj.io/v1alpha1"
+      kind       = "Application"
+      metadata = {
+        name      = "${var.workspace}-bootstrap"
+        namespace = var.argocd_namespace
+        finalizers = [
+          "resources-finalizer.argocd.argoproj.io",
+        ]
+      }
+      spec = {
+        project = "default"
+        source = {
+          repoURL        = var.bootstrap_repo_url
+          targetRevision = var.bootstrap_repo_revision
+          path           = var.bootstrap_repo_path
+        }
+        destination = {
+          server    = "https://kubernetes.default.svc"
+          namespace = var.argocd_namespace
+        }
+        syncPolicy = local.sync_policy
+      }
+    }) : null
+  )
+
+  external_secret_docs = [
+    for m in compact([
+      var.env_secret_name != null ? yamlencode({
+        apiVersion = "external-secrets.io/v1beta1"
+        kind       = "ExternalSecret"
+        metadata = {
+          name      = "paragon-secrets"
+          namespace = var.destination_namespace
+        }
+        spec = {
+          refreshInterval = "5m"
+          secretStoreRef = {
+            name = var.cluster_secret_store_name
+            kind = "ClusterSecretStore"
+          }
+          target = {
+            name           = "paragon-secrets"
+            creationPolicy = "Owner"
+          }
+          dataFrom = [{
+            extract = {
+              key = var.env_secret_name
+            }
+          }]
+        }
+      }) : null,
+      var.docker_cfg_secret_name != null ? yamlencode({
+        apiVersion = "external-secrets.io/v1beta1"
+        kind       = "ExternalSecret"
+        metadata = {
+          name      = "docker-cfg"
+          namespace = var.destination_namespace
+        }
+        spec = {
+          refreshInterval = "1h"
+          secretStoreRef = {
+            name = var.cluster_secret_store_name
+            kind = "ClusterSecretStore"
+          }
+          target = {
+            name           = "docker-cfg"
+            creationPolicy = "Owner"
+            template = {
+              type = "kubernetes.io/dockerconfigjson"
+              data = {
+                ".dockerconfigjson" = "{{ .dockerconfigjson }}"
+              }
+            }
+          }
+          data = [{
+            secretKey = "dockerconfigjson"
+            remoteRef = {
+              key = var.docker_cfg_secret_name
+            }
+          }]
+        }
+      }) : null,
+      var.managed_sync_secret_name != null ? yamlencode({
+        apiVersion = "external-secrets.io/v1beta1"
+        kind       = "ExternalSecret"
+        metadata = {
+          name      = "paragon-managed-sync-secrets"
+          namespace = var.destination_namespace
+        }
+        spec = {
+          refreshInterval = "5m"
+          secretStoreRef = {
+            name = var.cluster_secret_store_name
+            kind = "ClusterSecretStore"
+          }
+          target = {
+            name           = "paragon-managed-sync-secrets"
+            creationPolicy = "Owner"
+          }
+          dataFrom = [{
+            extract = {
+              key = var.managed_sync_secret_name
+            }
+          }]
+        }
+      }) : null,
+      var.openobserve_secret_name != null ? yamlencode({
+        apiVersion = "external-secrets.io/v1beta1"
+        kind       = "ExternalSecret"
+        metadata = {
+          name      = "openobserve-credentials"
+          namespace = var.destination_namespace
+        }
+        spec = {
+          refreshInterval = "1h"
+          secretStoreRef = {
+            name = var.cluster_secret_store_name
+            kind = "ClusterSecretStore"
+          }
+          target = {
+            name           = "openobserve-credentials"
+            creationPolicy = "Owner"
+          }
+          dataFrom = [{
+            extract = {
+              key = var.openobserve_secret_name
+            }
+          }]
+        }
+      }) : null,
+    ]) : yamldecode(m)
   ]
 
-  external_secret_manifests = nonsensitive({
-    for idx, doc in local.application_docs : "es-${idx}" => doc
-    if try(doc.kind, "") == "ExternalSecret"
-  })
-
-  argocd_application_manifests = nonsensitive({
-    for idx, doc in local.application_docs : "app-${idx}" => doc
-    if try(doc.kind, "") == "Application"
-  })
+  external_secret_manifests = { for idx, doc in local.external_secret_docs : "es-${idx}" => doc }
 
   gitops_bridge_annotations = merge(
     {
@@ -60,56 +196,6 @@ resource "kubernetes_storage_class_v1" "gp3" {
   }
 }
 
-resource "helm_release" "argocd" {
-  name             = "argo-cd"
-  repository       = "https://argoproj.github.io/argo-helm"
-  chart            = "argo-cd"
-  version          = var.argocd_helm_chart_version
-  namespace        = var.argocd_namespace
-  create_namespace = true
-  timeout          = 600
-  wait             = true
-  wait_for_jobs    = true
-
-  values = [
-    yamlencode({
-      global = {
-        image = {
-          tag = var.argocd_version
-        }
-      }
-      configs = {
-        params = {
-          "server.insecure" = true
-        }
-      }
-      crds = {
-        install = true
-        keep    = true
-      }
-    })
-  ]
-
-}
-
-# Helm wait does not block until CRDs are Established; kubernetes_manifest needs the GVK.
-resource "time_sleep" "wait_for_argocd_crds" {
-  create_duration = "45s"
-
-  depends_on = [helm_release.argocd]
-}
-
-data "kubernetes_resource" "argocd_applications_crd" {
-  api_version = "apiextensions.k8s.io/v1"
-  kind        = "CustomResourceDefinition"
-
-  metadata {
-    name = "applications.argoproj.io"
-  }
-
-  depends_on = [time_sleep.wait_for_argocd_crds]
-}
-
 resource "helm_release" "external_secrets" {
   name             = "external-secrets"
   repository       = "https://charts.external-secrets.io"
@@ -121,18 +207,18 @@ resource "helm_release" "external_secrets" {
   wait             = true
   wait_for_jobs    = true
 
-  set {
-    name  = "serviceAccount.name"
-    value = local.eso_sa_name
-  }
-
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = aws_iam_role.eso.arn
-  }
+  values = [
+    yamlencode({
+      serviceAccount = {
+        name = local.eso_sa_name
+        annotations = {
+          "eks.amazonaws.com/role-arn" = aws_iam_role.eso.arn
+        }
+      }
+    })
+  ]
 
   depends_on = [
-    helm_release.argocd,
     aws_iam_role_policy.eso_secrets,
   ]
 }
@@ -145,13 +231,13 @@ resource "kubernetes_annotations" "gitops_bridge" {
   kind        = "Secret"
 
   metadata {
-    name      = "${helm_release.argocd.name}-cluster"
+    name      = "${var.argocd_release_name}-cluster"
     namespace = var.argocd_namespace
   }
 
   annotations = local.gitops_bridge_annotations
 
-  depends_on = [helm_release.argocd]
+  depends_on = [helm_release.external_secrets]
 }
 
 resource "kubernetes_labels" "gitops_bridge" {
@@ -159,7 +245,7 @@ resource "kubernetes_labels" "gitops_bridge" {
   kind        = "Secret"
 
   metadata {
-    name      = "${helm_release.argocd.name}-cluster"
+    name      = "${var.argocd_release_name}-cluster"
     namespace = var.argocd_namespace
   }
 
@@ -170,7 +256,7 @@ resource "kubernetes_labels" "gitops_bridge" {
     "enable_argocd"    = "true"
   }
 
-  depends_on = [helm_release.argocd]
+  depends_on = [helm_release.external_secrets]
 }
 
 resource "kubernetes_manifest" "cluster_secret_store" {
@@ -178,7 +264,7 @@ resource "kubernetes_manifest" "cluster_secret_store" {
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ClusterSecretStore"
     metadata = {
-      name = "aws-secrets-manager"
+      name = var.cluster_secret_store_name
     }
     spec = {
       provider = {
@@ -201,14 +287,15 @@ resource "kubernetes_manifest" "cluster_secret_store" {
   depends_on = [helm_release.external_secrets]
 }
 
-resource "kubernetes_manifest" "argocd_applications" {
-  for_each = local.argocd_application_manifests
+resource "kubernetes_manifest" "app_of_apps" {
+  count = local.app_of_apps_manifest != null ? 1 : 0
 
-  manifest = each.value
+  manifest = yamldecode(local.app_of_apps_manifest)
 
   depends_on = [
-    data.kubernetes_resource.argocd_applications_crd,
     kubernetes_manifest.cluster_secret_store,
+    kubernetes_annotations.gitops_bridge,
+    kubernetes_labels.gitops_bridge,
   ]
 }
 
