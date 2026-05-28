@@ -5,17 +5,19 @@ locals {
   # Manifests only reference Secrets Manager keys, not secret values; nonsensitive()
   # is required because the argocd_apps module output inherits sensitivity from
   # other module inputs (for_each cannot use sensitive values).
-  application_docs = [for m in nonsensitive(var.argocd_application_manifests) : yamldecode(m)]
+  application_docs = [
+    for m in nonsensitive(var.argocd_application_manifests) : nonsensitive(yamldecode(m))
+  ]
 
-  external_secret_manifests = {
+  external_secret_manifests = nonsensitive({
     for idx, doc in local.application_docs : "es-${idx}" => doc
     if try(doc.kind, "") == "ExternalSecret"
-  }
+  })
 
-  argocd_application_manifests = {
+  argocd_application_manifests = nonsensitive({
     for idx, doc in local.application_docs : "app-${idx}" => doc
     if try(doc.kind, "") == "Application"
-  }
+  })
 
   gitops_bridge_annotations = merge(
     {

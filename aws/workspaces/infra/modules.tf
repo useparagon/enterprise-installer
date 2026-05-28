@@ -172,7 +172,7 @@ module "argocd" {
   slack_channel             = var.argocd_slack_channel
 
   secrets_manager_secret_arns  = local.argocd_secrets_ready ? module.secrets[0].secret_arns : []
-  argocd_application_manifests = local.argocd_secrets_ready ? module.argocd_apps[0].all_manifests : []
+  argocd_application_manifests = nonsensitive(local.argocd_secrets_ready ? module.argocd_apps[0].all_manifests : [])
 
   depends_on = [module.cluster]
 }
