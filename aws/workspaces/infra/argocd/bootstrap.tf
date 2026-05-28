@@ -204,37 +204,34 @@ resource "terraform_data" "eso_crds_ready" {
   input = var.eso_crds_ready
 }
 
-# GitOps bridge metadata (EKS Blueprints pattern): annotate the in-cluster
-# Argo CD cluster secret so ApplicationSets can read cloud/IAM context.
+# GitOps bridge metadata (EKS Blueprints pattern): create the in-cluster Argo CD cluster
+# secret so ApplicationSets can read cloud/IAM context. Blueprints installs Argo CD but
+# does not create this secret; annotating a non-existent resource fails at apply time.
 # https://aws-ia.github.io/terraform-aws-eks-blueprints/patterns/gitops/gitops-getting-started-argocd/
-resource "kubernetes_annotations" "gitops_bridge" {
-  api_version = "v1"
-  kind        = "Secret"
-
+resource "kubernetes_secret_v1" "gitops_bridge_cluster" {
   metadata {
     name      = "${var.argocd_release_name}-cluster"
     namespace = var.argocd_namespace
+    labels = {
+      "argocd.argoproj.io/secret-type" = "cluster"
+      "aws_cluster_name"               = var.cluster_name
+      "cluster_name"                   = "in-cluster"
+      "environment"                    = var.workspace
+      "enable_argocd"                  = "true"
+    }
+    annotations = local.gitops_bridge_annotations
   }
 
-  annotations = local.gitops_bridge_annotations
+  type = "Opaque"
 
-  depends_on = [terraform_data.eso_crds_ready]
-}
-
-resource "kubernetes_labels" "gitops_bridge" {
-  api_version = "v1"
-  kind        = "Secret"
-
-  metadata {
-    name      = "${var.argocd_release_name}-cluster"
-    namespace = var.argocd_namespace
-  }
-
-  labels = {
-    "aws_cluster_name" = var.cluster_name
-    "cluster_name"     = "in-cluster"
-    "environment"      = var.workspace
-    "enable_argocd"    = "true"
+  data = {
+    name   = base64encode("in-cluster")
+    server = base64encode("https://kubernetes.default.svc")
+    config = base64encode(jsonencode({
+      tlsClientConfig = {
+        insecure = false
+      }
+    }))
   }
 
   depends_on = [terraform_data.eso_crds_ready]
@@ -283,8 +280,7 @@ resource "kubectl_manifest" "app_of_apps" {
 
   depends_on = [
     kubectl_manifest.cluster_secret_store,
-    kubernetes_annotations.gitops_bridge,
-    kubernetes_labels.gitops_bridge,
+    kubernetes_secret_v1.gitops_bridge_cluster,
   ]
 }
 
