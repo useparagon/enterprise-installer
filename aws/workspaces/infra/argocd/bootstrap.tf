@@ -2,7 +2,10 @@ locals {
   eso_namespace = "external-secrets"
   eso_sa_name   = "external-secrets"
 
-  application_docs = [for m in var.argocd_application_manifests : yamldecode(m)]
+  # Manifests only reference Secrets Manager keys, not secret values; nonsensitive()
+  # is required because the argocd_apps module output inherits sensitivity from
+  # other module inputs (for_each cannot use sensitive values).
+  application_docs = [for m in nonsensitive(var.argocd_application_manifests) : yamldecode(m)]
 
   external_secret_manifests = {
     for idx, doc in local.application_docs : "es-${idx}" => doc
