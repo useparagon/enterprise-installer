@@ -33,51 +33,82 @@ locals {
   )
 }
 
-resource "kubernetes_namespace_v1" "argocd" {
-  metadata {
-    name = var.argocd_namespace
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
+# Server-side apply adopts namespaces and StorageClass left by the legacy SSM bootstrap.
+resource "kubernetes_manifest" "argocd_namespace" {
+  manifest = {
+    apiVersion = "v1"
+    kind       = "Namespace"
+    metadata = {
+      name = var.argocd_namespace
+      labels = {
+        "app.kubernetes.io/managed-by" = "terraform"
+      }
     }
+  }
+
+  field_manager {
+    force_conflicts = true
   }
 }
 
-resource "kubernetes_namespace_v1" "external_secrets" {
-  metadata {
-    name = local.eso_namespace
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
+resource "kubernetes_manifest" "external_secrets_namespace" {
+  manifest = {
+    apiVersion = "v1"
+    kind       = "Namespace"
+    metadata = {
+      name = local.eso_namespace
+      labels = {
+        "app.kubernetes.io/managed-by" = "terraform"
+      }
     }
+  }
+
+  field_manager {
+    force_conflicts = true
   }
 }
 
-resource "kubernetes_namespace_v1" "paragon" {
-  metadata {
-    name = "paragon"
-    labels = {
-      "app.kubernetes.io/managed-by"            = "terraform"
-      "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
+resource "kubernetes_manifest" "paragon_namespace" {
+  manifest = {
+    apiVersion = "v1"
+    kind       = "Namespace"
+    metadata = {
+      name = "paragon"
+      labels = {
+        "app.kubernetes.io/managed-by"            = "terraform"
+        "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
+      }
     }
+  }
+
+  field_manager {
+    force_conflicts = true
   }
 }
 
-resource "kubernetes_storage_class_v1" "gp3" {
-  metadata {
-    name = "gp3"
-    annotations = {
-      "storageclass.kubernetes.io/is-default-class" = "true"
+resource "kubernetes_manifest" "gp3_storage_class" {
+  manifest = {
+    apiVersion = "storage.k8s.io/v1"
+    kind       = "StorageClass"
+    metadata = {
+      name = "gp3"
+      annotations = {
+        "storageclass.kubernetes.io/is-default-class" = "true"
+      }
+    }
+    provisioner          = "ebs.csi.aws.com"
+    reclaimPolicy        = "Delete"
+    allowVolumeExpansion = true
+    volumeBindingMode    = "WaitForFirstConsumer"
+    parameters = {
+      encrypted = "true"
+      fsType    = "ext4"
+      type      = "gp3"
     }
   }
 
-  storage_provisioner    = "ebs.csi.aws.com"
-  reclaim_policy         = "Delete"
-  allow_volume_expansion = true
-  volume_binding_mode    = "WaitForFirstConsumer"
-
-  parameters = {
-    encrypted = "true"
-    fsType    = "ext4"
-    type      = "gp3"
+  field_manager {
+    force_conflicts = true
   }
 }
 
@@ -86,7 +117,7 @@ resource "helm_release" "argocd" {
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argo-cd"
   version          = var.argocd_helm_chart_version
-  namespace        = kubernetes_namespace_v1.argocd.metadata[0].name
+  namespace        = var.argocd_namespace
   create_namespace = false
   timeout          = 600
   wait             = true
@@ -108,8 +139,8 @@ resource "helm_release" "argocd" {
   ]
 
   depends_on = [
-    kubernetes_namespace_v1.argocd,
-    kubernetes_storage_class_v1.gp3,
+    kubernetes_manifest.argocd_namespace,
+    kubernetes_manifest.gp3_storage_class,
   ]
 }
 
@@ -118,7 +149,7 @@ resource "helm_release" "external_secrets" {
   repository       = "https://charts.external-secrets.io"
   chart            = "external-secrets"
   version          = var.eso_chart_version
-  namespace        = kubernetes_namespace_v1.external_secrets.metadata[0].name
+  namespace        = local.eso_namespace
   create_namespace = false
   timeout          = 600
   wait             = true
@@ -135,7 +166,7 @@ resource "helm_release" "external_secrets" {
   }
 
   depends_on = [
-    kubernetes_namespace_v1.external_secrets,
+    kubernetes_manifest.external_secrets_namespace,
     helm_release.argocd,
     aws_iam_role_policy.eso_secrets,
   ]
