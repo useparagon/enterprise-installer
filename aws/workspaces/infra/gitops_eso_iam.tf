@@ -4,7 +4,6 @@
 
 locals {
   gitops_eso_namespace = "external-secrets"
-  gitops_eso_sa_name   = "external-secrets-sa"
 
   # Secrets the operator may read. Prefer the concrete secret ARNs; fall back to the
   # per-workspace prefix wildcard when the secrets module has not created them yet.
