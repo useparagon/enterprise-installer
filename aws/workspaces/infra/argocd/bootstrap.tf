@@ -33,82 +33,30 @@ locals {
   )
 }
 
-# Server-side apply adopts namespaces and StorageClass left by the legacy SSM bootstrap.
-resource "kubernetes_manifest" "argocd_namespace" {
-  manifest = {
-    apiVersion = "v1"
-    kind       = "Namespace"
-    metadata = {
-      name = var.argocd_namespace
-      labels = {
-        "app.kubernetes.io/managed-by" = "terraform"
-      }
+# Namespaces and gp3 StorageClass are not managed here: legacy SSM bootstrap (and
+# Helm create_namespace) already created them on brownfield clusters, and
+# kubernetes_manifest cannot adopt without a prior import. The paragon namespace
+# is labeled by Argo CD Applications (CreateNamespace=true).
+
+resource "kubernetes_storage_class_v1" "gp3" {
+  count = var.create_gp3_storage_class ? 1 : 0
+
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
     }
   }
 
-  field_manager {
-    force_conflicts = true
-  }
-}
+  storage_provisioner    = "ebs.csi.aws.com"
+  reclaim_policy         = "Delete"
+  allow_volume_expansion = true
+  volume_binding_mode    = "WaitForFirstConsumer"
 
-resource "kubernetes_manifest" "external_secrets_namespace" {
-  manifest = {
-    apiVersion = "v1"
-    kind       = "Namespace"
-    metadata = {
-      name = local.eso_namespace
-      labels = {
-        "app.kubernetes.io/managed-by" = "terraform"
-      }
-    }
-  }
-
-  field_manager {
-    force_conflicts = true
-  }
-}
-
-resource "kubernetes_manifest" "paragon_namespace" {
-  manifest = {
-    apiVersion = "v1"
-    kind       = "Namespace"
-    metadata = {
-      name = "paragon"
-      labels = {
-        "app.kubernetes.io/managed-by"            = "terraform"
-        "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
-      }
-    }
-  }
-
-  field_manager {
-    force_conflicts = true
-  }
-}
-
-resource "kubernetes_manifest" "gp3_storage_class" {
-  manifest = {
-    apiVersion = "storage.k8s.io/v1"
-    kind       = "StorageClass"
-    metadata = {
-      name = "gp3"
-      annotations = {
-        "storageclass.kubernetes.io/is-default-class" = "true"
-      }
-    }
-    provisioner          = "ebs.csi.aws.com"
-    reclaimPolicy        = "Delete"
-    allowVolumeExpansion = true
-    volumeBindingMode    = "WaitForFirstConsumer"
-    parameters = {
-      encrypted = "true"
-      fsType    = "ext4"
-      type      = "gp3"
-    }
-  }
-
-  field_manager {
-    force_conflicts = true
+  parameters = {
+    encrypted = "true"
+    fsType    = "ext4"
+    type      = "gp3"
   }
 }
 
@@ -118,7 +66,7 @@ resource "helm_release" "argocd" {
   chart            = "argo-cd"
   version          = var.argocd_helm_chart_version
   namespace        = var.argocd_namespace
-  create_namespace = false
+  create_namespace = true
   timeout          = 600
   wait             = true
   wait_for_jobs    = true
@@ -138,10 +86,6 @@ resource "helm_release" "argocd" {
     })
   ]
 
-  depends_on = [
-    kubernetes_manifest.argocd_namespace,
-    kubernetes_manifest.gp3_storage_class,
-  ]
 }
 
 resource "helm_release" "external_secrets" {
@@ -150,7 +94,7 @@ resource "helm_release" "external_secrets" {
   chart            = "external-secrets"
   version          = var.eso_chart_version
   namespace        = local.eso_namespace
-  create_namespace = false
+  create_namespace = true
   timeout          = 600
   wait             = true
   wait_for_jobs    = true
@@ -166,7 +110,6 @@ resource "helm_release" "external_secrets" {
   }
 
   depends_on = [
-    kubernetes_manifest.external_secrets_namespace,
     helm_release.argocd,
     aws_iam_role_policy.eso_secrets,
   ]

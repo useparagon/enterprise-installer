@@ -29,6 +29,12 @@ variable "argocd_namespace" {
   default     = "argocd"
 }
 
+variable "create_gp3_storage_class" {
+  description = "Create a default gp3 StorageClass. Leave false when upgrading from SSM bootstrap (gp3 already exists)."
+  type        = bool
+  default     = false
+}
+
 variable "argocd_version" {
   description = "Argo CD container image tag (e.g. v3.4.3). Applied via the official argo-cd Helm chart."
   type        = string
