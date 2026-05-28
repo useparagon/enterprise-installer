@@ -138,6 +138,7 @@ module "eks_blueprints_addons" {
   cluster_endpoint  = module.cluster.eks_cluster.cluster_endpoint
   cluster_version   = var.k8s_version
   oidc_provider_arn = module.cluster.eks_cluster.oidc_provider_arn
+  observability_tag = null
 
   enable_argocd = var.argocd_enabled
   argocd = merge(
