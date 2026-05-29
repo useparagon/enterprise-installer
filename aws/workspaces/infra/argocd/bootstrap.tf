@@ -5,11 +5,12 @@ locals {
 
   bootstrap_repo_url_trimmed = trimspace(var.bootstrap_repo_url)
 
+  bootstrap_repo_token_trimmed = var.bootstrap_repo_token != null ? trimspace(var.bootstrap_repo_token) : ""
+
   bootstrap_repo_credential_enabled = (
     local.bootstrap_repo_url_trimmed != "" &&
     startswith(local.bootstrap_repo_url_trimmed, "https://") &&
-    var.bootstrap_repo_token != null &&
-    trimspace(var.bootstrap_repo_token) != ""
+    local.bootstrap_repo_token_trimmed != ""
   )
 
   sync_policy = {
@@ -35,6 +36,10 @@ locals {
       metadata = {
         name      = "${var.workspace}-bootstrap"
         namespace = var.argocd_namespace
+        annotations = local.bootstrap_repo_credential_enabled ? {
+          # Bumps when repo credentials change so Argo CD re-fetches Git after apply.
+          "paragon.io/bootstrap-repo-creds-checksum" = sha256(local.bootstrap_repo_token_trimmed)
+        } : {}
         finalizers = [
           "resources-finalizer.argocd.argoproj.io",
         ]
@@ -42,9 +47,12 @@ locals {
       spec = {
         project = "default"
         source = {
-          repoURL        = var.bootstrap_repo_url
+          repoURL        = local.bootstrap_repo_url_trimmed
           targetRevision = var.bootstrap_repo_revision
-          path           = var.bootstrap_repo_path
+          path           = trimspace(var.bootstrap_repo_path)
+          directory = {
+            recurse = true
+          }
         }
         destination = {
           server    = "https://kubernetes.default.svc"
@@ -262,11 +270,13 @@ resource "kubernetes_secret_v1" "bootstrap_repo" {
 
   type = "Opaque"
 
+  # data values are base64-encoded for the Kubernetes API (provider does not re-encode).
+  # GitHub PAT: username x-access-token, password = PAT.
   data = {
     type     = base64encode("git")
     url      = base64encode(local.bootstrap_repo_url_trimmed)
-    username = base64encode("git")
-    password = base64encode(var.bootstrap_repo_token)
+    username = base64encode("x-access-token")
+    password = base64encode(local.bootstrap_repo_token_trimmed)
   }
 
   depends_on = [terraform_data.eso_crds_ready]
@@ -312,6 +322,12 @@ resource "kubectl_manifest" "app_of_apps" {
   yaml_body = local.app_of_apps_manifest
 
   server_side_apply = true
+
+  lifecycle {
+    replace_triggered_by = [
+      kubernetes_secret_v1.bootstrap_repo,
+    ]
+  }
 
   depends_on = [
     kubectl_manifest.cluster_secret_store,
