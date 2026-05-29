@@ -184,17 +184,19 @@ module "secrets" {
 
   workspace    = local.workspace
   organization = var.organization
-  env_config   = var.argocd_env_config
+  env_config   = local.argocd_env_secret
 
   docker_config = jsonencode({
-    auths = {
-      (var.argocd_docker_registry_server) = {
-        username = var.argocd_docker_username
-        password = var.argocd_docker_password
-        email    = var.argocd_docker_email
-        auth     = base64encode("${var.argocd_docker_username}:${var.argocd_docker_password}")
+    dockerconfigjson = jsonencode({
+      auths = {
+        (var.argocd_docker_registry_server) = {
+          username = var.argocd_docker_username
+          password = var.argocd_docker_password
+          email    = var.argocd_docker_email
+          auth     = base64encode("${var.argocd_docker_username}:${var.argocd_docker_password}")
+        }
       }
-    }
+    })
   })
 
   managed_sync_config     = var.paragon_managed_sync_config

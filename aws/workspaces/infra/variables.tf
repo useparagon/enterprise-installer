@@ -510,8 +510,20 @@ variable "paragon_managed_sync_version" {
 # ArgoCD / GitOps — application secrets
 # ---------------------------------------------------------------------------
 
-variable "argocd_env_config" {
-  description = "Pre-merged map of environment variables to store in Secrets Manager for the Paragon application. When null, secrets are not written (use for phased migration)."
+variable "paragon_domain" {
+  description = "Customer-facing Paragon domain (e.g. customer.example.com). Used for ACM/ingress and written to Secrets Manager as PARAGON_DOMAIN and derived *_PUBLIC_URL values when argocd_enabled."
+  type        = string
+  default     = null
+}
+
+variable "argocd_env_overrides" {
+  description = "Optional overrides for any infra-derived env key written to Secrets Manager (e.g. ACCOUNT_PUBLIC_URL, CERBERUS_POSTGRES_PORT, CLOUD_STORAGE_PUBLIC_BUCKET). Merged on top of computed defaults; argocd_app_secrets wins if the same key is set in both."
+  type        = map(string)
+  default     = null
+}
+
+variable "argocd_app_secrets" {
+  description = "Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides argocd_env_overrides when the same key is set in both."
   type        = map(string)
   sensitive   = true
   default     = null
@@ -597,9 +609,9 @@ locals {
   eks_ondemand_node_instance_type = distinct([for value in split(",", var.eks_ondemand_node_instance_type) : trimspace(value)])
   eks_spot_node_instance_type     = distinct([for value in split(",", var.eks_spot_node_instance_type) : trimspace(value)])
 
-  # ArgoCD: guard for secrets module — only activate when Docker creds and env config are provided
+  # ArgoCD: guard for secrets module — domain, Docker creds, and argocd enabled.
   argocd_secrets_ready = (
-    var.argocd_env_config != null &&
+    local.argocd_domain != "" &&
     var.argocd_docker_username != null &&
     var.argocd_docker_password != null
   )
@@ -653,6 +665,13 @@ resource "terraform_data" "validate_argocd_versions" {
         (trimspace(var.argocd_bootstrap_repo_url) != "" && trimspace(var.argocd_bootstrap_repo_path) != "")
       )
       error_message = "argocd_bootstrap_repo_url and argocd_bootstrap_repo_path must either both be empty or both be set."
+    }
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        (var.paragon_domain != null && trimspace(var.paragon_domain) != "")
+      )
+      error_message = "paragon_domain must be set when argocd_enabled is true."
     }
   }
 }

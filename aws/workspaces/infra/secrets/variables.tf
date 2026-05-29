@@ -14,7 +14,7 @@ variable "organization" {
 }
 
 variable "env_config" {
-  description = "Map of environment variable key-value pairs to store as the primary paragon secret."
+  description = "Flat map of chart env var key-value pairs for the paragon/env Secrets Manager secret."
   type        = map(string)
   sensitive   = true
 }
