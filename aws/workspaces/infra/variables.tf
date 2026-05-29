@@ -591,6 +591,18 @@ variable "argocd_certificate_arn" {
   nullable    = false
 }
 
+variable "paragon_certificate_arn" {
+  description = "ACM certificate ARN for Paragon microservice ALB ingress (wildcard for paragon_domain). When empty and argocd_enabled, Terraform requests a new ACM cert and delegates DNS to Route 53 (NS records in Cloudflare when cloudflare_tunnel_zone_id is set)."
+  type        = string
+  default     = ""
+  nullable    = false
+
+  validation {
+    condition     = trimspace(var.paragon_certificate_arn) == "" || startswith(trimspace(var.paragon_certificate_arn), "arn:aws:acm:")
+    error_message = "paragon_certificate_arn must be an ACM certificate ARN when provided."
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Locals
 # ---------------------------------------------------------------------------

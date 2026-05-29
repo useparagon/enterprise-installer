@@ -90,3 +90,8 @@ output "secrets_manager_env_secret" {
   description = "Name of the Secrets Manager secret containing Paragon env config."
   value       = var.argocd_enabled && local.argocd_secrets_ready ? module.secrets[0].env_secret_name : null
 }
+
+output "paragon_certificate_arn" {
+  description = "ACM certificate ARN used for Paragon ALB ingress (GitOps bridge annotation paragon_certificate_arn)."
+  value       = var.argocd_enabled ? local.paragon_certificate_arn : null
+}

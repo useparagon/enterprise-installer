@@ -7,6 +7,10 @@ Call with: include "ingress.standard" $
 {{- $name := .Chart.Name -}}
 {{- $fullName := include (printf "%s.fullname" $name) . -}}
 {{- $svcPort := .Values.service.port -}}
+{{- $cert := .Values.ingress.certificate -}}
+{{- if not $cert -}}
+{{- $cert = dig "ingress" "certificate" "" .Values.global -}}
+{{- end -}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -21,7 +25,9 @@ metadata:
     {{- if eq .Values.global.env.HOST_ENV "AWS_K8" }}
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
-    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.certificate }}
+    {{- if $cert }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ $cert }}
+    {{- end }}
     alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.load_balancer_name | default "paragon" }}
     {{- if hasKey .Values.ingress "group_order" }}
     alb.ingress.kubernetes.io/group.order: '{{ .Values.ingress.group_order }}'
@@ -55,7 +61,9 @@ metadata:
     {{- end }}
     {{- else if eq .Values.global.env.HOST_ENV "GCP_K8" }}
     kubernetes.io/ingress.class: {{ .Values.ingress.className | default "gce" }}
-    ingress.gcp.kubernetes.io/pre-shared-cert: {{ .Values.ingress.certificate }}
+    {{- if $cert }}
+    ingress.gcp.kubernetes.io/pre-shared-cert: {{ $cert }}
+    {{- end }}
     ingress.kubernetes.io/healthcheck-path: {{ .Values.ingress.healthcheck_path | default "/healthz" }}
     kubernetes.io/ingress.allow-http: "true"
     kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.loadBalancerName }}

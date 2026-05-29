@@ -185,6 +185,9 @@ locals {
     },
     length(var.secrets_manager_secret_arns) > 0 ? {
       "secrets_manager_prefix" = "paragon/${var.workspace}"
+    } : {},
+    trimspace(var.paragon_certificate_arn) != "" ? {
+      paragon_certificate_arn = trimspace(var.paragon_certificate_arn)
     } : {}
   )
 }
@@ -243,13 +246,13 @@ resource "kubernetes_secret_v1" "gitops_bridge_cluster" {
   type = "Opaque"
 
   data = {
-    name   = base64encode("in-cluster")
-    server = base64encode("https://kubernetes.default.svc")
-    config = base64encode(jsonencode({
+    name   = "in-cluster"
+    server = "https://kubernetes.default.svc"
+    config = jsonencode({
       tlsClientConfig = {
         insecure = false
       }
-    }))
+    })
   }
 
   depends_on = [terraform_data.eso_crds_ready]

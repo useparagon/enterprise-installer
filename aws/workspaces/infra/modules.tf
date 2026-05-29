@@ -234,6 +234,7 @@ module "argocd" {
   bootstrap_repo_token    = var.argocd_bootstrap_repo_token
   auto_sync               = var.argocd_auto_sync
   self_heal               = var.argocd_self_heal
+  paragon_certificate_arn = local.paragon_certificate_arn
 
   depends_on = [
     module.cluster,

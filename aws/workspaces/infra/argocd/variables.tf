@@ -130,6 +130,12 @@ variable "self_heal" {
   default     = true
 }
 
+variable "paragon_certificate_arn" {
+  description = "ACM certificate ARN for Paragon ALB ingress (wildcard for paragon_domain). Exposed on the in-cluster GitOps bridge secret for ApplicationSet helm values."
+  type        = string
+  default     = ""
+}
+
 variable "app_of_apps_manifest" {
   description = "Deprecated override for root Argo CD Application YAML."
   type        = string
