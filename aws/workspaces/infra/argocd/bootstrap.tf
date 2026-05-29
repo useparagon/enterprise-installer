@@ -3,6 +3,15 @@ locals {
   # eks-blueprints-addons names the IRSA service account "{release-name}-sa".
   eso_sa_name = "external-secrets-sa"
 
+  bootstrap_repo_url_trimmed = trimspace(var.bootstrap_repo_url)
+
+  bootstrap_repo_credential_enabled = (
+    local.bootstrap_repo_url_trimmed != "" &&
+    startswith(local.bootstrap_repo_url_trimmed, "https://") &&
+    var.bootstrap_repo_token != null &&
+    trimspace(var.bootstrap_repo_token) != ""
+  )
+
   sync_policy = {
     automated = var.auto_sync ? {
       selfHeal = var.self_heal
@@ -238,6 +247,31 @@ resource "kubernetes_secret_v1" "gitops_bridge_cluster" {
   depends_on = [terraform_data.eso_crds_ready]
 }
 
+# Argo CD repository credential (GitHub PAT over HTTPS). Username is fixed to `git`;
+# password is the PAT. Same secret covers bootstrap + ApplicationSet $values refs.
+resource "kubernetes_secret_v1" "bootstrap_repo" {
+  count = local.bootstrap_repo_credential_enabled ? 1 : 0
+
+  metadata {
+    name      = "${var.workspace}-bootstrap-repo"
+    namespace = var.argocd_namespace
+    labels = {
+      "argocd.argoproj.io/secret-type" = "repository"
+    }
+  }
+
+  type = "Opaque"
+
+  data = {
+    type     = base64encode("git")
+    url      = base64encode(local.bootstrap_repo_url_trimmed)
+    username = base64encode("git")
+    password = base64encode(var.bootstrap_repo_token)
+  }
+
+  depends_on = [terraform_data.eso_crds_ready]
+}
+
 # Custom resources use kubectl_manifest (server-side apply, applied at apply-time) so the
 # plan does not require the CRDs to already exist on the cluster. The CRDs are installed by
 # eks-blueprints-addons earlier in the same apply; terraform_data.eso_crds_ready gates ordering.
@@ -282,6 +316,7 @@ resource "kubectl_manifest" "app_of_apps" {
   depends_on = [
     kubectl_manifest.cluster_secret_store,
     kubernetes_secret_v1.gitops_bridge_cluster,
+    kubernetes_secret_v1.bootstrap_repo,
   ]
 }
 

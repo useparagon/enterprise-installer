@@ -231,6 +231,7 @@ module "argocd" {
   bootstrap_repo_url      = var.argocd_bootstrap_repo_url
   bootstrap_repo_path     = var.argocd_bootstrap_repo_path
   bootstrap_repo_revision = var.argocd_bootstrap_repo_revision
+  bootstrap_repo_token    = var.argocd_bootstrap_repo_token
   auto_sync               = var.argocd_auto_sync
   self_heal               = var.argocd_self_heal
 

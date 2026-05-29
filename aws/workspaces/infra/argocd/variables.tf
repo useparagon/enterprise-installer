@@ -111,6 +111,13 @@ variable "bootstrap_repo_revision" {
   default     = "HEAD"
 }
 
+variable "bootstrap_repo_token" {
+  description = "GitHub personal access token for cloning bootstrap_repo_url (HTTPS). Set via Spacelift context / TF_VAR_* (never commit). Needs repo read on the bootstrap repository."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
 variable "auto_sync" {
   description = "Whether to enable automatic sync on the bootstrap Application."
   type        = bool

@@ -454,7 +454,7 @@ variable "argocd_app_chart_repository" {
 }
 
 variable "argocd_bootstrap_repo_url" {
-  description = "Git repository URL for Argo CD App-of-Apps bootstrap. Leave empty to skip creating the root Application."
+  description = "HTTPS Git repository URL for Argo CD App-of-Apps bootstrap (e.g. https://github.com/org/repo.git). Leave empty to skip creating the root Application."
   type        = string
   default     = ""
   nullable    = false
@@ -472,6 +472,13 @@ variable "argocd_bootstrap_repo_revision" {
   type        = string
   default     = "HEAD"
   nullable    = false
+}
+
+variable "argocd_bootstrap_repo_token" {
+  description = "GitHub PAT for argocd_bootstrap_repo_url (HTTPS). Set via Spacelift context / TF_VAR_* (never commit). Required when bootstrap repo URL and path are set."
+  type        = string
+  sensitive   = true
+  default     = null
 }
 
 variable "paragon_chart_version" {
@@ -665,6 +672,25 @@ resource "terraform_data" "validate_argocd_versions" {
         (trimspace(var.argocd_bootstrap_repo_url) != "" && trimspace(var.argocd_bootstrap_repo_path) != "")
       )
       error_message = "argocd_bootstrap_repo_url and argocd_bootstrap_repo_path must either both be empty or both be set."
+    }
+    precondition {
+      condition = (
+        trimspace(var.argocd_bootstrap_repo_url) == "" ||
+        trimspace(var.argocd_bootstrap_repo_path) == "" ||
+        startswith(trimspace(var.argocd_bootstrap_repo_url), "https://")
+      )
+      error_message = "argocd_bootstrap_repo_url must use HTTPS (https://github.com/...). SSH git@ URLs are not supported; use a GitHub PAT via argocd_bootstrap_repo_token."
+    }
+    precondition {
+      condition = (
+        trimspace(var.argocd_bootstrap_repo_url) == "" ||
+        trimspace(var.argocd_bootstrap_repo_path) == "" ||
+        (
+          var.argocd_bootstrap_repo_token != null &&
+          trimspace(var.argocd_bootstrap_repo_token) != ""
+        )
+      )
+      error_message = "argocd_bootstrap_repo_token (GitHub PAT) is required when argocd_bootstrap_repo_url and argocd_bootstrap_repo_path are set."
     }
     precondition {
       condition = (
