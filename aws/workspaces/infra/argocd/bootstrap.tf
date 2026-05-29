@@ -255,8 +255,9 @@ resource "kubernetes_secret_v1" "gitops_bridge_cluster" {
   depends_on = [terraform_data.eso_crds_ready]
 }
 
-# Argo CD repository credential (GitHub PAT over HTTPS). Username is fixed to `git`;
-# password is the PAT. Same secret covers bootstrap + ApplicationSet $values refs.
+# Argo CD repository credential (GitHub PAT over HTTPS). Same secret covers bootstrap
+# Application + ApplicationSet $values refs. kubernetes_secret_v1 `data` must be plain
+# text; the provider base64-encodes for the Kubernetes API.
 resource "kubernetes_secret_v1" "bootstrap_repo" {
   count = local.bootstrap_repo_credential_enabled ? 1 : 0
 
@@ -270,13 +271,11 @@ resource "kubernetes_secret_v1" "bootstrap_repo" {
 
   type = "Opaque"
 
-  # data values are base64-encoded for the Kubernetes API (provider does not re-encode).
-  # GitHub PAT: username x-access-token, password = PAT.
   data = {
-    type     = base64encode("git")
-    url      = base64encode(local.bootstrap_repo_url_trimmed)
-    username = base64encode("x-access-token")
-    password = base64encode(local.bootstrap_repo_token_trimmed)
+    type     = "git"
+    url      = local.bootstrap_repo_url_trimmed
+    username = "x-access-token"
+    password = local.bootstrap_repo_token_trimmed
   }
 
   depends_on = [terraform_data.eso_crds_ready]
