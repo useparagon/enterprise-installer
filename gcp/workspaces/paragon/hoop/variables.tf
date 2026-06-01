@@ -109,6 +109,7 @@ variable "hoop_slack_channel_ids" {
 
 variable "infra_vars" {
   description = "Infrastructure variables from infra-output.json."
+  sensitive   = true
   type = object({
     postgres = optional(object({
       value = optional(map(object({
@@ -127,6 +128,8 @@ variable "infra_vars" {
         db_number      = optional(number, 0)
         ssl            = optional(bool, false)
         ca_certificate = optional(string, null)
+        password       = optional(string)
+        user           = optional(string)
       })), {})
     }))
   })
