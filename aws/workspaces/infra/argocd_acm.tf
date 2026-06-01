@@ -51,8 +51,10 @@ module "paragon_acm" {
   zone_id                           = aws_route53_zone.paragon[0].zone_id
 }
 
+# Delegate Route 53 NS to Cloudflare (same pattern as paragon workspace alb/dns.tf).
+# count must be plan-time constant; AWS hosted zones always get four name servers.
 resource "cloudflare_record" "paragon_nameserver" {
-  count = local.paragon_acm_cloudflare_enabled ? length(aws_route53_zone.paragon[0].name_servers) : 0
+  count = local.paragon_acm_cloudflare_enabled ? 4 : 0
 
   content = aws_route53_zone.paragon[0].name_servers[count.index]
   name    = local.paragon_domain_trimmed
