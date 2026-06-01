@@ -4,8 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Git tag to check out and publish (must exist). Chart trees use __PARAGON_VERSION__ = this tag only."
+        description: >
+          Paragon release tag (e.g. 2026.0528.1501-2b7d0d71). Stamps __PARAGON_VERSION__
+          and loads charts/files/service-inputs.json from this tag.
         required: true
+        type: string
+      chart_ref:
+        description: >
+          Git ref for chart templates (branch or SHA). Defaults to the ref that
+          started this workflow (use your feature branch when dispatching from it).
+        required: false
         type: string
 
 permissions:
@@ -22,10 +30,10 @@ jobs:
       CHARTS: paragon-onprem paragon-logging paragon-monitoring
 
     steps:
-      - name: Checkout
+      - name: Checkout chart sources
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.3.1
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.chart_ref || github.ref }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -47,6 +55,9 @@ jobs:
             apt-get update -qq
             apt-get install -y rsync
           fi
+
+      - name: Fetch service-inputs from release tag
+        run: bash scripts/fetch-service-inputs-from-tag.sh "${{ inputs.version }}"
 
       - name: Update chart fixtures
         run: node scripts/update-charts.mjs charts/files/service-inputs.json
