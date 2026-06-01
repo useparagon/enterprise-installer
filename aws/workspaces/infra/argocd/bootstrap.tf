@@ -115,7 +115,8 @@ locals {
           data = [{
             secretKey = "dockerconfigjson"
             remoteRef = {
-              key = var.docker_cfg_secret_name
+              key      = var.docker_cfg_secret_name
+              property = "dockerconfigjson"
             }
           }]
         }
