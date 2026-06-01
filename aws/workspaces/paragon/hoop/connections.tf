@@ -1,6 +1,6 @@
 # Unified Hoop connections - all connection types in a single resource
 resource "hoop_connection" "all_connections" {
-  for_each = var.hoop_enabled ? toset(keys(local.all_connections)) : []
+  for_each = var.hoop_enabled ? toset(nonsensitive(keys(local.all_connections))) : []
 
   name     = local.all_connections[each.value].name
   type     = local.all_connections[each.value].type
@@ -26,7 +26,7 @@ resource "hoop_connection" "all_connections" {
 
 # Provider normalizes Postgres command; ignore to avoid perpetual drift.
 resource "hoop_connection" "postgres_connections" {
-  for_each = var.hoop_enabled ? toset(keys(local.postgres_connections)) : []
+  for_each = var.hoop_enabled ? toset(nonsensitive(keys(local.postgres_connections))) : []
 
   name     = local.postgres_connections[each.value].name
   type     = local.postgres_connections[each.value].type
