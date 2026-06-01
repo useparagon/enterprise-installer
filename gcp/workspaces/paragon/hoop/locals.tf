@@ -61,8 +61,13 @@ locals {
           },
           try(instance_config.ssl, false) == true ? { "envvar:REDIS_TLS" = "1" } : {},
           try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {},
-          try(instance_config.password, "") != "" ? { "envvar:PASS" = instance_config.password } : {},
-          try(instance_config.user, "") != "" ? { "envvar:USER" = instance_config.user } : {}
+          {
+            for k, v in {
+              "envvar:PASS" = try(instance_config.password, null)
+              "envvar:USER" = try(instance_config.user, null)
+            } : k => v
+            if v != null && v != ""
+          }
         )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"
@@ -313,4 +318,37 @@ locals {
   }
 
   all_connections = local.connections_merge
+
+  # Non-secret fields only (infra_vars is sensitive; keeps plan output readable)
+  all_connections_config = {
+    for k, v in local.all_connections : k => {
+      name                 = nonsensitive(v.name)
+      type                 = nonsensitive(v.type)
+      subtype              = nonsensitive(v.subtype)
+      command              = nonsensitive(v.command)
+      access_mode_runbooks = nonsensitive(v.access_mode_runbooks)
+      access_mode_exec     = nonsensitive(v.access_mode_exec)
+      access_mode_connect  = nonsensitive(v.access_mode_connect)
+      access_schema        = nonsensitive(v.access_schema)
+      guardrail_rules      = try(v.guardrail_rules, null) != null && length(coalesce(try(v.guardrail_rules, null), [])) > 0 ? nonsensitive(v.guardrail_rules) : null
+      reviewers            = try(v.reviewers, null) != null && length(coalesce(try(v.reviewers, null), [])) > 0 ? nonsensitive(v.reviewers) : null
+      tags                 = nonsensitive(v.tags)
+    }
+  }
+
+  postgres_connections_config = {
+    for k, v in local.postgres_connections : k => {
+      name                 = nonsensitive(v.name)
+      type                 = nonsensitive(v.type)
+      subtype              = nonsensitive(v.subtype)
+      command              = nonsensitive(v.command)
+      access_mode_runbooks = nonsensitive(v.access_mode_runbooks)
+      access_mode_exec     = nonsensitive(v.access_mode_exec)
+      access_mode_connect  = nonsensitive(v.access_mode_connect)
+      access_schema        = nonsensitive(v.access_schema)
+      guardrail_rules      = try(v.guardrail_rules, null) != null && length(coalesce(try(v.guardrail_rules, null), [])) > 0 ? nonsensitive(v.guardrail_rules) : null
+      reviewers            = try(v.reviewers, null) != null && length(coalesce(try(v.reviewers, null), [])) > 0 ? nonsensitive(v.reviewers) : null
+      tags                 = nonsensitive(v.tags)
+    }
+  }
 }
