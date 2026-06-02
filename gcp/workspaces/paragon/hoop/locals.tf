@@ -60,7 +60,14 @@ locals {
             "envvar:DB_NUMBER" = tostring(try(instance_config.db_number, 0))
           },
           try(instance_config.ssl, false) == true ? { "envvar:REDIS_TLS" = "1" } : {},
-          try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {}
+          try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {},
+          {
+            for k, v in {
+              "envvar:PASS" = try(instance_config.password, null)
+              "envvar:USER" = try(instance_config.user, null)
+            } : k => v
+            if v != null && v != ""
+          }
         )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"
@@ -133,6 +140,32 @@ locals {
         }
       }
     },
+    # grafana (private monitoring UI; not exposed when listed in private_services)
+    var.hoop_grafana_connection ? {
+      "grafana" = {
+        name    = "${local.connection_prefix}-grafana"
+        type    = "application"
+        subtype = "tcp"
+        command = ["bash"]
+        secrets = {
+          "envvar:HOST" = "grafana.paragon"
+          "envvar:PORT" = "4500"
+        }
+        access_mode_runbooks = "enabled"
+        access_mode_exec     = "enabled"
+        access_mode_connect  = "enabled"
+        access_schema        = "disabled"
+        tags = {
+          environment     = local.connection_environment
+          customer_facing = var.customer_facing
+          criticality     = "normal"
+          access-level    = "private"
+          impact          = "low"
+          service-type    = "monitoring"
+          cloud           = local.detected_cloud
+        }
+      }
+    } : {},
     # redis-insight
     try(var.infra_vars.redis.value, null) != null ? {
       "redis-insight" = {
@@ -285,4 +318,37 @@ locals {
   }
 
   all_connections = local.connections_merge
+
+  # Non-secret fields only (infra_vars is sensitive; keeps plan output readable)
+  all_connections_config = {
+    for k, v in local.all_connections : k => {
+      name                 = nonsensitive(v.name)
+      type                 = nonsensitive(v.type)
+      subtype              = nonsensitive(v.subtype)
+      command              = nonsensitive(v.command)
+      access_mode_runbooks = nonsensitive(v.access_mode_runbooks)
+      access_mode_exec     = nonsensitive(v.access_mode_exec)
+      access_mode_connect  = nonsensitive(v.access_mode_connect)
+      access_schema        = nonsensitive(v.access_schema)
+      guardrail_rules      = try(v.guardrail_rules, null) != null && length(coalesce(try(v.guardrail_rules, null), [])) > 0 ? nonsensitive(v.guardrail_rules) : null
+      reviewers            = try(v.reviewers, null) != null && length(coalesce(try(v.reviewers, null), [])) > 0 ? nonsensitive(v.reviewers) : null
+      tags                 = nonsensitive(v.tags)
+    }
+  }
+
+  postgres_connections_config = {
+    for k, v in local.postgres_connections : k => {
+      name                 = nonsensitive(v.name)
+      type                 = nonsensitive(v.type)
+      subtype              = nonsensitive(v.subtype)
+      command              = nonsensitive(v.command)
+      access_mode_runbooks = nonsensitive(v.access_mode_runbooks)
+      access_mode_exec     = nonsensitive(v.access_mode_exec)
+      access_mode_connect  = nonsensitive(v.access_mode_connect)
+      access_schema        = nonsensitive(v.access_schema)
+      guardrail_rules      = try(v.guardrail_rules, null) != null && length(coalesce(try(v.guardrail_rules, null), [])) > 0 ? nonsensitive(v.guardrail_rules) : null
+      reviewers            = try(v.reviewers, null) != null && length(coalesce(try(v.reviewers, null), [])) > 0 ? nonsensitive(v.reviewers) : null
+      tags                 = nonsensitive(v.tags)
+    }
+  }
 }

@@ -57,6 +57,12 @@ variable "hoop_redis_guardrail_rules" {
   default     = ["182f59b2-5d5d-4ab8-978e-94472b3915fc"]
 }
 
+variable "hoop_grafana_connection" {
+  description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
+  type        = bool
+  default     = false
+}
+
 variable "customer_facing" {
   description = "Whether the connections are customer-facing (true limits access to dev-team-oncall/dev-team-managers/admin, false adds dev-team-engineering)."
   type        = bool
@@ -103,6 +109,7 @@ variable "hoop_slack_channel_ids" {
 
 variable "infra_vars" {
   description = "Infrastructure variables from infra-output.json."
+  sensitive   = true
   type = object({
     postgres = optional(object({
       value = optional(map(object({
@@ -121,6 +128,8 @@ variable "infra_vars" {
         db_number      = optional(number, 0)
         ssl            = optional(bool, false)
         ca_certificate = optional(string, null)
+        password       = optional(string)
+        user           = optional(string)
       })), {})
     }))
   })
