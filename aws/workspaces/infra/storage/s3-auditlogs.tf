@@ -64,6 +64,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "auditlogs" {
   rule {
     id = "expiration"
 
+    filter {}
+
     expiration {
       days = var.auditlogs_retention_days
     }

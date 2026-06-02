@@ -58,6 +58,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "managed_sync" {
   rule {
     id = "expiration"
 
+    filter {}
+
     expiration {
       days = var.app_bucket_expiration
     }

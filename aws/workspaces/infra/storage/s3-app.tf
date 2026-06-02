@@ -51,6 +51,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "app" {
   rule {
     id = "expiration"
 
+    filter {}
+
     expiration {
       days = var.app_bucket_expiration
     }
