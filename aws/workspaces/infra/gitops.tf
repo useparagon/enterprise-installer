@@ -1,6 +1,18 @@
 # GitOps cluster add-ons: External Secrets Operator, AWS Load Balancer Controller,
 # and external-dns. Wired into eks_blueprints_addons from modules.tf.
 
+# Brownfield: legacy paragon workspace installed LBC as Helm release "ingress" in the
+# paragon namespace, creating cluster-scoped IngressClass / IngressClassParams "alb"
+# without ownership metadata for release aws-load-balancer-controller (kube-system).
+data "kubernetes_resources" "gitops_alb_ingress_class" {
+  count = var.argocd_enabled ? 1 : 0
+
+  api_version = "networking.k8s.io/v1"
+  kind        = "IngressClass"
+
+  depends_on = [module.cluster]
+}
+
 # ---------------------------------------------------------------------------
 # External Secrets Operator (ESO)
 # ---------------------------------------------------------------------------
@@ -47,16 +59,28 @@ locals {
   # infra path must provide the same controllers so Ingress resources provision ALBs
   # and Route 53 records.
 
-  gitops_aws_load_balancer_controller = {
-    name      = "aws-load-balancer-controller"
-    namespace = "kube-system"
-    # upgrades require kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
-    chart_version    = "3.3.0"
-    create_namespace = false
-    wait             = true
-    wait_for_jobs    = true
-    timeout          = 600
-  }
+  gitops_alb_ingress_class_exists = var.argocd_enabled && anytrue([
+    for obj in try(data.kubernetes_resources.gitops_alb_ingress_class[0].objects, []) :
+    try(obj.metadata.name, "") == "alb"
+  ])
+
+  gitops_aws_load_balancer_controller = merge(
+    {
+      name      = "aws-load-balancer-controller"
+      namespace = "kube-system"
+      # upgrades require kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+      chart_version    = "3.3.0"
+      create_namespace = false
+      wait             = true
+      wait_for_jobs    = true
+      timeout          = 600
+    },
+    local.gitops_alb_ingress_class_exists ? {
+      values = [yamlencode({
+        createIngressClassResource = false
+      })]
+    } : {}
+  )
 
   gitops_external_dns = {
     name             = "external-dns"
