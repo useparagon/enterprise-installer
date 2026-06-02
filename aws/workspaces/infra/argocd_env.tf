@@ -27,6 +27,11 @@ locals {
     role => try(local.argocd_redis_endpoint[role].cluster, false) ? "true" : "false"
   }
 
+  argocd_redis_tls_enabled = {
+    for role in keys(local.argocd_redis_endpoint) :
+    role => try(local.argocd_redis_endpoint[role].ssl, false) ? "true" : "false"
+  }
+
   argocd_redis_url = {
     for role in keys(local.argocd_redis_endpoint) :
     role => local.argocd_redis_endpoint[role] != null ? "${local.argocd_redis_endpoint[role].host}:${local.argocd_redis_endpoint[role].port}" : local.argocd_default_redis_url
@@ -45,7 +50,6 @@ locals {
     HADES_PUBLIC_URL              = "hades"
     HEALTH_CHECKER_PUBLIC_URL     = "health-checker"
     HERMES_PUBLIC_URL             = "hermes"
-    MINIO_PUBLIC_URL              = "minio"
     PASSPORT_PUBLIC_URL           = "passport"
     PHEME_PUBLIC_URL              = "pheme"
     RELEASE_PUBLIC_URL            = "release"
@@ -100,16 +104,16 @@ locals {
     REDIS_URL = local.argocd_default_redis_url
 
     CACHE_REDIS_CLUSTER_ENABLED    = local.argocd_redis_cluster_enabled.cache
-    CACHE_REDIS_TLS_ENABLED        = "false"
+    CACHE_REDIS_TLS_ENABLED        = local.argocd_redis_tls_enabled.cache
     CACHE_REDIS_URL                = local.argocd_redis_url.cache
     QUEUE_REDIS_CLUSTER_ENABLED    = local.argocd_redis_cluster_enabled.queue
-    QUEUE_REDIS_TLS_ENABLED        = "false"
+    QUEUE_REDIS_TLS_ENABLED        = local.argocd_redis_tls_enabled.queue
     QUEUE_REDIS_URL                = local.argocd_redis_url.queue
     SYSTEM_REDIS_CLUSTER_ENABLED   = local.argocd_redis_cluster_enabled.system
-    SYSTEM_REDIS_TLS_ENABLED       = "false"
+    SYSTEM_REDIS_TLS_ENABLED       = local.argocd_redis_tls_enabled.system
     SYSTEM_REDIS_URL               = local.argocd_redis_url.system
     WORKFLOW_REDIS_CLUSTER_ENABLED = local.argocd_redis_cluster_enabled.workflow
-    WORKFLOW_REDIS_TLS_ENABLED     = "false"
+    WORKFLOW_REDIS_TLS_ENABLED     = local.argocd_redis_tls_enabled.workflow
     WORKFLOW_REDIS_URL             = local.argocd_redis_url.workflow
 
     CLOUD_STORAGE_COMPLIANCE_BUCKET = local.argocd_storage.auditlogs_bucket
@@ -121,18 +125,6 @@ locals {
     CLOUD_STORAGE_REGION            = var.aws_region
     CLOUD_STORAGE_PUBLIC_URL        = local.argocd_s3_endpoint
     CLOUD_STORAGE_PRIVATE_URL       = local.argocd_s3_endpoint
-
-    MINIO_BROWSER           = "off"
-    MINIO_INSTANCE_COUNT    = "1"
-    MINIO_MICROSERVICE_PASS = local.argocd_storage.minio_microservice_pass
-    MINIO_MICROSERVICE_USER = local.argocd_storage.minio_microservice_user
-    MINIO_MODE              = "gateway-s3"
-    MINIO_NGINX_PROXY       = "on"
-    MINIO_PUBLIC_BUCKET     = local.argocd_storage.public_bucket
-    MINIO_REGION            = var.aws_region
-    MINIO_ROOT_PASSWORD     = local.argocd_storage.access_key_secret
-    MINIO_ROOT_USER         = local.argocd_storage.access_key_id
-    MINIO_SYSTEM_BUCKET     = local.argocd_storage.private_bucket
   })
 
   argocd_app_secret_overrides = var.argocd_app_secrets != null ? var.argocd_app_secrets : {}

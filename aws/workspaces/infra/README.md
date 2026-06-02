@@ -22,6 +22,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 5.100.0 |
 | <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | 4.52.5 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | 2.33.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | 3.8.1 |
 | <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
 | <a name="provider_time"></a> [time](#provider\_time) | 0.13.1 |
@@ -64,6 +65,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | [time_sleep.gitops_eso_crds](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_eks_cluster_auth.gitops](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/eks_cluster_auth) | data source |
+| [kubernetes_resources.gitops_alb_ingress_class](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/data-sources/resources) | data source |
 
 ## Inputs
 
