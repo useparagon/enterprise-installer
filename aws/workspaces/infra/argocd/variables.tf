@@ -136,6 +136,12 @@ variable "paragon_certificate_arn" {
   default     = ""
 }
 
+variable "paragon_domain" {
+  description = "Customer-facing Paragon domain (GitOps bridge annotation paragon_domain)."
+  type        = string
+  default     = ""
+}
+
 variable "app_of_apps_manifest" {
   description = "Deprecated override for root Argo CD Application YAML."
   type        = string

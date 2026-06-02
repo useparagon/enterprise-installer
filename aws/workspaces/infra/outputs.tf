@@ -95,3 +95,13 @@ output "paragon_certificate_arn" {
   description = "ACM certificate ARN used for Paragon ALB ingress (GitOps bridge annotation paragon_certificate_arn)."
   value       = var.argocd_enabled ? local.paragon_certificate_arn : null
 }
+
+output "paragon_route53_zone_id" {
+  description = "Route 53 hosted zone ID for paragon_domain (used by external-dns)."
+  value       = local.create_paragon_zone ? aws_route53_zone.paragon[0].zone_id : null
+}
+
+output "paragon_route53_name_servers" {
+  description = "Route 53 name servers for paragon_domain. Delegate from Cloudflare (or parent DNS) when not auto-managed."
+  value       = local.create_paragon_zone ? aws_route53_zone.paragon[0].name_servers : null
+}

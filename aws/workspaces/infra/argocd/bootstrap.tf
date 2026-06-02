@@ -189,6 +189,9 @@ locals {
     } : {},
     trimspace(var.paragon_certificate_arn) != "" ? {
       paragon_certificate_arn = trimspace(var.paragon_certificate_arn)
+    } : {},
+    trimspace(var.paragon_domain) != "" ? {
+      paragon_domain = trimspace(var.paragon_domain)
     } : {}
   )
 }
@@ -362,7 +365,7 @@ resource "kubectl_manifest" "external_secrets" {
 
   server_side_apply = true
   # Reclaim fields after out-of-band kubectl edits (e.g. hotfixing remoteRef.property).
-  force_conflicts   = true
+  force_conflicts = true
 
   depends_on = [
     kubectl_manifest.cluster_secret_store,

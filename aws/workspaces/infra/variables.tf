@@ -612,6 +612,14 @@ locals {
   environment = "enterprise"
   workspace   = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
 
+  paragon_domain_trimmed = var.paragon_domain != null ? trimspace(var.paragon_domain) : ""
+
+  # GitOps ingress: ALB controller + external-dns (Route 53 records from Ingress hosts).
+  gitops_ingress_enabled = (
+    var.argocd_enabled &&
+    local.paragon_domain_trimmed != ""
+  )
+
   default_tags = merge(
     {
       Name        = "paragon-${var.organization}"

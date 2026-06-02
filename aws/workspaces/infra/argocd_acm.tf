@@ -1,11 +1,12 @@
-# ACM for Paragon ALB ingress when GitOps is enabled. Skipped when paragon_certificate_arn
-# is set (e.g. cert already exists from a prior paragon workspace apply).
+# Route 53 zone, ACM, and Cloudflare NS delegation for Paragon GitOps ingress.
 locals {
-  paragon_domain_trimmed = var.paragon_domain != null ? trimspace(var.paragon_domain) : ""
+  create_paragon_zone = (
+    var.argocd_enabled &&
+    local.paragon_domain_trimmed != ""
+  )
 
   create_paragon_acm = (
-    var.argocd_enabled &&
-    local.paragon_domain_trimmed != "" &&
+    local.create_paragon_zone &&
     trimspace(var.paragon_certificate_arn) == ""
   )
 
@@ -13,8 +14,8 @@ locals {
     local.create_paragon_acm ? module.paragon_acm[0].arn : ""
   )
 
-  paragon_acm_cloudflare_enabled = (
-    local.create_paragon_acm &&
+  paragon_route53_cloudflare_enabled = (
+    local.create_paragon_zone &&
     trimspace(var.cloudflare_api_token) != "" &&
     trimspace(var.cloudflare_tunnel_zone_id) != "" &&
     var.cloudflare_api_token != "dummy-cloudflare-tokens-must-be-40-chars"
@@ -22,14 +23,18 @@ locals {
 }
 
 resource "aws_route53_zone" "paragon" {
-  count = local.create_paragon_acm ? 1 : 0
+  count = local.create_paragon_zone ? 1 : 0
 
   name          = local.paragon_domain_trimmed
   force_destroy = false
+
+  tags = merge(local.default_tags, {
+    Name = local.paragon_domain_trimmed
+  })
 }
 
 resource "aws_route53_record" "paragon_caa" {
-  count = local.create_paragon_acm ? 1 : 0
+  count = local.create_paragon_zone ? 1 : 0
 
   name    = local.paragon_domain_trimmed
   records = ["0 issue \"amazon.com\""]
@@ -54,7 +59,7 @@ module "paragon_acm" {
 # Delegate Route 53 NS to Cloudflare (same pattern as paragon workspace alb/dns.tf).
 # count must be plan-time constant; AWS hosted zones always get four name servers.
 resource "cloudflare_record" "paragon_nameserver" {
-  count = local.paragon_acm_cloudflare_enabled ? 4 : 0
+  count = local.paragon_route53_cloudflare_enabled ? 4 : 0
 
   content = aws_route53_zone.paragon[0].name_servers[count.index]
   name    = local.paragon_domain_trimmed

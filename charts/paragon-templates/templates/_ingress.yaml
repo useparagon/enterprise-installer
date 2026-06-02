@@ -11,6 +11,13 @@ Call with: include "ingress.standard" $
 {{- if not $cert -}}
 {{- $cert = dig "ingress" "certificate" "" .Values.global -}}
 {{- end -}}
+{{- $lbName := .Values.ingress.load_balancer_name -}}
+{{- if not $lbName -}}
+{{- $lbName = dig "ingress" "load_balancer_name" "" .Values.global -}}
+{{- end -}}
+{{- if not $lbName -}}
+{{- $lbName = "paragon" -}}
+{{- end -}}
 {{- $className := .Values.ingress.className -}}
 {{- if not $className -}}
 {{- $className = dig "ingress" "className" "" .Values.global -}}
@@ -31,7 +38,7 @@ metadata:
     {{- if $cert }}
     alb.ingress.kubernetes.io/certificate-arn: {{ $cert }}
     {{- end }}
-    alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.load_balancer_name | default "paragon" }}
+    alb.ingress.kubernetes.io/group.name: {{ $lbName }}
     {{- if hasKey .Values.ingress "group_order" }}
     alb.ingress.kubernetes.io/group.order: '{{ .Values.ingress.group_order }}'
     {{- end }}
@@ -40,7 +47,7 @@ metadata:
     alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
     alb.ingress.kubernetes.io/healthy-threshold-count: '2'
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/load-balancer-name: {{ .Values.ingress.load_balancer_name | default "paragon" }}
+    alb.ingress.kubernetes.io/load-balancer-name: {{ $lbName }}
     alb.ingress.kubernetes.io/scheme: {{ .Values.ingress.scheme | default "internet-facing" }}
     alb.ingress.kubernetes.io/ssl-policy: {{ .Values.ingress.ssl_policy | default "ELBSecurityPolicy-TLS13-1-2-2021-06" }}
     alb.ingress.kubernetes.io/ssl-redirect: '443'

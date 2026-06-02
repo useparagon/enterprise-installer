@@ -144,6 +144,15 @@ module "eks_blueprints_addons" {
   enable_external_secrets               = var.argocd_enabled
   external_secrets                      = local.gitops_external_secrets
   external_secrets_secrets_manager_arns = local.gitops_eso_secret_arns
+
+  enable_aws_load_balancer_controller = var.argocd_enabled
+  aws_load_balancer_controller        = local.gitops_aws_load_balancer_controller
+
+  enable_external_dns = local.gitops_ingress_enabled
+  external_dns        = local.gitops_external_dns
+  external_dns_route53_zone_arns = local.gitops_ingress_enabled ? [
+    aws_route53_zone.paragon[0].arn,
+  ] : []
   argocd = merge(
     {
       name             = "argo-cd"
@@ -235,6 +244,7 @@ module "argocd" {
   auto_sync               = var.argocd_auto_sync
   self_heal               = var.argocd_self_heal
   paragon_certificate_arn = local.paragon_certificate_arn
+  paragon_domain          = local.paragon_domain_trimmed
 
   depends_on = [
     module.cluster,

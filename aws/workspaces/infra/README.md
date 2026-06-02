@@ -161,6 +161,8 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | The bucket used to store system logs. |
 | <a name="output_minio"></a> [minio](#output\_minio) | MinIO server connection info. |
 | <a name="output_paragon_certificate_arn"></a> [paragon\_certificate\_arn](#output\_paragon\_certificate\_arn) | ACM certificate ARN used for Paragon ALB ingress (GitOps bridge annotation paragon\_certificate\_arn). |
+| <a name="output_paragon_route53_name_servers"></a> [paragon\_route53\_name\_servers](#output\_paragon\_route53\_name\_servers) | Route 53 name servers for paragon\_domain. Delegate from Cloudflare (or parent DNS) when not auto-managed. |
+| <a name="output_paragon_route53_zone_id"></a> [paragon\_route53\_zone\_id](#output\_paragon\_route53\_zone\_id) | Route 53 hosted zone ID for paragon\_domain (used by external-dns). |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
 | <a name="output_secrets_manager_env_secret"></a> [secrets\_manager\_env\_secret](#output\_secrets\_manager\_env\_secret) | Name of the Secrets Manager secret containing Paragon env config. |
