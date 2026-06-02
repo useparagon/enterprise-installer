@@ -361,6 +361,8 @@ resource "kubectl_manifest" "external_secrets" {
   yaml_body = yamlencode(each.value)
 
   server_side_apply = true
+  # Reclaim fields after out-of-band kubectl edits (e.g. hotfixing remoteRef.property).
+  force_conflicts   = true
 
   depends_on = [
     kubectl_manifest.cluster_secret_store,
