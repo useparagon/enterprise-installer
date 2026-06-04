@@ -45,9 +45,14 @@ output "minio" {
 }
 
 output "redis" {
-  description = "Connection information for Redis."
-  value       = module.redis.redis
+  description = "Connection information for Redis (legacy Azure Cache for Redis or Azure Managed Redis 7.4)."
+  value       = var.redis_managed_enabled ? module.redis_managed[0].redis : module.redis.redis
   sensitive   = true
+}
+
+output "redis_managed_export_storage" {
+  description = "Blob storage for on-demand Azure Managed Redis RDB export (null when disabled or legacy Redis)."
+  value       = var.redis_managed_enabled ? module.redis_managed[0].export_storage : null
 }
 
 output "cluster_name" {

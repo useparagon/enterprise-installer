@@ -15,11 +15,111 @@ To update credentials when the app registration secret expires:
 
 Do not commit real secrets to git. Prefer environment variables or a secret manager for `azure_client_secret` / `ARM_CLIENT_SECRET`.
 
+## Redis: legacy vs Azure Managed Redis
+
+Suggested branch for this work: `feat/PARA-21251/azure-managed-redis` (PARA-21251).
+
+Two mutually exclusive backends supply the `redis` output consumed by the paragon workspace:
+
+| Variable | Default | Backend | Redis version |
+|----------|---------|---------|---------------|
+| `redis_enabled` | `true` | `./redis` (`azurerm_redis_cache`) | 6 |
+| `redis_managed_enabled` | `false` | `./redis-managed` (`azurerm_managed_redis`) | 7.4 (service default) |
+
+Exactly one must be `true`. Existing customers keep defaults (`redis_enabled = true`) for a no-op plan on Redis.
+
+### Azure Managed Redis tuning (all regions)
+
+SKUs are **not** legacy `Premium` / `Standard`. Use Managed Redis names such as `Balanced_B10`, `MemoryOptimized_M50`, or `ComputeOptimized_X10`.
+
+One map drives every instance (`for_each` in `./redis-managed`). Globals stay fixed unless you need to change them:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `redis_managed_instances_default` | (in `variables.tf` locals) | Per-instance `sku`, `ha_enabled`, `cluster_enabled` |
+| `redis_managed_instances` | `null` | Per-key overrides merged into defaults |
+| `redis_managed_export_storage_enabled` | `false` | Blob storage + RBAC for on-demand RDB export |
+| `redis_managed_export_storage_replication_type` | `LRS` | Replication for export storage account |
+| `redis_managed_clustering_policy` | `OSSCluster` | Used when `cluster_enabled = true` |
+| `redis_managed_public_network_access` | `Disabled` | Network access |
+
+`redis_multiple_instances` and `managed_sync_enabled` still filter which keys deploy (same as legacy redis).
+
+Built-in default map (used when `redis_managed_instances` is null):
+
+```hcl
+cache        = { sku = "Balanced_B10", ha_enabled = true,  cluster_enabled = true }
+queue        = { sku = "Balanced_B3",  ha_enabled = true,  cluster_enabled = false }
+system       = { sku = "Balanced_B3",  ha_enabled = true,  cluster_enabled = false }
+managed-sync = { sku = "Balanced_B10", ha_enabled = true,  cluster_enabled = false }
+```
+
+`managed-sync` uses `cluster_enabled = false` (NoCluster policy). Bull/ioredis over a private endpoint cannot use OSS cluster slot discovery (internal shard addresses such as `10.0.16.x:8501` are not reachable with TLS), and a non-cluster client against OSSCluster receives `MOVED` redirects. Use NoCluster for the dedicated managed-sync instance; keep OSSCluster on `cache` when the monorepo client supports it.
+
+Greenfield example:
+
+```hcl
+redis_enabled         = false
+redis_managed_enabled = true
+```
+
+Per-region override example (merged into defaults per key):
+
+```hcl
+redis_managed_instances = {
+  cache = { sku = "MemoryOptimized_M50" }
+  queue = { sku = "MemoryOptimized_M10", ha_enabled = false }
+}
+```
+
+Development example (disable HA on all instances via overrides):
+
+```hcl
+redis_managed_instances = {
+  cache  = { ha_enabled = false }
+  queue  = { ha_enabled = false }
+  system = { ha_enabled = false }
+}
+```
+
+### Data persistence (RDB / AOF)
+
+Per-instance, merged like other fields. Requires `ha_enabled = true`. Cannot be used with geo-replication.
+
+| `persistence_mode` | `persistence_frequency` | Meaning |
+|--------------------|-------------------------|---------|
+| `null` (default) | — | No persistence |
+| `"rdb"` | `1h`, `6h`, or `12h` (default `1h`) | Snapshots on managed disk (included in SKU) |
+| `"aof"` | `1s` (only value) | Append-only log on managed disk |
+
+Example:
+
+```hcl
+redis_managed_instances = {
+  cache = { persistence_mode = "rdb", persistence_frequency = "1h" }
+  queue = { persistence_mode = "aof" }
+}
+```
+
+### RDB export to Storage (backup copies)
+
+Export is an on-demand Azure operation (CLI/portal), not continuous like legacy Premium RDB-to-storage. Terraform can provision the target storage account:
+
+```hcl
+redis_managed_export_storage_enabled = true
+```
+
+After apply, use `terraform output redis_managed_export_storage` and run export per [Import and export](https://learn.microsoft.com/azure/redis/how-to-import-export-data). Each instance gets a system-assigned identity with **Storage Blob Data Contributor** on that account.
+
+Confirm SKU availability in the target region before apply.
+
+Requires `azurerm` provider `>= 4.60` in `main.tf` (see `main.tf.example`).
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
 | <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | ~> 3.0 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.0 |
@@ -31,13 +131,14 @@ No providers.
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
+| ---- | ------ | ------- |
 | <a name="module_bastion"></a> [bastion](#module\_bastion) | ./bastion | n/a |
 | <a name="module_cluster"></a> [cluster](#module\_cluster) | ./cluster | n/a |
 | <a name="module_kafka"></a> [kafka](#module\_kafka) | ./kafka | n/a |
 | <a name="module_network"></a> [network](#module\_network) | ./network | n/a |
 | <a name="module_postgres"></a> [postgres](#module\_postgres) | ./postgres | n/a |
 | <a name="module_redis"></a> [redis](#module\_redis) | ./redis | n/a |
+| <a name="module_redis_managed"></a> [redis\_managed](#module\_redis\_managed) | ./redis-managed | n/a |
 | <a name="module_storage"></a> [storage](#module\_storage) | ./storage | n/a |
 
 ## Resources
@@ -47,7 +148,7 @@ No resources.
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to lock the audit logs container immutability policy. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |
@@ -77,7 +178,7 @@ No resources.
 | <a name="input_location"></a> [location](#input\_location) | Azure geographic region to deploy resources in. | `string` | n/a | yes |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
-| <a name="input_postgres_base_sku_name"></a> [postgres\_base\_sku\_name](#input\_postgres\_base\_sku\_name) | PostgreSQL SKU for secondary instances. Use GP\_Standard\_D2ads\_v5 for HA support. | `string` | `"B_Standard_B2s"` | no |
+| <a name="input_postgres_base_sku_name"></a> [postgres\_base\_sku\_name](#input\_postgres\_base\_sku\_name) | PostgreSQL SKU for secondary instances. Use GP\_Standard\_D2ads\_v5 for HA support. SKU availability may vary by Azure region. | `string` | `"B_Standard_B2s"` | no |
 | <a name="input_postgres_multiple_instances"></a> [postgres\_multiple\_instances](#input\_postgres\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_postgres_redundant"></a> [postgres\_redundant](#input\_postgres\_redundant) | Enable zone-redundant HA. Recommended: true for production (requires GP/MO SKU, not Burstable). | `bool` | `false` | no |
 | <a name="input_postgres_sku_name"></a> [postgres\_sku\_name](#input\_postgres\_sku\_name) | PostgreSQL SKU name (e.g. `B_Standard_B2s` or `GP_Standard_D2ds_v5`) | `string` | `"GP_Standard_D2ds_v5"` | no |
@@ -85,6 +186,13 @@ No resources.
 | <a name="input_redis_base_capacity"></a> [redis\_base\_capacity](#input\_redis\_base\_capacity) | Default capacity of the Redis cache for instances that don't use the main redis\_capacity. | `number` | `1` | no |
 | <a name="input_redis_base_sku_name"></a> [redis\_base\_sku\_name](#input\_redis\_base\_sku\_name) | Default SKU Name of the Redis cache (`Basic`, `Standard` or `Premium`) for instances that don't use the main redis\_sku\_name. | `string` | `"Standard"` | no |
 | <a name="input_redis_capacity"></a> [redis\_capacity](#input\_redis\_capacity) | Used to configure the capacity of the Redis cache. | `number` | `1` | no |
+| <a name="input_redis_enabled"></a> [redis\_enabled](#input\_redis\_enabled) | Deploy Azure Cache for Redis (legacy module). When false, no legacy Redis resources are created. | `bool` | `true` | no |
+| <a name="input_redis_managed_clustering_policy"></a> [redis\_managed\_clustering\_policy](#input\_redis\_managed\_clustering\_policy) | Clustering policy when cluster\_enabled is true on an instance. | `string` | `"OSSCluster"` | no |
+| <a name="input_redis_managed_enabled"></a> [redis\_managed\_enabled](#input\_redis\_managed\_enabled) | Deploy Azure Managed Redis (Redis 7.4). When false, the redis-managed module is not created. | `bool` | `false` | no |
+| <a name="input_redis_managed_export_storage_enabled"></a> [redis\_managed\_export\_storage\_enabled](#input\_redis\_managed\_export\_storage\_enabled) | Create blob storage and grant Managed Redis identities access for on-demand RDB export (CLI/portal). | `bool` | `false` | no |
+| <a name="input_redis_managed_export_storage_replication_type"></a> [redis\_managed\_export\_storage\_replication\_type](#input\_redis\_managed\_export\_storage\_replication\_type) | Replication type for the optional Managed Redis export storage account. | `string` | `"LRS"` | no |
+| <a name="input_redis_managed_instances"></a> [redis\_managed\_instances](#input\_redis\_managed\_instances) | Overrides for Azure Managed Redis instances (Redis 7.4). Each key is a logical name (cache, queue, system, managed-sync).<br/>Merged per key with redis\_managed\_instances\_default (sku, ha\_enabled, cluster\_enabled, persistence\_*). Null uses defaults only. | <pre>map(object({<br/>    sku                   = optional(string)<br/>    ha_enabled            = optional(bool)<br/>    cluster_enabled       = optional(bool)<br/>    persistence_mode      = optional(string)<br/>    persistence_frequency = optional(string)<br/>  }))</pre> | `null` | no |
+| <a name="input_redis_managed_public_network_access"></a> [redis\_managed\_public\_network\_access](#input\_redis\_managed\_public\_network\_access) | Public network access for Azure Managed Redis (Disabled recommended). | `string` | `"Disabled"` | no |
 | <a name="input_redis_multiple_instances"></a> [redis\_multiple\_instances](#input\_redis\_multiple\_instances) | Whether or not to create multiple Redis instances. | `bool` | `true` | no |
 | <a name="input_redis_sku_name"></a> [redis\_sku\_name](#input\_redis\_sku\_name) | The SKU Name of the Redis cache (`Basic`, `Standard` or `Premium`). | `string` | `"Premium"` | no |
 | <a name="input_redis_ssl_only"></a> [redis\_ssl\_only](#input\_redis\_ssl\_only) | Flag whether only SSL connections are allowed. | `bool` | `false` | no |
@@ -95,7 +203,7 @@ No resources.
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_auditlogs_bucket"></a> [auditlogs\_bucket](#output\_auditlogs\_bucket) | The bucket used to store audit logs. |
 | <a name="output_bastion"></a> [bastion](#output\_bastion) | Bastion server connection info. |
 | <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | The name of the AKS cluster. |
@@ -103,7 +211,8 @@ No resources.
 | <a name="output_logs_container"></a> [logs\_container](#output\_logs\_container) | The bucket used to store system logs. |
 | <a name="output_minio"></a> [minio](#output\_minio) | MinIO server connection info. |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
-| <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
+| <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis (legacy Azure Cache for Redis or Azure Managed Redis 7.4). |
+| <a name="output_redis_managed_export_storage"></a> [redis\_managed\_export\_storage](#output\_redis\_managed\_export\_storage) | Blob storage for on-demand Azure Managed Redis RDB export (null when disabled or legacy Redis). |
 | <a name="output_resource_group"></a> [resource\_group](#output\_resource\_group) | Resource Group that infrastructure was deployed to. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->

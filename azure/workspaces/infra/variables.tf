@@ -195,6 +195,91 @@ variable "redis_multiple_instances" {
   default     = true
 }
 
+variable "redis_enabled" {
+  description = "Deploy Azure Cache for Redis (legacy module). When false, no legacy Redis resources are created."
+  type        = bool
+  default     = true
+}
+
+variable "redis_managed_enabled" {
+  description = "Deploy Azure Managed Redis (Redis 7.4). When false, the redis-managed module is not created."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = var.redis_enabled != var.redis_managed_enabled
+    error_message = "Exactly one of redis_enabled or redis_managed_enabled must be true."
+  }
+}
+
+variable "redis_managed_instances" {
+  description = <<-EOT
+    Overrides for Azure Managed Redis instances (Redis 7.4). Each key is a logical name (cache, queue, system, managed-sync).
+    Merged per key with redis_managed_instances_default (sku, ha_enabled, cluster_enabled, persistence_*). Null uses defaults only.
+  EOT
+  type = map(object({
+    sku                   = optional(string)
+    ha_enabled            = optional(bool)
+    cluster_enabled       = optional(bool)
+    persistence_mode      = optional(string)
+    persistence_frequency = optional(string)
+  }))
+  default  = null
+  nullable = true
+
+  validation {
+    condition = var.redis_managed_instances == null ? true : alltrue([
+      for _, cfg in var.redis_managed_instances :
+      cfg.persistence_mode == null || cfg.persistence_mode == "rdb" || cfg.persistence_mode == "aof"
+    ])
+    error_message = "persistence_mode must be \"rdb\" or \"aof\" when set."
+  }
+
+  validation {
+    condition = var.redis_managed_instances == null ? true : alltrue([
+      for _, cfg in var.redis_managed_instances :
+      cfg.persistence_mode != "rdb" || cfg.persistence_frequency == null || (
+        cfg.persistence_frequency == "1h" || cfg.persistence_frequency == "6h" || cfg.persistence_frequency == "12h"
+      )
+    ])
+    error_message = "persistence_frequency must be 1h, 6h, or 12h when persistence_mode is rdb."
+  }
+}
+
+variable "redis_managed_export_storage_enabled" {
+  description = "Create blob storage and grant Managed Redis identities access for on-demand RDB export (CLI/portal)."
+  type        = bool
+  default     = false
+}
+
+variable "redis_managed_export_storage_replication_type" {
+  description = "Replication type for the optional Managed Redis export storage account."
+  type        = string
+  default     = "LRS"
+}
+
+variable "redis_managed_clustering_policy" {
+  description = "Clustering policy when cluster_enabled is true on an instance."
+  type        = string
+  default     = "OSSCluster"
+
+  validation {
+    condition     = contains(["OSSCluster", "EnterpriseCluster", "NoCluster"], var.redis_managed_clustering_policy)
+    error_message = "redis_managed_clustering_policy must be OSSCluster, EnterpriseCluster, or NoCluster."
+  }
+}
+
+variable "redis_managed_public_network_access" {
+  description = "Public network access for Azure Managed Redis (Disabled recommended)."
+  type        = string
+  default     = "Disabled"
+
+  validation {
+    condition     = contains(["Enabled", "Disabled"], var.redis_managed_public_network_access)
+    error_message = "redis_managed_public_network_access must be Enabled or Disabled."
+  }
+}
+
 # aks
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
@@ -311,4 +396,64 @@ locals {
   # get distinct values from comma-separated list, filter empty values and trim them
   # for `ip_whitelist`, if an ip doesn't contain a range at the end (e.g. `<IP_ADDRESS>/32`), then add `/32` to the end. `1.1.1.1` becomes `1.1.1.1/32`; `2.2.2.2/24` remains unchanged
   ssh_whitelist = distinct([for value in split(",", var.ssh_whitelist) : "${trimspace(value)}${replace(value, "/", "") != value ? "" : "/32"}" if trimspace(value) != ""])
+
+  redis_managed_instance_defaults = {
+    sku                   = "Balanced_B3"
+    ha_enabled            = true
+    cluster_enabled       = false
+    persistence_mode      = null
+    persistence_frequency = null
+  }
+
+  redis_managed_instances_default = {
+    cache = {
+      sku                   = "Balanced_B10"
+      ha_enabled            = true
+      cluster_enabled       = true
+      persistence_mode      = null
+      persistence_frequency = null
+    }
+    queue = {
+      sku                   = "Balanced_B3"
+      ha_enabled            = true
+      cluster_enabled       = false
+      persistence_mode      = null
+      persistence_frequency = null
+    }
+    system = {
+      sku                   = "Balanced_B3"
+      ha_enabled            = true
+      cluster_enabled       = false
+      persistence_mode      = null
+      persistence_frequency = null
+    }
+    managed-sync = {
+      sku                   = "Balanced_B10"
+      ha_enabled            = true
+      cluster_enabled       = false
+      persistence_mode      = null
+      persistence_frequency = null
+    }
+  }
+
+  redis_managed_instances_overrides = var.redis_managed_instances != null ? var.redis_managed_instances : {}
+
+  redis_managed_instances_config = merge(
+    local.redis_managed_instances_default,
+    {
+      for name, override in local.redis_managed_instances_overrides : name => merge(
+        lookup(local.redis_managed_instances_default, name, local.redis_managed_instance_defaults),
+        # Partial tfvars objects set omitted optional attributes to null; drop them so defaults survive merge.
+        { for key, value in override : key => value if value != null },
+      )
+    },
+  )
+
+  redis_managed_instances = var.redis_multiple_instances ? (
+    var.managed_sync_enabled ? local.redis_managed_instances_config : {
+      for name, cfg in local.redis_managed_instances_config : name => cfg if name != "managed-sync"
+    }
+    ) : {
+    cache = merge(local.redis_managed_instances_config["cache"], { cluster_enabled = false })
+  }
 }

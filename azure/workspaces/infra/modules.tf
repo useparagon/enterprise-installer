@@ -51,6 +51,7 @@ module "postgres" {
 module "redis" {
   source = "./redis"
 
+  enabled                  = var.redis_enabled
   managed_sync_enabled     = var.managed_sync_enabled
   private_subnet           = module.network.private_subnet
   public_subnet            = module.network.public_subnet
@@ -65,6 +66,22 @@ module "redis" {
   tags                     = local.default_tags
   virtual_network          = module.network.virtual_network
   workspace                = local.workspace
+}
+
+module "redis_managed" {
+  count  = var.redis_managed_enabled ? 1 : 0
+  source = "./redis-managed"
+
+  clustering_policy               = var.redis_managed_clustering_policy
+  export_storage_enabled          = var.redis_managed_export_storage_enabled
+  export_storage_replication_type = var.redis_managed_export_storage_replication_type
+  instances                       = local.redis_managed_instances
+  private_subnet                  = module.network.private_subnet
+  public_network_access           = var.redis_managed_public_network_access
+  resource_group                  = module.network.resource_group
+  tags                            = local.default_tags
+  virtual_network                 = module.network.virtual_network
+  workspace                       = local.workspace
 }
 
 module "storage" {
