@@ -304,6 +304,12 @@ variable "infra_json" {
   default     = null
 }
 
+variable "migrated_workspace" {
+  description = "Override the workspace name to preserve naming conventions when migrating from legacy workspaces. Must match the infra workspace value."
+  type        = string
+  default     = null
+}
+
 variable "helm_yaml_path" {
   description = "Path to helm values.yaml file."
   type        = string
@@ -341,11 +347,12 @@ locals {
     Creator      = "Terraform"
   }
 
-  infra_json_path      = var.infra_json_path != null ? abspath(var.infra_json_path) : null
+  infra_json_path       = var.infra_json_path != null ? abspath(var.infra_json_path) : null
   use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
-  legacy_infra_vars    = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
+  legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
 
-  workspace = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}") : "paragon-${var.organization}-${local.hash}"
+  default_workspace = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
+  workspace         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace
 
   cluster_name     = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
   logs_bucket      = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
@@ -841,8 +848,8 @@ locals {
     })
   })
 
-  bootstrap_values     = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
-  runtime_secret_keys  = toset(try(local.bootstrap_values.secretKeys, []))
+  bootstrap_values    = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
+  runtime_secret_keys = toset(try(local.bootstrap_values.secretKeys, []))
   helm_secret_values = {
     for key, value in local.helm_values.global.env :
     key => tostring(value)

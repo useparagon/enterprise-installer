@@ -1,14 +1,12 @@
-# Legacy handoff secrets for the paragon Terraform workspace (nested JSON).
-# Not created when argocd_enabled — GitOps uses flat paragon/<ws>/env instead.
+# Nested JSON handoff secrets for the paragon Terraform workspace (postgres, redis,
+# storage, kafka). Always created so paragon can read infra_vars via Secrets Manager.
+# When argocd_enabled, infra additionally writes a flat paragon/<ws>/env secret for GitOps.
 
 locals {
-  runtime_secret_prefix        = "paragon/${local.workspace}"
-  create_runtime_infra_secrets = !var.argocd_enabled
+  runtime_secret_prefix = "paragon/${local.workspace}"
 }
 
 resource "aws_secretsmanager_secret" "runtime_postgres" {
-  count = local.create_runtime_infra_secrets ? 1 : 0
-
   name                    = "${local.runtime_secret_prefix}/postgres"
   description             = "Raw Postgres connection info for ${var.organization}"
   recovery_window_in_days = var.secrets_recovery_window_in_days
@@ -20,15 +18,11 @@ resource "aws_secretsmanager_secret" "runtime_postgres" {
 }
 
 resource "aws_secretsmanager_secret_version" "runtime_postgres" {
-  count = local.create_runtime_infra_secrets ? 1 : 0
-
-  secret_id     = aws_secretsmanager_secret.runtime_postgres[0].id
+  secret_id     = aws_secretsmanager_secret.runtime_postgres.id
   secret_string = jsonencode(module.postgres.rds)
 }
 
 resource "aws_secretsmanager_secret" "runtime_redis" {
-  count = local.create_runtime_infra_secrets ? 1 : 0
-
   name                    = "${local.runtime_secret_prefix}/redis"
   description             = "Raw Redis connection info for ${var.organization}"
   recovery_window_in_days = var.secrets_recovery_window_in_days
@@ -40,15 +34,11 @@ resource "aws_secretsmanager_secret" "runtime_redis" {
 }
 
 resource "aws_secretsmanager_secret_version" "runtime_redis" {
-  count = local.create_runtime_infra_secrets ? 1 : 0
-
-  secret_id     = aws_secretsmanager_secret.runtime_redis[0].id
+  secret_id     = aws_secretsmanager_secret.runtime_redis.id
   secret_string = jsonencode(module.redis.elasticache)
 }
 
 resource "aws_secretsmanager_secret" "runtime_storage" {
-  count = local.create_runtime_infra_secrets ? 1 : 0
-
   name                    = "${local.runtime_secret_prefix}/storage"
   description             = "Raw object storage connection info for ${var.organization}"
   recovery_window_in_days = var.secrets_recovery_window_in_days
@@ -60,9 +50,7 @@ resource "aws_secretsmanager_secret" "runtime_storage" {
 }
 
 resource "aws_secretsmanager_secret_version" "runtime_storage" {
-  count = local.create_runtime_infra_secrets ? 1 : 0
-
-  secret_id = aws_secretsmanager_secret.runtime_storage[0].id
+  secret_id = aws_secretsmanager_secret.runtime_storage.id
   secret_string = jsonencode({
     public_bucket       = module.storage.s3.public_bucket
     private_bucket      = module.storage.s3.private_bucket
@@ -75,7 +63,7 @@ resource "aws_secretsmanager_secret_version" "runtime_storage" {
 }
 
 resource "aws_secretsmanager_secret" "runtime_kafka" {
-  count = local.create_runtime_infra_secrets && var.managed_sync_enabled ? 1 : 0
+  count = var.managed_sync_enabled ? 1 : 0
 
   name                    = "${local.runtime_secret_prefix}/kafka"
   description             = "Raw Kafka connection info for ${var.organization}"
@@ -88,7 +76,7 @@ resource "aws_secretsmanager_secret" "runtime_kafka" {
 }
 
 resource "aws_secretsmanager_secret_version" "runtime_kafka" {
-  count = local.create_runtime_infra_secrets && var.managed_sync_enabled ? 1 : 0
+  count = var.managed_sync_enabled ? 1 : 0
 
   secret_id = aws_secretsmanager_secret.runtime_kafka[0].id
   secret_string = jsonencode({
