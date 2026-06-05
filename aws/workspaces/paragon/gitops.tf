@@ -6,3 +6,21 @@ resource "terraform_data" "validate_gitops" {
     }
   }
 }
+
+resource "kubernetes_annotations" "paragon_env_eso_force_sync" {
+  count = var.argocd_enabled ? 1 : 0
+
+  api_version = "external-secrets.io/v1beta1"
+  kind        = "ExternalSecret"
+
+  metadata {
+    name      = "paragon-secrets"
+    namespace = "paragon"
+  }
+
+  annotations = {
+    "force-sync" = aws_secretsmanager_secret_version.env_paragon_overlay[0].version_id
+  }
+
+  depends_on = [aws_secretsmanager_secret_version.env_paragon_overlay]
+}

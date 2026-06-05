@@ -151,4 +151,6 @@ resource "terraform_data" "runtime_secrets_populated" {
     openobserve  = aws_secretsmanager_secret_version.openobserve[0].version_id
     managed_sync = var.managed_sync_enabled ? aws_secretsmanager_secret_version.managed_sync[0].version_id : null
   }
+
+  depends_on = [kubernetes_annotations.paragon_env_eso_force_sync]
 }

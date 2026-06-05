@@ -73,7 +73,7 @@ locals {
           namespace = var.destination_namespace
         }
         spec = {
-          refreshInterval = "5m"
+          refreshInterval = "30s"
           secretStoreRef = {
             name = var.cluster_secret_store_name
             kind = "ClusterSecretStore"
@@ -129,7 +129,7 @@ locals {
           namespace = var.destination_namespace
         }
         spec = {
-          refreshInterval = "5m"
+          refreshInterval = "30s"
           secretStoreRef = {
             name = var.cluster_secret_store_name
             kind = "ClusterSecretStore"
