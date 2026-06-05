@@ -1,7 +1,14 @@
 data "azurerm_client_config" "current" {}
 
+locals {
+  # Azure Key Vault names: 3-24 chars, alphanumeric and hyphens, must not end with
+  # a hyphen. Truncating local.workspace to 24 chars can leave a trailing hyphen,
+  # so strip any trailing hyphens after truncation.
+  key_vault_name = replace(substr(local.workspace, 0, 24), "/-+$/", "")
+}
+
 resource "azurerm_key_vault" "paragon" {
-  name                       = substr(local.workspace, 0, 24)
+  name                       = local.key_vault_name
   location                   = var.location
   resource_group_name        = module.network.resource_group.name
   tenant_id                  = coalesce(var.azure_tenant_id, data.azurerm_client_config.current.tenant_id)

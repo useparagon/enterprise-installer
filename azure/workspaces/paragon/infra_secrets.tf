@@ -4,7 +4,9 @@ data "azurerm_resource_group" "infra" {
 }
 
 data "azurerm_key_vault" "paragon" {
-  name                = substr(local.workspace, 0, 24)
+  # Must match the sanitized name created by the infra workspace (trailing
+  # hyphens stripped after truncating to Key Vault's 24-char limit).
+  name                = replace(substr(local.workspace, 0, 24), "/-+$/", "")
   resource_group_name = local.resource_group_name
 }
 

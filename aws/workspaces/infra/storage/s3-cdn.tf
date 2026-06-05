@@ -31,6 +31,20 @@ resource "aws_s3_bucket_public_access_block" "cdn" {
   restrict_public_buckets = true
 }
 
+# Reset bucket ACL to owner-only before BucketOwnerEnforced; AWS rejects PutBucketOwnershipControls
+# while the bucket ACL still grants other principals (e.g. legacy public-read or OAI grants).
+resource "aws_s3_bucket_acl" "cdn" {
+  bucket = aws_s3_bucket.cdn.id
+  acl    = "private"
+
+  depends_on = [aws_s3_bucket_public_access_block.cdn]
+
+  lifecycle {
+    # After BucketOwnerEnforced, S3 rejects ACL updates; keep managing ownership only.
+    ignore_changes = [acl]
+  }
+}
+
 resource "aws_s3_bucket_ownership_controls" "cdn" {
   bucket = aws_s3_bucket.cdn.id
 
@@ -38,7 +52,7 @@ resource "aws_s3_bucket_ownership_controls" "cdn" {
     object_ownership = "BucketOwnerEnforced"
   }
 
-  depends_on = [aws_s3_bucket_public_access_block.cdn]
+  depends_on = [aws_s3_bucket_acl.cdn]
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "cdn" {

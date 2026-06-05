@@ -674,6 +674,12 @@ resource "terraform_data" "validate_argocd_versions" {
       condition     = contains(["internet-facing", "internal"], var.argocd_ingress_scheme)
       error_message = "argocd_ingress_scheme must be either 'internet-facing' or 'internal'."
     }
+    # Without these, the secrets module is skipped (argocd_secrets_ready=false) while Argo CD
+    # and ESO still bootstrap, leaving workloads to sync with no paragon-secrets or pull creds.
+    precondition {
+      condition     = local.argocd_secrets_ready
+      error_message = "argocd_enabled requires paragon_domain, argocd_docker_username, and argocd_docker_password so the paragon-secrets and docker-cfg secrets can be created for GitOps/ESO."
+    }
     precondition {
       condition     = var.argocd_certificate_arn == "" || startswith(var.argocd_certificate_arn, "arn:aws:acm:")
       error_message = "argocd_certificate_arn must be an ACM certificate ARN when provided."
