@@ -10,3 +10,8 @@ output "eks_cluster" {
     cluster_certificate_authority_data = module.eks.cluster_certificate_authority_data
   }
 }
+
+output "cluster_autoscaler_role_arn" {
+  description = "IAM role ARN for the cluster-autoscaler service account."
+  value       = module.cluster_autoscaler.iam_role_attributes.arn
+}

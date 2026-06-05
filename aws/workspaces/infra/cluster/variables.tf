@@ -169,9 +169,3 @@ locals {
     [local.caller_arn]
   )))
 }
-
-variable "argocd_enabled" {
-  description = "When true, skip the Terraform-managed cluster-autoscaler (ArgoCD deploys its own)."
-  type        = bool
-  default     = false
-}

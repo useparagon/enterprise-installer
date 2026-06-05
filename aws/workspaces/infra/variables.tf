@@ -728,18 +728,7 @@ resource "terraform_data" "validate_argocd_versions" {
         trimspace(var.argocd_bootstrap_repo_path) == "" ||
         startswith(trimspace(var.argocd_bootstrap_repo_url), "https://")
       )
-      error_message = "argocd_bootstrap_repo_url must use HTTPS (https://github.com/...). SSH git@ URLs are not supported; use a GitHub PAT via argocd_bootstrap_repo_token."
-    }
-    precondition {
-      condition = (
-        trimspace(var.argocd_bootstrap_repo_url) == "" ||
-        trimspace(var.argocd_bootstrap_repo_path) == "" ||
-        (
-          var.argocd_bootstrap_repo_token != null &&
-          trimspace(var.argocd_bootstrap_repo_token) != ""
-        )
-      )
-      error_message = "argocd_bootstrap_repo_token (GitHub PAT) is required when argocd_bootstrap_repo_url and argocd_bootstrap_repo_path are set."
+      error_message = "argocd_bootstrap_repo_url must use HTTPS (https://github.com/...). SSH git@ URLs are not supported; use argocd_bootstrap_repo_token for private repositories."
     }
     precondition {
       condition = (

@@ -112,7 +112,6 @@ module "cluster" {
   bastion_role_arn          = module.bastion.bastion_role_arn
   bastion_security_group_id = module.bastion.security_group.host[0]
 
-  argocd_enabled                  = var.argocd_enabled
   create_autoscaling_linked_role  = var.create_autoscaling_linked_role
   eks_admin_arns                  = var.eks_admin_arns
   eks_max_node_count              = var.eks_max_node_count
@@ -223,6 +222,8 @@ module "argocd" {
   oidc_issuer_url   = module.cluster.eks_cluster.cluster_oidc_issuer_url
   workspace         = local.workspace
   aws_region        = var.aws_region
+
+  cluster_autoscaler_role_arn = module.cluster.cluster_autoscaler_role_arn
 
   argocd_release_name = "argo-cd"
   eso_role_arn        = try(module.eks_blueprints_addons.external_secrets.iam_role_arn, null)

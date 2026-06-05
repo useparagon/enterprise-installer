@@ -20,16 +20,11 @@ resource "aws_autoscaling_group_tag" "cluster_autoscaler_label_tags" {
   }
 }
 
-# When argocd_enabled, the cluster-autoscaler is owned by the GitOps bootstrap repo
-# (app-of-apps), not Terraform. The argocd module provisions its IRSA role and exposes
-# the role ARN via the GitOps bridge cluster secret annotation (cluster_autoscaler_role_arn)
-# so the bootstrap repo's cluster-autoscaler Application binds the correct IAM identity.
-# The bootstrap repo must deploy cluster-autoscaler; this Terraform module only runs it
-# in the non-GitOps path below.
+# Cluster-autoscaler is always deployed here (Helm via lablabs module). When GitOps is
+# enabled, the role ARN is also exposed on the GitOps bridge secret for bootstrap apps.
 module "cluster_autoscaler" {
   source  = "lablabs/eks-cluster-autoscaler/aws"
   version = "2.2.0"
-  count   = var.argocd_enabled ? 0 : 1
 
   cluster_name                     = module.eks.cluster_name
   cluster_identity_oidc_issuer     = module.eks.cluster_oidc_issuer_url

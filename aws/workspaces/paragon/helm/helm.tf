@@ -269,8 +269,8 @@ resource "helm_release" "paragon_on_prem" {
 
   depends_on = [
     helm_release.ingress,
-    kubectl_manifest.external_secret_docker,
-    kubectl_manifest.external_secret_paragon,
+    data.kubernetes_secret.paragon_secrets,
+    data.kubernetes_secret.docker_cfg,
     kubernetes_storage_class_v1.gp3_encrypted,
     kubernetes_config_map.feature_flag_content
   ]
@@ -315,8 +315,8 @@ resource "helm_release" "paragon_logging" {
 
   depends_on = [
     helm_release.ingress,
-    kubectl_manifest.external_secret_docker,
-    kubectl_manifest.external_secret_openobserve,
+    data.kubernetes_secret.docker_cfg,
+    data.kubernetes_secret.openobserve_credentials,
     kubernetes_storage_class_v1.gp3_encrypted
   ]
 }
@@ -361,8 +361,8 @@ resource "helm_release" "paragon_monitoring" {
   depends_on = [
     helm_release.ingress,
     helm_release.paragon_on_prem,
-    kubectl_manifest.external_secret_docker,
-    kubectl_manifest.external_secret_paragon,
+    data.kubernetes_secret.paragon_secrets,
+    data.kubernetes_secret.docker_cfg,
     kubernetes_storage_class_v1.gp3_encrypted
   ]
 }
