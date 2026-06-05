@@ -16,35 +16,37 @@ module "alb" {
 module "helm" {
   source = "./helm"
 
-  certificate            = module.alb.certificate
-  aws_region             = var.aws_region
-  cluster_name           = local.cluster_name
-  docker_email           = var.docker_email
-  docker_password        = var.docker_password
-  docker_registry_server = var.docker_registry_server
-  docker_username        = var.docker_username
-  docker_cfg_secret_name = aws_secretsmanager_secret.docker_cfg.name
-  env_secret_name        = aws_secretsmanager_secret.env.name
-  eso_role_arn           = aws_iam_role.eso.arn
-  feature_flags_content  = local.feature_flags_content
-  flipt_options          = local.flipt_options
-  helm_values            = local.helm_values_public
-  ingress_scheme         = var.ingress_scheme
-  k8s_version            = var.k8s_version
-  logs_bucket            = local.logs_bucket
-  managed_sync_enabled   = var.managed_sync_enabled
+  certificate              = module.alb.certificate
+  aws_region               = var.aws_region
+  cluster_name             = local.cluster_name
+  docker_email             = var.docker_email
+  docker_password          = var.docker_password
+  docker_registry_server   = var.docker_registry_server
+  docker_username          = var.docker_username
+  docker_cfg_secret_name   = aws_secretsmanager_secret.docker_cfg.name
+  env_secret_name          = aws_secretsmanager_secret.env.name
+  eso_role_arn             = aws_iam_role.eso.arn
+  feature_flags_content    = local.feature_flags_content
+  flipt_options            = local.flipt_options
+  helm_values              = local.helm_values_public
+  ingress_scheme           = var.ingress_scheme
+  k8s_version              = var.k8s_version
+  logs_bucket              = local.logs_bucket
+  managed_sync_enabled     = var.managed_sync_enabled
   managed_sync_secret_name = var.managed_sync_enabled ? aws_secretsmanager_secret.managed_sync[0].name : null
-  managed_sync_version   = var.managed_sync_version
-  microservices          = local.microservices
-  monitor_version        = local.monitor_version
-  monitors               = local.monitors
-  monitors_enabled       = var.monitors_enabled
-  openobserve_email      = local.openobserve_email
-  openobserve_password   = local.openobserve_password
-  openobserve_secret_name = aws_secretsmanager_secret.openobserve[0].name
-  public_microservices   = local.public_microservices
-  public_monitors        = local.public_monitors
-  workspace              = local.workspace
+  managed_sync_version     = var.managed_sync_version
+  microservices            = local.microservices
+  monitor_version          = local.monitor_version
+  monitors                 = local.monitors
+  monitors_enabled         = var.monitors_enabled
+  openobserve_email        = local.openobserve_email
+  openobserve_password     = local.openobserve_password
+  openobserve_secret_name  = aws_secretsmanager_secret.openobserve[0].name
+  public_microservices     = local.public_microservices
+  public_monitors          = local.public_monitors
+  workspace                = local.workspace
+
+  runtime_secrets_ready = terraform_data.runtime_secrets_populated.id
 }
 
 module "managed_sync_config" {

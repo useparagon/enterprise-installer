@@ -142,6 +142,48 @@ variable "paragon_domain" {
   default     = ""
 }
 
+variable "app_chart_repository" {
+  description = "Helm chart repository URL for Paragon application charts (GitOps bridge annotation)."
+  type        = string
+  default     = ""
+}
+
+variable "paragon_chart_version" {
+  description = "Target chart version or constraint for Paragon charts (GitOps bridge annotation)."
+  type        = string
+  default     = null
+}
+
+variable "paragon_monitor_version" {
+  description = "Chart version for the monitoring stack when deployed via Argo CD (GitOps bridge annotation)."
+  type        = string
+  default     = null
+}
+
+variable "paragon_managed_sync_version" {
+  description = "Chart version for managed-sync when deployed via Argo CD (GitOps bridge annotation)."
+  type        = string
+  default     = null
+}
+
+variable "paragon_monitors_enabled" {
+  description = "Whether monitoring charts are deployed via Argo CD (GitOps bridge annotation)."
+  type        = bool
+  default     = false
+}
+
+variable "managed_sync_enabled" {
+  description = "Whether managed sync is enabled (GitOps bridge annotation)."
+  type        = bool
+  default     = false
+}
+
+variable "ingress_scheme" {
+  description = "ALB scheme for Argo CD-managed ingress (GitOps bridge annotation)."
+  type        = string
+  default     = "internet-facing"
+}
+
 variable "app_of_apps_manifest" {
   description = "Deprecated override for root Argo CD Application YAML."
   type        = string

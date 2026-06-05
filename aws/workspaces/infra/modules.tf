@@ -246,6 +246,14 @@ module "argocd" {
   paragon_certificate_arn = local.paragon_certificate_arn
   paragon_domain          = local.paragon_domain_trimmed
 
+  app_chart_repository         = var.argocd_app_chart_repository
+  paragon_chart_version        = var.paragon_chart_version
+  paragon_monitor_version      = var.paragon_monitor_version
+  paragon_managed_sync_version = var.paragon_managed_sync_version
+  paragon_monitors_enabled     = var.paragon_monitors_enabled
+  managed_sync_enabled         = var.managed_sync_enabled
+  ingress_scheme               = var.argocd_ingress_scheme
+
   depends_on = [
     module.cluster,
     module.eks_blueprints_addons,

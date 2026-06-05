@@ -659,12 +659,35 @@ resource "terraform_data" "validate_argocd_versions" {
       error_message = "paragon_chart_version cannot be empty when set."
     }
     precondition {
+      condition = (
+        !var.argocd_enabled ||
+        (var.paragon_chart_version != null && trimspace(var.paragon_chart_version) != "")
+      )
+      error_message = "paragon_chart_version is required when argocd_enabled is true."
+    }
+    precondition {
       condition     = trimspace(var.argocd_app_chart_repository) != ""
       error_message = "argocd_app_chart_repository cannot be empty."
     }
     precondition {
       condition     = var.paragon_managed_sync_version == null || trimspace(var.paragon_managed_sync_version) != ""
       error_message = "paragon_managed_sync_version cannot be empty when set."
+    }
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        !var.managed_sync_enabled ||
+        (var.paragon_managed_sync_version != null && trimspace(var.paragon_managed_sync_version) != "")
+      )
+      error_message = "paragon_managed_sync_version is required when argocd_enabled and managed_sync_enabled are both true."
+    }
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        !var.managed_sync_enabled ||
+        (var.paragon_managed_sync_config != null && length(var.paragon_managed_sync_config) > 0)
+      )
+      error_message = "paragon_managed_sync_config is required when argocd_enabled and managed_sync_enabled are both true."
     }
     precondition {
       condition     = !var.paragon_monitors_enabled || (var.paragon_monitor_version != null && trimspace(var.paragon_monitor_version) != "")

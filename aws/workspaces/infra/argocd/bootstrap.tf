@@ -183,7 +183,22 @@ locals {
       "cluster_name"                = "in-cluster"
       "environment"                 = var.workspace
       "cluster_autoscaler_role_arn" = aws_iam_role.cluster_autoscaler.arn
+      "ingress_scheme"              = var.ingress_scheme
+      "paragon_monitors_enabled"    = var.paragon_monitors_enabled ? "true" : "false"
+      "managed_sync_enabled"        = var.managed_sync_enabled ? "true" : "false"
     },
+    trimspace(var.app_chart_repository) != "" ? {
+      app_chart_repository = trimspace(var.app_chart_repository)
+    } : {},
+    var.paragon_chart_version != null && trimspace(var.paragon_chart_version) != "" ? {
+      paragon_chart_version = trimspace(var.paragon_chart_version)
+    } : {},
+    var.paragon_monitor_version != null && trimspace(var.paragon_monitor_version) != "" ? {
+      paragon_monitor_version = trimspace(var.paragon_monitor_version)
+    } : {},
+    var.paragon_managed_sync_version != null && trimspace(var.paragon_managed_sync_version) != "" ? {
+      paragon_managed_sync_version = trimspace(var.paragon_managed_sync_version)
+    } : {},
     length(var.secrets_manager_secret_arns) > 0 ? {
       "secrets_manager_prefix" = "paragon/${var.workspace}"
     } : {},

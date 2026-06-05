@@ -178,7 +178,7 @@ locals {
 
 resource "kubectl_manifest" "secret_store" {
   yaml_body  = local.secret_store_yaml
-  depends_on = [helm_release.external_secrets, kubernetes_namespace.paragon]
+  depends_on = [helm_release.external_secrets, kubernetes_namespace.paragon, terraform_data.runtime_secrets_ready]
 }
 
 resource "kubectl_manifest" "external_secret_paragon" {

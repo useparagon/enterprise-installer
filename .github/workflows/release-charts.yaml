@@ -98,6 +98,7 @@ jobs:
           staging="${{ steps.stamp.outputs.staging }}"
           pkg_dir="$RUNNER_TEMP/packages"
           mkdir -p "$pkg_dir"
+          packaged=0
 
           for chart_name in $CHARTS; do
             chart_dir="$staging/$chart_name"
@@ -108,11 +109,19 @@ jobs:
 
             echo "=== Building $chart_name ==="
             for sub in "$chart_dir"/charts/*/; do
-              [ -f "$sub/Chart.yaml" ] && helm dependency build "$sub" 2>/dev/null || true
+              if [ -f "$sub/Chart.yaml" ]; then
+                helm dependency build "$sub"
+              fi
             done
             helm dependency build "$chart_dir"
             helm package "$chart_dir" --destination "$pkg_dir"
+            packaged=$((packaged + 1))
           done
+
+          if [ "$packaged" -eq 0 ]; then
+            echo "Error: no charts were packaged; check CHARTS and staging directory contents." >&2
+            exit 1
+          fi
 
           echo "--- Packaged charts ---"
           ls -1 "$pkg_dir"/*.tgz
@@ -156,7 +165,14 @@ jobs:
       - name: Publish charts to S3
         run: |
           set -euo pipefail
-          cd "$RUNNER_TEMP/packages"
+          pkg_dir="$RUNNER_TEMP/packages"
+          shopt -s nullglob
+          tgz_files=("$pkg_dir"/*.tgz)
+          if [ "${#tgz_files[@]}" -eq 0 ]; then
+            echo "Error: no packaged charts found in $pkg_dir" >&2
+            exit 1
+          fi
+          cd "$pkg_dir"
 
           aws s3 cp "s3://$S3_BUCKET/index.yaml" existing-index.yaml 2>/dev/null \
             || echo "No existing index found; creating new index."
@@ -167,8 +183,8 @@ jobs:
             helm repo index . --url "$HELM_REPO_URL"
           fi
 
-          for tgz in *.tgz; do
-            echo "Uploading $tgz"
+          for tgz in "${tgz_files[@]}"; do
+            echo "Uploading $(basename "$tgz")"
             aws s3 cp "$tgz" "s3://$S3_BUCKET/"
           done
 
