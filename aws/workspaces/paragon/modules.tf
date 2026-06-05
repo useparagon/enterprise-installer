@@ -8,7 +8,7 @@ module "alb" {
   domain                   = var.domain
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
-  release_ingress          = module.helm.release_ingress
+  ingress_ready            = module.helm.ingress_ready
   release_paragon_on_prem  = module.helm.release_paragon_on_prem
   workspace                = local.workspace
 }
@@ -32,6 +32,7 @@ module "helm" {
   ingress_scheme             = var.ingress_scheme
   install_external_secrets   = !var.argocd_enabled
   install_ingress_controller = !var.argocd_enabled
+  infra_gitops_ready         = var.infra_gitops_ready
   k8s_version                = var.k8s_version
   logs_bucket                = local.logs_bucket
   managed_sync_enabled       = var.managed_sync_enabled

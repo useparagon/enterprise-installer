@@ -60,6 +60,12 @@ variable "install_ingress_controller" {
   default     = true
 }
 
+variable "infra_gitops_ready" {
+  description = "Apply-time signal that infra GitOps bootstrap finished (ALB controller, ESO CRs). Required when install_ingress_controller is false."
+  type        = string
+  default     = null
+}
+
 variable "openobserve_email" {
   description = "OpenObserve admin login email."
   type        = string

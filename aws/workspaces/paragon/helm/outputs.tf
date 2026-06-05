@@ -1,3 +1,10 @@
+output "ingress_ready" {
+  value = one(compact([
+    try(terraform_data.managed_ingress_controller_ready[0].id, null),
+    try(terraform_data.external_ingress_controller_ready[0].id, null),
+  ]))
+}
+
 output "release_ingress" {
   value = try(helm_release.ingress[0], null)
 }

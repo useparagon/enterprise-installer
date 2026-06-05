@@ -2,7 +2,7 @@ data "aws_lb" "load_balancer" {
   name = var.workspace
 
   depends_on = [
-    var.release_ingress,
+    var.ingress_ready,
     var.release_paragon_on_prem,
   ]
 }

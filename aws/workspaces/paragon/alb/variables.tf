@@ -30,8 +30,8 @@ variable "public_monitors" {
   }))
 }
 
-variable "release_ingress" {
-  description = "The helm release for the ingress."
+variable "ingress_ready" {
+  description = "Signal that the AWS Load Balancer Controller is ready (managed Helm release or GitOps bootstrap)."
 }
 
 variable "release_paragon_on_prem" {

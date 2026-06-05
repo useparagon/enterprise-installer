@@ -126,6 +126,16 @@ data "aws_secretsmanager_secret_version" "managed_sync" {
   secret_id = data.aws_secretsmanager_secret.managed_sync[0].id
 }
 
+resource "aws_secretsmanager_secret_version" "managed_sync_paragon_overlay" {
+  count = var.argocd_enabled && var.managed_sync_enabled ? 1 : 0
+
+  secret_id = data.aws_secretsmanager_secret.managed_sync[0].id
+  secret_string = jsonencode(merge(
+    jsondecode(data.aws_secretsmanager_secret_version.managed_sync[0].secret_string),
+    module.managed_sync_config[0].config
+  ))
+}
+
 data "aws_secretsmanager_secret_version" "openobserve" {
   count     = var.argocd_enabled ? 1 : 0
   secret_id = data.aws_secretsmanager_secret.openobserve[0].id
@@ -141,10 +151,12 @@ locals {
 # Gate Helm/ESO until Secrets Manager values exist (not just secret metadata).
 resource "terraform_data" "runtime_secrets_populated" {
   input = var.argocd_enabled ? {
-    env          = aws_secretsmanager_secret_version.env_paragon_overlay[0].version_id
-    docker_cfg   = data.aws_secretsmanager_secret_version.docker_cfg[0].version_id
-    openobserve  = data.aws_secretsmanager_secret_version.openobserve[0].version_id
-    managed_sync = var.managed_sync_enabled ? data.aws_secretsmanager_secret_version.managed_sync[0].version_id : null
+    env         = aws_secretsmanager_secret_version.env_paragon_overlay[0].version_id
+    docker_cfg  = data.aws_secretsmanager_secret_version.docker_cfg[0].version_id
+    openobserve = data.aws_secretsmanager_secret_version.openobserve[0].version_id
+    managed_sync = var.managed_sync_enabled ? (
+      var.argocd_enabled ? aws_secretsmanager_secret_version.managed_sync_paragon_overlay[0].version_id : aws_secretsmanager_secret_version.managed_sync[0].version_id
+    ) : null
     } : {
     env          = aws_secretsmanager_secret_version.env[0].version_id
     docker_cfg   = aws_secretsmanager_secret_version.docker_cfg[0].version_id

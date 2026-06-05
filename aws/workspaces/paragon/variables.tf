@@ -322,6 +322,12 @@ variable "infra_eso_role_arn" {
   default     = null
 }
 
+variable "infra_gitops_ready" {
+  description = "Apply-time signal that the infra GitOps bootstrap finished (ALB controller, ESO ExternalSecrets). Required when argocd_enabled is true."
+  type        = string
+  default     = null
+}
+
 variable "helm_yaml_path" {
   description = "Path to helm values.yaml file."
   type        = string
