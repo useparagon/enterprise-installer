@@ -35,10 +35,8 @@ resource "helm_release" "external_secrets" {
 }
 
 resource "helm_release" "reloader" {
-  count = var.install_external_secrets ? 1 : 0
-
   name             = "reloader"
-  namespace        = kubernetes_namespace.external_secrets[0].id
+  namespace        = "kube-system"
   repository       = "https://stakater.github.io/stakater-charts"
   chart            = "reloader"
   version          = "2.2.11"
