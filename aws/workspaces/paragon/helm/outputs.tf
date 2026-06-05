@@ -1,5 +1,5 @@
 output "release_ingress" {
-  value = helm_release.ingress
+  value = try(helm_release.ingress[0], null)
 }
 
 output "release_paragon_on_prem" {

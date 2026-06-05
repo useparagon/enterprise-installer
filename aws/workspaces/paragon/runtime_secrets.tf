@@ -101,6 +101,26 @@ data "aws_secretsmanager_secret" "openobserve" {
   name  = local.runtime_secret_names.openobserve
 }
 
+data "aws_secretsmanager_secret_version" "env" {
+  count     = var.argocd_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.env[0].id
+}
+
+data "aws_secretsmanager_secret_version" "docker_cfg" {
+  count     = var.argocd_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.docker_cfg[0].id
+}
+
+data "aws_secretsmanager_secret_version" "managed_sync" {
+  count     = var.argocd_enabled && var.managed_sync_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.managed_sync[0].id
+}
+
+data "aws_secretsmanager_secret_version" "openobserve" {
+  count     = var.argocd_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.openobserve[0].id
+}
+
 locals {
   runtime_env_secret_name          = var.argocd_enabled ? data.aws_secretsmanager_secret.env[0].name : aws_secretsmanager_secret.env[0].name
   runtime_docker_cfg_secret_name   = var.argocd_enabled ? data.aws_secretsmanager_secret.docker_cfg[0].name : aws_secretsmanager_secret.docker_cfg[0].name
@@ -111,10 +131,10 @@ locals {
 # Gate Helm/ESO until Secrets Manager values exist (not just secret metadata).
 resource "terraform_data" "runtime_secrets_populated" {
   input = var.argocd_enabled ? {
-    env          = data.aws_secretsmanager_secret.env[0].id
-    docker_cfg   = data.aws_secretsmanager_secret.docker_cfg[0].id
-    openobserve  = data.aws_secretsmanager_secret.openobserve[0].id
-    managed_sync = var.managed_sync_enabled ? data.aws_secretsmanager_secret.managed_sync[0].id : null
+    env          = data.aws_secretsmanager_secret_version.env[0].version_id
+    docker_cfg   = data.aws_secretsmanager_secret_version.docker_cfg[0].version_id
+    openobserve  = data.aws_secretsmanager_secret_version.openobserve[0].version_id
+    managed_sync = var.managed_sync_enabled ? data.aws_secretsmanager_secret_version.managed_sync[0].version_id : null
     } : {
     env          = aws_secretsmanager_secret_version.env[0].version_id
     docker_cfg   = aws_secretsmanager_secret_version.docker_cfg[0].version_id

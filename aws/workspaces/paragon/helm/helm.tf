@@ -186,8 +186,10 @@ resource "kubernetes_config_map" "feature_flag_content" {
   }
 }
 
-# ingress controller; provisions load balancer
+# ingress controller; provisions load balancer (skipped when infra/GitOps owns the controller)
 resource "helm_release" "ingress" {
+  count = var.install_ingress_controller ? 1 : 0
+
   name        = "ingress"
   description = "AWS Ingress Controller"
 

@@ -49,7 +49,7 @@ resource "time_sleep" "wait_for_eso_managed_sync" {
 resource "time_sleep" "wait_for_gitops_secrets" {
   count = var.install_external_secrets ? 0 : 1
 
-  create_duration = "30s"
+  create_duration = "90s"
 
   triggers = {
     runtime_secrets_ready = var.runtime_secrets_ready

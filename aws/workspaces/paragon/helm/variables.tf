@@ -54,6 +54,12 @@ variable "install_external_secrets" {
   default     = true
 }
 
+variable "install_ingress_controller" {
+  description = "Install the AWS Load Balancer Controller Helm release. Set false when infra/GitOps already manages it."
+  type        = bool
+  default     = true
+}
+
 variable "openobserve_email" {
   description = "OpenObserve admin login email."
   type        = string
