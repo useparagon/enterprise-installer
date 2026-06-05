@@ -70,7 +70,7 @@ resource "terraform_data" "eso_secrets_gate" {
 data "kubernetes_secret" "paragon_secrets" {
   metadata {
     name      = "paragon-secrets"
-    namespace = kubernetes_namespace.paragon.metadata[0].name
+    namespace = local.paragon_namespace
   }
 
   depends_on = [terraform_data.eso_secrets_gate]
@@ -79,7 +79,7 @@ data "kubernetes_secret" "paragon_secrets" {
 data "kubernetes_secret" "docker_cfg" {
   metadata {
     name      = "docker-cfg"
-    namespace = kubernetes_namespace.paragon.metadata[0].name
+    namespace = local.paragon_namespace
   }
 
   depends_on = [terraform_data.eso_secrets_gate]
@@ -90,7 +90,7 @@ data "kubernetes_secret" "openobserve_credentials" {
 
   metadata {
     name      = "openobserve-credentials"
-    namespace = kubernetes_namespace.paragon.metadata[0].name
+    namespace = local.paragon_namespace
   }
 
   depends_on = [terraform_data.eso_secrets_gate]
@@ -101,7 +101,7 @@ data "kubernetes_secret" "managed_sync_secrets" {
 
   metadata {
     name      = "paragon-managed-sync-secrets"
-    namespace = kubernetes_namespace.paragon.metadata[0].name
+    namespace = local.paragon_namespace
   }
 
   depends_on = [terraform_data.eso_secrets_gate]

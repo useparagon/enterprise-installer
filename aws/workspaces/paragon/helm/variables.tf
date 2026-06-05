@@ -48,6 +48,12 @@ variable "eso_role_arn" {
   type        = string
 }
 
+variable "argocd_enabled" {
+  description = "When true, adopt the paragon namespace created by infra GitOps instead of creating it."
+  type        = bool
+  default     = false
+}
+
 variable "install_external_secrets" {
   description = "Install External Secrets Operator and CRs. Set false when infra/GitOps already manages ESO."
   type        = bool

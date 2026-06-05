@@ -14,7 +14,7 @@ output "release_paragon_on_prem" {
 }
 
 output "namespace_paragon" {
-  value = kubernetes_namespace.paragon
+  value = var.argocd_enabled ? data.kubernetes_namespace.paragon[0] : kubernetes_namespace.paragon[0]
 }
 
 output "openobserve_email" {

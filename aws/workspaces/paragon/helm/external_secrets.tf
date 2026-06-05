@@ -51,7 +51,7 @@ locals {
     kind       = "SecretStore"
     metadata = {
       name      = "aws-secrets-manager"
-      namespace = kubernetes_namespace.paragon.id
+      namespace = local.paragon_namespace
     }
     spec = {
       provider = {
@@ -76,7 +76,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "paragon-secrets"
-      namespace = kubernetes_namespace.paragon.id
+      namespace = local.paragon_namespace
     }
     spec = {
       refreshInterval = "5m"
@@ -101,7 +101,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "docker-cfg"
-      namespace = kubernetes_namespace.paragon.id
+      namespace = local.paragon_namespace
     }
     spec = {
       refreshInterval = "1h"
@@ -134,7 +134,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "paragon-managed-sync-secrets"
-      namespace = kubernetes_namespace.paragon.id
+      namespace = local.paragon_namespace
     }
     spec = {
       refreshInterval = "5m"
@@ -159,7 +159,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "openobserve-credentials"
-      namespace = kubernetes_namespace.paragon.id
+      namespace = local.paragon_namespace
     }
     spec = {
       refreshInterval = "5m"
@@ -184,7 +184,7 @@ resource "kubectl_manifest" "secret_store" {
   count = var.install_external_secrets ? 1 : 0
 
   yaml_body  = local.secret_store_yaml
-  depends_on = [helm_release.external_secrets[0], kubernetes_namespace.paragon, terraform_data.runtime_secrets_ready]
+  depends_on = [helm_release.external_secrets[0], terraform_data.runtime_secrets_ready]
 }
 
 resource "kubectl_manifest" "external_secret_paragon" {

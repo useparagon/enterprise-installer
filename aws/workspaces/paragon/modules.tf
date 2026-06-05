@@ -30,6 +30,7 @@ module "helm" {
   flipt_options              = local.flipt_options
   helm_values                = local.helm_values_public
   ingress_scheme             = var.ingress_scheme
+  argocd_enabled             = var.argocd_enabled
   install_external_secrets   = !var.argocd_enabled
   install_ingress_controller = !var.argocd_enabled
   infra_gitops_ready         = var.infra_gitops_ready

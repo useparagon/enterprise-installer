@@ -158,27 +158,12 @@ locals {
   })
 }
 
-# creates the `paragon` namespace
-resource "kubernetes_namespace" "paragon" {
-  metadata {
-    name = "paragon"
-
-    annotations = {
-      name = "paragon"
-    }
-
-    labels = {
-      "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
-    }
-  }
-}
-
 resource "kubernetes_config_map" "feature_flag_content" {
   count = var.feature_flags_content != null ? 1 : 0
 
   metadata {
     name      = "feature-flags-content"
-    namespace = kubernetes_namespace.paragon.id
+    namespace = local.paragon_namespace
   }
 
   data = {
@@ -197,7 +182,7 @@ resource "helm_release" "ingress" {
   chart      = "aws-load-balancer-controller"
   version    = "1.9.1"
 
-  namespace        = kubernetes_namespace.paragon.id
+  namespace        = local.paragon_namespace
   atomic           = true
   cleanup_on_fail  = true
   create_namespace = false
@@ -223,7 +208,7 @@ resource "helm_release" "metricsserver" {
   repository = "https://kubernetes-sigs.github.io/metrics-server/"
   chart      = "metrics-server"
 
-  namespace        = kubernetes_namespace.paragon.id
+  namespace        = local.paragon_namespace
   atomic           = true
   cleanup_on_fail  = true
   create_namespace = false
@@ -251,7 +236,7 @@ resource "helm_release" "paragon_on_prem" {
   chart       = "./charts/paragon-onprem"
   version     = "${local.version}-${local.chart_hashes["paragon-onprem"]}"
 
-  namespace         = kubernetes_namespace.paragon.id
+  namespace         = local.paragon_namespace
   atomic            = true
   cleanup_on_fail   = true
   create_namespace  = false
@@ -287,7 +272,7 @@ resource "helm_release" "paragon_logging" {
   chart       = "./charts/paragon-logging"
   version     = "${local.version}-${local.chart_hashes["paragon-logging"]}"
 
-  namespace         = kubernetes_namespace.paragon.id
+  namespace         = local.paragon_namespace
   atomic            = true
   cleanup_on_fail   = true
   create_namespace  = false
@@ -335,7 +320,7 @@ resource "helm_release" "paragon_monitoring" {
   chart       = "./charts/paragon-monitoring"
   version     = "${var.monitor_version}-${local.chart_hashes["paragon-monitoring"]}"
 
-  namespace         = kubernetes_namespace.paragon.id
+  namespace         = local.paragon_namespace
   atomic            = true
   cleanup_on_fail   = true
   create_namespace  = false
