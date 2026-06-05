@@ -4,33 +4,32 @@ data "azurerm_resource_group" "infra" {
 }
 
 data "azurerm_key_vault" "paragon" {
-  count               = local.use_legacy_infra_json ? 0 : 1
   name                = substr(local.workspace, 0, 24)
-  resource_group_name = data.azurerm_resource_group.infra[0].name
+  resource_group_name = local.resource_group_name
 }
 
 data "azurerm_key_vault_secret" "infra_postgres" {
   count        = local.use_legacy_infra_json ? 0 : 1
   name         = "postgres"
-  key_vault_id = data.azurerm_key_vault.paragon[0].id
+  key_vault_id = data.azurerm_key_vault.paragon.id
 }
 
 data "azurerm_key_vault_secret" "infra_redis" {
   count        = local.use_legacy_infra_json ? 0 : 1
   name         = "redis"
-  key_vault_id = data.azurerm_key_vault.paragon[0].id
+  key_vault_id = data.azurerm_key_vault.paragon.id
 }
 
 data "azurerm_key_vault_secret" "infra_storage" {
   count        = local.use_legacy_infra_json ? 0 : 1
   name         = "storage"
-  key_vault_id = data.azurerm_key_vault.paragon[0].id
+  key_vault_id = data.azurerm_key_vault.paragon.id
 }
 
 data "azurerm_key_vault_secret" "infra_kafka" {
   count        = local.use_legacy_infra_json ? 0 : (var.managed_sync_enabled ? 1 : 0)
   name         = "kafka"
-  key_vault_id = data.azurerm_key_vault.paragon[0].id
+  key_vault_id = data.azurerm_key_vault.paragon.id
 }
 
 locals {

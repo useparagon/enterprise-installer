@@ -408,7 +408,7 @@ locals {
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
 
-  gcp_creds = var.gcp_assume_role ? try(base64decode(local.infra_vars.minio.value.root_password), null) : jsonencode({
+  gcp_provider_credentials = jsonencode({
     type                        = "service_account",
     auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs",
     auth_uri                    = "https://accounts.google.com/o/oauth2/auth",
@@ -416,10 +416,13 @@ locals {
     client_email                = try(local.creds_json.client_email, var.gcp_client_email),
     client_id                   = try(local.creds_json.client_id, var.gcp_client_id),
     client_x509_cert_url        = try(local.creds_json.client_x509_cert_url, var.gcp_client_x509_cert_url),
-    gcp_project_id              = try(local.creds_json.gcp_project_id, var.gcp_project_id),
+    project_id                  = try(local.creds_json.project_id, var.gcp_project_id),
     private_key                 = try(local.creds_json.private_key, var.gcp_private_key),
     private_key_id              = try(local.creds_json.private_key_id, var.gcp_private_key_id),
   })
+
+  # WIF deployments store the storage SA key in infra secrets; static JSON creds otherwise.
+  gcp_creds = var.gcp_assume_role ? try(base64decode(local.infra_vars.minio.value.root_password), null) : local.gcp_provider_credentials
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "GCP")
 

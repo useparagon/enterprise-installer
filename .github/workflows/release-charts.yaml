@@ -57,16 +57,19 @@ jobs:
           fi
 
       - name: Fetch service-inputs from release tag
-        run: bash scripts/fetch-service-inputs-from-tag.sh "${{ inputs.version }}"
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash scripts/fetch-service-inputs-from-tag.sh "$VERSION"
 
       - name: Update chart fixtures
         run: node scripts/update-charts.mjs charts/files/service-inputs.json
 
       - name: Stage and version charts
         id: stamp
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          version="${{ inputs.version }}"
           staging="$RUNNER_TEMP/charts"
           mkdir -p "$staging"
 
@@ -78,8 +81,8 @@ jobs:
 
           for chart in "$staging"/*/; do
             [ -d "$chart" ] || continue
-            find "$chart" -type f -exec sed -i "s/__PARAGON_VERSION__/${version}/g" {} +
-            echo "$(basename "$chart"): ${version}"
+            find "$chart" -type f -exec perl -pi -e 's/\Q__PARAGON_VERSION__\E/$ENV{VERSION}/g' {} +
+            echo "$(basename "$chart"): ${VERSION}"
           done
 
           echo "staging=$staging" >> "$GITHUB_OUTPUT"
