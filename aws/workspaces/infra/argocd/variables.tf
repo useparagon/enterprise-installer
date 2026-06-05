@@ -23,11 +23,6 @@ variable "aws_region" {
   type        = string
 }
 
-variable "cluster_autoscaler_role_arn" {
-  description = "IAM role ARN for the cluster-autoscaler service account (from the cluster module)."
-  type        = string
-}
-
 variable "argocd_namespace" {
   description = "Namespace to install ArgoCD into."
   type        = string

@@ -182,7 +182,7 @@ locals {
       "aws_cluster_name"            = var.cluster_name
       "cluster_name"                = "in-cluster"
       "environment"                 = var.workspace
-      "cluster_autoscaler_role_arn" = var.cluster_autoscaler_role_arn
+      "cluster_autoscaler_role_arn" = aws_iam_role.cluster_autoscaler.arn
       "ingress_scheme"              = var.ingress_scheme
       "paragon_monitors_enabled"    = var.paragon_monitors_enabled ? "true" : "false"
       "managed_sync_enabled"        = var.managed_sync_enabled ? "true" : "false"

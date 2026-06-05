@@ -12,6 +12,6 @@ output "eks_cluster" {
 }
 
 output "cluster_autoscaler_role_arn" {
-  description = "IAM role ARN for the cluster-autoscaler service account."
-  value       = module.cluster_autoscaler.iam_role_attributes.arn
+  description = "IAM role ARN for the cluster-autoscaler service account (non-GitOps path only)."
+  value       = length(module.cluster_autoscaler) > 0 ? module.cluster_autoscaler[0].iam_role_attributes.arn : null
 }

@@ -10,7 +10,7 @@ output "eso_role_arn" {
 
 output "cluster_autoscaler_role_arn" {
   description = "IAM role ARN used by the cluster-autoscaler service account."
-  value       = var.cluster_autoscaler_role_arn
+  value       = aws_iam_role.cluster_autoscaler.arn
 }
 
 output "cluster_secret_store_name" {
