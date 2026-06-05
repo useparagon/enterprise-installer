@@ -1,12 +1,16 @@
 resource "kubernetes_namespace" "external_secrets" {
+  count = var.install_external_secrets ? 1 : 0
+
   metadata {
     name = "external-secrets"
   }
 }
 
 resource "helm_release" "external_secrets" {
+  count = var.install_external_secrets ? 1 : 0
+
   name             = "external-secrets"
-  namespace        = kubernetes_namespace.external_secrets.id
+  namespace        = kubernetes_namespace.external_secrets[0].id
   repository       = "https://charts.external-secrets.io"
   chart            = "external-secrets"
   version          = "0.14.4"
@@ -31,8 +35,10 @@ resource "helm_release" "external_secrets" {
 }
 
 resource "helm_release" "reloader" {
+  count = var.install_external_secrets ? 1 : 0
+
   name             = "reloader"
-  namespace        = kubernetes_namespace.external_secrets.id
+  namespace        = kubernetes_namespace.external_secrets[0].id
   repository       = "https://stakater.github.io/stakater-charts"
   chart            = "reloader"
   version          = "2.2.11"
@@ -58,7 +64,7 @@ locals {
             jwt = {
               serviceAccountRef = {
                 name      = "external-secrets"
-                namespace = kubernetes_namespace.external_secrets.id
+                namespace = "external-secrets"
               }
             }
           }
@@ -177,28 +183,36 @@ locals {
 }
 
 resource "kubectl_manifest" "secret_store" {
+  count = var.install_external_secrets ? 1 : 0
+
   yaml_body  = local.secret_store_yaml
-  depends_on = [helm_release.external_secrets, kubernetes_namespace.paragon, terraform_data.runtime_secrets_ready]
+  depends_on = [helm_release.external_secrets[0], kubernetes_namespace.paragon, terraform_data.runtime_secrets_ready]
 }
 
 resource "kubectl_manifest" "external_secret_paragon" {
+  count = var.install_external_secrets ? 1 : 0
+
   yaml_body  = local.external_secret_paragon_yaml
-  depends_on = [kubectl_manifest.secret_store]
+  depends_on = [kubectl_manifest.secret_store[0]]
 }
 
 resource "kubectl_manifest" "external_secret_docker" {
+  count = var.install_external_secrets ? 1 : 0
+
   yaml_body  = local.external_secret_docker_yaml
-  depends_on = [kubectl_manifest.secret_store]
+  depends_on = [kubectl_manifest.secret_store[0]]
 }
 
 resource "kubectl_manifest" "external_secret_managed_sync" {
-  count      = local.external_secret_managed_sync_yaml != null ? 1 : 0
+  count = var.install_external_secrets && local.external_secret_managed_sync_yaml != null ? 1 : 0
+
   yaml_body  = local.external_secret_managed_sync_yaml
-  depends_on = [kubectl_manifest.secret_store]
+  depends_on = [kubectl_manifest.secret_store[0]]
 }
 
 resource "kubectl_manifest" "external_secret_openobserve" {
-  count      = local.external_secret_openobserve_yaml != null ? 1 : 0
+  count = var.install_external_secrets && local.external_secret_openobserve_yaml != null ? 1 : 0
+
   yaml_body  = local.external_secret_openobserve_yaml
-  depends_on = [kubectl_manifest.secret_store]
+  depends_on = [kubectl_manifest.secret_store[0]]
 }

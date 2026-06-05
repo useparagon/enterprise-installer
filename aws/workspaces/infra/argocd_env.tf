@@ -140,17 +140,19 @@ locals {
 
   argocd_app_secret_overrides = var.argocd_app_secrets != null ? var.argocd_app_secrets : {}
 
+  argocd_license_admin_auth = try(local.argocd_app_secret_overrides.LICENSE, null) != null ? {
+    ADMIN_BASIC_AUTH_USERNAME = local.argocd_app_secret_overrides.LICENSE
+    ADMIN_BASIC_AUTH_PASSWORD = local.argocd_app_secret_overrides.LICENSE
+  } : {}
+
   argocd_env_secret = {
     for key, value in merge(
       local.argocd_infra_env,
       local.argocd_postgres_env,
       local.argocd_public_url_defaults,
       local.argocd_env_overrides,
+      local.argocd_license_admin_auth,
       local.argocd_app_secret_overrides,
-      try(local.argocd_app_secret_overrides.LICENSE, null) != null ? {
-        ADMIN_BASIC_AUTH_USERNAME = local.argocd_app_secret_overrides.LICENSE
-        ADMIN_BASIC_AUTH_PASSWORD = local.argocd_app_secret_overrides.LICENSE
-      } : {}
     ) :
     key => tostring(value)
     if value != null && tostring(value) != ""

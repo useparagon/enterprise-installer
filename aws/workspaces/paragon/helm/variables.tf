@@ -48,6 +48,12 @@ variable "eso_role_arn" {
   type        = string
 }
 
+variable "install_external_secrets" {
+  description = "Install External Secrets Operator and CRs. Set false when infra/GitOps already manages ESO."
+  type        = bool
+  default     = true
+}
+
 variable "openobserve_email" {
   description = "OpenObserve admin login email."
   type        = string

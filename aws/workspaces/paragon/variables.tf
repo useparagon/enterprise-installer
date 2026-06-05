@@ -310,6 +310,18 @@ variable "migrated_workspace" {
   default     = null
 }
 
+variable "argocd_enabled" {
+  description = "When true, the infra workspace manages runtime secrets and External Secrets; this workspace references them instead of creating duplicates."
+  type        = bool
+  default     = false
+}
+
+variable "infra_eso_role_arn" {
+  description = "IAM role ARN for External Secrets Operator from the infra workspace. Required when argocd_enabled is true."
+  type        = string
+  default     = null
+}
+
 variable "helm_yaml_path" {
   description = "Path to helm values.yaml file."
   type        = string
