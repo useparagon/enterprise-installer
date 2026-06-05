@@ -231,7 +231,8 @@ resource "helm_release" "metricsserver" {
   verify           = false
 
   depends_on = [
-    helm_release.ingress
+    terraform_data.managed_ingress_controller_ready,
+    terraform_data.external_ingress_controller_ready,
   ]
 }
 
@@ -270,7 +271,8 @@ resource "helm_release" "paragon_on_prem" {
   ]
 
   depends_on = [
-    helm_release.ingress,
+    terraform_data.managed_ingress_controller_ready,
+    terraform_data.external_ingress_controller_ready,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
     kubernetes_storage_class_v1.gp3_encrypted,
@@ -316,7 +318,8 @@ resource "helm_release" "paragon_logging" {
   }
 
   depends_on = [
-    helm_release.ingress,
+    terraform_data.managed_ingress_controller_ready,
+    terraform_data.external_ingress_controller_ready,
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.openobserve_credentials,
     kubernetes_storage_class_v1.gp3_encrypted
@@ -361,7 +364,8 @@ resource "helm_release" "paragon_monitoring" {
   }
 
   depends_on = [
-    helm_release.ingress,
+    terraform_data.managed_ingress_controller_ready,
+    terraform_data.external_ingress_controller_ready,
     helm_release.paragon_on_prem,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,

@@ -481,6 +481,13 @@ variable "argocd_bootstrap_repo_token" {
   default     = null
 }
 
+variable "argocd_bootstrap_repo_private" {
+  description = "When true, argocd_bootstrap_repo_token is required to clone the bootstrap repository."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 variable "paragon_chart_version" {
   description = "Target chart version or constraint for Paragon charts deployed via ArgoCD (e.g. '2026.04.*'). Required when argocd_enabled is true."
   type        = string
@@ -729,6 +736,18 @@ resource "terraform_data" "validate_argocd_versions" {
         startswith(trimspace(var.argocd_bootstrap_repo_url), "https://")
       )
       error_message = "argocd_bootstrap_repo_url must use HTTPS (https://github.com/...). SSH git@ URLs are not supported; use argocd_bootstrap_repo_token for private repositories."
+    }
+    precondition {
+      condition = (
+        trimspace(var.argocd_bootstrap_repo_url) == "" ||
+        trimspace(var.argocd_bootstrap_repo_path) == "" ||
+        !var.argocd_bootstrap_repo_private ||
+        (
+          var.argocd_bootstrap_repo_token != null &&
+          trimspace(var.argocd_bootstrap_repo_token) != ""
+        )
+      )
+      error_message = "argocd_bootstrap_repo_token is required when argocd_bootstrap_repo_private is true and bootstrap repo URL/path are set."
     }
     precondition {
       condition = (
