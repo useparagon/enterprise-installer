@@ -617,6 +617,12 @@ locals {
     "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
   )
 
+  # Infra ElastiCache exposes managed_sync (not workflow) when managed sync is enabled.
+  workflow_redis = coalesce(
+    try(local.infra_vars.redis.value.workflow, null),
+    try(local.infra_vars.redis.value.managed_sync, null),
+  )
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       env = merge(
@@ -771,9 +777,9 @@ locals {
           SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
           SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
           SYSTEM_REDIS_URL               = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
-          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
-          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}", local.default_redis_url)
+          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.workflow_redis.cluster, local.default_redis_cluster)
+          WORKFLOW_REDIS_TLS_ENABLED     = try(local.workflow_redis.ssl, local.default_redis_ssl)
+          WORKFLOW_REDIS_URL             = try("${local.workflow_redis.host}:${local.workflow_redis.port}", local.default_redis_url)
 
           # Cloud Storage configurations
           CLOUD_STORAGE_MICROSERVICE_PASS = local.cloud_storage_type == "S3" ? local.infra_vars.minio.value.root_password : local.infra_vars.minio.value.microservice_pass

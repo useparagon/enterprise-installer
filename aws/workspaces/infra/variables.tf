@@ -380,9 +380,9 @@ variable "migrated_passwords" {
 # ---------------------------------------------------------------------------
 
 variable "argocd_version" {
-  description = "Argo CD container image tag (e.g. v3.4.3). Applied via the official argo-cd Helm chart."
+  description = "Argo CD container image tag (e.g. v3.4.2). Applied via the official argo-cd Helm chart."
   type        = string
-  default     = "v2.14.11"
+  default     = "v3.4.2"
   nullable    = false
 }
 
