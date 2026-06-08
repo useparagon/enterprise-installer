@@ -15,7 +15,9 @@
 | Name | Version |
 | ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 5.100.0 |
-| <a name="provider_random"></a> [random](#provider\_random) | 3.8.1 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | 2.38.0 |
+| <a name="provider_random"></a> [random](#provider\_random) | 3.9.0 |
+| <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
 
 ## Modules
 
@@ -40,24 +42,39 @@
 | [aws_secretsmanager_secret.openobserve](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret_version.docker_cfg](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.env](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.env_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.managed_sync](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.managed_sync_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.openobserve](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [kubernetes_annotations.paragon_env_eso_force_sync](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/annotations) | resource |
 | [random_password.openobserve_password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.openobserve_email](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
+| [terraform_data.infra_gitops_applied](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
+| [terraform_data.runtime_secrets_populated](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
+| [terraform_data.validate_gitops](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_eks_cluster.cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/eks_cluster) | data source |
 | [aws_eks_cluster_auth.cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/eks_cluster_auth) | data source |
 | [aws_iam_policy_document.eso_assume](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.eso_secrets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_secretsmanager_secret.docker_cfg](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret.env](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret.managed_sync](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret.openobserve](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret_version.docker_cfg](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.env](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.managed_sync](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.openobserve](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_argocd_enabled"></a> [argocd\_enabled](#input\_argocd\_enabled) | When true, the infra workspace manages runtime secrets and External Secrets; this workspace references them instead of creating duplicates. | `bool` | `false` | no |
 | <a name="input_aws_access_key_id"></a> [aws\_access\_key\_id](#input\_aws\_access\_key\_id) | AWS Access Key for AWS account to provision resources on. | `string` | n/a | yes |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | The AWS region resources are created in. | `string` | n/a | yes |
 | <a name="input_aws_secret_access_key"></a> [aws\_secret\_access\_key](#input\_aws\_secret\_access\_key) | AWS Secret Access Key for AWS account to provision resources on. | `string` | n/a | yes |
@@ -84,6 +101,7 @@
 | <a name="input_hoop_api_url"></a> [hoop\_api\_url](#input\_hoop\_api\_url) | Hoop API URL. | `string` | `"https://hoop.ops.paragoninternal.com/api"` | no |
 | <a name="input_hoop_custom_connections"></a> [hoop\_custom\_connections](#input\_hoop\_custom\_connections) | Custom Hoop connections defined via tfvars. Map of connection names to their configuration. | <pre>map(object({<br/>    type                  = string<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "disabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string))<br/>    secrets               = map(string)<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_enabled"></a> [hoop\_enabled](#input\_hoop\_enabled) | Whether to enable Hoop agent. hoop\_key, hoop\_api\_key, and hoop\_agent\_id must be set if this is true. | `bool` | `true` | no |
+| <a name="input_hoop_grafana_connection"></a> [hoop\_grafana\_connection](#input\_hoop\_grafana\_connection) | Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500). | `bool` | `false` | no |
 | <a name="input_hoop_k8s_connections"></a> [hoop\_k8s\_connections](#input\_hoop\_k8s\_connections) | Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created. | <pre>map(object({<br/>    type                  = optional(string, "custom")<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "enabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string), ["bash"])<br/>    remote_url            = optional(string, "https://kubernetes.default.svc.cluster.local")<br/>    insecure              = optional(string, "true")<br/>    namespace             = optional(string, "paragon")<br/>    secrets               = optional(map(string), {})<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_key"></a> [hoop\_key](#input\_hoop\_key) | Hoop agent key (token). Only used if hoop\_enabled is true. | `string` | `null` | no |
 | <a name="input_hoop_postgres_guardrail_rules"></a> [hoop\_postgres\_guardrail\_rules](#input\_hoop\_postgres\_guardrail\_rules) | Guardrail rule IDs for PostgreSQL connections. | `list(string)` | <pre>[<br/>  "a85115f6-5ef3-4618-b70c-f7cccdc62c5a"<br/>]</pre> | no |
@@ -93,12 +111,15 @@
 | <a name="input_hoop_slack_app_token"></a> [hoop\_slack\_app\_token](#input\_hoop\_slack\_app\_token) | Slack app token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_bot_token"></a> [hoop\_slack\_bot\_token](#input\_hoop\_slack\_bot\_token) | Slack bot token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_channel_ids"></a> [hoop\_slack\_channel\_ids](#input\_hoop\_slack\_channel\_ids) | Slack channel IDs to notify for connections that require reviews. | `list(string)` | `[]` | no |
+| <a name="input_infra_eso_role_arn"></a> [infra\_eso\_role\_arn](#input\_infra\_eso\_role\_arn) | IAM role ARN for External Secrets Operator from the infra workspace. Required when argocd\_enabled is true. | `string` | `null` | no |
+| <a name="input_infra_gitops_ready"></a> [infra\_gitops\_ready](#input\_infra\_gitops\_ready) | Apply-time signal that the infra GitOps bootstrap finished (ALB controller, ESO ExternalSecrets). Required when argocd\_enabled is true. | `string` | `null` | no |
 | <a name="input_infra_json"></a> [infra\_json](#input\_infra\_json) | Deprecated legacy JSON string of `infra` workspace variables. | `string` | `null` | no |
 | <a name="input_infra_json_path"></a> [infra\_json\_path](#input\_infra\_json\_path) | Deprecated legacy path to an `infra` workspace output JSON file. | `string` | `null` | no |
 | <a name="input_ingress_scheme"></a> [ingress\_scheme](#input\_ingress\_scheme) | Whether the load balancer is 'internet-facing' (public) or 'internal' (private) | `string` | `"internet-facing"` | no |
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.31"` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
 | <a name="input_managed_sync_version"></a> [managed\_sync\_version](#input\_managed\_sync\_version) | The version of the Managed Sync helm chart to install. | `string` | `"latest"` | no |
+| <a name="input_migrated_workspace"></a> [migrated\_workspace](#input\_migrated\_workspace) | Override the workspace name to preserve naming conventions when migrating from legacy workspaces. Must match the infra workspace value. | `string` | `null` | no |
 | <a name="input_monitor_version"></a> [monitor\_version](#input\_monitor\_version) | The version of the Paragon monitors to install. | `string` | `null` | no |
 | <a name="input_monitors_enabled"></a> [monitors\_enabled](#input\_monitors\_enabled) | Specifies that monitors are enabled. | `bool` | `false` | no |
 | <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve\_email) | OpenObserve admin login email. | `string` | `null` | no |

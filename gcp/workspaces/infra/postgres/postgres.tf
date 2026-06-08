@@ -121,7 +121,7 @@ resource "google_sql_user" "postgres_user" {
 }
 
 locals {
-  openfga_instance_key       = var.managed_sync_enabled ? (contains(keys(local.postgres_instances), "managed_sync") ? "managed_sync" : "paragon") : null
+  openfga_instance_key        = var.managed_sync_enabled ? (contains(keys(local.postgres_instances), "managed_sync") ? "managed_sync" : "paragon") : null
   managed_sync_extra_db_names = toset(local.openfga_instance_key != null ? ["sync_project", "sync_instance"] : [])
 }
 

@@ -73,6 +73,9 @@ resource "azurerm_kubernetes_cluster" "cluster" {
     service_cidr   = "172.0.0.0/16"
   }
 
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
+
   identity {
     type = "SystemAssigned"
   }

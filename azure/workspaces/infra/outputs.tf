@@ -77,3 +77,18 @@ output "kafka" {
   } : null
   sensitive = true
 }
+
+output "argocd_namespace" {
+  description = "Namespace where ArgoCD is installed."
+  value       = var.argocd_enabled ? module.argocd[0].argocd_namespace : null
+}
+
+output "cluster_secret_store_name" {
+  description = "Name of the ClusterSecretStore used by ESO."
+  value       = var.argocd_enabled ? module.argocd[0].cluster_secret_store_name : null
+}
+
+output "key_vault_uri" {
+  description = "URI of the Azure Key Vault holding GitOps secrets."
+  value       = var.argocd_enabled ? module.argocd[0].key_vault_uri : null
+}

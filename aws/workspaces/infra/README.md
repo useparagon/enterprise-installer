@@ -21,11 +21,11 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | Name | Version |
 | ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 5.100.0 |
-| <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | 4.52.5 |
-| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | 2.33.0 |
-| <a name="provider_random"></a> [random](#provider\_random) | 3.8.1 |
+| <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | 4.52.7 |
+| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | 2.38.0 |
+| <a name="provider_random"></a> [random](#provider\_random) | 3.9.0 |
 | <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
-| <a name="provider_time"></a> [time](#provider\_time) | 0.13.1 |
+| <a name="provider_time"></a> [time](#provider\_time) | 0.14.0 |
 
 ## Modules
 
@@ -77,6 +77,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_argocd_app_secrets"></a> [argocd\_app\_secrets](#input\_argocd\_app\_secrets) | Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides argocd\_env\_overrides when the same key is set in both. | `map(string)` | `null` | no |
 | <a name="input_argocd_auto_sync"></a> [argocd\_auto\_sync](#input\_argocd\_auto\_sync) | Whether ArgoCD Applications should auto-sync on git/chart changes. | `bool` | `true` | no |
 | <a name="input_argocd_bootstrap_repo_path"></a> [argocd\_bootstrap\_repo\_path](#input\_argocd\_bootstrap\_repo\_path) | Path inside argocd\_bootstrap\_repo\_url containing child Application manifests. | `string` | `""` | no |
+| <a name="input_argocd_bootstrap_repo_private"></a> [argocd\_bootstrap\_repo\_private](#input\_argocd\_bootstrap\_repo\_private) | When true, argocd\_bootstrap\_repo\_token is required to clone the bootstrap repository. | `bool` | `false` | no |
 | <a name="input_argocd_bootstrap_repo_revision"></a> [argocd\_bootstrap\_repo\_revision](#input\_argocd\_bootstrap\_repo\_revision) | Git revision (branch, tag, or commit) for App-of-Apps bootstrap. | `string` | `"HEAD"` | no |
 | <a name="input_argocd_bootstrap_repo_token"></a> [argocd\_bootstrap\_repo\_token](#input\_argocd\_bootstrap\_repo\_token) | GitHub PAT for argocd\_bootstrap\_repo\_url (HTTPS). Set via Spacelift context / TF\_VAR\_* (never commit). Required when bootstrap repo URL and path are set. | `string` | `null` | no |
 | <a name="input_argocd_bootstrap_repo_url"></a> [argocd\_bootstrap\_repo\_url](#input\_argocd\_bootstrap\_repo\_url) | HTTPS Git repository URL for Argo CD App-of-Apps bootstrap (e.g. https://github.com/org/repo.git). Leave empty to skip creating the root Application. | `string` | `""` | no |
@@ -92,7 +93,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_argocd_self_heal"></a> [argocd\_self\_heal](#input\_argocd\_self\_heal) | Whether ArgoCD should auto-correct drift from desired state. | `bool` | `true` | no |
 | <a name="input_argocd_slack_channel"></a> [argocd\_slack\_channel](#input\_argocd\_slack\_channel) | Slack channel name for ArgoCD notifications. | `string` | `""` | no |
 | <a name="input_argocd_slack_token"></a> [argocd\_slack\_token](#input\_argocd\_slack\_token) | Optional Slack bot token for ArgoCD sync notifications. | `string` | `null` | no |
-| <a name="input_argocd_version"></a> [argocd\_version](#input\_argocd\_version) | Argo CD container image tag (e.g. v3.4.3). Applied via the official argo-cd Helm chart. | `string` | `"v2.14.11"` | no |
+| <a name="input_argocd_version"></a> [argocd\_version](#input\_argocd\_version) | Argo CD container image tag (e.g. v3.4.2). Applied via the official argo-cd Helm chart. | `string` | `"v3.4.2"` | no |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to enable S3 Object Lock for the audit logs bucket. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
 | <a name="input_aws_access_key_id"></a> [aws\_access\_key\_id](#input\_aws\_access\_key\_id) | AWS Access Key for AWS account to provision resources on. | `string` | `null` | no |

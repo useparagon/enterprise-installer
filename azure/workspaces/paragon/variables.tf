@@ -319,11 +319,11 @@ variable "managed_sync_version" {
 
 locals {
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
-  hash      = substr(sha256(var.azure_subscription_id), 0, 8)
-  infra_json_path      = var.infra_json_path != null ? abspath(var.infra_json_path) : null
+  hash                  = substr(sha256(var.azure_subscription_id), 0, 8)
+  infra_json_path       = var.infra_json_path != null ? abspath(var.infra_json_path) : null
   use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
-  legacy_infra_vars    = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
-  workspace            = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}") : "paragon-${var.organization}-${local.hash}")
+  legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
+  workspace             = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}") : "paragon-${var.organization}-${local.hash}")
 
   dns_enabled = var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
 
@@ -822,8 +822,8 @@ locals {
     })
   })
 
-  bootstrap_values     = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
-  runtime_secret_keys  = toset(try(local.bootstrap_values.secretKeys, []))
+  bootstrap_values    = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
+  runtime_secret_keys = toset(try(local.bootstrap_values.secretKeys, []))
   helm_secret_values = {
     for key, value in local.helm_values.global.env :
     key => tostring(value)

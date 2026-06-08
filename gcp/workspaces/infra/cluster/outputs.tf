@@ -7,3 +7,8 @@ output "kubernetes" {
   }
   sensitive = true
 }
+
+output "workload_pool" {
+  value       = "${var.gcp_project_id}.svc.id.goog"
+  description = "GKE Workload Identity pool."
+}

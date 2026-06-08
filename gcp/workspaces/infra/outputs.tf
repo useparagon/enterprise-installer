@@ -75,3 +75,18 @@ output "cluster_name" {
   description = "The name of the GKE cluster."
   value       = module.cluster.kubernetes.name
 }
+
+output "argocd_namespace" {
+  description = "Namespace where ArgoCD is installed."
+  value       = var.argocd_enabled ? module.argocd[0].argocd_namespace : null
+}
+
+output "cluster_secret_store_name" {
+  description = "Name of the GCP Secret Manager ClusterSecretStore."
+  value       = var.argocd_enabled ? module.argocd[0].cluster_secret_store_name : null
+}
+
+output "eso_gsa_email" {
+  description = "GSA email for the External Secrets Operator."
+  value       = var.argocd_enabled ? module.argocd[0].eso_gsa_email : null
+}

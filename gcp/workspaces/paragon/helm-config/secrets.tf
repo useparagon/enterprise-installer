@@ -108,23 +108,23 @@ locals {
     PARAGON_PROXY_BASE_URL = try("http://worker-proxy:${var.microservices["worker-proxy"].port}", null)
     PARAGON_ZEUS_BASE_URL  = try("http://zeus:${var.microservices["zeus"].port}", null)
 
-    MANAGED_SYNC_PRIVATE_KEY      = replace(tls_private_key.managed_sync_signing_key.private_key_pem, "\n", "\\n")
-    MANAGED_SYNC_AUTH_PUBLIC_KEY  = replace(tls_private_key.managed_sync_signing_key.public_key_pem, "\n", "\\n")
+    MANAGED_SYNC_PRIVATE_KEY     = replace(tls_private_key.managed_sync_signing_key.private_key_pem, "\n", "\\n")
+    MANAGED_SYNC_AUTH_PUBLIC_KEY = replace(tls_private_key.managed_sync_signing_key.public_key_pem, "\n", "\\n")
 
     MANAGED_SYNC_ETCD_HOSTS = join(",", [for i in range(3) : "http://etcd-${i}.etcd-headless:2379"])
 
-    MANAGED_SYNC_KAFKA_BROKER_URLS    = local.kafka_config.broker_urls
-    MANAGED_SYNC_KAFKA_SASL_USERNAME  = local.kafka_config.sasl_username
+    MANAGED_SYNC_KAFKA_BROKER_URLS   = local.kafka_config.broker_urls
+    MANAGED_SYNC_KAFKA_SASL_USERNAME = local.kafka_config.sasl_username
     # GMK SASL PLAIN expects the password (service account JSON key) to be base64-encoded.
     MANAGED_SYNC_KAFKA_SASL_PASSWORD  = local.kafka_config.sasl_mechanism == "plain" ? base64encode(local.kafka_config.sasl_password) : local.kafka_config.sasl_password
     MANAGED_SYNC_KAFKA_SASL_MECHANISM = local.kafka_config.sasl_mechanism
     MANAGED_SYNC_KAFKA_SSL_ENABLED    = tostring(local.kafka_config.ssl_enabled)
 
     # Redis from infra when present (TLS → rediss://; else 0x15). Do not override from base_helm_values so managed_sync always gets infra's scheme.
-    MANAGED_SYNC_REDIS_URL              = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
-    MANAGED_SYNC_REDIS_CLUSTER_ENABLED  = local.redis_config.cluster_enabled
-    MANAGED_SYNC_REDIS_TLS_ENABLED      = tostring(local.redis_config.redis_tls_enabled)
-    MANAGED_SYNC_REDIS_CA_CERT          = local.redis_config.redis_ca_certificate != null ? local.redis_config.redis_ca_certificate : ""
+    MANAGED_SYNC_REDIS_URL             = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
+    MANAGED_SYNC_REDIS_CLUSTER_ENABLED = local.redis_config.cluster_enabled
+    MANAGED_SYNC_REDIS_TLS_ENABLED     = tostring(local.redis_config.redis_tls_enabled)
+    MANAGED_SYNC_REDIS_CA_CERT         = local.redis_config.redis_ca_certificate != null ? local.redis_config.redis_ca_certificate : ""
 
     SYNC_INSTANCE_POSTGRES_HOST        = local.postgres_config.sync_instance.host
     SYNC_INSTANCE_POSTGRES_PORT        = local.postgres_config.sync_instance.port
@@ -166,7 +166,7 @@ locals {
 
     OPENFGA_HTTP_PORT           = "6200"
     OPENFGA_GRPC_PORT           = "6201"
-    OPENFGA_AUTH_METHOD        = "preshared"
+    OPENFGA_AUTH_METHOD         = "preshared"
     OPENFGA_AUTH_PRESHARED_KEYS = sha256(local.postgres_config.openfga.password)
     OPENFGA_HTTP_URL            = "http://openfga:6200"
 

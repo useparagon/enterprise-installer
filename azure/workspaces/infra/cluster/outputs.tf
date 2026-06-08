@@ -12,6 +12,11 @@ output "kubernetes" {
   sensitive = true
 }
 
+output "oidc_issuer_url" {
+  description = "OIDC issuer URL for Workload Identity federation."
+  value       = azurerm_kubernetes_cluster.cluster.oidc_issuer_url
+}
+
 output "wait_for_cluster" {
   description = "Variable that can be referenced to ensure cluster is initialized."
   value       = azurerm_kubernetes_cluster.cluster.fqdn

@@ -396,9 +396,9 @@ locals {
 
   dns_enabled = var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
 
-  infra_json_path      = var.infra_json_path != null ? abspath(var.infra_json_path) : null
+  infra_json_path       = var.infra_json_path != null ? abspath(var.infra_json_path) : null
   use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
-  legacy_infra_vars    = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
+  legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
 
   workspace        = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
   cluster_name     = coalesce(var.cluster_name_override, local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, null) : null, "${local.workspace}-cluster")
@@ -899,8 +899,8 @@ locals {
     })
   })
 
-  bootstrap_values     = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
-  runtime_secret_keys  = toset(try(local.bootstrap_values.secretKeys, []))
+  bootstrap_values    = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
+  runtime_secret_keys = toset(try(local.bootstrap_values.secretKeys, []))
   helm_secret_values = {
     for key, value in local.helm_values.global.env :
     key => tostring(value)

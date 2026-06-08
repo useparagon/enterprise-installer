@@ -60,8 +60,8 @@ resource "google_secret_manager_secret" "runtime_kafka" {
 }
 
 resource "google_secret_manager_secret_version" "runtime_kafka" {
-  count       = var.managed_sync_enabled ? 1 : 0
-  secret      = google_secret_manager_secret.runtime_kafka[0].id
+  count  = var.managed_sync_enabled ? 1 : 0
+  secret = google_secret_manager_secret.runtime_kafka[0].id
   secret_data = jsonencode({
     cluster_bootstrap_brokers     = module.kafka[0].cluster_bootstrap_brokers
     cluster_service_account_email = module.kafka[0].cluster_service_account_email

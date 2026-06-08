@@ -1,9 +1,9 @@
 locals {
   runtime_secret_names = {
-    env          = "${local.workspace}-env"
-    docker_cfg   = "${local.workspace}-docker-cfg"
-    managed_sync = "${local.workspace}-managed-sync"
-    openobserve  = "${local.workspace}-openobserve"
+    env             = "${local.workspace}-env"
+    docker_cfg      = "${local.workspace}-docker-cfg"
+    managed_sync    = "${local.workspace}-managed-sync"
+    openobserve     = "${local.workspace}-openobserve"
     openobserve_gcs = "${local.workspace}-openobserve-gcs"
   }
 }
@@ -70,8 +70,8 @@ resource "google_secret_manager_secret" "openobserve" {
 }
 
 resource "google_secret_manager_secret_version" "openobserve" {
-  count       = 1
-  secret      = google_secret_manager_secret.openobserve[0].id
+  count  = 1
+  secret = google_secret_manager_secret.openobserve[0].id
   secret_data = jsonencode({
     ZO_ROOT_USER_EMAIL    = local.openobserve_email
     ZO_ROOT_USER_PASSWORD = local.openobserve_password
