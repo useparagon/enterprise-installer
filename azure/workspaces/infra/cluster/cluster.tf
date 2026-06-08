@@ -68,9 +68,11 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   }
 
   network_profile {
-    network_plugin = "azure"
-    dns_service_ip = "172.0.0.10"
-    service_cidr   = "172.0.0.0/16"
+    network_plugin    = "azure"
+    dns_service_ip    = "172.0.0.10"
+    service_cidr      = "172.0.0.0/16"
+    outbound_type     = "userAssignedNATGateway"
+    load_balancer_sku = "standard"
   }
 
   identity {
