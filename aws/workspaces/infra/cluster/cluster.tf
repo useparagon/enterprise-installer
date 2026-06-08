@@ -76,6 +76,9 @@ module "eks" {
     resources        = ["secrets"]
   }
 
+  # logging
+  cluster_enabled_log_types = ["api", "authenticator"]
+
   cluster_tags = {
     Name = var.workspace
   }
