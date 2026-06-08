@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(terraform fmt*)",
+      "Bash(terraform validate*)",
+      "Bash(terraform init -backend=false*)",
+      "Bash(terraform output*)",
+      "Bash(terraform providers*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git status*)",
+      "Bash(git branch*)",
+      "Bash(git show*)",
+      "Bash(find . *)",
+      "Bash(find /Users/ted/Projects/enterprise-installer *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(ls *)",
+      "Bash(cat *.tf)",
+      "Bash(cat *.yaml)",
+      "Bash(cat *.yml)",
+      "Bash(cat *.json)",
+      "Bash(cat *.sh)",
+      "Bash(cat *.md)",
+      "Bash(helm lint *)",
+      "Bash(helm template *)",
+      "Bash(helm dependency build *)",
+      "Bash(node scripts/*.mjs *)",
+      "Bash(echo *)",
+      "Bash(wc *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(sed *)",
+      "Bash(tflint *)",
+      "Bash(terraform-docs *)"
+    ],
+    "deny": [
+      "Bash(terraform apply*)",
+      "Bash(terraform destroy*)",
+      "Bash(terraform import*)",
+      "Bash(git push*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -rf*)"
+    ]
+  }
+}
