@@ -69,6 +69,7 @@ resource "helm_release" "managed_sync" {
     local.global_values_minus_env,
     local.managed_sync_azure_values,
     local.managed_sync_openfga_values,
+    local.managed_sync_values,
     local.secret_hash
   ]
 
