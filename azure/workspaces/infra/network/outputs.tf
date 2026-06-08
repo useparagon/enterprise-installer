@@ -21,3 +21,8 @@ output "postgres_subnet" {
 output "redis_subnet" {
   value = azurerm_subnet.redis
 }
+
+output "nat_gateway_public_ip" {
+  description = "Static public IP used for outbound SNAT from the private subnet."
+  value       = azurerm_public_ip.nat.ip_address
+}
