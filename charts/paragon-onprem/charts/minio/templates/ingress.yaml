@@ -1,6 +1,14 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName := include "minio.fullname" . -}}
 {{- $svcPort := .Values.service.port -}}
+{{- $cert := .Values.ingress.certificate -}}
+{{- if not $cert -}}
+{{- $cert = dig "ingress" "certificate" "" .Values.global -}}
+{{- end -}}
+{{- $className := .Values.ingress.className -}}
+{{- if not $className -}}
+{{- $className = dig "ingress" "className" "" .Values.global -}}
+{{- end -}}
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -13,9 +21,10 @@ metadata:
     {{- toYaml .Values.ingress.annotations | nindent 4 }}
     {{- end }}
     {{- if eq .Values.global.env.HOST_ENV "AWS_K8" }}
-    kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
-    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.certificate }}
+    {{- if $cert }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ $cert }}
+    {{- end }}
     alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.load_balancer_name | default "paragon" }}
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
     alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.ingress.healthcheck_path | default "/healthz" }}
@@ -41,8 +50,10 @@ metadata:
     service.beta.kubernetes.io/azure-load-balancer-internal: "true"
     {{- end }}
     {{- else if eq .Values.global.env.HOST_ENV "GCP_K8" }}
-    kubernetes.io/ingress.class: {{ .Values.ingress.className | default "gce" }}
-    ingress.gcp.kubernetes.io/pre-shared-cert: {{ .Values.ingress.certificate }}
+    kubernetes.io/ingress.class: {{ $className | default "gce" }}
+    {{- if $cert }}
+    ingress.gcp.kubernetes.io/pre-shared-cert: {{ $cert }}
+    {{- end }}
     ingress.kubernetes.io/healthcheck-path: {{ .Values.ingress.healthcheck_path | default "/minio/health/live" }}
     kubernetes.io/ingress.allow-http: "true"
     kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.loadBalancerName }}
@@ -56,7 +67,13 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     {{- end }}
 spec:
-  ingressClassName: {{ .Values.ingress.className | default "nginx" }}
+  {{- if eq .Values.global.env.HOST_ENV "AWS_K8" }}
+  ingressClassName: {{ $className | default "alb" }}
+  {{- else if eq .Values.global.env.HOST_ENV "GCP_K8" }}
+  ingressClassName: {{ $className | default "gce" }}
+  {{- else }}
+  ingressClassName: {{ $className | default "nginx" }}
+  {{- end }}
   {{- if or (eq .Values.global.env.HOST_ENV "AZURE_K8") (not (or (eq .Values.global.env.HOST_ENV "AWS_K8") (eq .Values.global.env.HOST_ENV "GCP_K8"))) }}
   tls:
     - hosts:

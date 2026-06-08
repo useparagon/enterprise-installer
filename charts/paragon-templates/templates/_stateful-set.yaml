@@ -9,6 +9,13 @@ Call with: include "statefulset.standard" (dict "root" $ "volumeName" "minio" "m
 {{- $storageSize := .storageSize | default "5Gi" -}}
 {{- $name := $root.Chart.Name -}}
 {{- $command := .command | default "" -}}
+{{- $podAnnotations := dict -}}
+{{- if and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "podAnnotations") (kindIs "map" $root.Values.global.podAnnotations) -}}
+{{- $podAnnotations = merge $podAnnotations $root.Values.global.podAnnotations -}}
+{{- end -}}
+{{- if $root.Values.podAnnotations -}}
+{{- $podAnnotations = merge $podAnnotations $root.Values.podAnnotations -}}
+{{- end -}}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -26,9 +33,9 @@ spec:
   serviceName: {{ include (printf "%s.fullname" $name) $root }}
   template:
     metadata:
-      {{- with $root.Values.podAnnotations }}
+      {{- if $podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $podAnnotations | nindent 8 }}
       {{- end }}
       labels:
         {{- include (printf "%s.selectorLabels" $name) $root | nindent 8 }}

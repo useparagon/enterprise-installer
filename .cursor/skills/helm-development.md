@@ -17,7 +17,7 @@ Each application chart declares its subcharts as `file://` dependencies in `Char
 
 ### Subchart-to-Parent-Chart Mapping
 
-- **`paragon-onprem`**: `account`, `api-triggerkit`, `cache-replay`, `cerberus`, `connect`, `dashboard`, `hades`, `health-checker`, `hermes`, `minio`, `passport`, `pheme`, `release`, `zeus`, `worker-actionkit`, `worker-actions`, `worker-auditlogs`, `worker-credentials`, `worker-crons`, `worker-deployments`, `worker-eventlogs`, `worker-proxy`, `worker-triggerkit`, `worker-triggers`, `worker-workflows`, `flipt`
+- **`paragon-onprem`**: `account`, `api-triggerkit`, `cache-replay`, `cerberus`, `connect`, `dashboard`, `hades`, `health-checker`, `hermes`, `passport`, `pheme`, `release`, `zeus`, `worker-actionkit`, `worker-actions`, `worker-auditlogs`, `worker-credentials`, `worker-crons`, `worker-deployments`, `worker-eventlogs`, `worker-proxy`, `worker-triggerkit`, `worker-triggers`, `worker-workflows`, `flipt`
 - **`paragon-monitoring`**: `bull-exporter`, `grafana`, `kafka-exporter`, `kube-state-metrics`, `node-exporter`, `pgadmin`, `postgres-exporter`, `prometheus`, `redis-exporter`, `redis-insight`
 - **`paragon-logging`**: `fluent-bit`, `openobserve`
 
@@ -391,3 +391,26 @@ When modifying ingress behavior, test with all relevant `HOST_ENV` values.
 | `scripts/push-versioned-commit.sh` | CI helper: commits, tags, and force-pushes tags |
 | `prepare.sh` | Main entry point: fetches tag, runs update-charts, copies/versions charts |
 | `.github/workflows/update-charts.yaml` | CI workflow triggered by monorepo releases |
+| `.github/workflows/stage-charts.yaml` | Package charts to ECR (sandbox); split chart ref vs release tag |
+| `.github/workflows/release-charts.yaml` | Package charts to S3 (production); split chart ref vs release tag |
+| `scripts/fetch-service-inputs-from-tag.sh` | Extract `charts/files/service-inputs.json` from a release tag |
+
+### Stage / Release chart workflows (split ref)
+
+`stage-charts.yaml` and `release-charts.yaml` decouple **chart templates** from the **Paragon release tag** (same idea as `prepare.sh`):
+
+| Input | Purpose |
+|-------|---------|
+| `version` | Release tag (e.g. `2026.0528.1501-2b7d0d71`). Stamps `__PARAGON_VERSION__` and supplies `service-inputs.json` from this tag. |
+| `chart_ref` | Optional branch/SHA for chart sources. Defaults to the ref that started the workflow. |
+
+**Typical GitOps feature work:** dispatch from your feature branch, set `version` to the image release tag, leave `chart_ref` empty (or set it explicitly to your branch). Chart templates (e.g. `global.ingress.certificate`) come from the branch; fixtures and image tags match the release.
+
+**Local equivalent:**
+
+```bash
+git checkout chore/PARA-18824/argocd-support
+bash scripts/fetch-service-inputs-from-tag.sh 2026.0528.1501-2b7d0d71
+node scripts/update-charts.mjs charts/files/service-inputs.json
+# then helm package with sed __PARAGON_VERSION__ = release tag, or use prepare.sh -t <tag> on the branch
+```

@@ -1,4 +1,7 @@
-# credentials
+# ---------------------------------------------------------------------------
+# AWS credentials
+# ---------------------------------------------------------------------------
+
 variable "aws_region" {
   description = "The AWS region resources are created in."
   type        = string
@@ -25,13 +28,19 @@ variable "aws_session_token" {
   default     = null
 }
 
-# account
+# ---------------------------------------------------------------------------
+# Account
+# ---------------------------------------------------------------------------
+
 variable "organization" {
   description = "Name of organization to include in resource names."
   type        = string
 }
 
-# network
+# ---------------------------------------------------------------------------
+# Network
+# ---------------------------------------------------------------------------
+
 variable "az_count" {
   description = "Number of AZs to cover in a given region."
   type        = number
@@ -53,7 +62,10 @@ variable "vpc_cidr_newbits" {
   nullable    = false
 }
 
-# rds
+# ---------------------------------------------------------------------------
+# RDS
+# ---------------------------------------------------------------------------
+
 variable "rds_instance_class" {
   description = "The RDS instance class type used for Postgres."
   type        = string
@@ -96,7 +108,10 @@ variable "rds_final_snapshot_enabled" {
   nullable    = false
 }
 
-# elasticache
+# ---------------------------------------------------------------------------
+# ElastiCache
+# ---------------------------------------------------------------------------
+
 variable "elasticache_node_type" {
   description = "The ElastiCache node type used for Redis."
   type        = string
@@ -118,11 +133,14 @@ variable "elasticache_multi_az" {
   nullable    = false
 }
 
-# eks
+# ---------------------------------------------------------------------------
+# EKS
+# ---------------------------------------------------------------------------
+
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.34"
+  default     = "1.35"
   nullable    = false
 }
 
@@ -179,7 +197,44 @@ variable "create_autoscaling_linked_role" {
   nullable    = false
 }
 
-# security
+# ---------------------------------------------------------------------------
+# MSK (Kafka)
+# ---------------------------------------------------------------------------
+
+variable "msk_kafka_version" {
+  description = "The Kafka version for the MSK cluster."
+  type        = string
+  // NOTE: to use a small instance type like `kafka.t3.small`, we need to use an older version that uses zookeeper
+  // we're default to an older version to keep costs low, but we can override this if we use a supported larger instance type
+  default  = "3.6.0"
+  nullable = false
+}
+
+variable "msk_kafka_num_broker_nodes" {
+  description = "The number of broker nodes for the MSK cluster."
+  type        = number
+  default     = 2
+  nullable    = false
+}
+
+variable "msk_autoscaling_enabled" {
+  description = "Whether to enable autoscaling for the MSK cluster."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
+variable "msk_instance_type" {
+  description = "The instance type for the MSK cluster."
+  type        = string
+  default     = "kafka.t3.small"
+  nullable    = false
+}
+
+# ---------------------------------------------------------------------------
+# Security & storage
+# ---------------------------------------------------------------------------
+
 variable "master_guardduty_account_id" {
   description = "Optional AWS account id to delegate GuardDuty control to."
   type        = string
@@ -235,7 +290,10 @@ variable "auditlogs_lock_enabled" {
   nullable    = false
 }
 
-# cloudflare
+# ---------------------------------------------------------------------------
+# Cloudflare
+# ---------------------------------------------------------------------------
+
 variable "cloudflare_api_token" {
   description = "Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS`"
   type        = string
@@ -282,6 +340,28 @@ variable "cloudflare_tunnel_email_domain" {
   nullable    = false
 }
 
+# ---------------------------------------------------------------------------
+# Feature flags
+# ---------------------------------------------------------------------------
+
+variable "managed_sync_enabled" {
+  description = "Whether to enable managed sync."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "argocd_enabled" {
+  description = "Enable ArgoCD-based GitOps deployment. When true, bootstraps ArgoCD and ESO on the cluster, writes config to Secrets Manager, and applies ArgoCD Application manifests."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+# ---------------------------------------------------------------------------
+# Migration
+# ---------------------------------------------------------------------------
+
 variable "migrated_workspace" {
   description = "Override the workspace name to preserve naming conventions when migrating from legacy workspaces"
   type        = string
@@ -295,50 +375,258 @@ variable "migrated_passwords" {
   nullable    = false
 }
 
-variable "managed_sync_enabled" {
-  description = "Whether to enable managed sync."
-  type        = bool
-  default     = false
-  nullable    = false
-}
+# ---------------------------------------------------------------------------
+# ArgoCD / GitOps — tooling
+# ---------------------------------------------------------------------------
 
-variable "msk_kafka_version" {
-  description = "The Kafka version for the MSK cluster."
+variable "argocd_version" {
+  description = "Argo CD container image tag (e.g. v3.4.2). Applied via the official argo-cd Helm chart."
   type        = string
-  // NOTE: to use a small instance type like `kafka.t3.small`, we need to use an older version that uses zookeeper
-  // we're default to an older version to keep costs low, but we can override this if we use a supported larger instance type
-  default  = "3.6.0"
-  nullable = false
-}
-
-variable "msk_kafka_num_broker_nodes" {
-  description = "The number of broker nodes for the MSK cluster."
-  type        = number
-  default     = 2
+  default     = "v3.4.2"
   nullable    = false
 }
 
-variable "msk_autoscaling_enabled" {
-  description = "Whether to enable autoscaling for the MSK cluster."
+variable "argocd_helm_chart_version" {
+  description = "Version of the argo-cd Helm chart from https://argoproj.github.io/argo-helm."
+  type        = string
+  default     = "9.5.15"
+  nullable    = false
+}
+
+variable "argocd_addon_overrides" {
+  description = "Optional overrides merged into the EKS Blueprints Argo CD addon map."
+  type        = map(any)
+  default     = {}
+  nullable    = false
+}
+
+variable "eso_chart_version" {
+  description = "Helm chart version for external-secrets operator."
+  type        = string
+  default     = "0.14.4"
+  nullable    = false
+}
+
+variable "eso_addon_overrides" {
+  description = "Optional overrides for the Blueprints external-secrets addon (merged into the default external_secrets map)."
+  type        = map(any)
+  default     = {}
+  nullable    = false
+}
+
+variable "argocd_auto_sync" {
+  description = "Whether ArgoCD Applications should auto-sync on git/chart changes."
   type        = bool
   default     = true
   nullable    = false
 }
 
-variable "msk_instance_type" {
-  description = "The instance type for the MSK cluster."
-  type        = string
-  default     = "kafka.t3.small"
+variable "argocd_self_heal" {
+  description = "Whether ArgoCD should auto-correct drift from desired state."
+  type        = bool
+  default     = true
   nullable    = false
 }
 
+variable "argocd_slack_token" {
+  description = "Optional Slack bot token for ArgoCD sync notifications."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "argocd_slack_channel" {
+  description = "Slack channel name for ArgoCD notifications."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
+# ---------------------------------------------------------------------------
+# ArgoCD / GitOps — Paragon application charts
+# ---------------------------------------------------------------------------
+
+variable "argocd_app_chart_repository" {
+  description = "Helm chart repository URL for Paragon application charts (e.g. OCI registry or HTTPS repo)."
+  type        = string
+  default     = "https://paragon-helm-production.s3.amazonaws.com"
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_url" {
+  description = "HTTPS Git repository URL for Argo CD App-of-Apps bootstrap (e.g. https://github.com/org/repo.git). Leave empty to skip creating the root Application."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_path" {
+  description = "Path inside argocd_bootstrap_repo_url containing child Application manifests."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_revision" {
+  description = "Git revision (branch, tag, or commit) for App-of-Apps bootstrap."
+  type        = string
+  default     = "HEAD"
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_token" {
+  description = "GitHub PAT for argocd_bootstrap_repo_url (HTTPS). Set via Spacelift context / TF_VAR_* (never commit). Required when bootstrap repo URL and path are set."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "argocd_bootstrap_repo_private" {
+  description = "When true, argocd_bootstrap_repo_token is required to clone the bootstrap repository."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "paragon_chart_version" {
+  description = "Target chart version or constraint for Paragon charts deployed via ArgoCD (e.g. '2026.04.*'). Required when argocd_enabled is true."
+  type        = string
+  default     = null
+}
+
+variable "paragon_monitors_enabled" {
+  description = "Whether monitoring charts should be deployed via ArgoCD."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "paragon_monitor_version" {
+  description = "Chart version for the monitoring stack when deployed via ArgoCD. Defaults to paragon_chart_version when paragon_monitors_enabled is true."
+  type        = string
+  default     = null
+}
+
+variable "paragon_managed_sync_config" {
+  description = "Optional managed-sync secret data to write to Secrets Manager. Null when managed sync is disabled."
+  type        = map(string)
+  sensitive   = true
+  default     = null
+}
+
+variable "paragon_managed_sync_version" {
+  description = "Chart version for managed-sync when deployed via ArgoCD. Required when argocd_enabled and managed_sync_enabled are both true."
+  type        = string
+  default     = null
+}
+
+# ---------------------------------------------------------------------------
+# ArgoCD / GitOps — application secrets
+# ---------------------------------------------------------------------------
+
+variable "paragon_domain" {
+  description = "Customer-facing Paragon domain (e.g. customer.example.com). Used for ACM/ingress and written to Secrets Manager as PARAGON_DOMAIN and derived *_PUBLIC_URL values when argocd_enabled."
+  type        = string
+  default     = null
+}
+
+variable "argocd_env_overrides" {
+  description = "Optional overrides for any infra-derived env key written to Secrets Manager (e.g. ACCOUNT_PUBLIC_URL, CERBERUS_POSTGRES_PORT, CLOUD_STORAGE_PUBLIC_BUCKET). Merged on top of computed defaults; argocd_app_secrets wins if the same key is set in both."
+  type        = map(string)
+  default     = null
+}
+
+variable "argocd_app_secrets" {
+  description = "Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides argocd_env_overrides when the same key is set in both."
+  type        = map(string)
+  sensitive   = true
+  default     = null
+}
+
+variable "argocd_docker_registry_server" {
+  description = "Docker registry server for ArgoCD image pulls."
+  type        = string
+  default     = "docker.io"
+  nullable    = false
+}
+
+variable "argocd_docker_username" {
+  description = "Docker username for ArgoCD image pulls."
+  type        = string
+  default     = null
+}
+
+variable "argocd_docker_password" {
+  description = "Docker password for ArgoCD image pulls."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "argocd_docker_email" {
+  description = "Docker email for ArgoCD image pulls."
+  type        = string
+  default     = null
+}
+
+variable "secrets_recovery_window_in_days" {
+  description = "Secrets Manager deletion recovery window for ArgoCD application secrets (env, docker-cfg, managed-sync, openobserve). Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.secrets_recovery_window_in_days == 0 || (var.secrets_recovery_window_in_days >= 7 && var.secrets_recovery_window_in_days <= 30)
+    error_message = "secrets_recovery_window_in_days must be 0 (immediate) or between 7 and 30."
+  }
+}
+
+# ---------------------------------------------------------------------------
+# ArgoCD / GitOps — ingress
+# ---------------------------------------------------------------------------
+
+variable "argocd_ingress_scheme" {
+  description = "ALB scheme for ArgoCD-managed ingress: internet-facing or internal."
+  type        = string
+  default     = "internet-facing"
+  nullable    = false
+}
+
+variable "argocd_certificate_arn" {
+  description = "ACM certificate ARN for the ArgoCD-managed ingress."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
+variable "paragon_certificate_arn" {
+  description = "ACM certificate ARN for Paragon microservice ALB ingress (wildcard for paragon_domain). When empty and argocd_enabled, Terraform requests a new ACM cert and delegates DNS to Route 53 (NS records in Cloudflare when cloudflare_tunnel_zone_id is set)."
+  type        = string
+  default     = ""
+  nullable    = false
+
+  validation {
+    condition     = trimspace(var.paragon_certificate_arn) == "" || startswith(trimspace(var.paragon_certificate_arn), "arn:aws:acm:")
+    error_message = "paragon_certificate_arn must be an ACM certificate ARN when provided."
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Locals
+# ---------------------------------------------------------------------------
+
 locals {
-  # hash of account ID to help ensure uniqueness of resources like S3 bucket names
   hash        = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)
   environment = "enterprise"
   workspace   = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
 
-  # NOTE hash and workspace can't be included in tags since it creates a circular reference
+  paragon_domain_trimmed = var.paragon_domain != null ? trimspace(var.paragon_domain) : ""
+
+  # GitOps ingress: ALB controller + external-dns (Route 53 records from Ingress hosts).
+  gitops_ingress_enabled = (
+    var.argocd_enabled &&
+    local.paragon_domain_trimmed != ""
+  )
+
   default_tags = merge(
     {
       Name        = "paragon-${var.organization}"
@@ -352,7 +640,145 @@ locals {
   # for `ip_whitelist`, if an ip doesn't contain a range at the end (e.g. `<IP_ADDRESS>/32`), then add `/32` to the end. `1.1.1.1` becomes `1.1.1.1/32`; `2.2.2.2/24` remains unchanged
   ssh_whitelist = distinct([for value in split(",", var.ssh_whitelist) : "${trimspace(value)}${replace(value, "/", "") != value ? "" : "/32"}" if trimspace(value) != ""])
 
-  # split instance types by comma, trim, and remove duplicates
   eks_ondemand_node_instance_type = distinct([for value in split(",", var.eks_ondemand_node_instance_type) : trimspace(value)])
   eks_spot_node_instance_type     = distinct([for value in split(",", var.eks_spot_node_instance_type) : trimspace(value)])
+
+  # ArgoCD: guard for secrets module — domain, Docker creds, and argocd enabled.
+  argocd_secrets_ready = (
+    local.argocd_domain != "" &&
+    var.argocd_docker_username != null &&
+    var.argocd_docker_password != null
+  )
+
+  argocd_openobserve_credentials = var.argocd_enabled ? {
+    email    = "${random_string.openobserve_email[0].result}@useparagon.com"
+    password = random_password.openobserve_password[0].result
+  } : null
+
+}
+
+resource "terraform_data" "validate_argocd_versions" {
+  count = var.argocd_enabled ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = var.paragon_chart_version == null || trimspace(var.paragon_chart_version) != ""
+      error_message = "paragon_chart_version cannot be empty when set."
+    }
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        (var.paragon_chart_version != null && trimspace(var.paragon_chart_version) != "")
+      )
+      error_message = "paragon_chart_version is required when argocd_enabled is true."
+    }
+    precondition {
+      condition     = trimspace(var.argocd_app_chart_repository) != ""
+      error_message = "argocd_app_chart_repository cannot be empty."
+    }
+    precondition {
+      condition     = var.paragon_managed_sync_version == null || trimspace(var.paragon_managed_sync_version) != ""
+      error_message = "paragon_managed_sync_version cannot be empty when set."
+    }
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        !var.managed_sync_enabled ||
+        (var.paragon_managed_sync_version != null && trimspace(var.paragon_managed_sync_version) != "")
+      )
+      error_message = "paragon_managed_sync_version is required when argocd_enabled and managed_sync_enabled are both true."
+    }
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        !var.managed_sync_enabled ||
+        (var.paragon_managed_sync_config != null && length(var.paragon_managed_sync_config) > 0)
+      )
+      error_message = "paragon_managed_sync_config is required when argocd_enabled and managed_sync_enabled are both true."
+    }
+    precondition {
+      condition     = !var.paragon_monitors_enabled || (var.paragon_monitor_version != null && trimspace(var.paragon_monitor_version) != "")
+      error_message = "paragon_monitor_version must be set when paragon_monitors_enabled is true."
+    }
+    precondition {
+      condition     = contains(["internet-facing", "internal"], var.argocd_ingress_scheme)
+      error_message = "argocd_ingress_scheme must be either 'internet-facing' or 'internal'."
+    }
+    # Without these, the secrets module is skipped (argocd_secrets_ready=false) while Argo CD
+    # and ESO still bootstrap, leaving workloads to sync with no paragon-secrets or pull creds.
+    precondition {
+      condition     = local.argocd_secrets_ready
+      error_message = "argocd_enabled requires paragon_domain, argocd_docker_username, and argocd_docker_password so the paragon-secrets and docker-cfg secrets can be created for GitOps/ESO."
+    }
+    precondition {
+      condition     = var.argocd_certificate_arn == "" || startswith(var.argocd_certificate_arn, "arn:aws:acm:")
+      error_message = "argocd_certificate_arn must be an ACM certificate ARN when provided."
+    }
+    precondition {
+      condition     = var.argocd_slack_token == null || trimspace(var.argocd_slack_channel) != ""
+      error_message = "argocd_slack_channel must be set when argocd_slack_token is provided."
+    }
+    precondition {
+      condition     = trimspace(var.argocd_slack_channel) == "" || var.argocd_slack_token != null
+      error_message = "argocd_slack_token must be set when argocd_slack_channel is provided."
+    }
+    precondition {
+      condition = (
+        (trimspace(var.argocd_bootstrap_repo_url) == "" && trimspace(var.argocd_bootstrap_repo_path) == "") ||
+        (trimspace(var.argocd_bootstrap_repo_url) != "" && trimspace(var.argocd_bootstrap_repo_path) != "")
+      )
+      error_message = "argocd_bootstrap_repo_url and argocd_bootstrap_repo_path must either both be empty or both be set."
+    }
+    precondition {
+      condition = (
+        trimspace(var.argocd_bootstrap_repo_url) == "" ||
+        trimspace(var.argocd_bootstrap_repo_path) == "" ||
+        startswith(trimspace(var.argocd_bootstrap_repo_url), "https://")
+      )
+      error_message = "argocd_bootstrap_repo_url must use HTTPS (https://github.com/...). SSH git@ URLs are not supported; use argocd_bootstrap_repo_token for private repositories."
+    }
+    precondition {
+      condition = (
+        trimspace(var.argocd_bootstrap_repo_url) == "" ||
+        trimspace(var.argocd_bootstrap_repo_path) == "" ||
+        !var.argocd_bootstrap_repo_private ||
+        (
+          var.argocd_bootstrap_repo_token != null &&
+          trimspace(var.argocd_bootstrap_repo_token) != ""
+        )
+      )
+      error_message = "argocd_bootstrap_repo_token is required when argocd_bootstrap_repo_private is true and bootstrap repo URL/path are set."
+    }
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        (var.paragon_domain != null && trimspace(var.paragon_domain) != "")
+      )
+      error_message = "paragon_domain must be set when argocd_enabled is true."
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Generated resources (conditional on argocd_enabled)
+# ---------------------------------------------------------------------------
+
+resource "random_string" "openobserve_email" {
+  count = var.argocd_enabled ? 1 : 0
+
+  length  = 12
+  lower   = true
+  numeric = true
+  special = false
+  upper   = false
+}
+
+resource "random_password" "openobserve_password" {
+  count = var.argocd_enabled ? 1 : 0
+
+  length  = 32
+  lower   = true
+  numeric = true
+  special = false
+  upper   = true
 }

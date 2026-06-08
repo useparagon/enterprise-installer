@@ -112,6 +112,7 @@ module "cluster" {
   bastion_role_arn          = module.bastion.bastion_role_arn
   bastion_security_group_id = module.bastion.security_group.host[0]
 
+  argocd_enabled                  = var.argocd_enabled
   create_autoscaling_linked_role  = var.create_autoscaling_linked_role
   eks_admin_arns                  = var.eks_admin_arns
   eks_max_node_count              = var.eks_max_node_count
@@ -123,4 +124,139 @@ module "cluster" {
 
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
+}
+
+# ---------------------------------------------------------------------------
+# ArgoCD / GitOps modules — only created when argocd_enabled = true
+# ---------------------------------------------------------------------------
+
+module "eks_blueprints_addons" {
+  source  = "aws-ia/eks-blueprints-addons/aws"
+  version = "~> 1.23"
+
+  cluster_name      = module.cluster.eks_cluster.name
+  cluster_endpoint  = module.cluster.eks_cluster.cluster_endpoint
+  cluster_version   = var.k8s_version
+  oidc_provider_arn = module.cluster.eks_cluster.oidc_provider_arn
+  observability_tag = null
+
+  enable_argocd                         = var.argocd_enabled
+  enable_external_secrets               = var.argocd_enabled
+  external_secrets                      = local.gitops_external_secrets
+  external_secrets_secrets_manager_arns = local.gitops_eso_secret_arns
+
+  enable_aws_load_balancer_controller = var.argocd_enabled
+  aws_load_balancer_controller        = local.gitops_aws_load_balancer_controller
+
+  enable_external_dns = local.gitops_ingress_enabled
+  external_dns        = local.gitops_external_dns
+  external_dns_route53_zone_arns = local.gitops_ingress_enabled ? [
+    aws_route53_zone.paragon[0].arn,
+  ] : []
+  argocd = merge(
+    {
+      name             = "argo-cd"
+      namespace        = "argocd"
+      create_namespace = true
+      chart_version    = var.argocd_helm_chart_version
+      values = [yamlencode({
+        global = {
+          image = {
+            tag = var.argocd_version
+          }
+        }
+        configs = {
+          params = {
+            "server.insecure" = true
+          }
+        }
+        crds = {
+          install = true
+          keep    = true
+        }
+      })]
+      wait          = true
+      wait_for_jobs = true
+      timeout       = 600
+    },
+    var.argocd_addon_overrides
+  )
+
+  tags = local.default_tags
+
+  depends_on = [module.cluster]
+}
+
+module "secrets" {
+  source = "./secrets"
+  count  = var.argocd_enabled && local.argocd_secrets_ready ? 1 : 0
+
+  workspace    = local.workspace
+  organization = var.organization
+  env_config   = local.argocd_env_secret
+
+  docker_config = jsonencode({
+    dockerconfigjson = jsonencode({
+      auths = {
+        (var.argocd_docker_registry_server) = {
+          username = var.argocd_docker_username
+          password = var.argocd_docker_password
+          email    = var.argocd_docker_email
+          auth     = base64encode("${var.argocd_docker_username}:${var.argocd_docker_password}")
+        }
+      }
+    })
+  })
+
+  managed_sync_config     = var.paragon_managed_sync_config
+  openobserve_credentials = local.argocd_openobserve_credentials
+
+  recovery_window_in_days = var.secrets_recovery_window_in_days
+}
+
+module "argocd" {
+  source = "./argocd"
+  count  = var.argocd_enabled ? 1 : 0
+
+  cluster_name      = module.cluster.eks_cluster.name
+  oidc_provider_arn = module.cluster.eks_cluster.oidc_provider_arn
+  oidc_issuer_url   = module.cluster.eks_cluster.cluster_oidc_issuer_url
+  workspace         = local.workspace
+  aws_region        = var.aws_region
+
+  argocd_release_name = "argo-cd"
+  eso_role_arn        = try(module.eks_blueprints_addons.external_secrets.iam_role_arn, null)
+  eso_crds_ready      = time_sleep.gitops_eso_crds[0].id
+
+  secrets_manager_secret_arns = local.argocd_secrets_ready ? module.secrets[0].secret_arns : []
+
+  destination_namespace     = "paragon"
+  cluster_secret_store_name = "aws-secrets-manager"
+  env_secret_name           = local.argocd_secrets_ready ? module.secrets[0].env_secret_name : null
+  docker_cfg_secret_name    = local.argocd_secrets_ready ? module.secrets[0].docker_cfg_secret_name : null
+  managed_sync_secret_name  = local.argocd_secrets_ready ? module.secrets[0].managed_sync_secret_name : null
+  openobserve_secret_name   = local.argocd_secrets_ready ? module.secrets[0].openobserve_secret_name : null
+
+  bootstrap_repo_url      = var.argocd_bootstrap_repo_url
+  bootstrap_repo_path     = var.argocd_bootstrap_repo_path
+  bootstrap_repo_revision = var.argocd_bootstrap_repo_revision
+  bootstrap_repo_token    = var.argocd_bootstrap_repo_token
+  auto_sync               = var.argocd_auto_sync
+  self_heal               = var.argocd_self_heal
+  paragon_certificate_arn = local.paragon_certificate_arn
+  paragon_domain          = local.paragon_domain_trimmed
+
+  app_chart_repository         = var.argocd_app_chart_repository
+  paragon_chart_version        = var.paragon_chart_version
+  paragon_monitor_version      = var.paragon_monitor_version
+  paragon_managed_sync_version = var.paragon_managed_sync_version
+  paragon_monitors_enabled     = var.paragon_monitors_enabled
+  managed_sync_enabled         = var.managed_sync_enabled
+  ingress_scheme               = var.argocd_ingress_scheme
+
+  depends_on = [
+    module.cluster,
+    module.eks_blueprints_addons,
+    time_sleep.gitops_eso_crds,
+  ]
 }

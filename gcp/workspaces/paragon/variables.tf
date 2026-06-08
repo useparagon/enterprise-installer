@@ -350,13 +350,19 @@ variable "customer_facing" {
 }
 
 variable "infra_json_path" {
-  description = "Path to `infra` workspace output JSON file."
+  description = "Deprecated legacy path to an `infra` workspace output JSON file."
   type        = string
-  default     = ".secure/infra-output.json"
+  default     = null
 }
 
 variable "infra_json" {
-  description = "JSON string of `infra` workspace variables to use instead of `infra_json_path`"
+  description = "Deprecated legacy JSON string of `infra` workspace variables."
+  type        = string
+  default     = null
+}
+
+variable "cluster_name_override" {
+  description = "Optional override for the GKE cluster name when it does not follow the default $${workspace}-cluster naming."
   type        = string
   default     = null
 }
@@ -378,8 +384,8 @@ locals {
   gcp_project_id = try(local.creds_json.project_id, var.gcp_project_id)
 
   # hash of project ID to help ensure uniqueness of resources like bucket names
-  hash      = substr(sha256(local.gcp_project_id), 0, 8)
-  workspace = nonsensitive("paragon-${var.organization}-${local.hash}")
+  hash              = substr(sha256(local.gcp_project_id), 0, 8)
+  default_workspace = "paragon-${var.organization}-${local.hash}"
 
   default_labels = {
     name         = local.workspace
@@ -390,18 +396,19 @@ locals {
 
   dns_enabled = var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
 
-  infra_json_path = abspath(var.infra_json_path)
-  infra_vars      = jsondecode(fileexists(local.infra_json_path) && var.infra_json == null ? file(local.infra_json_path) : var.infra_json)
+  infra_json_path      = var.infra_json_path != null ? abspath(var.infra_json_path) : null
+  use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
+  legacy_infra_vars    = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
 
-  # use default where standard value can be determined
-  cluster_name     = try(local.infra_vars.cluster_name.value, local.workspace)
-  logs_bucket      = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
-  auditlogs_bucket = try(local.infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs")
+  workspace        = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
+  cluster_name     = coalesce(var.cluster_name_override, local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, null) : null, "${local.workspace}-cluster")
+  logs_bucket      = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
+  auditlogs_bucket = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
 
-  gcp_creds = var.gcp_assume_role ? try(base64decode(local.infra_vars.minio.value.root_password), null) : jsonencode({
+  gcp_provider_credentials = jsonencode({
     type                        = "service_account",
     auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs",
     auth_uri                    = "https://accounts.google.com/o/oauth2/auth",
@@ -409,10 +416,13 @@ locals {
     client_email                = try(local.creds_json.client_email, var.gcp_client_email),
     client_id                   = try(local.creds_json.client_id, var.gcp_client_id),
     client_x509_cert_url        = try(local.creds_json.client_x509_cert_url, var.gcp_client_x509_cert_url),
-    gcp_project_id              = try(local.creds_json.gcp_project_id, var.gcp_project_id),
+    project_id                  = try(local.creds_json.project_id, var.gcp_project_id),
     private_key                 = try(local.creds_json.private_key, var.gcp_private_key),
     private_key_id              = try(local.creds_json.private_key_id, var.gcp_private_key_id),
   })
+
+  # WIF deployments store the storage SA key in infra secrets; static JSON creds otherwise.
+  gcp_creds = var.gcp_assume_role ? try(base64decode(local.infra_vars.minio.value.root_password), null) : local.gcp_provider_credentials
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "GCP")
 
@@ -886,6 +896,23 @@ locals {
         for key, value in local.helm_vars.global.env :
         key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
       }, var.managed_sync_enabled ? module.managed_sync_config[0].config : {})
+    })
+  })
+
+  bootstrap_values     = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
+  runtime_secret_keys  = toset(try(local.bootstrap_values.secretKeys, []))
+  helm_secret_values = {
+    for key, value in local.helm_values.global.env :
+    key => tostring(value)
+    if value != null && contains(local.runtime_secret_keys, key)
+  }
+  helm_values_public = merge(local.helm_values, {
+    global = merge(local.helm_values.global, {
+      env = {
+        for key, value in local.helm_values.global.env :
+        key => value
+        if value != null && !contains(local.runtime_secret_keys, key)
+      }
     })
   })
 

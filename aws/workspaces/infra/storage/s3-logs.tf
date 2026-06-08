@@ -65,24 +65,19 @@ resource "aws_s3_bucket_policy" "logs_bucket" {
   policy = data.aws_iam_policy_document.logs_bucket_policy.json
 }
 
+resource "aws_s3_bucket_versioning" "logs" {
+  bucket = aws_s3_bucket.logs.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   bucket = aws_s3_bucket.logs.id
 
   rule {
-    id     = "abort-incomplete"
-    status = "Enabled"
-
-    filter {
-      prefix = "files/"
-    }
-
-    abort_incomplete_multipart_upload {
-      days_after_initiation = 1
-    }
-  }
-
-  rule {
-    id     = "expire"
+    id     = "expiration"
     status = "Enabled"
 
     filter {
@@ -91,6 +86,27 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
 
     expiration {
       days = 365
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 7
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+
+  rule {
+    id     = "markers"
+    status = "Enabled"
+
+    filter {
+      prefix = "files/"
+    }
+
+    expiration {
+      expired_object_delete_marker = true
     }
   }
 }

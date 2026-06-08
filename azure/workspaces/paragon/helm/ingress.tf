@@ -1,5 +1,7 @@
 resource "azurerm_key_vault" "paragon" {
-  name                = substr(var.workspace, 0, 24)
+  # Key Vault names are 3-24 chars and must not end with a hyphen; strip any
+  # trailing hyphen left by truncating the workspace name to 24 chars.
+  name                = replace(substr(var.workspace, 0, 24), "/-+$/", "")
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   tenant_id           = data.azurerm_client_config.current.tenant_id

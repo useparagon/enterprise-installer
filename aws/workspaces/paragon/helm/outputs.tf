@@ -1,5 +1,12 @@
+output "ingress_ready" {
+  value = one(compact([
+    try(terraform_data.managed_ingress_controller_ready[0].id, null),
+    try(terraform_data.external_ingress_controller_ready[0].id, null),
+  ]))
+}
+
 output "release_ingress" {
-  value = helm_release.ingress
+  value = try(helm_release.ingress[0], null)
 }
 
 output "release_paragon_on_prem" {
@@ -7,7 +14,7 @@ output "release_paragon_on_prem" {
 }
 
 output "namespace_paragon" {
-  value = kubernetes_namespace.paragon
+  value = var.argocd_enabled ? data.kubernetes_namespace.paragon[0] : kubernetes_namespace.paragon[0]
 }
 
 output "openobserve_email" {

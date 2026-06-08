@@ -42,7 +42,7 @@ variable "hoop_server" {
 variable "hoop_version" {
   description = "The version of Hoop agent to install."
   type        = string
-  default     = "1.49.4"
+  default     = "1.87.2"
 }
 
 variable "hoop_postgres_guardrail_rules" {

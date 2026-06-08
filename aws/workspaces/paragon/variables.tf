@@ -293,13 +293,37 @@ variable "customer_facing" {
 }
 
 variable "infra_json_path" {
-  description = "Path to `infra` workspace output JSON file."
+  description = "Deprecated legacy path to an `infra` workspace output JSON file."
   type        = string
-  default     = ".secure/infra-output.json"
+  default     = null
 }
 
 variable "infra_json" {
-  description = "JSON string of `infra` workspace variables to use instead of `infra_json_path`"
+  description = "Deprecated legacy JSON string of `infra` workspace variables."
+  type        = string
+  default     = null
+}
+
+variable "migrated_workspace" {
+  description = "Override the workspace name to preserve naming conventions when migrating from legacy workspaces. Must match the infra workspace value."
+  type        = string
+  default     = null
+}
+
+variable "argocd_enabled" {
+  description = "When true, the infra workspace manages runtime secrets and External Secrets; this workspace references them instead of creating duplicates."
+  type        = bool
+  default     = false
+}
+
+variable "infra_eso_role_arn" {
+  description = "IAM role ARN for External Secrets Operator from the infra workspace. Required when argocd_enabled is true."
+  type        = string
+  default     = null
+}
+
+variable "infra_gitops_ready" {
+  description = "Apply-time signal that the infra GitOps bootstrap finished (ALB controller, ESO ExternalSecrets). Required when argocd_enabled is true."
   type        = string
   default     = null
 }
@@ -341,15 +365,16 @@ locals {
     Creator      = "Terraform"
   }
 
-  infra_json_path = abspath(var.infra_json_path)
-  infra_vars      = jsondecode(fileexists(local.infra_json_path) && var.infra_json == null ? file(local.infra_json_path) : var.infra_json)
+  infra_json_path       = var.infra_json_path != null ? abspath(var.infra_json_path) : null
+  use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
+  legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
 
-  workspace = try(local.infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}")
+  default_workspace = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
+  workspace         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace
 
-  # use default where standard value can be determined
-  cluster_name     = try(local.infra_vars.cluster_name.value, local.workspace)
-  logs_bucket      = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
-  auditlogs_bucket = try(local.infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs")
+  cluster_name     = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
+  logs_bucket      = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
+  auditlogs_bucket = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
@@ -610,6 +635,12 @@ locals {
     "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
   )
 
+  # Infra ElastiCache exposes managed_sync (not workflow) when managed sync is enabled.
+  workflow_redis = coalesce(
+    try(local.infra_vars.redis.value.workflow, null),
+    try(local.infra_vars.redis.value.managed_sync, null),
+  )
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       env = merge(
@@ -764,9 +795,9 @@ locals {
           SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
           SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
           SYSTEM_REDIS_URL               = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
-          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
-          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}", local.default_redis_url)
+          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.workflow_redis.cluster, local.default_redis_cluster)
+          WORKFLOW_REDIS_TLS_ENABLED     = try(local.workflow_redis.ssl, local.default_redis_ssl)
+          WORKFLOW_REDIS_URL             = try("${local.workflow_redis.host}:${local.workflow_redis.port}", local.default_redis_url)
 
           # Cloud Storage configurations
           CLOUD_STORAGE_MICROSERVICE_PASS = local.cloud_storage_type == "S3" ? local.infra_vars.minio.value.root_password : local.infra_vars.minio.value.microservice_pass
@@ -838,6 +869,23 @@ locals {
         },
         var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
       )
+    })
+  })
+
+  bootstrap_values    = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
+  runtime_secret_keys = toset(try(local.bootstrap_values.secretKeys, []))
+  helm_secret_values = {
+    for key, value in local.helm_values.global.env :
+    key => tostring(value)
+    if value != null && contains(local.runtime_secret_keys, key)
+  }
+  helm_values_public = merge(local.helm_values, {
+    global = merge(local.helm_values.global, {
+      env = {
+        for key, value in local.helm_values.global.env :
+        key => value
+        if value != null && !contains(local.runtime_secret_keys, key)
+      }
     })
   })
 

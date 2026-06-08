@@ -442,8 +442,8 @@ config:
         Retry_Limit 10
         Path /api/default
         Suppress_Type_Name On
-        HTTP_User {{ .Values.secrets.ZO_ROOT_USER_EMAIL }}
-        HTTP_Passwd {{ .Values.secrets.ZO_ROOT_USER_PASSWORD }}
+        HTTP_User ${ZO_ROOT_USER_EMAIL}
+        HTTP_Passwd ${ZO_ROOT_USER_PASSWORD}
         Buffer_Size 1MB
 
   ## https://docs.fluentbit.io/manual/administration/configuring-fluent-bit/classic-mode/upstream-servers

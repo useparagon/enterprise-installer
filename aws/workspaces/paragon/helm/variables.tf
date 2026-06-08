@@ -18,6 +18,11 @@ variable "docker_registry_server" {
   type        = string
 }
 
+variable "docker_cfg_secret_name" {
+  description = "Secrets Manager secret name for docker credentials."
+  type        = string
+}
+
 variable "docker_username" {
   description = "Docker username to pull images."
   type        = string
@@ -31,6 +36,40 @@ variable "docker_password" {
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+}
+
+variable "env_secret_name" {
+  description = "Secrets Manager secret name for shared Paragon application secrets."
+  type        = string
+}
+
+variable "eso_role_arn" {
+  description = "IAM role ARN used by the External Secrets Operator."
+  type        = string
+}
+
+variable "argocd_enabled" {
+  description = "When true, adopt the paragon namespace created by infra GitOps instead of creating it."
+  type        = bool
+  default     = false
+}
+
+variable "install_external_secrets" {
+  description = "Install External Secrets Operator and CRs. Set false when infra/GitOps already manages ESO."
+  type        = bool
+  default     = true
+}
+
+variable "install_ingress_controller" {
+  description = "Install the AWS Load Balancer Controller Helm release. Set false when infra/GitOps already manages it."
+  type        = bool
+  default     = true
+}
+
+variable "infra_gitops_ready" {
+  description = "Apply-time signal that infra GitOps bootstrap finished (ALB controller, ESO CRs). Required when install_ingress_controller is false."
+  type        = string
+  default     = null
 }
 
 variable "openobserve_email" {
@@ -135,6 +174,18 @@ variable "managed_sync_enabled" {
 variable "managed_sync_version" {
   description = "The version of the Managed Sync helm chart to install."
   type        = string
+}
+
+variable "managed_sync_secret_name" {
+  description = "Secrets Manager secret name for managed-sync secrets."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_secret_name" {
+  description = "Secrets Manager secret name for OpenObserve credentials."
+  type        = string
+  default     = null
 }
 
 locals {

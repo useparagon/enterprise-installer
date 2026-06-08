@@ -20,9 +20,12 @@ resource "aws_autoscaling_group_tag" "cluster_autoscaler_label_tags" {
   }
 }
 
+# Non-GitOps: Terraform deploys cluster-autoscaler via lablabs. GitOps: the argocd
+# module provisions IRSA and an Argo CD Application for cluster-autoscaler.
 module "cluster_autoscaler" {
   source  = "lablabs/eks-cluster-autoscaler/aws"
   version = "2.2.0"
+  count   = var.argocd_enabled ? 0 : 1
 
   cluster_name                     = module.eks.cluster_name
   cluster_identity_oidc_issuer     = module.eks.cluster_oidc_issuer_url

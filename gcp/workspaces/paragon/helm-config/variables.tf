@@ -4,7 +4,7 @@ variable "base_helm_values" {
 }
 
 variable "infra_values" {
-  description = "The values from the infrastructure workspace (from infra-output.json)."
+  description = "The infrastructure connection values resolved from the provider secret manager."
   type        = any
 }
 

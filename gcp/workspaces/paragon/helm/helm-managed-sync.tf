@@ -105,7 +105,8 @@ resource "helm_release" "managed_sync" {
     google_compute_managed_ssl_certificate.cert,
     google_compute_global_address.loadbalancer,
     google_compute_region_url_map.frontend_config,
-    kubernetes_secret_v1.docker_login,
-    kubernetes_secret_v1.paragon_secrets,
+    kubectl_manifest.external_secret_docker,
+    kubectl_manifest.external_secret_paragon,
+    kubectl_manifest.external_secret_managed_sync,
   ]
 }

@@ -66,3 +66,42 @@ output "cluster_name" {
   description = "The name of the EKS cluster."
   value       = module.cluster.eks_cluster.name
 }
+
+# ---------------------------------------------------------------------------
+# ArgoCD outputs (only populated when argocd_enabled = true)
+# ---------------------------------------------------------------------------
+
+output "argocd_enabled" {
+  description = "Whether ArgoCD is bootstrapped on this cluster."
+  value       = var.argocd_enabled
+}
+
+output "argocd_namespace" {
+  description = "The namespace ArgoCD is installed in."
+  value       = var.argocd_enabled ? module.argocd[0].argocd_namespace : null
+}
+
+output "eso_role_arn" {
+  description = "IAM role ARN used by the External Secrets Operator."
+  value       = var.argocd_enabled ? try(module.eks_blueprints_addons.external_secrets.iam_role_arn, null) : null
+}
+
+output "secrets_manager_env_secret" {
+  description = "Name of the Secrets Manager secret containing Paragon env config."
+  value       = var.argocd_enabled && local.argocd_secrets_ready ? module.secrets[0].env_secret_name : null
+}
+
+output "paragon_certificate_arn" {
+  description = "ACM certificate ARN used for Paragon ALB ingress (GitOps bridge annotation paragon_certificate_arn)."
+  value       = var.argocd_enabled ? local.paragon_certificate_arn : null
+}
+
+output "paragon_route53_zone_id" {
+  description = "Route 53 hosted zone ID for paragon_domain (used by external-dns)."
+  value       = local.create_paragon_zone ? aws_route53_zone.paragon[0].zone_id : null
+}
+
+output "paragon_route53_name_servers" {
+  description = "Route 53 name servers for paragon_domain. Delegate from Cloudflare (or parent DNS) when not auto-managed."
+  value       = local.create_paragon_zone ? aws_route53_zone.paragon[0].name_servers : null
+}

@@ -35,6 +35,7 @@ serviceAccount:
 
 # used to store GCP JSON creds as ConfigMap
 credsJson: ""
+credsSecretName: ""
 
 ingress:
   enabled: false

@@ -1,25 +1,192 @@
-# Stub so workflow_dispatch appears on main before the full pipeline lands.
-# Replace this file with the real release-charts workflow in a follow-up PR.
 name: Release Charts
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Git tag (reserved for the full workflow; unused in this stub)."
+        description: >
+          Paragon release tag (e.g. 2026.0528.1501-2b7d0d71). Stamps __PARAGON_VERSION__
+          and loads charts/files/service-inputs.json from this tag.
         required: true
+        type: string
+      chart_ref:
+        description: >
+          Git ref for chart templates (branch or SHA). Defaults to the ref that
+          started this workflow (use your feature branch when dispatching from it).
+        required: false
         type: string
 
 permissions:
+  id-token: write
   contents: read
 
 jobs:
   release-charts:
-    name: Stub (no-op)
+    name: Package & Publish Production Helm Charts
     runs-on: ubuntu-latest
+    env:
+      HELM_REPO_URL: https://paragon-helm-production.s3.amazonaws.com
+      S3_BUCKET: paragon-helm-production
+      CHARTS: paragon-onprem paragon-logging paragon-monitoring
+
     steps:
-      - name: Placeholder
+      - name: Checkout chart sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.3.1
+        with:
+          ref: ${{ inputs.chart_ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+
+      # ubuntu-latest includes rsync; common act images (e.g. catthehacker/ubuntu:js-22.04) do not
+      - name: Ensure rsync is installed
         run: |
-          echo "release-charts: no-op stub on main."
-          echo "version input: ${{ inputs.version }}"
-          echo "Run the full workflow from a branch that includes the chart packaging implementation."
+          if command -v rsync >/dev/null 2>&1; then
+            exit 0
+          fi
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y rsync
+          else
+            apt-get update -qq
+            apt-get install -y rsync
+          fi
+
+      - name: Fetch service-inputs from release tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash scripts/fetch-service-inputs-from-tag.sh "$VERSION"
+
+      - name: Update chart fixtures
+        run: node scripts/update-charts.mjs charts/files/service-inputs.json
+
+      - name: Stage and version charts
+        id: stamp
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          staging="$RUNNER_TEMP/charts"
+          mkdir -p "$staging"
+
+          rsync -aq --delete \
+            --exclude='example.yaml' \
+            --exclude='values.placeholder.yaml' \
+            --exclude='bootstrap/' \
+            charts/ "$staging/"
+
+          for chart in "$staging"/*/; do
+            [ -d "$chart" ] || continue
+            find "$chart" -type f -exec perl -pi -e 's/\Q__PARAGON_VERSION__\E/$ENV{VERSION}/g' {} +
+            echo "$(basename "$chart"): ${VERSION}"
+          done
+
+          echo "staging=$staging" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: v3.16.1
+
+      - name: Build and package charts
+        run: |
+          set -euo pipefail
+          staging="${{ steps.stamp.outputs.staging }}"
+          pkg_dir="$RUNNER_TEMP/packages"
+          mkdir -p "$pkg_dir"
+          packaged=0
+
+          for chart_name in $CHARTS; do
+            chart_dir="$staging/$chart_name"
+            if [ ! -d "$chart_dir" ]; then
+              echo "Skipping $chart_name (directory not found)"
+              continue
+            fi
+
+            echo "=== Building $chart_name ==="
+            for sub in "$chart_dir"/charts/*/; do
+              if [ -f "$sub/Chart.yaml" ]; then
+                helm dependency build "$sub"
+              fi
+            done
+            helm dependency build "$chart_dir"
+            helm package "$chart_dir" --destination "$pkg_dir"
+            packaged=$((packaged + 1))
+          done
+
+          if [ "$packaged" -eq 0 ]; then
+            echo "Error: no charts were packaged; check CHARTS and staging directory contents." >&2
+            exit 1
+          fi
+
+          echo "--- Packaged charts ---"
+          ls -1 "$pkg_dir"/*.tgz
+
+      # GitHub-hosted: OIDC → role. Local act: pass -s ACT_AWS_ACCESS_KEY_ID / -s ACT_AWS_SECRET_ACCESS_KEY
+      # (and optional -s ACT_AWS_SESSION_TOKEN) for an IAM principal in account 571812824132 with S3 + Helm index permissions.
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ !env.ACT }}
+        uses: aws-actions/configure-aws-credentials@99214aa6889fcddfa57764031d71add364327e59 # v6.1.3
+        with:
+          aws-region: us-east-1
+          role-session-name: enterprise-chart-release
+          role-to-assume: arn:aws:iam::571812824132:role/helm-repo-manager
+
+      - name: Configure AWS credentials (act — access keys)
+        if: ${{ env.ACT }}
+        uses: aws-actions/configure-aws-credentials@99214aa6889fcddfa57764031d71add364327e59 # v6.1.3
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.ACT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ACT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.ACT_AWS_SESSION_TOKEN }}
+
+      - name: Ensure AWS CLI is installed
+        run: |
+          if command -v aws >/dev/null 2>&1; then
+            exit 0
+          fi
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y awscli
+          else
+            apt-get update -qq
+            apt-get install -y awscli
+          fi
+          aws --version
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Publish charts to S3
+        run: |
+          set -euo pipefail
+          pkg_dir="$RUNNER_TEMP/packages"
+          shopt -s nullglob
+          tgz_files=("$pkg_dir"/*.tgz)
+          if [ "${#tgz_files[@]}" -eq 0 ]; then
+            echo "Error: no packaged charts found in $pkg_dir" >&2
+            exit 1
+          fi
+          cd "$pkg_dir"
+
+          aws s3 cp "s3://$S3_BUCKET/index.yaml" existing-index.yaml 2>/dev/null \
+            || echo "No existing index found; creating new index."
+
+          if [ -f existing-index.yaml ]; then
+            helm repo index . --url "$HELM_REPO_URL" --merge existing-index.yaml
+          else
+            helm repo index . --url "$HELM_REPO_URL"
+          fi
+
+          for tgz in "${tgz_files[@]}"; do
+            echo "Uploading $(basename "$tgz")"
+            aws s3 cp "$tgz" "s3://$S3_BUCKET/"
+          done
+
+          echo "Uploading index.yaml"
+          aws s3 cp index.yaml "s3://$S3_BUCKET/"

@@ -12,6 +12,13 @@ Parameters:
 {{- $namespaceTemplate := .namespaceTemplate -}}
 {{- $name := $root.Chart.Name -}}
 {{- $redisCaCertEnabled := and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "redisCaCert") (kindIs "map" $root.Values.global.redisCaCert) (hasKey $root.Values.global.redisCaCert "enabled") $root.Values.global.redisCaCert.enabled -}}
+{{- $podAnnotations := dict -}}
+{{- if and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "podAnnotations") (kindIs "map" $root.Values.global.podAnnotations) -}}
+{{- $podAnnotations = merge $podAnnotations $root.Values.global.podAnnotations -}}
+{{- end -}}
+{{- if $root.Values.podAnnotations -}}
+{{- $podAnnotations = merge $podAnnotations $root.Values.podAnnotations -}}
+{{- end -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -31,9 +38,9 @@ spec:
       {{- include (printf "%s.selectorLabels" $name) $root | nindent 6 }}
   template:
     metadata:
-      {{- with $root.Values.podAnnotations }}
+      {{- if $podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $podAnnotations | nindent 8 }}
       {{- end }}
       labels:
         {{- include (printf "%s.selectorLabels" $name) $root | nindent 8 }}

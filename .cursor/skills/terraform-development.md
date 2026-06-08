@@ -17,7 +17,7 @@ The workspaces are coupled via a **JSON file**, not `terraform_remote_state`:
 infra workspace → terraform output -json → .secure/infra-output.json → paragon workspace
 ```
 
-The paragon workspace reads this file through `local.infra_vars = jsondecode(file(var.infra_json_path))`. Each key in the JSON corresponds to an infra output name (e.g., `postgres`, `redis`, `minio`, `workspace`, `cluster_name`).
+The paragon workspace reads this file through `local.infra_vars = jsondecode(file(var.infra_json_path))`. Each key in the JSON corresponds to an infra output name (e.g., `postgres`, `redis`, `workspace`, `cluster_name`).
 
 ### Directory Layout
 
