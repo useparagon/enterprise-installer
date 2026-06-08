@@ -54,7 +54,9 @@ subchart:
 
 restart:
   enabled: true
-  schedule: 0 14 * * * # everyday at 9am EST
+  hour: 4 # UTC; window start (~11PM EST)
+  minute: 0
+  windowMinutes: 180 # stable per-deployment offset within this window (from PARAGON_DOMAIN hash)
 
 global:
   pullPolicy: IfNotPresent

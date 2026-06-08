@@ -1,10 +1,20 @@
 {{- if .Values.restart.enabled }}
+{{- $seed := .Values.global.env.PARAGON_DOMAIN | default .Release.Name | toString }}
+{{- $windowMinutes := int (.Values.restart.windowMinutes | default 120) }}
+{{- $offsetMinutes := cond (gt $windowMinutes 0) (mod (adler32sum $seed) $windowMinutes) 0 }}
+{{- $baseTotalMinutes := add (mul (int .Values.restart.hour) 60) (int .Values.restart.minute) }}
+{{- $scheduledTotalMinutes := add $baseTotalMinutes $offsetMinutes }}
+{{- $scheduleMinute := mod $scheduledTotalMinutes 60 }}
+{{- $scheduleHour := mod (div $scheduledTotalMinutes 60) 24 }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: restart-paragon-pods-cronjob
+  annotations:
+    paragon.useparagon.com/restart-window-minutes: {{ $windowMinutes | quote }}
+    paragon.useparagon.com/restart-offset-minutes: {{ $offsetMinutes | quote }}
 spec:
-  schedule: "{{ .Values.restart.schedule }}"
+  schedule: "{{ $scheduleMinute }} {{ $scheduleHour }} * * *"
   jobTemplate:
     spec:
       template:
