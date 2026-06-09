@@ -17,16 +17,30 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 
 ## Redis: legacy vs Azure Managed Redis
 
-Suggested branch for this work: `feat/PARA-21251/azure-managed-redis` (PARA-21251).
+Branch: `fix/PARA-21251/managed-sync-redis` ([PARA-21251](https://useparagon.atlassian.net/browse/PARA-21251)).
 
-Two mutually exclusive backends supply the `redis` output consumed by the paragon workspace:
+Two optional backends can run independently or **in parallel** during customer migration:
 
 | Variable | Default | Backend | Redis version |
 |----------|---------|---------|---------------|
 | `redis_enabled` | `true` | `./redis` (`azurerm_redis_cache`) | 6 |
 | `redis_managed_enabled` | `false` | `./redis-managed` (`azurerm_managed_redis`) | 7.4 (service default) |
 
-Exactly one must be `true`. Existing customers keep defaults (`redis_enabled = true`) for a no-op plan on Redis.
+At least one must be `true`. Existing customers keep defaults (`redis_enabled = true`, `redis_managed_enabled = false`) for a no-op plan on Redis.
+
+### Outputs during migration
+
+| Output | When | Contents |
+|--------|------|----------|
+| `redis` | `redis_enabled = true` (even if managed is also enabled) | Legacy BSP endpoints — **unchanged contract for paragon** |
+| `redis` | `redis_enabled = false`, `redis_managed_enabled = true` | Managed Redis endpoints (post-cutover) |
+| `redis_managed` | `redis_managed_enabled = true` | Managed Redis endpoints for trial `kubectl` patching |
+
+### Customer migration tfvars sequence
+
+1. **Baseline:** `redis_enabled = true`, `redis_managed_enabled = false`
+2. **Parallel deploy:** `redis_enabled = true`, `redis_managed_enabled = true` → apply creates Managed Redis; legacy keeps running; use `terraform output -json redis_managed` for new endpoints
+3. **After validation:** `redis_enabled = false`, `redis_managed_enabled = true` → apply destroys legacy; `output redis` switches to managed
 
 ### Azure Managed Redis tuning (all regions)
 

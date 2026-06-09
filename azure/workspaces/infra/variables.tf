@@ -202,13 +202,13 @@ variable "redis_enabled" {
 }
 
 variable "redis_managed_enabled" {
-  description = "Deploy Azure Managed Redis (Redis 7.4). When false, the redis-managed module is not created."
+  description = "Deploy Azure Managed Redis (Redis 7.4). When false, the redis-managed module is not created. May be true alongside redis_enabled during customer migration (both modules run in parallel)."
   type        = bool
   default     = false
 
   validation {
-    condition     = var.redis_enabled != var.redis_managed_enabled
-    error_message = "Exactly one of redis_enabled or redis_managed_enabled must be true."
+    condition     = var.redis_enabled || var.redis_managed_enabled
+    error_message = "At least one of redis_enabled or redis_managed_enabled must be true."
   }
 }
 

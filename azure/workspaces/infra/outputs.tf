@@ -45,8 +45,14 @@ output "minio" {
 }
 
 output "redis" {
-  description = "Connection information for Redis (legacy Azure Cache for Redis or Azure Managed Redis 7.4)."
-  value       = var.redis_managed_enabled ? module.redis_managed[0].redis : module.redis.redis
+  description = "Primary Redis connection info for the paragon workspace. During migration (both modules enabled), returns legacy endpoints until redis_enabled is set to false."
+  value       = var.redis_enabled ? module.redis.redis : module.redis_managed[0].redis
+  sensitive   = true
+}
+
+output "redis_managed" {
+  description = "Azure Managed Redis 7.4 endpoints (null when redis_managed_enabled is false). Use during migration for kubectl trial routing while output redis still points at legacy."
+  value       = var.redis_managed_enabled ? module.redis_managed[0].redis : null
   sensitive   = true
 }
 
