@@ -68,11 +68,14 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   }
 
   network_profile {
-    network_plugin    = "azure"
-    dns_service_ip    = "172.0.0.10"
-    service_cidr      = "172.0.0.0/16"
-    outbound_type     = "userAssignedNATGateway"
-    load_balancer_sku = "standard"
+    network_plugin      = var.k8s_network_plugin
+    network_plugin_mode = var.k8s_network_plugin_mode
+    pod_cidr            = var.k8s_pod_cidr
+    dns_service_ip      = var.k8s_dns_service_ip
+    service_cidr        = var.k8s_service_cidr
+    outbound_type       = var.k8s_outbound_type
+    load_balancer_sku   = var.k8s_load_balancer_sku
+    network_policy      = var.k8s_network_policy
   }
 
   identity {
