@@ -6,6 +6,11 @@ variable "private_subnet" {
   description = "Private subnet accessible only within the virtual network to deploy to."
 }
 
+variable "private_subnet_nat_gateway_id" {
+  description = "Private subnet NAT gateway association ID. Required before AKS can use userAssignedNATGateway outbound."
+  type        = string
+}
+
 variable "workspace" {
   description = "The workspace prefix to use for created resources."
   type        = string

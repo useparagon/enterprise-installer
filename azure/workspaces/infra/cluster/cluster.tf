@@ -34,6 +34,15 @@ locals {
   )
 }
 
+# AKS rejects userAssignedNATGateway until the node subnet has a NAT gateway associated.
+# The cluster only references private_subnet.id (which pre-exists), so without this hook
+# Terraform can update outbound_type in parallel with the new association resource.
+resource "terraform_data" "nat_gateway_ready" {
+  count = var.k8s_outbound_type == "userAssignedNATGateway" ? 1 : 0
+
+  input = var.private_subnet_nat_gateway_id
+}
+
 resource "azurerm_kubernetes_cluster" "cluster" {
   name                = local.cluster_name
   location            = var.resource_group.location
@@ -81,6 +90,8 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   identity {
     type = "SystemAssigned"
   }
+
+  depends_on = [terraform_data.nat_gateway_ready]
 
   lifecycle {
     ignore_changes = [

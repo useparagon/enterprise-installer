@@ -26,3 +26,8 @@ output "nat_gateway_public_ip" {
   description = "Static public IP used for outbound SNAT from the private subnet."
   value       = azurerm_public_ip.nat.ip_address
 }
+
+output "private_subnet_nat_gateway_id" {
+  description = "ID of the private subnet NAT gateway association. Used to order AKS outbound_type updates after the association exists."
+  value       = azurerm_subnet_nat_gateway_association.private.id
+}

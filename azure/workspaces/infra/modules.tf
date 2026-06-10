@@ -117,6 +117,7 @@ module "cluster" {
   k8s_spot_node_instance_type     = var.k8s_spot_node_instance_type
   k8s_version                     = var.k8s_version
   private_subnet                  = module.network.private_subnet
+  private_subnet_nat_gateway_id   = module.network.private_subnet_nat_gateway_id
   resource_group                  = module.network.resource_group
   tags                            = local.default_tags
   workspace                       = local.workspace
