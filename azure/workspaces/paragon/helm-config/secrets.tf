@@ -49,24 +49,32 @@ locals {
   }
 
   # Paragon reads infra from .secure/infra-output.json (terraform output -json from infra workspace).
-  # If that file predates the managed-sync Redis instance, refresh it after infra apply.
+  # Prefer managed-sync, then cache (same resolution order as GCP).
   redis_from_infra = try(
     var.infra_values.redis.value["managed-sync"],
     var.infra_values.redis.value.managed_sync,
+    var.infra_values.redis.value.cache,
     null
   )
 
+  # base_helm_values env vars are strings; coerce before boolean conditionals (non-empty "false" is truthy).
+  managed_sync_redis_tls_enabled = local.redis_from_infra != null ? local.redis_from_infra.ssl : (
+    try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_TLS_ENABLED"], null) != null
+    ? contains(["true", "1", "yes"], lower(tostring(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_TLS_ENABLED"])))
+    : try(var.infra_values.redis.value["managed-sync"].ssl, var.infra_values.redis.value.managed_sync.ssl, var.infra_values.redis.value.cache.ssl, false)
+  )
+
   redis_config = {
-    host                 = local.redis_from_infra != null ? local.redis_from_infra.host : try(var.base_helm_values.global.env["REDIS_HOST"], try(var.infra_values.redis.value["managed-sync"], var.infra_values.redis.value.managed_sync).host)
-    port                 = local.redis_from_infra != null ? local.redis_from_infra.port : try(var.base_helm_values.global.env["REDIS_PORT"], try(var.infra_values.redis.value["managed-sync"], var.infra_values.redis.value.managed_sync).port)
-    password             = local.redis_from_infra != null ? local.redis_from_infra.password : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_PASSWORD"], try(var.infra_values.redis.value["managed-sync"], var.infra_values.redis.value.managed_sync).password, null)
-    cluster_enabled      = local.redis_from_infra != null ? try(local.redis_from_infra.cluster, false) : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_CLUSTER_ENABLED"], try(var.infra_values.redis.value["managed-sync"], var.infra_values.redis.value.managed_sync).cluster, false)
-    redis_tls_enabled    = local.redis_from_infra != null ? local.redis_from_infra.ssl : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_TLS_ENABLED"], try(var.infra_values.redis.value["managed-sync"], var.infra_values.redis.value.managed_sync).ssl, false)
-    redis_ca_certificate = local.redis_from_infra != null ? try(local.redis_from_infra.ca_certificate, null) : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_CA_CERT"], try(var.infra_values.redis.value["managed-sync"], var.infra_values.redis.value.managed_sync).ca_certificate, null)
+    host                 = local.redis_from_infra != null ? local.redis_from_infra.host : try(var.base_helm_values.global.env["REDIS_HOST"], try(var.infra_values.redis.value["managed-sync"].host, var.infra_values.redis.value.managed_sync.host, var.infra_values.redis.value.cache.host))
+    port                 = local.redis_from_infra != null ? local.redis_from_infra.port : try(var.base_helm_values.global.env["REDIS_PORT"], try(var.infra_values.redis.value["managed-sync"].port, var.infra_values.redis.value.managed_sync.port, var.infra_values.redis.value.cache.port))
+    password             = local.redis_from_infra != null ? local.redis_from_infra.password : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_PASSWORD"], try(var.infra_values.redis.value["managed-sync"].password, var.infra_values.redis.value.managed_sync.password, var.infra_values.redis.value.cache.password, null))
+    cluster_enabled      = local.redis_from_infra != null ? try(local.redis_from_infra.cluster, false) : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_CLUSTER_ENABLED"], try(var.infra_values.redis.value["managed-sync"].cluster, var.infra_values.redis.value.managed_sync.cluster, var.infra_values.redis.value.cache.cluster, false))
+    redis_tls_enabled    = local.managed_sync_redis_tls_enabled
+    redis_ca_certificate = local.redis_from_infra != null ? try(local.redis_from_infra.ca_certificate, null) : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_CA_CERT"], try(var.infra_values.redis.value["managed-sync"].ca_certificate, var.infra_values.redis.value.managed_sync.ca_certificate, null))
   }
 
-  # Managed-sync uses the same URL shape as GCP (rediss:// + separate TLS flag), not the monorepo
-  # connection_string (`:password@host:port`) used by CACHE_REDIS_* on Azure.
+  # Managed-sync uses rediss:// when TLS is enabled (same as GCP). The monorepo accepts this
+  # URL scheme but still requires MANAGED_SYNC_REDIS_TLS_ENABLED to enable TLS in the client.
   managed_sync_redis_url = "${local.redis_config.redis_tls_enabled ? "rediss" : "redis"}://${local.redis_config.password != null ? ":${urlencode(local.redis_config.password)}@" : ""}${local.redis_config.host}:${local.redis_config.port}"
 
   storage_type = try(var.base_helm_values.global.env["CLOUD_STORAGE_TYPE"], "AZURE")
@@ -130,8 +138,8 @@ locals {
     MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_PARTITION_COUNT    = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_PARTITION_COUNT"], 2)
     MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_REPLICATION_FACTOR = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_REPLICATION_FACTOR"], 1)
 
-    # Redis from infra when present. Do not override from base_helm_values so managed_sync always
-    # gets infra credentials for the dedicated managed-sync instance (not cache).
+    # Redis from infra when present (managed-sync, then cache). Do not override from
+    # base_helm_values when infra provides credentials.
     MANAGED_SYNC_REDIS_URL              = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
     MANAGED_SYNC_REDIS_PASSWORD         = local.redis_config.password != null ? local.redis_config.password : ""
     MANAGED_SYNC_REDIS_CLUSTER_ENABLED  = local.redis_config.cluster_enabled
