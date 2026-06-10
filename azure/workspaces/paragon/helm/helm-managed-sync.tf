@@ -27,6 +27,19 @@ locals {
       class     = "nginx"
       className = "nginx"
     }
+    "api-sync" = {
+      ingress = {
+        class     = "nginx"
+        className = "nginx"
+        host      = replace(replace(var.microservices["api-sync"].public_url, "https://", ""), "http://", "")
+        annotations = {
+          "kubernetes.io/ingress.class"    = "nginx"
+          "cert-manager.io/cluster-issuer" = "letsencrypt-prod"
+        }
+        scheme = var.ingress_scheme
+      }
+      tls_secret = "api-sync-secret"
+    }
     bootstrap = {
       postgres = {
         configOpenFGA = {
