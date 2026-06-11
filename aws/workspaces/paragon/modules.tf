@@ -57,7 +57,7 @@ module "helm" {
   openobserve_password   = var.openobserve_password
   public_microservices   = local.public_microservices
   public_monitors        = local.public_monitors
-  waf_web_acl_arn        = local.waf_active ? module.waf[0].web_acl_arn : "none"
+  waf_web_acl_arn        = local.waf_active ? module.waf[0].web_acl_arn : ""
   workspace              = local.workspace
 }
 

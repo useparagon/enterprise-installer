@@ -138,9 +138,9 @@ variable "managed_sync_version" {
 }
 
 variable "waf_web_acl_arn" {
-  description = "Regional WAFv2 Web ACL ARN for the shared ALB. Set to 'none' to disable WAF association."
+  description = "Regional WAFv2 Web ACL ARN for the shared ALB. Empty disables WAF association."
   type        = string
-  default     = "none"
+  default     = ""
 }
 
 locals {
