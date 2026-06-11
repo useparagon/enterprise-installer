@@ -75,26 +75,29 @@ resource "aws_wafv2_web_acl" "this" {
     }
   }
 
-  rule {
-    name     = "rate-limit-global"
-    priority = local.rate_global_priority
+  dynamic "rule" {
+    for_each = local.has_global_rate_limit ? [1] : []
+    content {
+      name     = "rate-limit-global"
+      priority = local.ip_custom_rule_count
 
-    action {
-      block {}
-    }
-
-    statement {
-      rate_based_statement {
-        limit                 = var.waf_rate_limit_global
-        aggregate_key_type    = "IP"
-        evaluation_window_sec = var.waf_rate_limit_global_window_sec
+      action {
+        block {}
       }
-    }
 
-    visibility_config {
-      cloudwatch_metrics_enabled = true
-      metric_name                = "${var.workspace}-waf-rate-global"
-      sampled_requests_enabled   = true
+      statement {
+        rate_based_statement {
+          limit                 = var.waf_rate_limit_global
+          aggregate_key_type    = "IP"
+          evaluation_window_sec = var.waf_rate_limit_global_window_sec
+        }
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = "${var.workspace}-waf-rate-global"
+        sampled_requests_enabled   = true
+      }
     }
   }
 
@@ -102,7 +105,7 @@ resource "aws_wafv2_web_acl" "this" {
     for_each = local.sorted_path_limits
     content {
       name     = "rate-limit-path-${replace(trimprefix(rule.value.path, "/"), "/", "-")}"
-      priority = local.path_rate_priorities[rule.value.path]
+      priority = rule.value.priority
 
       action {
         block {}
@@ -141,48 +144,67 @@ resource "aws_wafv2_web_acl" "this" {
   }
 
   dynamic "rule" {
-    for_each = var.waf_ip_reputation_enabled ? [1] : []
+    for_each = local.managed_rules
     content {
-      name     = "aws-managed-ip-reputation"
-      priority = local.ip_reputation_priority
+      name     = rule.value.key
+      priority = rule.value.priority
 
-      override_action {
-        none {}
-      }
-
-      statement {
-        managed_rule_group_statement {
-          name        = "AWSManagedRulesAmazonIpReputationList"
-          vendor_name = "AWS"
+      dynamic "override_action" {
+        for_each = rule.value.rule.override_action == "count" ? [1] : []
+        content {
+          count {}
         }
       }
 
-      visibility_config {
-        cloudwatch_metrics_enabled = true
-        metric_name                = "${var.workspace}-waf-ip-reputation"
-        sampled_requests_enabled   = true
-      }
-    }
-  }
-
-  dynamic "rule" {
-    for_each = var.waf_bot_control_enabled ? [1] : []
-    content {
-      name     = "aws-managed-bot-control"
-      priority = local.bot_control_priority
-
-      override_action {
-        none {}
+      dynamic "override_action" {
+        for_each = rule.value.rule.override_action == "none" ? [1] : []
+        content {
+          none {}
+        }
       }
 
       statement {
         managed_rule_group_statement {
-          name        = "AWSManagedRulesBotControlRuleSet"
-          vendor_name = "AWS"
+          name        = rule.value.rule.name
+          vendor_name = rule.value.rule.vendor_name
 
-          managed_rule_group_configs {
-            aws_managed_rules_bot_control_rule_set {
-              inspection_level = "COMMON"
+          dynamic "excluded_rule" {
+            for_each = rule.value.rule.excluded_rules
+            content {
+              name = excluded_rule.value
+            }
+          }
+
+          dynamic "rule_action_override" {
+            for_each = rule.value.rule.rule_action_overrides
+            content {
+              name = rule_action_override.key
+
+              action_to_use {
+                dynamic "count" {
+                  for_each = rule_action_override.value == "count" ? [1] : []
+                  content {}
+                }
+
+                dynamic "block" {
+                  for_each = rule_action_override.value == "block" ? [1] : []
+                  content {}
+                }
+
+                dynamic "allow" {
+                  for_each = rule_action_override.value == "allow" ? [1] : []
+                  content {}
+                }
+              }
+            }
+          }
+
+          dynamic "managed_rule_group_configs" {
+            for_each = rule.value.rule.bot_control_inspection_level != null ? [1] : []
+            content {
+              aws_managed_rules_bot_control_rule_set {
+                inspection_level = rule.value.rule.bot_control_inspection_level
+              }
             }
           }
         }
@@ -190,7 +212,7 @@ resource "aws_wafv2_web_acl" "this" {
 
       visibility_config {
         cloudwatch_metrics_enabled = true
-        metric_name                = "${var.workspace}-waf-bot-control"
+        metric_name                = "${var.workspace}-waf-${rule.value.key}"
         sampled_requests_enabled   = true
       }
     }

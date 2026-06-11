@@ -329,9 +329,9 @@ variable "managed_sync_version" {
 }
 
 variable "waf_enabled" {
-  description = "Enable AWS WAF v2 on the public ALB."
+  description = "Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf_managed_rule_groups, rate limits, or IP lists in tfvars."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "waf_ip_whitelist" {
@@ -347,9 +347,10 @@ variable "waf_ip_blacklist" {
 }
 
 variable "waf_rate_limit_global" {
-  description = "Max requests per IP across all endpoints in the evaluation window."
+  description = "Max requests per IP across all endpoints in the evaluation window. null = no global rate limit rule."
   type        = number
-  default     = 2000
+  default     = null
+  nullable    = true
 }
 
 variable "waf_rate_limit_global_window_sec" {
@@ -359,15 +360,9 @@ variable "waf_rate_limit_global_window_sec" {
 }
 
 variable "waf_rate_limit_paths" {
-  description = "Map of URI path prefix to max requests per IP per window."
+  description = "Map of URI path prefix to max requests per IP per window. Empty = no path rate limit rules."
   type        = map(number)
-  default = {
-    "/admin"         = 100
-    "/auth"          = 200
-    "/oauth"         = 200
-    "/stats/metrics" = 100
-    "/stats/swagger" = 50
-  }
+  default     = {}
 }
 
 variable "waf_rate_limit_path_window_sec" {
@@ -376,16 +371,60 @@ variable "waf_rate_limit_path_window_sec" {
   default     = 300
 }
 
-variable "waf_ip_reputation_enabled" {
-  description = "Enable the AWSManagedRulesAmazonIpReputationList managed rule group."
-  type        = bool
-  default     = true
-}
+variable "waf_managed_rule_groups" {
+  description = <<-EOT
+    Map of AWS WAF managed rule groups to attach to the Web ACL. Empty by default — you choose which groups to enable.
 
-variable "waf_bot_control_enabled" {
-  description = "Enable the AWSManagedRulesBotControlRuleSet managed rule group (COMMON level)."
-  type        = bool
-  default     = true
+    Each key is the Web ACL rule name (unique). Each value configures one managed rule group:
+
+    - name (required): e.g. AWSManagedRulesCommonRuleSet, AWSManagedRulesAmazonIpReputationList
+    - vendor_name: default "AWS"
+    - priority: evaluation order (lower first). Auto-assigned after IP/rate rules when omitted.
+    - override_action: "none" (enforce) or "count" (observe only, no block)
+    - excluded_rules: rules inside the group to set to Count (legacy AWS API; prefer rule_action_overrides)
+    - rule_action_overrides: per-rule override — "count", "block", or "allow"
+    - bot_control_inspection_level: "COMMON" or "TARGETED" for AWSManagedRulesBotControlRuleSet only
+
+    Copy-paste examples: see waf.examples.tfvars in this workspace.
+    Reference config (Paragon SaaS): paragon/terraform/workspaces/environment/shared/waf.tf
+  EOT
+  type = map(object({
+    name                         = string
+    vendor_name                  = optional(string, "AWS")
+    priority                     = optional(number)
+    override_action              = optional(string, "none")
+    excluded_rules               = optional(list(string), [])
+    rule_action_overrides        = optional(map(string), {})
+    bot_control_inspection_level = optional(string)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      contains(["none", "count"], coalesce(rule.override_action, "none"))
+    ])
+    error_message = "waf_managed_rule_groups.override_action must be \"none\" or \"count\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      alltrue([
+        for action in values(coalesce(rule.rule_action_overrides, {})) :
+        contains(["count", "block", "allow"], action)
+      ])
+    ])
+    error_message = "waf_managed_rule_groups.rule_action_overrides values must be \"count\", \"block\", or \"allow\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      rule.bot_control_inspection_level == null || contains(["COMMON", "TARGETED"], rule.bot_control_inspection_level)
+    ])
+    error_message = "waf_managed_rule_groups.bot_control_inspection_level must be \"COMMON\" or \"TARGETED\" when set."
+  }
 }
 
 variable "waf_logs_enabled" {

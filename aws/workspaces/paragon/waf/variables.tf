@@ -29,8 +29,9 @@ variable "waf_ip_blacklist" {
 }
 
 variable "waf_rate_limit_global" {
-  description = "Max requests per IP across all endpoints in the evaluation window."
+  description = "Max requests per IP across all endpoints in the evaluation window. null = no global rate limit rule."
   type        = number
+  nullable    = true
 }
 
 variable "waf_rate_limit_global_window_sec" {
@@ -39,7 +40,7 @@ variable "waf_rate_limit_global_window_sec" {
 }
 
 variable "waf_rate_limit_paths" {
-  description = "Map of URI path prefix to max requests per IP per window."
+  description = "Map of URI path prefix to max requests per IP per window. Empty = no path rate limit rules."
   type        = map(number)
 }
 
@@ -48,12 +49,31 @@ variable "waf_rate_limit_path_window_sec" {
   type        = number
 }
 
-variable "waf_ip_reputation_enabled" {
-  description = "Enable the AWSManagedRulesAmazonIpReputationList managed rule group."
-  type        = bool
-}
+variable "waf_managed_rule_groups" {
+  description = <<-EOT
+    Map of AWS WAF managed rule groups to attach to the Web ACL. Empty = no managed rules.
 
-variable "waf_bot_control_enabled" {
-  description = "Enable the AWSManagedRulesBotControlRuleSet managed rule group (COMMON level)."
-  type        = bool
+    Each key is the Web ACL rule name (unique, used for metrics). Each value configures one
+    managed rule group from an AWS or marketplace vendor.
+
+    Fields:
+    - name (required): managed rule group name, e.g. AWSManagedRulesCommonRuleSet
+    - vendor_name: vendor (default AWS). See ListAvailableManagedRuleGroups in AWS WAF API.
+    - priority: rule evaluation order (lower runs first). Auto-assigned after IP/rate rules when null.
+    - override_action: "none" (enforce group defaults) or "count" (count all matches, block none)
+    - excluded_rules: rule names inside the group set to Count (legacy; prefer rule_action_overrides)
+    - rule_action_overrides: per-rule actions inside the group — "count", "block", or "allow"
+    - bot_control_inspection_level: "COMMON" or "TARGETED" — only for AWSManagedRulesBotControlRuleSet
+
+    See waf.examples.tfvars in the paragon workspace for copy-paste examples.
+  EOT
+  type = map(object({
+    name                       = string
+    vendor_name                = optional(string, "AWS")
+    priority                   = optional(number)
+    override_action            = optional(string, "none")
+    excluded_rules             = optional(list(string), [])
+    rule_action_overrides      = optional(map(string), {})
+    bot_control_inspection_level = optional(string)
+  }))
 }

@@ -14,22 +14,29 @@ locals {
   has_whitelist = length(local.waf_ip_whitelist) > 0
   has_blacklist = length(local.waf_ip_blacklist) > 0
 
-  rate_global_priority = (local.has_whitelist ? 1 : 0) + (local.has_blacklist ? 1 : 0)
+  has_global_rate_limit = var.waf_rate_limit_global != null
 
   sorted_path_limits = [
-    for path in sort(keys(var.waf_rate_limit_paths)) : {
-      path  = path
-      limit = var.waf_rate_limit_paths[path]
+    for idx, path in sort(keys(var.waf_rate_limit_paths)) : {
+      path     = path
+      limit    = var.waf_rate_limit_paths[path]
+      priority = local.ip_custom_rule_count + (local.has_global_rate_limit ? 1 : 0) + idx
     }
   ]
 
-  path_rate_priorities = {
-    for idx, item in local.sorted_path_limits :
-    item.path => local.rate_global_priority + 1 + idx
-  }
+  ip_custom_rule_count = (local.has_whitelist ? 1 : 0) + (local.has_blacklist ? 1 : 0)
 
-  managed_rules_offset = local.rate_global_priority + 1 + length(local.sorted_path_limits)
+  rate_rule_count = (local.has_global_rate_limit ? 1 : 0) + length(local.sorted_path_limits)
 
-  ip_reputation_priority = var.waf_ip_reputation_enabled ? local.managed_rules_offset : -1
-  bot_control_priority   = var.waf_bot_control_enabled ? local.managed_rules_offset + (var.waf_ip_reputation_enabled ? 1 : 0) : -1
+  managed_rules_offset = local.ip_custom_rule_count + local.rate_rule_count
+
+  managed_rule_keys = sort(keys(var.waf_managed_rule_groups))
+
+  managed_rules = [
+    for idx, key in local.managed_rule_keys : {
+      key      = key
+      rule     = var.waf_managed_rule_groups[key]
+      priority = coalesce(var.waf_managed_rule_groups[key].priority, local.managed_rules_offset + idx)
+    }
+  ]
 }
