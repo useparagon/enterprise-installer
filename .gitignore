@@ -52,7 +52,7 @@ build/
 .vscode/
 
 # local env files
-.env.local
+*.local
 
 # os and local files
 .DS_Store

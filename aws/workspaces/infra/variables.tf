@@ -179,7 +179,7 @@ variable "eks_min_node_count" {
 variable "eks_max_node_count" {
   description = "The maximum number of nodes to run in the Kubernetes cluster."
   type        = number
-  default     = 40
+  default     = 50
   nullable    = false
 }
 

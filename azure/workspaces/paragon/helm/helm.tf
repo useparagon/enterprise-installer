@@ -29,6 +29,12 @@ locals {
     }
   })
 
+  # managed-sync chart (useparagon-internal/managed-sync) shared ingress requires root-level
+  # tlsSecret on Azure; see k8s/charts/managed-sync/templates/ingress/ingress.yaml
+  managed_sync_values = yamlencode({
+    tlsSecret = "api-sync-secret"
+  })
+
   public_microservice_values = yamlencode({
     for microservice_name, microservice_config in var.public_microservices : microservice_name => {
       ingress = {
