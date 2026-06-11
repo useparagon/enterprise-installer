@@ -16,15 +16,15 @@ service:
 
 resources:
   limits:
-    memory: 600Mi
+    memory: 800Mi
   requests:
     cpu: 200m
-    memory: 600Mi
+    memory: 800Mi
 
 autoscaling:
   enabled: true
   minReplicas: 2
-  maxReplicas: 10
+  maxReplicas: 20
   targetCPUUtilizationPercentage: 75
   targetMemoryUtilizationPercentage: 75
 
