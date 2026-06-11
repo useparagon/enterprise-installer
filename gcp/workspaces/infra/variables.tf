@@ -280,7 +280,7 @@ variable "k8s_min_node_count" {
 variable "k8s_max_node_count" {
   description = "Maximum number of node Kubernetes can scale up to."
   type        = number
-  default     = 20
+  default     = 50
   nullable    = false
 }
 

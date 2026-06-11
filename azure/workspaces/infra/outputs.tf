@@ -46,9 +46,20 @@ output "minio" {
 }
 
 output "redis" {
-  description = "Connection information for Redis."
-  value       = module.redis.redis
+  description = "Primary Redis connection info for the paragon workspace. During migration (both modules enabled), returns legacy endpoints until redis_enabled is set to false."
+  value       = var.redis_enabled ? module.redis.redis : module.redis_managed[0].redis
   sensitive   = true
+}
+
+output "redis_managed" {
+  description = "Azure Managed Redis 7.4 endpoints (null when redis_managed_enabled is false). Use during migration for kubectl trial routing while output redis still points at legacy."
+  value       = var.redis_managed_enabled ? module.redis_managed[0].redis : null
+  sensitive   = true
+}
+
+output "redis_managed_export_storage" {
+  description = "Blob storage for on-demand Azure Managed Redis RDB export (null when disabled or legacy Redis)."
+  value       = var.redis_managed_enabled ? module.redis_managed[0].export_storage : null
 }
 
 output "cluster_name" {

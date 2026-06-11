@@ -48,11 +48,34 @@ locals {
     ssl_enabled    = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SSL_ENABLED"], var.infra_values.kafka.value.cluster_tls_enabled)
   }
 
+  # Paragon reads infra from .secure/infra-output.json (terraform output -json from infra workspace).
+  # Prefer managed-sync, then cache (same resolution order as GCP).
+  redis_from_infra = try(
+    var.infra_values.redis.value["managed-sync"],
+    var.infra_values.redis.value.managed_sync,
+    var.infra_values.redis.value.cache,
+    null
+  )
+
+  # base_helm_values env vars are strings; coerce before boolean conditionals (non-empty "false" is truthy).
+  managed_sync_redis_tls_enabled = local.redis_from_infra != null ? local.redis_from_infra.ssl : (
+    try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_TLS_ENABLED"], null) != null
+    ? contains(["true", "1", "yes"], lower(tostring(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_TLS_ENABLED"])))
+    : try(var.infra_values.redis.value["managed-sync"].ssl, var.infra_values.redis.value.managed_sync.ssl, var.infra_values.redis.value.cache.ssl, false)
+  )
+
   redis_config = {
-    host            = try(var.base_helm_values.global.env["REDIS_HOST"], var.infra_values.redis.value.managed_sync.host, var.infra_values.redis.value.cache.host)
-    port            = try(var.base_helm_values.global.env["REDIS_PORT"], var.infra_values.redis.value.managed_sync.port, var.infra_values.redis.value.cache.port)
-    cluster_enabled = try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_CLUSTER_ENABLED"], var.infra_values.redis.value.managed_sync.cluster, var.infra_values.redis.value.cache.cluster, false)
+    host                 = local.redis_from_infra != null ? local.redis_from_infra.host : try(var.base_helm_values.global.env["REDIS_HOST"], try(var.infra_values.redis.value["managed-sync"].host, var.infra_values.redis.value.managed_sync.host, var.infra_values.redis.value.cache.host))
+    port                 = local.redis_from_infra != null ? local.redis_from_infra.port : try(var.base_helm_values.global.env["REDIS_PORT"], try(var.infra_values.redis.value["managed-sync"].port, var.infra_values.redis.value.managed_sync.port, var.infra_values.redis.value.cache.port))
+    password             = local.redis_from_infra != null ? local.redis_from_infra.password : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_PASSWORD"], try(var.infra_values.redis.value["managed-sync"].password, var.infra_values.redis.value.managed_sync.password, var.infra_values.redis.value.cache.password, null))
+    cluster_enabled      = local.redis_from_infra != null ? try(local.redis_from_infra.cluster, false) : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_CLUSTER_ENABLED"], try(var.infra_values.redis.value["managed-sync"].cluster, var.infra_values.redis.value.managed_sync.cluster, var.infra_values.redis.value.cache.cluster, false))
+    redis_tls_enabled    = local.managed_sync_redis_tls_enabled
+    redis_ca_certificate = local.redis_from_infra != null ? try(local.redis_from_infra.ca_certificate, null) : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_CA_CERT"], try(var.infra_values.redis.value["managed-sync"].ca_certificate, var.infra_values.redis.value.managed_sync.ca_certificate, null))
   }
+
+  # Managed-sync uses rediss:// when TLS is enabled (same as GCP). The monorepo accepts this
+  # URL scheme but still requires MANAGED_SYNC_REDIS_TLS_ENABLED to enable TLS in the client.
+  managed_sync_redis_url = "${local.redis_config.redis_tls_enabled ? "rediss" : "redis"}://${local.redis_config.password != null ? ":${urlencode(local.redis_config.password)}@" : ""}${local.redis_config.host}:${local.redis_config.port}"
 
   storage_type = try(var.base_helm_values.global.env["CLOUD_STORAGE_TYPE"], "AZURE")
 
@@ -83,7 +106,7 @@ locals {
   }
 
   managed_sync_secrets = {
-    HOST_ENV  = "AWS_K8"
+    HOST_ENV  = "AZURE_K8"
     LOG_LEVEL = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
 
     CLOUD_STORAGE_TYPE                = local.storage_type
@@ -115,9 +138,13 @@ locals {
     MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_PARTITION_COUNT    = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_PARTITION_COUNT"], 2)
     MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_REPLICATION_FACTOR = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_REPLICATION_FACTOR"], 1)
 
-    MANAGED_SYNC_REDIS_URL             = try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], "${local.redis_config.host}:${local.redis_config.port}")
-    MANAGED_SYNC_REDIS_CLUSTER_ENABLED = local.redis_config.cluster_enabled
-    MANAGED_SYNC_REDIS_TLS_ENABLED     = false
+    # Redis from infra when present (managed-sync, then cache). Do not override from
+    # base_helm_values when infra provides credentials.
+    MANAGED_SYNC_REDIS_URL              = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
+    MANAGED_SYNC_REDIS_PASSWORD         = local.redis_config.password != null ? local.redis_config.password : ""
+    MANAGED_SYNC_REDIS_CLUSTER_ENABLED  = local.redis_config.cluster_enabled
+    MANAGED_SYNC_REDIS_TLS_ENABLED      = tostring(local.redis_config.redis_tls_enabled)
+    MANAGED_SYNC_REDIS_CA_CERT          = local.redis_config.redis_ca_certificate != null ? local.redis_config.redis_ca_certificate : ""
 
     SYNC_INSTANCE_POSTGRES_HOST        = local.postgres_config.sync_instance.host
     SYNC_INSTANCE_POSTGRES_PORT        = local.postgres_config.sync_instance.port
@@ -140,7 +167,7 @@ locals {
     OPENFGA_POSTGRES_PASSWORD    = local.postgres_config.openfga.password
     OPENFGA_POSTGRES_DATABASE    = local.postgres_config.openfga.database
     OPENFGA_POSTGRES_SSL_ENABLED = true
-    OPENFGA_POSTGRES_URI         = "postgres://${local.postgres_config.openfga.username}:${local.postgres_config.openfga.password}@${local.postgres_config.openfga.host}:${local.postgres_config.openfga.port}/${local.postgres_config.openfga.database}?sslmode=prefer"
+    OPENFGA_POSTGRES_URI         = "postgres://${local.postgres_config.openfga.username}:${local.postgres_config.openfga.password}@${local.postgres_config.openfga.host}:${local.postgres_config.openfga.port}/${local.postgres_config.openfga.database}?sslmode=require"
     OPENFGA_AUTH_PRESHARED_KEY   = random_string.openfga_preshared_key.result
 
     ADMIN_POSTGRES_HOST        = local.postgres_config.admin.host
