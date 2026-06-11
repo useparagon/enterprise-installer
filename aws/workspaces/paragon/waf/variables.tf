@@ -45,11 +45,14 @@ variable "waf_rate_limit_global_window_sec" {
 }
 
 variable "waf_rate_limit_paths" {
-  description = "Map of URI path prefix to max requests per IP per window."
+  description = "Map of URI path prefix to max requests per IP per window. Defaults target sensitive public routes (zeus, hermes, hades, account, pheme, api-triggerkit, passport, dashboard)."
   type        = map(number)
   default = {
-    "/client-logs/actuator" = 100
-    "/actuator"             = 100
+    "/admin"         = 100 # admin APIs across zeus, hermes, hades, account, pheme, api-triggerkit
+    "/auth"          = 200 # zeus authentication and MFA
+    "/oauth"         = 200 # passport OAuth flows
+    "/stats/metrics" = 100 # dashboard Prometheus metrics
+    "/stats/swagger" = 50  # swagger-stats UI (NestJS microservices; Grafana reads /stats/metrics via Prometheus internally)
   }
 }
 

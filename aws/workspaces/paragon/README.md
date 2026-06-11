@@ -99,7 +99,7 @@
 | <a name="input_waf_rate_limit_global"></a> [waf\_rate\_limit\_global](#input\_waf\_rate\_limit\_global) | Max requests per IP across all endpoints in the evaluation window. | `number` | `2000` | no |
 | <a name="input_waf_rate_limit_global_window_sec"></a> [waf\_rate\_limit\_global\_window\_sec](#input\_waf\_rate\_limit\_global\_window\_sec) | Evaluation window for global rate limit (60, 120, 300, or 600). | `number` | `300` | no |
 | <a name="input_waf_rate_limit_path_window_sec"></a> [waf\_rate\_limit\_path\_window\_sec](#input\_waf\_rate\_limit\_path\_window\_sec) | Evaluation window for path rate limits (60, 120, 300, or 600). | `number` | `300` | no |
-| <a name="input_waf_rate_limit_paths"></a> [waf\_rate\_limit\_paths](#input\_waf\_rate\_limit\_paths) | Map of URI path prefix to max requests per IP per window. | `map(number)` | <pre>{<br/>  "/actuator": 100,<br/>  "/client-logs/actuator": 100<br/>}</pre> | no |
+| <a name="input_waf_rate_limit_paths"></a> [waf\_rate\_limit\_paths](#input\_waf\_rate\_limit\_paths) | Map of URI path prefix to max requests per IP per window. Defaults target sensitive public routes (zeus, hermes, hades, account, pheme, api-triggerkit, passport, dashboard). | `map(number)` | <pre>{<br/>  "/admin": 100,<br/>  "/auth": 200,<br/>  "/oauth": 200,<br/>  "/stats/metrics": 100,<br/>  "/stats/swagger": 50<br/>}</pre> | no |
 
 ## Outputs
 
