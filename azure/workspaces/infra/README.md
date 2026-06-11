@@ -129,6 +129,39 @@ Confirm SKU availability in the target region before apply.
 
 Requires `azurerm` provider `>= 4.60` in `main.tf` (see `main.tf.example`).
 
+## AKS network profile
+
+The `k8s_*` network variables configure the AKS `network_profile`. Defaults are optimized for greenfield deployments:
+
+| Variable | Default |
+| -------- | ------- |
+| `k8s_network_plugin` | `azure` |
+| `k8s_network_plugin_mode` | `overlay` |
+| `k8s_pod_cidr` | `192.168.0.0/16` |
+| `k8s_service_cidr` | `172.16.0.0/16` |
+| `k8s_dns_service_ip` | `172.16.0.10` |
+| `k8s_outbound_type` | `userAssignedNATGateway` |
+| `k8s_load_balancer_sku` | `standard` |
+
+All CIDR defaults are RFC 1918 private. `k8s_service_cidr` and `k8s_dns_service_ip` are **immutable after cluster creation** — override them before the first apply if they overlap the customer's address space.
+
+### Legacy deployments
+
+The existing Azure deployments that use node-subnet CNI and the non-private `172.0.0.0/16` service range. Pin these in tfvars:
+
+```hcl
+k8s_network_plugin_mode = null
+k8s_pod_cidr            = null
+k8s_service_cidr        = "172.0.0.0/16"
+k8s_dns_service_ip      = "172.0.0.10"
+```
+
+Optional staged migrations for legacy clusters (each step is one-way where noted):
+
+1. **NAT Gateway outbound**: remove any `k8s_outbound_type = "loadBalancer"` override and apply — creates the NAT Gateway and switches outbound SNAT.
+2. **Azure CNI Overlay** (irreversible): drop the `k8s_network_plugin_mode` and `k8s_pod_cidr` overrides above and apply with the new defaults (or set them explicitly). Pods stop consuming VNet subnet IPs.
+3. **Service CIDR / DNS IP**: cannot be changed in-place; requires a new cluster.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -182,9 +215,17 @@ No resources.
 | <a name="input_eventhub_maximum_throughput_units"></a> [eventhub\_maximum\_throughput\_units](#input\_eventhub\_maximum\_throughput\_units) | The maximum throughput units for auto-inflate (only applicable when auto\_inflate\_enabled is true). | `number` | `20` | no |
 | <a name="input_eventhub_namespace_sku"></a> [eventhub\_namespace\_sku](#input\_eventhub\_namespace\_sku) | The SKU name for the Event Hubs namespace (Basic, Standard, Premium). | `string` | `"Standard"` | no |
 | <a name="input_k8s_default_node_pool_vm_size"></a> [k8s\_default\_node\_pool\_vm\_size](#input\_k8s\_default\_node\_pool\_vm\_size) | VM size for the AKS default (system) node pool. Must be available in the target region (e.g. Standard\_B2s\_v2 in japaneast). | `string` | `"Standard_B2s"` | no |
+| <a name="input_k8s_dns_service_ip"></a> [k8s\_dns\_service\_ip](#input\_k8s\_dns\_service\_ip) | IP address within k8s\_service\_cidr for the cluster DNS service. Immutable after cluster creation. | `string` | `"172.16.0.10"` | no |
+| <a name="input_k8s_load_balancer_sku"></a> [k8s\_load\_balancer\_sku](#input\_k8s\_load\_balancer\_sku) | SKU for the AKS load balancer. | `string` | `"standard"` | no |
 | <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `20` | no |
 | <a name="input_k8s_min_node_count"></a> [k8s\_min\_node\_count](#input\_k8s\_min\_node\_count) | Minimum number of node Kubernetes can scale down to. | `number` | `3` | no |
+| <a name="input_k8s_network_plugin"></a> [k8s\_network\_plugin](#input\_k8s\_network\_plugin) | AKS network plugin. Use `azure` (recommended) or legacy `kubenet`. | `string` | `"azure"` | no |
+| <a name="input_k8s_network_plugin_mode"></a> [k8s\_network\_plugin\_mode](#input\_k8s\_network\_plugin\_mode) | Azure CNI mode. `overlay` assigns pod IPs from k8s\_pod\_cidr (default, IP-efficient). Set to null for legacy node-subnet mode (pod IPs from the VNet). | `string` | `"overlay"` | no |
+| <a name="input_k8s_network_policy"></a> [k8s\_network\_policy](#input\_k8s\_network\_policy) | Network policy engine. Leave null to disable, or set to `azure`, `calico`, or `cilium`. | `string` | `null` | no |
 | <a name="input_k8s_ondemand_node_instance_type"></a> [k8s\_ondemand\_node\_instance\_type](#input\_k8s\_ondemand\_node\_instance\_type) | The compute instance type to use for Kubernetes on demand nodes. | `string` | `"Standard_B2ms"` | no |
+| <a name="input_k8s_outbound_type"></a> [k8s\_outbound\_type](#input\_k8s\_outbound\_type) | AKS outbound connectivity type. Use `userAssignedNATGateway` when the private subnet has a NAT Gateway (recommended). | `string` | `"userAssignedNATGateway"` | no |
+| <a name="input_k8s_pod_cidr"></a> [k8s\_pod\_cidr](#input\_k8s\_pod\_cidr) | Pod overlay CIDR (RFC 1918 private). Used when k8s\_network\_plugin\_mode is `overlay` or k8s\_network\_plugin is `kubenet`. Must not overlap vpc\_cidr or k8s\_service\_cidr. | `string` | `"192.168.0.0/16"` | no |
+| <a name="input_k8s_service_cidr"></a> [k8s\_service\_cidr](#input\_k8s\_service\_cidr) | Kubernetes service CIDR block (RFC 1918 private). Immutable after cluster creation. | `string` | `"172.16.0.0/16"` | no |
 | <a name="input_k8s_sku_tier"></a> [k8s\_sku\_tier](#input\_k8s\_sku\_tier) | The SKU Tier of the AKS cluster (`Free`, `Standard` or `Premium`). | `string` | `"Premium"` | no |
 | <a name="input_k8s_spot_instance_percent"></a> [k8s\_spot\_instance\_percent](#input\_k8s\_spot\_instance\_percent) | The percentage of spot instances to use for Kubernetes nodes. | `number` | `75` | no |
 | <a name="input_k8s_spot_node_instance_type"></a> [k8s\_spot\_node\_instance\_type](#input\_k8s\_spot\_node\_instance\_type) | The compute instance type to use for Kubernetes spot nodes. | `string` | `"Standard_B2ms"` | no |
