@@ -351,11 +351,6 @@ resource "helm_release" "paragon_logging" {
     value = local.openobserve_password
   }
 
-  set {
-    name  = "openobserve.ingress.wafv2_acl_arn"
-    value = var.waf_web_acl_arn
-  }
-
   depends_on = [
     helm_release.ingress,
     kubernetes_secret.docker_login,
