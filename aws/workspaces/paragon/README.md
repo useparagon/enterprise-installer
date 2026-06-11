@@ -103,6 +103,64 @@
 | <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime\_webhook) | Uptime webhook URL |
 <!-- END_TF_DOCS -->
 
+## AWS WAF (PARA-21681)
+
+Public `internet-facing` ALB deployments enable **AWS WAF v2** by default (`waf_enabled = true`). Terraform provisions a regional Web ACL; the AWS Load Balancer Controller associates it to the shared ALB via the `alb.ingress.kubernetes.io/wafv2-acl-arn` Ingress annotation.
+
+### Protection included
+
+| Layer | Description |
+|-------|-------------|
+| IP whitelist | Optional comma-separated CIDRs that bypass all WAF rules (office egress IPs) |
+| IP blacklist | Optional comma-separated CIDRs that are always blocked |
+| Rate limit (global) | Per-IP limit across all endpoints (default: 2000 req / 5 min) |
+| Rate limit (paths) | Stricter per-IP limits on sensitive URI prefixes (default: `/client-logs/actuator`, `/actuator`) |
+| Amazon IP reputation | `AWSManagedRulesAmazonIpReputationList` managed rule group |
+| Bot Control | `AWSManagedRulesBotControlRuleSet` at **COMMON** inspection level |
+| S3 logging | Traffic logs to `aws-waf-logs-<workspace>` (AWS-required prefix); lifecycle retention configurable |
+
+### Logging
+
+WAF logs are stored in a **dedicated S3 bucket** (not the general `{workspace}-logs` bucket). AWS requires the bucket name to start with `aws-waf-logs-` and uses the `delivery.logs.amazonaws.com` service principal with a special bucket policy.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `waf_logs_enabled` | `true` | Enable WAF traffic logging to S3 |
+| `waf_logs_retention_days` | `30` | S3 lifecycle expiration for objects under `AWSLogs/` |
+
+Logs are published every ~5 minutes as compressed `.log.gz` files under `AWSLogs/<account-id>/WAFLogs/<region>/<web-acl-name>/`.
+
+### Opt-out
+
+Set `waf_enabled = false` in `.secure/terraform.tfvars`. Helm passes `wafv2-acl-arn: none` to disassociate WAF from an existing ALB.
+
+### Example tfvars
+
+```hcl
+waf_enabled = true
+
+# Office IPs (comma-separated; /32 appended automatically when omitted)
+waf_ip_whitelist = "203.0.113.50,203.0.113.0/24"
+waf_ip_blacklist = ""
+
+waf_rate_limit_global = 2000
+waf_rate_limit_paths = {
+  "/client-logs/actuator" = 50
+  "/actuator"             = 50
+}
+
+waf_logs_enabled          = true
+waf_logs_retention_days   = 30
+```
+
+### Estimated cost (per deployment)
+
+- Web ACL + rules: ~$11–13/month
+- Bot Control: ~$10/month + $1 per million requests evaluated
+- WAF requests: $0.60 per million requests
+
+WAF is **not** applied when `ingress_scheme = "internal"`.
+
 ## Updates
 
 This Terraform documentation can be automatically regenerated with:

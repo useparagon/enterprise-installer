@@ -1,3 +1,21 @@
+module "waf" {
+  source = "./waf"
+  count  = local.waf_active ? 1 : 0
+
+  aws_region                       = var.aws_region
+  workspace                        = local.workspace
+  waf_logs_enabled                 = var.waf_logs_enabled
+  waf_logs_retention_days          = var.waf_logs_retention_days
+  waf_ip_whitelist                 = var.waf_ip_whitelist
+  waf_ip_blacklist                 = var.waf_ip_blacklist
+  waf_rate_limit_global            = var.waf_rate_limit_global
+  waf_rate_limit_global_window_sec = var.waf_rate_limit_global_window_sec
+  waf_rate_limit_paths             = var.waf_rate_limit_paths
+  waf_rate_limit_path_window_sec   = var.waf_rate_limit_path_window_sec
+  waf_ip_reputation_enabled        = var.waf_ip_reputation_enabled
+  waf_bot_control_enabled          = var.waf_bot_control_enabled
+}
+
 module "alb" {
   source = "./alb"
 
@@ -39,6 +57,7 @@ module "helm" {
   openobserve_password   = var.openobserve_password
   public_microservices   = local.public_microservices
   public_monitors        = local.public_monitors
+  waf_web_acl_arn        = local.waf_active ? module.waf[0].web_acl_arn : "none"
   workspace              = local.workspace
 }
 

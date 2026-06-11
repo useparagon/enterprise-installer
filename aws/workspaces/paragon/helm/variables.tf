@@ -137,6 +137,12 @@ variable "managed_sync_version" {
   type        = string
 }
 
+variable "waf_web_acl_arn" {
+  description = "Regional WAFv2 Web ACL ARN for the shared ALB. Set to 'none' to disable WAF association."
+  type        = string
+  default     = "none"
+}
+
 locals {
   chart_names     = var.monitors_enabled ? ["paragon-logging", "paragon-monitoring", "paragon-onprem"] : ["paragon-logging", "paragon-onprem"]
   chart_directory = "../charts"

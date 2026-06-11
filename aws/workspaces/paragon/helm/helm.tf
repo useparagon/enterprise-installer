@@ -70,6 +70,7 @@ locals {
         certificate        = var.certificate
         load_balancer_name = var.workspace
         logs_bucket        = var.logs_bucket
+        wafv2_acl_arn      = var.waf_web_acl_arn
       }
     }
   })
@@ -93,6 +94,7 @@ locals {
         scheme             = var.ingress_scheme
         certificate        = var.certificate
         load_balancer_name = var.workspace
+        wafv2_acl_arn      = var.waf_web_acl_arn
       }
     }
   })
@@ -347,6 +349,11 @@ resource "helm_release" "paragon_logging" {
   set_sensitive {
     name  = "openobserve.secrets.ZO_ROOT_USER_PASSWORD"
     value = local.openobserve_password
+  }
+
+  set {
+    name  = "openobserve.ingress.wafv2_acl_arn"
+    value = var.waf_web_acl_arn
   }
 
   depends_on = [
