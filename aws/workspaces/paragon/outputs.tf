@@ -38,7 +38,7 @@ output "waf_web_acl_arn" {
 }
 
 output "waf_logs_bucket" {
-  description = "S3 bucket name for WAF traffic logs when WAF logging is enabled."
+  description = "S3 bucket name for WAF traffic logs when WAF is enabled, otherwise null."
   value       = local.waf_active ? module.waf[0].waf_logs_bucket : null
 }
 

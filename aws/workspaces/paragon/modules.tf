@@ -4,7 +4,6 @@ module "waf" {
 
   aws_region                       = var.aws_region
   workspace                        = local.workspace
-  waf_logs_enabled                 = var.waf_logs_enabled
   waf_logs_retention_days          = var.waf_logs_retention_days
   waf_ip_whitelist                 = var.waf_ip_whitelist
   waf_ip_blacklist                 = var.waf_ip_blacklist

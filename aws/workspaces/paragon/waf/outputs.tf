@@ -14,6 +14,6 @@ output "web_acl_name" {
 }
 
 output "waf_logs_bucket" {
-  description = "S3 bucket name for WAF traffic logs when logging is enabled."
-  value       = var.waf_logs_enabled ? aws_s3_bucket.waf_logs[0].id : null
+  description = "S3 bucket name for WAF traffic logs."
+  value       = aws_s3_bucket.waf_logs.id
 }

@@ -5,16 +5,12 @@ locals {
 }
 
 resource "aws_s3_bucket" "waf_logs" {
-  count = var.waf_logs_enabled ? 1 : 0
-
   bucket        = local.waf_logs_bucket_name
   force_destroy = false
 }
 
 resource "aws_s3_bucket_ownership_controls" "waf_logs" {
-  count = var.waf_logs_enabled ? 1 : 0
-
-  bucket = aws_s3_bucket.waf_logs[0].id
+  bucket = aws_s3_bucket.waf_logs.id
 
   rule {
     object_ownership = "BucketOwnerEnforced"
@@ -22,9 +18,7 @@ resource "aws_s3_bucket_ownership_controls" "waf_logs" {
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "waf_logs" {
-  count = var.waf_logs_enabled ? 1 : 0
-
-  bucket = aws_s3_bucket.waf_logs[0].id
+  bucket = aws_s3_bucket.waf_logs.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -34,8 +28,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "waf_logs" {
 }
 
 data "aws_iam_policy_document" "waf_logs" {
-  count = var.waf_logs_enabled ? 1 : 0
-
   statement {
     sid    = "AWSLogDeliveryWrite"
     effect = "Allow"
@@ -47,7 +39,7 @@ data "aws_iam_policy_document" "waf_logs" {
 
     actions = ["s3:PutObject"]
     resources = [
-      "${aws_s3_bucket.waf_logs[0].arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*",
+      "${aws_s3_bucket.waf_logs.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*",
     ]
 
     condition {
@@ -82,7 +74,7 @@ data "aws_iam_policy_document" "waf_logs" {
       "s3:GetBucketAcl",
       "s3:ListBucket",
     ]
-    resources = [aws_s3_bucket.waf_logs[0].arn]
+    resources = [aws_s3_bucket.waf_logs.arn]
 
     condition {
       test     = "StringEquals"
@@ -99,16 +91,12 @@ data "aws_iam_policy_document" "waf_logs" {
 }
 
 resource "aws_s3_bucket_policy" "waf_logs" {
-  count = var.waf_logs_enabled ? 1 : 0
-
-  bucket = aws_s3_bucket.waf_logs[0].id
-  policy = data.aws_iam_policy_document.waf_logs[0].json
+  bucket = aws_s3_bucket.waf_logs.id
+  policy = data.aws_iam_policy_document.waf_logs.json
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "waf_logs" {
-  count = var.waf_logs_enabled ? 1 : 0
-
-  bucket = aws_s3_bucket.waf_logs[0].id
+  bucket = aws_s3_bucket.waf_logs.id
 
   rule {
     id     = "expire-waf-logs"
@@ -125,10 +113,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "waf_logs" {
 }
 
 resource "aws_wafv2_web_acl_logging_configuration" "this" {
-  count = var.waf_logs_enabled ? 1 : 0
-
   resource_arn            = aws_wafv2_web_acl.this.arn
-  log_destination_configs = [aws_s3_bucket.waf_logs[0].arn]
+  log_destination_configs = [aws_s3_bucket.waf_logs.arn]
 
   depends_on = [aws_s3_bucket_policy.waf_logs]
 }

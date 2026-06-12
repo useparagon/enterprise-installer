@@ -385,7 +385,6 @@ variable "waf_managed_rule_groups" {
     - rule_action_overrides: per-rule override — "count", "block", or "allow"
     - bot_control_inspection_level: "COMMON" or "TARGETED" for AWSManagedRulesBotControlRuleSet only
 
-    Copy-paste examples: see waf.examples.tfvars in this workspace.
     Reference config (Paragon SaaS): paragon/terraform/workspaces/environment/shared/waf.tf
   EOT
   type = map(object({
@@ -427,14 +426,8 @@ variable "waf_managed_rule_groups" {
   }
 }
 
-variable "waf_logs_enabled" {
-  description = "Enable WAF traffic logging to a dedicated S3 bucket (aws-waf-logs-*)."
-  type        = bool
-  default     = true
-}
-
 variable "waf_logs_retention_days" {
-  description = "Number of days to retain WAF logs in S3 before lifecycle expiration."
+  description = "Number of days to retain WAF logs in S3 before lifecycle expiration. Only applies when waf_enabled is true."
   type        = number
   default     = 30
 }
