@@ -420,7 +420,7 @@ variable "waf_managed_rule_groups" {
   validation {
     condition = alltrue([
       for _, rule in var.waf_managed_rule_groups :
-      rule.bot_control_inspection_level == null || contains(["COMMON", "TARGETED"], rule.bot_control_inspection_level)
+      rule.bot_control_inspection_level == null ? true : contains(["COMMON", "TARGETED"], rule.bot_control_inspection_level)
     ])
     error_message = "waf_managed_rule_groups.bot_control_inspection_level must be \"COMMON\" or \"TARGETED\" when set."
   }
