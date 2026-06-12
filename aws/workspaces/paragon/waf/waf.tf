@@ -168,13 +168,6 @@ resource "aws_wafv2_web_acl" "this" {
           name        = rule.value.rule.name
           vendor_name = rule.value.rule.vendor_name
 
-          dynamic "excluded_rule" {
-            for_each = rule.value.rule.excluded_rules
-            content {
-              name = excluded_rule.value
-            }
-          }
-
           dynamic "rule_action_override" {
             for_each = rule.value.rule.rule_action_overrides
             content {

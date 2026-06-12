@@ -34,8 +34,17 @@ locals {
 
   managed_rules = [
     for idx, key in local.managed_rule_keys : {
-      key      = key
-      rule     = var.waf_managed_rule_groups[key]
+      key = key
+      rule = merge(var.waf_managed_rule_groups[key], {
+        # excluded_rules is legacy AWS API — provider only supports rule_action_override
+        rule_action_overrides = merge(
+          {
+            for name in coalesce(var.waf_managed_rule_groups[key].excluded_rules, []) :
+            name => "count"
+          },
+          coalesce(var.waf_managed_rule_groups[key].rule_action_overrides, {})
+        )
+      })
       priority = coalesce(var.waf_managed_rule_groups[key].priority, local.managed_rules_offset + idx)
     }
   ]
