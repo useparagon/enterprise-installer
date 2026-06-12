@@ -335,40 +335,60 @@ variable "waf_enabled" {
 }
 
 variable "waf_ip_whitelist" {
-  description = "Comma-separated CIDRs to bypass WAF rules (office IPs). Empty = no whitelist rule."
-  type        = string
-  default     = ""
+  description = "CIDRs to bypass WAF rules (office IPs). Empty list = no whitelist rule."
+  type        = list(string)
+  default     = []
 }
 
 variable "waf_ip_blacklist" {
-  description = "Comma-separated CIDRs to always block. Empty = no blacklist rule."
-  type        = string
-  default     = ""
+  description = "CIDRs to always block. Empty list = no blacklist rule."
+  type        = list(string)
+  default     = []
 }
 
 variable "waf_rate_limit_global" {
-  description = "Max requests per IP across all endpoints in the evaluation window. null = no global rate limit rule."
+  description = "Max requests per IP across all endpoints in the evaluation window. null or 0 = no global rate limit rule."
   type        = number
   default     = null
   nullable    = true
+
+  validation {
+    condition     = var.waf_rate_limit_global == null || var.waf_rate_limit_global == 0 || var.waf_rate_limit_global >= 100
+    error_message = "waf_rate_limit_global must be null, 0 (disabled), or >= 100 (AWS WAF minimum)."
+  }
 }
 
 variable "waf_rate_limit_global_window_sec" {
   description = "Evaluation window for global rate limit (60, 120, 300, or 600)."
   type        = number
   default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_global_window_sec)
+    error_message = "waf_rate_limit_global_window_sec must be 60, 120, 300, or 600."
+  }
 }
 
 variable "waf_rate_limit_paths" {
-  description = "Map of URI path prefix to max requests per IP per window. Empty = no path rate limit rules."
+  description = "Map of URI path prefix to max requests per IP per window. Paths without a leading / are normalized. Empty = no path rate limit rules."
   type        = map(number)
   default     = {}
+
+  validation {
+    condition     = alltrue([for limit in values(var.waf_rate_limit_paths) : limit >= 100])
+    error_message = "waf_rate_limit_paths values must be >= 100 (AWS WAF minimum)."
+  }
 }
 
 variable "waf_rate_limit_path_window_sec" {
   description = "Evaluation window for path rate limits (60, 120, 300, or 600)."
   type        = number
   default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_path_window_sec)
+    error_message = "waf_rate_limit_path_window_sec must be 60, 120, 300, or 600."
+  }
 }
 
 variable "waf_managed_rule_groups" {
@@ -381,7 +401,7 @@ variable "waf_managed_rule_groups" {
     - vendor_name: default "AWS"
     - priority: evaluation order (lower first). Auto-assigned after IP/rate rules when omitted.
     - override_action: "none" (enforce) or "count" (observe only, no block)
-    - excluded_rules: rules inside the group to set to Count (legacy AWS API; prefer rule_action_overrides)
+    - excluded_rules: rule names to count (not block); translated to rule_action_overrides internally
     - rule_action_overrides: per-rule override — "count", "block", or "allow"
     - bot_control_inspection_level: "COMMON" or "TARGETED" for AWSManagedRulesBotControlRuleSet only
 
@@ -423,6 +443,14 @@ variable "waf_managed_rule_groups" {
       rule.bot_control_inspection_level == null ? true : contains(["COMMON", "TARGETED"], rule.bot_control_inspection_level)
     ])
     error_message = "waf_managed_rule_groups.bot_control_inspection_level must be \"COMMON\" or \"TARGETED\" when set."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      rule.bot_control_inspection_level == null || rule.name == "AWSManagedRulesBotControlRuleSet"
+    ])
+    error_message = "bot_control_inspection_level is only valid when name is AWSManagedRulesBotControlRuleSet."
   }
 }
 

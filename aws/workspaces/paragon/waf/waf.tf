@@ -104,7 +104,7 @@ resource "aws_wafv2_web_acl" "this" {
   dynamic "rule" {
     for_each = local.sorted_path_limits
     content {
-      name     = "rate-limit-path-${replace(trimprefix(rule.value.path, "/"), "/", "-")}"
+      name     = "rate-limit-${rule.value.slug}"
       priority = rule.value.priority
 
       action {
@@ -137,7 +137,7 @@ resource "aws_wafv2_web_acl" "this" {
 
       visibility_config {
         cloudwatch_metrics_enabled = true
-        metric_name                = "${var.workspace}-waf-rate-${replace(trimprefix(rule.value.path, "/"), "/", "-")}"
+        metric_name                = "${var.workspace}-waf-rate-${rule.value.slug}"
         sampled_requests_enabled   = true
       }
     }
@@ -193,7 +193,7 @@ resource "aws_wafv2_web_acl" "this" {
           }
 
           dynamic "managed_rule_group_configs" {
-            for_each = rule.value.rule.bot_control_inspection_level != null ? [1] : []
+            for_each = rule.value.rule.name == "AWSManagedRulesBotControlRuleSet" && rule.value.rule.bot_control_inspection_level != null ? [1] : []
             content {
               aws_managed_rules_bot_control_rule_set {
                 inspection_level = rule.value.rule.bot_control_inspection_level
