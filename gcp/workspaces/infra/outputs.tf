@@ -36,14 +36,12 @@ output "auditlogs_bucket" {
   sensitive   = true
 }
 
-output "minio" {
-  description = "MinIO server connection info."
+output "storage" {
+  description = "Object storage connection info."
   value = {
     public_bucket       = module.storage.storage.public_bucket
     private_bucket      = module.storage.storage.private_bucket
     managed_sync_bucket = module.storage.storage.managed_sync_bucket
-    microservice_user   = module.storage.storage.minio_microservice_user
-    microservice_pass   = module.storage.storage.minio_microservice_pass
     root_user           = module.storage.storage.project_id
     root_password       = module.storage.storage.private_key
     service_account     = module.storage.storage.service_account

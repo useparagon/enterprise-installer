@@ -5,21 +5,18 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-| Name | Version |
-|------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
+No requirements.
 
 ## Providers
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 5.100.0 |
 
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
+| ---- | ------ | ------- |
 | <a name="module_bastion"></a> [bastion](#module\_bastion) | ./bastion | n/a |
 | <a name="module_cloudtrail"></a> [cloudtrail](#module\_cloudtrail) | ./cloudtrail | n/a |
 | <a name="module_cluster"></a> [cluster](#module\_cluster) | ./cluster | n/a |
@@ -32,13 +29,13 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_app_bucket_expiration"></a> [app\_bucket\_expiration](#input\_app\_bucket\_expiration) | The number of days to retain S3 app data before deleting | `number` | `90` | no |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to enable S3 Object Lock for the audit logs bucket. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
@@ -57,7 +54,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_disable_cloudtrail"></a> [disable\_cloudtrail](#input\_disable\_cloudtrail) | Used to specify that Cloudtrail is disabled. | `bool` | `true` | no |
 | <a name="input_disable_deletion_protection"></a> [disable\_deletion\_protection](#input\_disable\_deletion\_protection) | Used to disable deletion protection on RDS and S3 resources. | `bool` | `false` | no |
 | <a name="input_eks_admin_arns"></a> [eks\_admin\_arns](#input\_eks\_admin\_arns) | Array of ARNs for IAM users or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard. | `list(string)` | `[]` | no |
-| <a name="input_eks_max_node_count"></a> [eks\_max\_node\_count](#input\_eks\_max\_node\_count) | The maximum number of nodes to run in the Kubernetes cluster. | `number` | `30` | no |
+| <a name="input_eks_max_node_count"></a> [eks\_max\_node\_count](#input\_eks\_max\_node\_count) | The maximum number of nodes to run in the Kubernetes cluster. | `number` | `50` | no |
 | <a name="input_eks_min_node_count"></a> [eks\_min\_node\_count](#input\_eks\_min\_node\_count) | The minimum number of nodes to run in the Kubernetes cluster. | `number` | `4` | no |
 | <a name="input_eks_ondemand_node_instance_type"></a> [eks\_ondemand\_node\_instance\_type](#input\_eks\_ondemand\_node\_instance\_type) | The compute instance type to use for Kubernetes nodes. | `string` | `"m6a.xlarge"` | no |
 | <a name="input_eks_spot_instance_percent"></a> [eks\_spot\_instance\_percent](#input\_eks\_spot\_instance\_percent) | The percentage of spot instances to use for Kubernetes nodes. | `number` | `75` | no |
@@ -89,15 +86,15 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_auditlogs_bucket"></a> [auditlogs\_bucket](#output\_auditlogs\_bucket) | The bucket used to store audit logs. |
 | <a name="output_bastion"></a> [bastion](#output\_bastion) | Bastion server connection info. |
 | <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | The name of the EKS cluster. |
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka. |
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | The bucket used to store system logs. |
-| <a name="output_minio"></a> [minio](#output\_minio) | MinIO server connection info. |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
+| <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->
 

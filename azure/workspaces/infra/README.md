@@ -170,6 +170,12 @@ Optional staged migrations for legacy clusters (each step is one-way where noted
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
 | <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | ~> 3.0 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.0 |
+| <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
+| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 2.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
+| <a name="requirement_time"></a> [time](#requirement\_time) | ~> 0.9 |
 
 ## Providers
 
@@ -217,7 +223,7 @@ No resources.
 | <a name="input_k8s_default_node_pool_vm_size"></a> [k8s\_default\_node\_pool\_vm\_size](#input\_k8s\_default\_node\_pool\_vm\_size) | VM size for the AKS default (system) node pool. Must be available in the target region (e.g. Standard\_B2s\_v2 in japaneast). | `string` | `"Standard_B2s"` | no |
 | <a name="input_k8s_dns_service_ip"></a> [k8s\_dns\_service\_ip](#input\_k8s\_dns\_service\_ip) | IP address within k8s\_service\_cidr for the cluster DNS service. Immutable after cluster creation. | `string` | `"172.16.0.10"` | no |
 | <a name="input_k8s_load_balancer_sku"></a> [k8s\_load\_balancer\_sku](#input\_k8s\_load\_balancer\_sku) | SKU for the AKS load balancer. | `string` | `"standard"` | no |
-| <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `20` | no |
+| <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `50` | no |
 | <a name="input_k8s_min_node_count"></a> [k8s\_min\_node\_count](#input\_k8s\_min\_node\_count) | Minimum number of node Kubernetes can scale down to. | `number` | `3` | no |
 | <a name="input_k8s_network_plugin"></a> [k8s\_network\_plugin](#input\_k8s\_network\_plugin) | AKS network plugin. Use `azure` (recommended) or legacy `kubenet`. | `string` | `"azure"` | no |
 | <a name="input_k8s_network_plugin_mode"></a> [k8s\_network\_plugin\_mode](#input\_k8s\_network\_plugin\_mode) | Azure CNI mode. `overlay` assigns pod IPs from k8s\_pod\_cidr (default, IP-efficient). Set to null for legacy node-subnet mode (pod IPs from the VNet). | `string` | `"overlay"` | no |
@@ -264,12 +270,12 @@ No resources.
 | <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | The name of the AKS cluster. |
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka (Event Hubs for Kafka). |
 | <a name="output_logs_container"></a> [logs\_container](#output\_logs\_container) | The bucket used to store system logs. |
-| <a name="output_minio"></a> [minio](#output\_minio) | MinIO server connection info. |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Primary Redis connection info for the paragon workspace. During migration (both modules enabled), returns legacy endpoints until redis\_enabled is set to false. |
 | <a name="output_redis_managed"></a> [redis\_managed](#output\_redis\_managed) | Azure Managed Redis 7.4 endpoints (null when redis\_managed\_enabled is false). Use during migration for kubectl trial routing while output redis still points at legacy. |
 | <a name="output_redis_managed_export_storage"></a> [redis\_managed\_export\_storage](#output\_redis\_managed\_export\_storage) | Blob storage for on-demand Azure Managed Redis RDB export (null when disabled or legacy Redis). |
 | <a name="output_resource_group"></a> [resource\_group](#output\_resource\_group) | Resource Group that infrastructure was deployed to. |
+| <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->
 

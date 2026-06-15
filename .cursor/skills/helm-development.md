@@ -17,7 +17,7 @@ Each application chart declares its subcharts as `file://` dependencies in `Char
 
 ### Subchart-to-Parent-Chart Mapping
 
-- **`paragon-onprem`**: `account`, `api-triggerkit`, `cache-replay`, `cerberus`, `connect`, `dashboard`, `hades`, `health-checker`, `hermes`, `minio`, `passport`, `pheme`, `release`, `zeus`, `worker-actionkit`, `worker-actions`, `worker-auditlogs`, `worker-credentials`, `worker-crons`, `worker-deployments`, `worker-eventlogs`, `worker-proxy`, `worker-triggerkit`, `worker-triggers`, `worker-workflows`, `flipt`
+- **`paragon-onprem`**: `account`, `api-triggerkit`, `cache-replay`, `cerberus`, `connect`, `dashboard`, `hades`, `health-checker`, `hermes`, `passport`, `pheme`, `release`, `zeus`, `worker-actionkit`, `worker-actions`, `worker-auditlogs`, `worker-credentials`, `worker-crons`, `worker-deployments`, `worker-eventlogs`, `worker-proxy`, `worker-triggerkit`, `worker-triggers`, `worker-workflows`, `flipt`
 - **`paragon-monitoring`**: `bull-exporter`, `grafana`, `kafka-exporter`, `kube-state-metrics`, `node-exporter`, `pgadmin`, `postgres-exporter`, `prometheus`, `redis-exporter`, `redis-insight`
 - **`paragon-logging`**: `fluent-bit`, `openobserve`
 
