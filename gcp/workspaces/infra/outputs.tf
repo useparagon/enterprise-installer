@@ -78,15 +78,15 @@ output "cluster_name" {
 
 output "argocd_namespace" {
   description = "Namespace where ArgoCD is installed."
-  value       = module.argocd.argocd_namespace
+  value       = var.argocd_enabled ? module.argocd[0].argocd_namespace : null
 }
 
 output "cluster_secret_store_name" {
   description = "Name of the GCP Secret Manager ClusterSecretStore."
-  value       = module.argocd.cluster_secret_store_name
+  value       = var.argocd_enabled ? module.argocd[0].cluster_secret_store_name : null
 }
 
 output "eso_gsa_email" {
   description = "GSA email for the External Secrets Operator."
-  value       = module.argocd.eso_gsa_email
+  value       = var.argocd_enabled ? module.argocd[0].eso_gsa_email : null
 }

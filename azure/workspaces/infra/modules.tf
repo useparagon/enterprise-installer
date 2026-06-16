@@ -137,21 +137,10 @@ module "kafka" {
 }
 
 module "argocd" {
+  count  = var.argocd_enabled ? 1 : 0
   source = "./argocd"
 
-  providers = {
-    azurerm    = azurerm
-    cloudflare = cloudflare
-    random     = random
-    time       = time
-  }
-
-  argocd_enabled = var.argocd_enabled
-
-  cluster_host                   = module.cluster.kubernetes.host
-  cluster_client_certificate     = module.cluster.kubernetes.client_certificate
-  cluster_client_key             = module.cluster.kubernetes.client_key
-  cluster_cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
+  argocd_enabled = true
 
   # Identity / cluster
   workspace                 = local.workspace
@@ -201,4 +190,9 @@ module "argocd" {
   paragon_monitors_enabled     = var.paragon_monitors_enabled
   managed_sync_enabled         = var.managed_sync_enabled
   ingress_scheme               = var.argocd_ingress_scheme
+
+  depends_on = [
+    azurerm_key_vault_access_policy.terraform,
+    module.cluster,
+  ]
 }

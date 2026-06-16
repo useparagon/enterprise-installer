@@ -57,5 +57,29 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
+# Kubernetes providers at the infra root (same layer as AWS EKS). OpenTofu does not reliably
+# configure alekc/kubectl inside a nested argocd submodule when this workspace is pulled
+# via git (enterprise-deployments stacks).
+provider "kubernetes" {
+  host                   = module.cluster.kubernetes.host
+  token                  = module.cluster.kubernetes.token
+  cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = module.cluster.kubernetes.host
+    token                  = module.cluster.kubernetes.token
+    cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
+  }
+}
+
+provider "kubectl" {
+  host                   = module.cluster.kubernetes.host
+  token                  = module.cluster.kubernetes.token
+  cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
+  load_config_file       = false
+}
+
 provider "random" {}
 provider "time" {}
