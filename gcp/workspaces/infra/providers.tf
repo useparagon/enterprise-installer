@@ -57,29 +57,26 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-# Kubernetes API access for GitOps bootstrap (ArgoCD, ESO, platform manifests).
-# Uses GKE access token from the google provider (Application Default Credentials / SA).
-
+# Kubernetes providers are only consumed when argocd_enabled creates the argocd module.
+# Do not use try(..., "") fallbacks — empty host fails alekc/kubectl provider validation at plan.
 provider "kubernetes" {
-  host                   = try(module.cluster.kubernetes.host, "")
-  token                  = try(module.cluster.kubernetes.token, "")
-  cluster_ca_certificate = try(module.cluster.kubernetes.cluster_ca_certificate, "")
+  host                   = module.cluster.kubernetes.host
+  token                  = module.cluster.kubernetes.token
+  cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
 }
 
 provider "helm" {
   kubernetes {
-    host                   = try(module.cluster.kubernetes.host, "")
-    token                  = try(module.cluster.kubernetes.token, "")
-    cluster_ca_certificate = try(module.cluster.kubernetes.cluster_ca_certificate, "")
+    host                   = module.cluster.kubernetes.host
+    token                  = module.cluster.kubernetes.token
+    cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
   }
 }
 
-# kubectl provider applies custom resources via server-side apply at apply-time and does
-# NOT validate the GroupVersionKind at plan-time.
 provider "kubectl" {
-  host                   = try(module.cluster.kubernetes.host, "")
-  token                  = try(module.cluster.kubernetes.token, "")
-  cluster_ca_certificate = try(module.cluster.kubernetes.cluster_ca_certificate, "")
+  host                   = module.cluster.kubernetes.host
+  token                  = module.cluster.kubernetes.token
+  cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
   load_config_file       = false
 }
 
