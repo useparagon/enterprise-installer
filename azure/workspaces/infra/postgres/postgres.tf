@@ -53,6 +53,15 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
     }
   }
 
+  # Azure Postgres Flexible Server provisioning can be slow and occasionally
+  # completes server-side after the client gives up, leaving an orphaned resource
+  # and broken state. Allow ample time so the apply waits for completion.
+  timeouts {
+    create = "90m"
+    update = "90m"
+    delete = "60m"
+  }
+
   lifecycle {
     ignore_changes = [
       high_availability[0].standby_availability_zone,
