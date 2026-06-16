@@ -328,6 +328,138 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "waf_enabled" {
+  description = "Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf_managed_rule_groups, rate limits, or IP lists in tfvars."
+  type        = bool
+  default     = false
+}
+
+variable "waf_ip_whitelist" {
+  description = "CIDRs to bypass WAF rules (office IPs). Empty list = no whitelist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_ip_blacklist" {
+  description = "CIDRs to always block. Empty list = no blacklist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_rate_limit_global" {
+  description = "Max requests per IP across all endpoints in the evaluation window. null or 0 = no global rate limit rule."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.waf_rate_limit_global == null || var.waf_rate_limit_global == 0 || var.waf_rate_limit_global >= 100
+    error_message = "waf_rate_limit_global must be null, 0 (disabled), or >= 100 (AWS WAF minimum)."
+  }
+}
+
+variable "waf_rate_limit_global_window_sec" {
+  description = "Evaluation window for global rate limit (60, 120, 300, or 600)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_global_window_sec)
+    error_message = "waf_rate_limit_global_window_sec must be 60, 120, 300, or 600."
+  }
+}
+
+variable "waf_rate_limit_paths" {
+  description = "Map of URI path prefix to max requests per IP per window. Paths without a leading / are normalized. Empty = no path rate limit rules."
+  type        = map(number)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for limit in values(var.waf_rate_limit_paths) : limit >= 100])
+    error_message = "waf_rate_limit_paths values must be >= 100 (AWS WAF minimum)."
+  }
+}
+
+variable "waf_rate_limit_path_window_sec" {
+  description = "Evaluation window for path rate limits (60, 120, 300, or 600)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_path_window_sec)
+    error_message = "waf_rate_limit_path_window_sec must be 60, 120, 300, or 600."
+  }
+}
+
+variable "waf_managed_rule_groups" {
+  description = <<-EOT
+    Map of AWS WAF managed rule groups to attach to the Web ACL. Empty by default — you choose which groups to enable.
+
+    Each key is the Web ACL rule name (unique). Each value configures one managed rule group:
+
+    - name (required): e.g. AWSManagedRulesCommonRuleSet, AWSManagedRulesAmazonIpReputationList
+    - vendor_name: default "AWS"
+    - priority: evaluation order (lower first). Auto-assigned after IP/rate rules when omitted.
+    - override_action: "none" (enforce) or "count" (observe only, no block)
+    - excluded_rules: rule names to count (not block); translated to rule_action_overrides internally
+    - rule_action_overrides: per-rule override — "count", "block", or "allow"
+    - bot_control_inspection_level: "COMMON" or "TARGETED" for AWSManagedRulesBotControlRuleSet only
+
+    Reference config (Paragon SaaS): paragon/terraform/workspaces/environment/shared/waf.tf
+  EOT
+  type = map(object({
+    name                         = string
+    vendor_name                  = optional(string, "AWS")
+    priority                     = optional(number)
+    override_action              = optional(string, "none")
+    excluded_rules               = optional(list(string), [])
+    rule_action_overrides        = optional(map(string), {})
+    bot_control_inspection_level = optional(string)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      contains(["none", "count"], coalesce(rule.override_action, "none"))
+    ])
+    error_message = "waf_managed_rule_groups.override_action must be \"none\" or \"count\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      alltrue([
+        for action in values(coalesce(rule.rule_action_overrides, {})) :
+        contains(["count", "block", "allow"], action)
+      ])
+    ])
+    error_message = "waf_managed_rule_groups.rule_action_overrides values must be \"count\", \"block\", or \"allow\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      rule.bot_control_inspection_level == null ? true : contains(["COMMON", "TARGETED"], rule.bot_control_inspection_level)
+    ])
+    error_message = "waf_managed_rule_groups.bot_control_inspection_level must be \"COMMON\" or \"TARGETED\" when set."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      rule.bot_control_inspection_level == null || rule.name == "AWSManagedRulesBotControlRuleSet"
+    ])
+    error_message = "bot_control_inspection_level is only valid when name is AWSManagedRulesBotControlRuleSet."
+  }
+}
+
+variable "waf_logs_retention_days" {
+  description = "Number of days to retain WAF logs in S3 before lifecycle expiration. Only applies when waf_enabled is true."
+  type        = number
+  default     = 30
+}
+
 locals {
   # hash of account ID to help ensure uniqueness of resources like S3 bucket names
   hash        = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)
@@ -345,6 +477,8 @@ locals {
   infra_vars      = jsondecode(fileexists(local.infra_json_path) && var.infra_json == null ? file(local.infra_json_path) : var.infra_json)
 
   workspace = try(local.infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}")
+
+  waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
 
   # use default where standard value can be determined
   cluster_name     = try(local.infra_vars.cluster_name.value, local.workspace)
