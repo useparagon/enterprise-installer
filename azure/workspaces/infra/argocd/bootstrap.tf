@@ -210,6 +210,8 @@ locals {
 
 
 resource "helm_release" "argocd" {
+  count = local.enabled ? 1 : 0
+
   name             = var.argocd_release_name
   repository       = "https://argoproj.github.io/argo-helm"
   chart            = "argo-cd"
@@ -237,9 +239,13 @@ resource "helm_release" "argocd" {
       value = set.value
     }
   }
+
+  depends_on = [time_sleep.eso_crds]
 }
 
 resource "helm_release" "external_secrets" {
+  count = local.enabled ? 1 : 0
+
   name             = "external-secrets"
   repository       = "https://charts.external-secrets.io"
   chart            = "external-secrets"
@@ -253,7 +259,7 @@ resource "helm_release" "external_secrets" {
     installCRDs = true
     serviceAccount = {
       annotations = {
-        "azure.workload.identity/client-id" = azurerm_user_assigned_identity.eso.client_id
+        "azure.workload.identity/client-id" = azurerm_user_assigned_identity.eso[0].client_id
       }
     }
     podLabels = {
@@ -280,7 +286,7 @@ resource "helm_release" "cert_manager" {
     installCRDs = true
   })]
 
-  depends_on = [helm_release.external_secrets]
+  depends_on = [helm_release.external_secrets[0]]
 }
 
 resource "helm_release" "external_dns" {
@@ -311,7 +317,7 @@ resource "helm_release" "external_dns" {
     sources       = ["ingress", "service"]
   })]
 
-  depends_on = [helm_release.external_secrets]
+  depends_on = [helm_release.external_secrets[0]]
 }
 
 resource "helm_release" "alb_controller" {
@@ -334,10 +340,12 @@ resource "helm_release" "alb_controller" {
     }
   })]
 
-  depends_on = [helm_release.external_secrets]
+  depends_on = [helm_release.external_secrets[0]]
 }
 
 resource "kubernetes_secret_v1" "gitops_bridge_cluster" {
+  count = local.enabled ? 1 : 0
+
   metadata {
     name      = "${var.argocd_release_name}-cluster"
     namespace = var.argocd_namespace
@@ -367,7 +375,7 @@ resource "kubernetes_secret_v1" "gitops_bridge_cluster" {
 }
 
 resource "kubernetes_secret_v1" "bootstrap_repo" {
-  count = local.bootstrap_repo_credential_enabled ? 1 : 0
+  count = local.enabled && local.bootstrap_repo_credential_enabled ? 1 : 0
 
   metadata {
     name      = "${var.workspace}-bootstrap-repo"
@@ -390,6 +398,8 @@ resource "kubernetes_secret_v1" "bootstrap_repo" {
 }
 
 resource "kubectl_manifest" "cluster_secret_store" {
+  count = local.enabled ? 1 : 0
+
   yaml_body = yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ClusterSecretStore"
@@ -417,7 +427,7 @@ resource "kubectl_manifest" "cluster_secret_store" {
 }
 
 resource "kubectl_manifest" "app_of_apps" {
-  count = local.app_of_apps_manifest != null ? 1 : 0
+  count = local.enabled && local.app_of_apps_manifest != null ? 1 : 0
 
   yaml_body = local.app_of_apps_manifest
 
@@ -437,7 +447,7 @@ resource "kubectl_manifest" "app_of_apps" {
 }
 
 resource "kubectl_manifest" "destination_namespace" {
-  count = length(local.external_secret_manifests) > 0 ? 1 : 0
+  count = local.enabled && length(local.external_secret_manifests) > 0 ? 1 : 0
 
   yaml_body = yamlencode({
     apiVersion = "v1"
@@ -451,7 +461,7 @@ resource "kubectl_manifest" "destination_namespace" {
 }
 
 resource "kubectl_manifest" "external_secrets" {
-  for_each = local.external_secret_manifests
+  for_each = local.enabled ? local.external_secret_manifests : {}
 
   yaml_body = yamlencode(each.value)
 

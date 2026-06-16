@@ -1,17 +1,4 @@
 # Azure DNS zone for paragon_domain + Cloudflare NS delegation.
-# Created inside the module so DNS infrastructure is fully encapsulated
-# behind the argocd_enabled feature flag.
-
-locals {
-  create_dns_zone = trimspace(var.paragon_domain) != ""
-
-  cloudflare_enabled = (
-    local.create_dns_zone &&
-    trimspace(var.cloudflare_api_token) != "" &&
-    trimspace(var.cloudflare_zone_id) != "" &&
-    var.cloudflare_api_token != "dummy-cloudflare-tokens-must-be-40-chars"
-  )
-}
 
 resource "azurerm_dns_zone" "paragon" {
   count = local.create_dns_zone ? 1 : 0

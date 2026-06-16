@@ -59,31 +59,5 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token == "dummy-cloudflare-tokens-must-be-40-chars" ? null : var.cloudflare_api_token
 }
 
-# Kubernetes providers are only consumed when argocd_enabled creates the argocd module.
-# Do not use try(..., "") fallbacks — empty host fails alekc/kubectl provider validation at plan.
-provider "kubernetes" {
-  host = module.cluster.kubernetes.host
-
-  client_certificate     = base64decode(module.cluster.kubernetes.client_certificate)
-  client_key             = base64decode(module.cluster.kubernetes.client_key)
-  cluster_ca_certificate = base64decode(module.cluster.kubernetes.cluster_ca_certificate)
-}
-
-provider "helm" {
-  kubernetes {
-    host = module.cluster.kubernetes.host
-
-    client_certificate     = base64decode(module.cluster.kubernetes.client_certificate)
-    client_key             = base64decode(module.cluster.kubernetes.client_key)
-    cluster_ca_certificate = base64decode(module.cluster.kubernetes.cluster_ca_certificate)
-  }
-}
-
-provider "kubectl" {
-  host = module.cluster.kubernetes.host
-
-  client_certificate     = base64decode(module.cluster.kubernetes.client_certificate)
-  client_key             = base64decode(module.cluster.kubernetes.client_key)
-  cluster_ca_certificate = base64decode(module.cluster.kubernetes.cluster_ca_certificate)
-  load_config_file       = false
-}
+provider "random" {}
+provider "time" {}

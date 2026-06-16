@@ -1,3 +1,33 @@
+variable "argocd_enabled" {
+  description = "When false, no ArgoCD/GitOps resources are created in this module."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "cluster_host" {
+  description = "AKS API server host."
+  type        = string
+}
+
+variable "cluster_client_certificate" {
+  description = "Base64-encoded client certificate for AKS admin access."
+  type        = string
+  sensitive   = true
+}
+
+variable "cluster_client_key" {
+  description = "Base64-encoded client key for AKS admin access."
+  type        = string
+  sensitive   = true
+}
+
+variable "cluster_cluster_ca_certificate" {
+  description = "Base64-encoded cluster CA certificate."
+  type        = string
+  sensitive   = true
+}
+
 variable "workspace" {
   description = "Workspace name used for resource naming."
   type        = string

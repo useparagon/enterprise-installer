@@ -1,35 +1,30 @@
 # Key Vault secrets for GitOps + OpenObserve credentials + CRD readiness wait.
-# All secrets are created inside the module so the argocd_enabled feature flag
-# at the module call site is the single gate for all cloud-side ArgoCD resources.
 
 locals {
-  secrets_ready = (
-    trimspace(var.paragon_domain) != "" &&
-    var.docker_username != null && var.docker_username != "" &&
-    var.docker_password != null && var.docker_password != ""
-  )
-
-  openobserve_credentials = {
-    email    = "${random_string.openobserve_email.result}@useparagon.com"
-    password = random_password.openobserve_password.result
-  }
+  openobserve_credentials = local.secrets_ready ? {
+    email    = "${random_string.openobserve_email[0].result}@useparagon.com"
+    password = random_password.openobserve_password[0].result
+  } : null
 }
 
 resource "random_string" "openobserve_email" {
+  count = local.secrets_ready ? 1 : 0
+
   length  = 8
   special = false
   upper   = false
 }
 
 resource "random_password" "openobserve_password" {
+  count = local.secrets_ready ? 1 : 0
+
   length  = 32
   special = true
 }
 
-# Wait for the cluster API to be fully stable before Helm installs attempt
-# to apply CRD-backed resources. Triggered by cluster_name so a cluster
-# replacement causes the wait to re-run.
 resource "time_sleep" "eso_crds" {
+  count = local.enabled ? 1 : 0
+
   create_duration = "120s"
 
   triggers = {

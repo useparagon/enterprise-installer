@@ -112,8 +112,20 @@ module "bastion" {
 }
 
 module "argocd" {
-  count  = var.argocd_enabled ? 1 : 0
   source = "./argocd"
+
+  providers = {
+    google     = google
+    cloudflare = cloudflare
+    random     = random
+    time       = time
+  }
+
+  argocd_enabled = var.argocd_enabled
+
+  cluster_host                   = module.cluster.kubernetes.host
+  cluster_token                  = module.cluster.kubernetes.token
+  cluster_cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
 
   # Identity / cluster
   workspace      = local.workspace
@@ -161,6 +173,4 @@ module "argocd" {
   paragon_monitors_enabled     = var.paragon_monitors_enabled
   managed_sync_enabled         = var.managed_sync_enabled
   ingress_scheme               = var.argocd_ingress_scheme
-
-  depends_on = [module.cluster]
 }

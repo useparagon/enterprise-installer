@@ -1,3 +1,27 @@
+variable "argocd_enabled" {
+  description = "When false, no ArgoCD/GitOps resources are created in this module."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "cluster_host" {
+  description = "GKE API server host."
+  type        = string
+}
+
+variable "cluster_token" {
+  description = "Bearer token for GKE API access."
+  type        = string
+  sensitive   = true
+}
+
+variable "cluster_cluster_ca_certificate" {
+  description = "Cluster CA certificate for GKE API access (decoded PEM)."
+  type        = string
+  sensitive   = true
+}
+
 variable "workspace" {
   description = "Workspace name used for resource naming."
   type        = string
