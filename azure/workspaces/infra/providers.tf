@@ -62,30 +62,44 @@ provider "cloudflare" {
 # Kubernetes providers at the infra root (same layer as AWS EKS). OpenTofu does not reliably
 # configure alekc/kubectl inside a nested argocd submodule when this workspace is pulled
 # via git (enterprise-deployments stacks). Auth uses AKS admin kubeconfig, not IAM tokens.
-provider "kubernetes" {
-  host = module.cluster.kubernetes.host
+#
+# These providers are only consumed by the count-gated `argocd` module. On a fresh plan the
+# AKS cluster does not exist yet, so its kube_config outputs are unknown. The hashicorp
+# kubernetes/helm providers tolerate an unknown host, but alekc/kubectl errors at configure
+# time ("no configuration has been provided"). So when ArgoCD is disabled we feed all three a
+# static placeholder (they stay unused); when it is enabled the cluster already exists from a
+# prior apply, so the real, known kube_config values are used.
+locals {
+  k8s_host = var.argocd_enabled ? module.cluster.kubernetes.host : "https://localhost"
+  k8s_cert = var.argocd_enabled ? base64decode(module.cluster.kubernetes.client_certificate) : ""
+  k8s_key  = var.argocd_enabled ? base64decode(module.cluster.kubernetes.client_key) : ""
+  k8s_ca   = var.argocd_enabled ? base64decode(module.cluster.kubernetes.cluster_ca_certificate) : ""
+}
 
-  client_certificate     = base64decode(module.cluster.kubernetes.client_certificate)
-  client_key             = base64decode(module.cluster.kubernetes.client_key)
-  cluster_ca_certificate = base64decode(module.cluster.kubernetes.cluster_ca_certificate)
+provider "kubernetes" {
+  host = local.k8s_host
+
+  client_certificate     = local.k8s_cert
+  client_key             = local.k8s_key
+  cluster_ca_certificate = local.k8s_ca
 }
 
 provider "helm" {
   kubernetes {
-    host = module.cluster.kubernetes.host
+    host = local.k8s_host
 
-    client_certificate     = base64decode(module.cluster.kubernetes.client_certificate)
-    client_key             = base64decode(module.cluster.kubernetes.client_key)
-    cluster_ca_certificate = base64decode(module.cluster.kubernetes.cluster_ca_certificate)
+    client_certificate     = local.k8s_cert
+    client_key             = local.k8s_key
+    cluster_ca_certificate = local.k8s_ca
   }
 }
 
 provider "kubectl" {
-  host = module.cluster.kubernetes.host
+  host = local.k8s_host
 
-  client_certificate     = base64decode(module.cluster.kubernetes.client_certificate)
-  client_key             = base64decode(module.cluster.kubernetes.client_key)
-  cluster_ca_certificate = base64decode(module.cluster.kubernetes.cluster_ca_certificate)
+  client_certificate     = local.k8s_cert
+  client_key             = local.k8s_key
+  cluster_ca_certificate = local.k8s_ca
   load_config_file       = false
 }
 
