@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.7.0"
+  required_version = ">= 1.9.0"
 
   required_providers {
     google = {
@@ -36,3 +36,51 @@ terraform {
     }
   }
 }
+
+provider "google" {
+  credentials    = var.gcp_assume_role ? null : local.gcp_creds
+  default_labels = local.default_labels
+  project        = local.gcp_project_id
+  region         = var.region
+  zone           = var.region_zone
+}
+
+provider "google-beta" {
+  credentials    = var.gcp_assume_role ? null : local.gcp_creds
+  default_labels = local.default_labels
+  project        = local.gcp_project_id
+  region         = var.region
+  zone           = var.region_zone
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
+# Kubernetes API access for GitOps bootstrap (ArgoCD, ESO, platform manifests).
+# Uses GKE access token from the google provider (Application Default Credentials / SA).
+
+provider "kubernetes" {
+  host                   = try(module.cluster.kubernetes.host, "")
+  token                  = try(module.cluster.kubernetes.token, "")
+  cluster_ca_certificate = try(module.cluster.kubernetes.cluster_ca_certificate, "")
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = try(module.cluster.kubernetes.host, "")
+    token                  = try(module.cluster.kubernetes.token, "")
+    cluster_ca_certificate = try(module.cluster.kubernetes.cluster_ca_certificate, "")
+  }
+}
+
+# kubectl provider applies custom resources via server-side apply at apply-time and does
+# NOT validate the GroupVersionKind at plan-time.
+provider "kubectl" {
+  host                   = try(module.cluster.kubernetes.host, "")
+  token                  = try(module.cluster.kubernetes.token, "")
+  cluster_ca_certificate = try(module.cluster.kubernetes.cluster_ca_certificate, "")
+  load_config_file       = false
+}
+
+provider "time" {}

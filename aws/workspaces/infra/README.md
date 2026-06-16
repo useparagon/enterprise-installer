@@ -7,7 +7,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 
 | Name | Version |
 | ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
@@ -111,7 +111,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_disable_cloudtrail"></a> [disable\_cloudtrail](#input\_disable\_cloudtrail) | Used to specify that Cloudtrail is disabled. | `bool` | `true` | no |
 | <a name="input_disable_deletion_protection"></a> [disable\_deletion\_protection](#input\_disable\_deletion\_protection) | Used to disable deletion protection on RDS and S3 resources. | `bool` | `false` | no |
 | <a name="input_eks_admin_arns"></a> [eks\_admin\_arns](#input\_eks\_admin\_arns) | Array of ARNs for IAM users or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard. | `list(string)` | `[]` | no |
-| <a name="input_eks_max_node_count"></a> [eks\_max\_node\_count](#input\_eks\_max\_node\_count) | The maximum number of nodes to run in the Kubernetes cluster. | `number` | `40` | no |
+| <a name="input_eks_max_node_count"></a> [eks\_max\_node\_count](#input\_eks\_max\_node\_count) | The maximum number of nodes to run in the Kubernetes cluster. | `number` | `50` | no |
 | <a name="input_eks_min_node_count"></a> [eks\_min\_node\_count](#input\_eks\_min\_node\_count) | The minimum number of nodes to run in the Kubernetes cluster. | `number` | `2` | no |
 | <a name="input_eks_ondemand_node_instance_type"></a> [eks\_ondemand\_node\_instance\_type](#input\_eks\_ondemand\_node\_instance\_type) | The compute instance type to use for Kubernetes nodes. | `string` | `"m6a.xlarge"` | no |
 | <a name="input_eks_spot_instance_percent"></a> [eks\_spot\_instance\_percent](#input\_eks\_spot\_instance\_percent) | The percentage of spot instances to use for Kubernetes nodes. | `number` | `75` | no |

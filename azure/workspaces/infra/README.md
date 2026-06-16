@@ -169,21 +169,22 @@ Optional staged migrations for legacy clusters (each step is one-way where noted
 
 | Name | Version |
 | ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | ~> 3.0 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.0 |
-| <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.0 |
+| <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
 | <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 2.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 | <a name="requirement_time"></a> [time](#requirement\_time) | ~> 0.9 |
+| <a name="requirement_tls"></a> [tls](#requirement\_tls) | ~> 4.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.76.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.77.0 |
 | <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
 
 ## Modules
@@ -260,7 +261,7 @@ Optional staged migrations for legacy clusters (each step is one-way where noted
 | <a name="input_k8s_default_node_pool_vm_size"></a> [k8s\_default\_node\_pool\_vm\_size](#input\_k8s\_default\_node\_pool\_vm\_size) | VM size for the AKS default (system) node pool. Must be available in the target region (e.g. Standard\_B2s\_v2 in japaneast). | `string` | `"Standard_B2s"` | no |
 | <a name="input_k8s_dns_service_ip"></a> [k8s\_dns\_service\_ip](#input\_k8s\_dns\_service\_ip) | IP address within k8s\_service\_cidr for the cluster DNS service. Immutable after cluster creation. | `string` | `"172.16.0.10"` | no |
 | <a name="input_k8s_load_balancer_sku"></a> [k8s\_load\_balancer\_sku](#input\_k8s\_load\_balancer\_sku) | SKU for the AKS load balancer. | `string` | `"standard"` | no |
-| <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `20` | no |
+| <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `50` | no |
 | <a name="input_k8s_min_node_count"></a> [k8s\_min\_node\_count](#input\_k8s\_min\_node\_count) | Minimum number of node Kubernetes can scale down to. | `number` | `3` | no |
 | <a name="input_k8s_network_plugin"></a> [k8s\_network\_plugin](#input\_k8s\_network\_plugin) | AKS network plugin. Use `azure` (recommended) or legacy `kubenet`. | `string` | `"azure"` | no |
 | <a name="input_k8s_network_plugin_mode"></a> [k8s\_network\_plugin\_mode](#input\_k8s\_network\_plugin\_mode) | Azure CNI mode. `overlay` assigns pod IPs from k8s\_pod\_cidr (default, IP-efficient). Set to null for legacy node-subnet mode (pod IPs from the VNet). | `string` | `"overlay"` | no |

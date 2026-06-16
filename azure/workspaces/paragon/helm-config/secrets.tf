@@ -140,11 +140,11 @@ locals {
 
     # Redis from infra when present (managed-sync, then cache). Do not override from
     # base_helm_values when infra provides credentials.
-    MANAGED_SYNC_REDIS_URL              = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
-    MANAGED_SYNC_REDIS_PASSWORD         = local.redis_config.password != null ? local.redis_config.password : ""
-    MANAGED_SYNC_REDIS_CLUSTER_ENABLED  = local.redis_config.cluster_enabled
-    MANAGED_SYNC_REDIS_TLS_ENABLED      = tostring(local.redis_config.redis_tls_enabled)
-    MANAGED_SYNC_REDIS_CA_CERT          = local.redis_config.redis_ca_certificate != null ? local.redis_config.redis_ca_certificate : ""
+    MANAGED_SYNC_REDIS_URL             = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
+    MANAGED_SYNC_REDIS_PASSWORD        = local.redis_config.password != null ? local.redis_config.password : ""
+    MANAGED_SYNC_REDIS_CLUSTER_ENABLED = local.redis_config.cluster_enabled
+    MANAGED_SYNC_REDIS_TLS_ENABLED     = tostring(local.redis_config.redis_tls_enabled)
+    MANAGED_SYNC_REDIS_CA_CERT         = local.redis_config.redis_ca_certificate != null ? local.redis_config.redis_ca_certificate : ""
 
     SYNC_INSTANCE_POSTGRES_HOST        = local.postgres_config.sync_instance.host
     SYNC_INSTANCE_POSTGRES_PORT        = local.postgres_config.sync_instance.port

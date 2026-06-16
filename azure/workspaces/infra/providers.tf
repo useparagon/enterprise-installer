@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.7.0"
+  required_version = ">= 1.9.0"
 
   required_providers {
     azurerm = {
@@ -53,4 +53,35 @@ provider "azuread" {
   client_id     = var.azure_client_id
   client_secret = var.azure_client_secret
   tenant_id     = var.azure_tenant_id
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token == "dummy-cloudflare-tokens-must-be-40-chars" ? null : var.cloudflare_api_token
+}
+
+provider "kubernetes" {
+  host = try(module.cluster.kubernetes.host, "")
+
+  client_certificate     = try(base64decode(module.cluster.kubernetes.client_certificate), "")
+  client_key             = try(base64decode(module.cluster.kubernetes.client_key), "")
+  cluster_ca_certificate = try(base64decode(module.cluster.kubernetes.cluster_ca_certificate), "")
+}
+
+provider "helm" {
+  kubernetes {
+    host = try(module.cluster.kubernetes.host, "")
+
+    client_certificate     = try(base64decode(module.cluster.kubernetes.client_certificate), "")
+    client_key             = try(base64decode(module.cluster.kubernetes.client_key), "")
+    cluster_ca_certificate = try(base64decode(module.cluster.kubernetes.cluster_ca_certificate), "")
+  }
+}
+
+provider "kubectl" {
+  host = try(module.cluster.kubernetes.host, "")
+
+  client_certificate     = try(base64decode(module.cluster.kubernetes.client_certificate), "")
+  client_key             = try(base64decode(module.cluster.kubernetes.client_key), "")
+  cluster_ca_certificate = try(base64decode(module.cluster.kubernetes.cluster_ca_certificate), "")
+  load_config_file       = false
 }
