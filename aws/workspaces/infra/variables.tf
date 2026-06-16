@@ -268,9 +268,7 @@ variable "managed_sync_enabled" {
 variable "msk_kafka_version" {
   description = "The Kafka version for the MSK cluster."
   type        = string
-  // NOTE: to use a small instance type like `kafka.t3.small`, we need to use an older version that uses zookeeper
-  // we're default to an older version to keep costs low, but we can override this if we use a supported larger instance type
-  default = "3.6.0"
+  default = "3.9.x"
 }
 
 variable "msk_kafka_num_broker_nodes" {
