@@ -57,29 +57,34 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-# Kubernetes providers at the infra root (same layer as AWS EKS). OpenTofu does not reliably
-# configure alekc/kubectl inside a nested argocd submodule when this workspace is pulled
-# via git (enterprise-deployments stacks).
+# Kubernetes providers at the infra root. Only consumed by the count-gated argocd
+# module; on a fresh plan the GKE cluster does not exist yet so its outputs are
+# unknown. alekc/kubectl errors at configure time on an unknown host, so feed all
+# three a static placeholder when ArgoCD is disabled (they stay unused); use the
+# real cluster values when enabled (the cluster exists from a prior apply).
+locals {
+  k8s_host  = var.argocd_enabled ? module.cluster.kubernetes.host : "https://localhost"
+  k8s_token = var.argocd_enabled ? module.cluster.kubernetes.token : ""
+  k8s_ca    = var.argocd_enabled ? module.cluster.kubernetes.cluster_ca_certificate : ""
+}
+
 provider "kubernetes" {
-  host                   = module.cluster.kubernetes.host
-  token                  = module.cluster.kubernetes.token
-  cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
+  host                   = local.k8s_host
+  token                  = local.k8s_token
+  cluster_ca_certificate = local.k8s_ca
 }
 
 provider "helm" {
   kubernetes {
-    host                   = module.cluster.kubernetes.host
-    token                  = module.cluster.kubernetes.token
-    cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
+    host                   = local.k8s_host
+    token                  = local.k8s_token
+    cluster_ca_certificate = local.k8s_ca
   }
 }
 
 provider "kubectl" {
-  host                   = module.cluster.kubernetes.host
-  token                  = module.cluster.kubernetes.token
-  cluster_ca_certificate = module.cluster.kubernetes.cluster_ca_certificate
+  host                   = local.k8s_host
+  token                  = local.k8s_token
+  cluster_ca_certificate = local.k8s_ca
   load_config_file       = false
 }
-
-provider "random" {}
-provider "time" {}
