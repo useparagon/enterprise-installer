@@ -325,8 +325,8 @@ resource "helm_release" "alb_controller" {
 
   name             = "azure-alb-controller"
   repository       = "oci://mcr.microsoft.com/application-lb/charts"
-  chart            = "azure-alb-controller"
-  version          = "1.4.0"
+  chart            = "alb-controller"
+  version          = "1.11.1"
   namespace        = "azure-alb-system"
   create_namespace = true
   wait             = true
