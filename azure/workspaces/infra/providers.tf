@@ -102,6 +102,3 @@ provider "kubectl" {
   cluster_ca_certificate = local.k8s_ca
   load_config_file       = false
 }
-
-provider "random" {}
-provider "time" {}
