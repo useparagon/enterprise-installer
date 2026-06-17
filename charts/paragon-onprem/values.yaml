@@ -52,6 +52,9 @@ subchart:
   worker-workflows:
     enabled: true
 
+# Karpenter: optional node selectors / tolerations for workloads when mixing Karpenter nodes with
+# managed node groups belong in environment-specific Helm value overlays (not in this base chart).
+
 restart:
   enabled: true
   schedule: 0 14 * * * # everyday at 9am EST

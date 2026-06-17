@@ -137,6 +137,36 @@ variable "managed_sync_version" {
   type        = string
 }
 
+variable "enable_karpenter" {
+  description = "When true, installs Karpenter controller and baseline NodePool/EC2NodeClass."
+  type        = bool
+  default     = false
+}
+
+variable "karpenter_controller_role_arn" {
+  description = "IRSA role ARN for the Karpenter controller."
+  type        = string
+  default     = ""
+}
+
+variable "karpenter_node_iam_role_name" {
+  description = "IAM role name for nodes launched by Karpenter (EC2NodeClass spec.role)."
+  type        = string
+  default     = ""
+}
+
+variable "karpenter_interruption_queue_name" {
+  description = "SQS queue name for Karpenter interruption handling (optional)."
+  type        = string
+  default     = null
+}
+
+variable "karpenter_chart_version" {
+  description = "Karpenter Helm chart version."
+  type        = string
+  default     = "1.8.1"
+}
+
 locals {
   chart_names     = var.monitors_enabled ? ["paragon-logging", "paragon-monitoring", "paragon-onprem"] : ["paragon-logging", "paragon-onprem"]
   chart_directory = "../charts"

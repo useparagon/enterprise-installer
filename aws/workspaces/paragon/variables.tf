@@ -328,6 +328,36 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "enable_karpenter" {
+  description = "When true, installs the Karpenter controller Helm chart and baseline EC2NodeClass/NodePool in the karpenter namespace. Requires IAM values from the infra workspace (terraform output karpenter) — see docs/aws-karpenter-poc.md."
+  type        = bool
+  default     = false
+}
+
+variable "karpenter_controller_role_arn" {
+  description = "IRSA role ARN for the Karpenter controller service account (from infra output karpenter.controller_role_arn)."
+  type        = string
+  default     = ""
+}
+
+variable "karpenter_node_iam_role_name" {
+  description = "IAM role name (not ARN) for EC2 instances launched by Karpenter (from infra output karpenter.node_iam_role_name)."
+  type        = string
+  default     = ""
+}
+
+variable "karpenter_interruption_queue_name" {
+  description = "SQS queue name for spot interruption handling (from infra output karpenter.interruption_queue_name). Leave null/empty if the infra queue was not created."
+  type        = string
+  default     = null
+}
+
+variable "karpenter_chart_version" {
+  description = "Karpenter Helm chart version (OCI public.ecr.aws/karpenter/karpenter)."
+  type        = string
+  default     = "1.8.1"
+}
+
 locals {
   # hash of account ID to help ensure uniqueness of resources like S3 bucket names
   hash        = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)

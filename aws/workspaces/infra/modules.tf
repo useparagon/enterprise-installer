@@ -121,6 +121,27 @@ module "cluster" {
   eks_spot_node_instance_type     = local.eks_spot_node_instance_type
   k8s_version                     = var.k8s_version
 
+  enable_karpenter = var.enable_karpenter
+
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
+}
+
+module "karpenter" {
+  count   = var.enable_karpenter ? 1 : 0
+  source  = "terraform-aws-modules/eks/aws//modules/karpenter"
+  version = "20.26.0"
+
+  cluster_name = module.cluster.eks_cluster.name
+
+  enable_irsa                     = true
+  enable_pod_identity             = false
+  irsa_oidc_provider_arn          = module.cluster.eks_cluster.oidc_provider_arn
+  enable_v1_permissions           = true
+  enable_spot_termination         = var.karpenter_enable_spot_interruption_queue
+  create_pod_identity_association = false
+
+  tags = local.default_tags
+
+  depends_on = [module.cluster]
 }

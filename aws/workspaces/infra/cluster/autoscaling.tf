@@ -21,6 +21,8 @@ resource "aws_autoscaling_group_tag" "cluster_autoscaler_label_tags" {
 }
 
 module "cluster_autoscaler" {
+  count = var.enable_karpenter ? 0 : 1
+
   source  = "lablabs/eks-cluster-autoscaler/aws"
   version = "2.2.0"
 

@@ -70,6 +70,12 @@ variable "create_autoscaling_linked_role" {
   type        = bool
 }
 
+variable "enable_karpenter" {
+  description = "When true, disables the lablabs cluster-autoscaler submodule (Karpenter replaces CA once installed from the paragon workspace)."
+  type        = bool
+  default     = false
+}
+
 data "aws_caller_identity" "current" {}
 
 locals {

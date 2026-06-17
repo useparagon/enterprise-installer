@@ -291,6 +291,19 @@ variable "msk_instance_type" {
   default     = "kafka.t3.small"
 }
 
+# Karpenter (AWS EKS node autoscaling / provisioning). Default off; see docs/aws-karpenter-poc.md.
+variable "enable_karpenter" {
+  description = "When true, provisions the terraform-aws-modules/eks karpenter submodule (controller IRSA, node role, interruption queue), tags subnets/SGs for discovery, and disables the in-cluster Cluster Autoscaler IAM/Helm wiring in favor of Karpenter installed from the paragon workspace."
+  type        = bool
+  default     = false
+}
+
+variable "karpenter_enable_spot_interruption_queue" {
+  description = "When enable_karpenter is true, create the SQS queue and EventBridge rules for native spot interruption handling (recommended; required by the upstream karpenter submodule access_entry depends_on chain)."
+  type        = bool
+  default     = true
+}
+
 locals {
   # hash of account ID to help ensure uniqueness of resources like S3 bucket names
   hash        = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)

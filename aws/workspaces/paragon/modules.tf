@@ -40,6 +40,12 @@ module "helm" {
   public_microservices   = local.public_microservices
   public_monitors        = local.public_monitors
   workspace              = local.workspace
+
+  enable_karpenter                  = var.enable_karpenter
+  karpenter_controller_role_arn     = var.karpenter_controller_role_arn
+  karpenter_node_iam_role_name      = var.karpenter_node_iam_role_name
+  karpenter_interruption_queue_name = var.karpenter_interruption_queue_name
+  karpenter_chart_version           = var.karpenter_chart_version
 }
 
 module "managed_sync_config" {

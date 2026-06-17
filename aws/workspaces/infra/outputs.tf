@@ -66,3 +66,14 @@ output "cluster_name" {
   description = "The name of the EKS cluster."
   value       = module.cluster.eks_cluster.name
 }
+
+output "karpenter" {
+  description = "IAM and queue outputs for wiring the paragon workspace when enable_karpenter is true. Copy into paragon tfvars (see docs/aws-karpenter-poc.md)."
+  value = var.enable_karpenter ? {
+    controller_role_arn     = module.karpenter[0].iam_role_arn
+    interruption_queue_name = module.karpenter[0].queue_name
+    node_iam_role_name      = module.karpenter[0].node_iam_role_name
+    node_iam_role_arn       = module.karpenter[0].node_iam_role_arn
+    interruption_queue_url  = module.karpenter[0].queue_url
+  } : null
+}
