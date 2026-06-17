@@ -353,7 +353,9 @@ variable "waf_rate_limit_global" {
   nullable    = true
 
   validation {
-    condition     = var.waf_rate_limit_global == null || var.waf_rate_limit_global == 0 || var.waf_rate_limit_global >= 100
+    condition = var.waf_rate_limit_global == null ? true : (
+      var.waf_rate_limit_global == 0 || var.waf_rate_limit_global >= 100
+    )
     error_message = "waf_rate_limit_global must be null, 0 (disabled), or >= 100 (AWS WAF minimum)."
   }
 }
