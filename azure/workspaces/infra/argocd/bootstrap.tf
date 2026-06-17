@@ -461,7 +461,12 @@ resource "kubectl_manifest" "destination_namespace" {
 }
 
 resource "kubectl_manifest" "external_secrets" {
-  for_each = local.enabled ? local.external_secret_manifests : {}
+  # local.enabled is always true here (module is count-gated on argocd_enabled),
+  # so iterate the manifests directly — matching the AWS module. The previous
+  # `local.enabled ? ... : {}` ternary broke plan: its branches had inconsistent
+  # types (object-with-attrs vs empty object), which also made for_each keys
+  # undeterminable at plan time.
+  for_each = local.external_secret_manifests
 
   yaml_body = yamlencode(each.value)
 
