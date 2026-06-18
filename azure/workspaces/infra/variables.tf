@@ -112,12 +112,6 @@ variable "cloudflare_tunnel_email_domain" {
 }
 
 # postgres
-variable "postgres_redundant" {
-  description = "When true, enables zone-redundant HA on hermes (or paragon when postgres_multiple_instances is false) via postgres_instances override. All instances default to no HA."
-  type        = bool
-  default     = false
-}
-
 variable "postgres_sku_name" {
   description = "PostgreSQL SKU name (e.g. `B_Standard_B2s` or `GP_Standard_D2ds_v5`)"
   type        = string
@@ -144,12 +138,12 @@ variable "postgres_multiple_instances" {
 
 variable "postgres_instances" {
   description = <<-EOT
-    Overrides for PostgreSQL flexible server instances. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon).
-    Merged per key with postgres_instances_default (sku, redundant). Null uses defaults only.
+    Per-instance PostgreSQL overrides. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon).
+    Both sku and redundant must be set on each entry you include. Omitted keys use built-in defaults (no HA). Null uses defaults for all instances.
   EOT
   type = map(object({
-    sku       = optional(string)
-    redundant = optional(bool)
+    sku       = string
+    redundant = bool
   }))
   default  = null
   nullable = true
@@ -483,65 +477,25 @@ locals {
   # for `ip_whitelist`, if an ip doesn't contain a range at the end (e.g. `<IP_ADDRESS>/32`), then add `/32` to the end. `1.1.1.1` becomes `1.1.1.1/32`; `2.2.2.2/24` remains unchanged
   ssh_whitelist = distinct([for value in split(",", var.ssh_whitelist) : "${trimspace(value)}${replace(value, "/", "") != value ? "" : "/32"}" if trimspace(value) != ""])
 
-  postgres_instance_defaults = {
-    sku       = var.postgres_base_sku_name
-    redundant = false
+  postgres_instances_defaults = {
+    cerberus     = { sku = var.postgres_base_sku_name, redundant = false }
+    eventlogs    = { sku = var.postgres_base_sku_name, redundant = false }
+    hermes       = { sku = var.postgres_sku_name, redundant = false }
+    triggerkit   = { sku = var.postgres_base_sku_name, redundant = false }
+    zeus         = { sku = var.postgres_base_sku_name, redundant = false }
+    managed_sync = { sku = var.postgres_base_sku_name, redundant = false }
+    paragon      = { sku = var.postgres_sku_name, redundant = false }
   }
-
-  postgres_instances_default = {
-    cerberus = {
-      sku       = var.postgres_base_sku_name
-      redundant = false
-    }
-    eventlogs = {
-      sku       = var.postgres_base_sku_name
-      redundant = false
-    }
-    hermes = {
-      sku       = var.postgres_sku_name
-      redundant = false
-    }
-    triggerkit = {
-      sku       = var.postgres_base_sku_name
-      redundant = false
-    }
-    zeus = {
-      sku       = var.postgres_base_sku_name
-      redundant = false
-    }
-    managed_sync = {
-      sku       = var.postgres_base_sku_name
-      redundant = false
-    }
-    paragon = {
-      sku       = var.postgres_sku_name
-      redundant = false
-    }
-  }
-
-  postgres_redundant_overrides = var.postgres_redundant ? (
-    var.postgres_multiple_instances ? { hermes = { redundant = true } } : { paragon = { redundant = true } }
-  ) : {}
-
-  postgres_instances_overrides = merge(
-    local.postgres_redundant_overrides,
-    var.postgres_instances != null ? var.postgres_instances : {},
-  )
 
   postgres_instances_config = merge(
-    local.postgres_instances_default,
-    {
-      for name, override in local.postgres_instances_overrides : name => merge(
-        lookup(local.postgres_instances_default, name, local.postgres_instance_defaults),
-        { for key, value in override : key => value if value != null },
-      )
-    },
+    local.postgres_instances_defaults,
+    var.postgres_instances != null ? var.postgres_instances : {},
   )
 
   postgres_instances = var.postgres_multiple_instances ? {
     for name, cfg in local.postgres_instances_config : name => cfg
     if name != "paragon" && (var.managed_sync_enabled || name != "managed_sync")
-  } : {
+    } : {
     paragon = local.postgres_instances_config["paragon"]
   }
 

@@ -129,49 +129,6 @@ Confirm SKU availability in the target region before apply.
 
 Requires `azurerm` provider `>= 4.60` in `main.tf` (see `main.tf.example`).
 
-## PostgreSQL per-instance tuning
-
-One map drives every PostgreSQL flexible server (`for_each` in `./postgres`). Globals set defaults; per-instance overrides merge on top (same pattern as `redis_managed_instances`).
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `postgres_sku_name` | `GP_Standard_D2ds_v5` | SKU for primary instances (`hermes`, `paragon`) |
-| `postgres_base_sku_name` | `B_Standard_B2s` | SKU for secondary instances |
-| `postgres_redundant` | `false` | Shorthand: sets `hermes.redundant = true` (or `paragon` when single-instance) |
-| `postgres_instances` | `null` | Per-key overrides (`sku`, `redundant`) |
-
-`postgres_multiple_instances` and `managed_sync_enabled` still filter which keys deploy (same as before). With `postgres_multiple_instances = true`, only `cerberus`, `eventlogs`, `hermes`, `triggerkit`, `zeus` (and `managed_sync` when enabled) deploy — `paragon` deploys only when `postgres_multiple_instances = false`.
-
-Built-in default map (used when `postgres_instances` is null):
-
-```hcl
-cerberus     = { sku = postgres_base_sku_name, redundant = false }
-eventlogs    = { sku = postgres_base_sku_name, redundant = false }
-hermes       = { sku = postgres_sku_name,      redundant = false }
-triggerkit   = { sku = postgres_base_sku_name, redundant = false }
-zeus         = { sku = postgres_base_sku_name, redundant = false }
-managed_sync = { sku = postgres_base_sku_name, redundant = false }
-paragon      = { sku = postgres_sku_name,      redundant = false }
-```
-
-All instances default to **no HA**. Enable zone-redundant HA on `hermes` explicitly (requires GP/MO SKU, not Burstable):
-
-```hcl
-postgres_instances = {
-  hermes = { redundant = true }
-}
-```
-
-Or use the legacy shorthand `postgres_redundant = true` (equivalent to the hermes override above).
-
-Per-instance override example (HA on a secondary instance):
-
-```hcl
-postgres_instances = {
-  cerberus = { redundant = true, sku = "GP_Standard_D2ads_v5" }
-}
-```
-
 ## AKS network profile
 
 The `k8s_*` network variables configure the AKS `network_profile`. Defaults are optimized for greenfield deployments:
@@ -211,7 +168,7 @@ Optional staged migrations for legacy clusters (each step is one-way where noted
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
-| <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | ~> 3.0 |
+| <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | ~> 3.0.2 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.0 |
 
 ## Providers
@@ -260,7 +217,7 @@ No resources.
 | <a name="input_k8s_default_node_pool_vm_size"></a> [k8s\_default\_node\_pool\_vm\_size](#input\_k8s\_default\_node\_pool\_vm\_size) | VM size for the AKS default (system) node pool. Must be available in the target region (e.g. Standard\_B2s\_v2 in japaneast). | `string` | `"Standard_B2s"` | no |
 | <a name="input_k8s_dns_service_ip"></a> [k8s\_dns\_service\_ip](#input\_k8s\_dns\_service\_ip) | IP address within k8s\_service\_cidr for the cluster DNS service. Immutable after cluster creation. | `string` | `"172.16.0.10"` | no |
 | <a name="input_k8s_load_balancer_sku"></a> [k8s\_load\_balancer\_sku](#input\_k8s\_load\_balancer\_sku) | SKU for the AKS load balancer. | `string` | `"standard"` | no |
-| <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `20` | no |
+| <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `50` | no |
 | <a name="input_k8s_min_node_count"></a> [k8s\_min\_node\_count](#input\_k8s\_min\_node\_count) | Minimum number of node Kubernetes can scale down to. | `number` | `3` | no |
 | <a name="input_k8s_network_plugin"></a> [k8s\_network\_plugin](#input\_k8s\_network\_plugin) | AKS network plugin. Use `azure` (recommended) or legacy `kubenet`. | `string` | `"azure"` | no |
 | <a name="input_k8s_network_plugin_mode"></a> [k8s\_network\_plugin\_mode](#input\_k8s\_network\_plugin\_mode) | Azure CNI mode. `overlay` assigns pod IPs from k8s\_pod\_cidr (default, IP-efficient). Set to null for legacy node-subnet mode (pod IPs from the VNet). | `string` | `"overlay"` | no |
@@ -277,9 +234,8 @@ No resources.
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
 | <a name="input_postgres_base_sku_name"></a> [postgres\_base\_sku\_name](#input\_postgres\_base\_sku\_name) | PostgreSQL SKU for secondary instances. Use GP\_Standard\_D2ads\_v5 for HA support. SKU availability may vary by Azure region. | `string` | `"B_Standard_B2s"` | no |
-| <a name="input_postgres_instances"></a> [postgres\_instances](#input\_postgres\_instances) | Overrides for PostgreSQL flexible server instances. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed\_sync, paragon).<br/>Merged per key with postgres\_instances\_default (sku, redundant). Null uses defaults only. | <pre>map(object({<br/>    sku       = optional(string)<br/>    redundant = optional(bool)<br/>  }))</pre> | `null` | no |
+| <a name="input_postgres_instances"></a> [postgres\_instances](#input\_postgres\_instances) | Per-instance PostgreSQL overrides. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed\_sync, paragon).<br/>Both sku and redundant must be set on each entry you include. Omitted keys use built-in defaults (no HA). Null uses defaults for all instances. | <pre>map(object({<br/>    sku       = string<br/>    redundant = bool<br/>  }))</pre> | `null` | no |
 | <a name="input_postgres_multiple_instances"></a> [postgres\_multiple\_instances](#input\_postgres\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
-| <a name="input_postgres_redundant"></a> [postgres\_redundant](#input\_postgres\_redundant) | When true, enables zone-redundant HA on hermes (or paragon when postgres\_multiple\_instances is false) via postgres\_instances override. All instances default to no HA. | `bool` | `false` | no |
 | <a name="input_postgres_sku_name"></a> [postgres\_sku\_name](#input\_postgres\_sku\_name) | PostgreSQL SKU name (e.g. `B_Standard_B2s` or `GP_Standard_D2ds_v5`) | `string` | `"GP_Standard_D2ds_v5"` | no |
 | <a name="input_postgres_version"></a> [postgres\_version](#input\_postgres\_version) | PostgreSQL version (14, 15 or 16) | `string` | `"14"` | no |
 | <a name="input_redis_base_capacity"></a> [redis\_base\_capacity](#input\_redis\_base\_capacity) | Default capacity of the Redis cache for instances that don't use the main redis\_capacity. | `number` | `1` | no |
