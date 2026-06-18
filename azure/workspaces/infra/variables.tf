@@ -538,11 +538,10 @@ locals {
     },
   )
 
-  postgres_instances = var.postgres_multiple_instances ? (
-    var.managed_sync_enabled ? local.postgres_instances_config : {
-      for name, cfg in local.postgres_instances_config : name => cfg if name != "managed_sync"
-    }
-    ) : {
+  postgres_instances = var.postgres_multiple_instances ? {
+    for name, cfg in local.postgres_instances_config : name => cfg
+    if name != "paragon" && (var.managed_sync_enabled || name != "managed_sync")
+  } : {
     paragon = local.postgres_instances_config["paragon"]
   }
 

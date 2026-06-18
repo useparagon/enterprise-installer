@@ -140,7 +140,7 @@ One map drives every PostgreSQL flexible server (`for_each` in `./postgres`). Gl
 | `postgres_redundant` | `false` | Shorthand: sets `hermes.redundant = true` (or `paragon` when single-instance) |
 | `postgres_instances` | `null` | Per-key overrides (`sku`, `redundant`) |
 
-`postgres_multiple_instances` and `managed_sync_enabled` still filter which keys deploy (same as before).
+`postgres_multiple_instances` and `managed_sync_enabled` still filter which keys deploy (same as before). With `postgres_multiple_instances = true`, only `cerberus`, `eventlogs`, `hermes`, `triggerkit`, `zeus` (and `managed_sync` when enabled) deploy — `paragon` deploys only when `postgres_multiple_instances = false`.
 
 Built-in default map (used when `postgres_instances` is null):
 
