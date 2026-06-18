@@ -57,34 +57,33 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-# Kubernetes providers at the infra root. Only consumed by the count-gated argocd
-# module; on a fresh plan the GKE cluster does not exist yet so its outputs are
-# unknown. alekc/kubectl errors at configure time on an unknown host, so feed all
-# three a static placeholder when ArgoCD is disabled (they stay unused); use the
-# real cluster values when enabled (the cluster exists from a prior apply).
+# Kubernetes providers at the infra root, consumed by the count-gated argocd
+# module. The GKE control plane is PRIVATE, so reach it through Connect Gateway
+# (a Google-managed proxy at connectgateway.googleapis.com) using an IAM OAuth
+# token — works from the public Spacelift worker, no public endpoint/VPC peering.
+# When ArgoCD is disabled, feed a static placeholder so alekc/kubectl doesn't
+# error at configure time. No cluster_ca_certificate: the gateway endpoint
+# presents a public Google TLS cert validated by system CAs. Referencing the
+# membership resource (via one()) also orders it before the providers connect.
 locals {
-  k8s_host  = var.argocd_enabled ? module.cluster.kubernetes.host : "https://localhost"
-  k8s_token = var.argocd_enabled ? module.cluster.kubernetes.token : ""
-  k8s_ca    = var.argocd_enabled ? module.cluster.kubernetes.cluster_ca_certificate : ""
+  k8s_host  = var.argocd_enabled ? "https://connectgateway.googleapis.com/v1/projects/${data.google_project.this.number}/locations/global/gkeMemberships/${one(google_gke_hub_membership.cluster[*].membership_id)}" : "https://localhost"
+  k8s_token = var.argocd_enabled ? data.google_client_config.default.access_token : ""
 }
 
 provider "kubernetes" {
-  host                   = local.k8s_host
-  token                  = local.k8s_token
-  cluster_ca_certificate = local.k8s_ca
+  host  = local.k8s_host
+  token = local.k8s_token
 }
 
 provider "helm" {
   kubernetes {
-    host                   = local.k8s_host
-    token                  = local.k8s_token
-    cluster_ca_certificate = local.k8s_ca
+    host  = local.k8s_host
+    token = local.k8s_token
   }
 }
 
 provider "kubectl" {
-  host                   = local.k8s_host
-  token                  = local.k8s_token
-  cluster_ca_certificate = local.k8s_ca
-  load_config_file       = false
+  host             = local.k8s_host
+  token            = local.k8s_token
+  load_config_file = false
 }
