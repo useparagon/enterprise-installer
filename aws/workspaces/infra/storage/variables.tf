@@ -31,3 +31,9 @@ variable "migrated" {
   type        = bool
   default     = false
 }
+
+variable "cdn_bucket_acl_reset" {
+  description = "Reset the CDN S3 bucket ACL to private before BucketOwnerEnforced."
+  type        = bool
+  default     = false
+}
