@@ -113,7 +113,7 @@ variable "cloudflare_tunnel_email_domain" {
 
 # postgres
 variable "postgres_redundant" {
-  description = "Enable zone-redundant HA. Recommended: true for production (requires GP/MO SKU, not Burstable)."
+  description = "When true, enables zone-redundant HA on hermes (or paragon when postgres_multiple_instances is false) via postgres_instances override. All instances default to no HA."
   type        = bool
   default     = false
 }
@@ -140,6 +140,19 @@ variable "postgres_multiple_instances" {
   description = "Whether or not to create multiple Postgres instances. Used for higher volume installations."
   type        = bool
   default     = true
+}
+
+variable "postgres_instances" {
+  description = <<-EOT
+    Overrides for PostgreSQL flexible server instances. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon).
+    Merged per key with postgres_instances_default (sku, redundant). Null uses defaults only.
+  EOT
+  type = map(object({
+    sku       = optional(string)
+    redundant = optional(bool)
+  }))
+  default  = null
+  nullable = true
 }
 
 # redis
@@ -469,6 +482,69 @@ locals {
   # get distinct values from comma-separated list, filter empty values and trim them
   # for `ip_whitelist`, if an ip doesn't contain a range at the end (e.g. `<IP_ADDRESS>/32`), then add `/32` to the end. `1.1.1.1` becomes `1.1.1.1/32`; `2.2.2.2/24` remains unchanged
   ssh_whitelist = distinct([for value in split(",", var.ssh_whitelist) : "${trimspace(value)}${replace(value, "/", "") != value ? "" : "/32"}" if trimspace(value) != ""])
+
+  postgres_instance_defaults = {
+    sku       = var.postgres_base_sku_name
+    redundant = false
+  }
+
+  postgres_instances_default = {
+    cerberus = {
+      sku       = var.postgres_base_sku_name
+      redundant = false
+    }
+    eventlogs = {
+      sku       = var.postgres_base_sku_name
+      redundant = false
+    }
+    hermes = {
+      sku       = var.postgres_sku_name
+      redundant = false
+    }
+    triggerkit = {
+      sku       = var.postgres_base_sku_name
+      redundant = false
+    }
+    zeus = {
+      sku       = var.postgres_base_sku_name
+      redundant = false
+    }
+    managed_sync = {
+      sku       = var.postgres_base_sku_name
+      redundant = false
+    }
+    paragon = {
+      sku       = var.postgres_sku_name
+      redundant = false
+    }
+  }
+
+  postgres_redundant_overrides = var.postgres_redundant ? (
+    var.postgres_multiple_instances ? { hermes = { redundant = true } } : { paragon = { redundant = true } }
+  ) : {}
+
+  postgres_instances_overrides = merge(
+    local.postgres_redundant_overrides,
+    var.postgres_instances != null ? var.postgres_instances : {},
+  )
+
+  postgres_instances_config = merge(
+    local.postgres_instances_default,
+    {
+      for name, override in local.postgres_instances_overrides : name => merge(
+        lookup(local.postgres_instances_default, name, local.postgres_instance_defaults),
+        { for key, value in override : key => value if value != null },
+      )
+    },
+  )
+
+  postgres_instances = var.postgres_multiple_instances ? (
+    var.managed_sync_enabled ? local.postgres_instances_config : {
+      for name, cfg in local.postgres_instances_config : name => cfg if name != "managed_sync"
+    }
+    ) : {
+    paragon = local.postgres_instances_config["paragon"]
+  }
 
   redis_managed_instance_defaults = {
     sku                   = "Balanced_B3"

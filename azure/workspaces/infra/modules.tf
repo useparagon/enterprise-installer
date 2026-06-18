@@ -35,17 +35,13 @@ module "bastion" {
 module "postgres" {
   source = "./postgres"
 
-  managed_sync_enabled        = var.managed_sync_enabled
-  postgres_multiple_instances = var.postgres_multiple_instances
-  postgres_base_sku_name      = var.postgres_base_sku_name
-  postgres_redundant          = var.postgres_redundant
-  postgres_sku_name           = var.postgres_sku_name
-  postgres_version            = var.postgres_version
-  resource_group              = module.network.resource_group
-  tags                        = local.default_tags
-  virtual_network             = module.network.virtual_network
-  private_subnet              = module.network.postgres_subnet
-  workspace                   = local.workspace
+  instances        = local.postgres_instances
+  postgres_version = var.postgres_version
+  resource_group   = module.network.resource_group
+  tags             = local.default_tags
+  virtual_network  = module.network.virtual_network
+  private_subnet   = module.network.postgres_subnet
+  workspace        = local.workspace
 }
 
 module "redis" {
