@@ -170,6 +170,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
     id     = "abort-incomplete"
     status = "Enabled"
 
+    filter {}
+
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
     }
@@ -178,6 +180,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
   rule {
     id     = "transition-to-glacier"
     status = "Enabled"
+
+    filter {}
 
     transition {
       days          = 7
@@ -188,6 +192,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
   rule {
     id     = "expire"
     status = "Enabled"
+
+    filter {}
 
     expiration {
       days = 365

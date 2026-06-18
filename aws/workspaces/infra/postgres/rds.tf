@@ -1,5 +1,14 @@
 locals {
   postgres_family = "postgres${split(".", var.rds_postgres_version)[0]}" // e.g. `postgres11`, `postgres12`, etc
+
+  # gp3 baseline depends on allocated size: PostgreSQL stripes at >= 400 GiB (12k IOPS / 500 MiB/s).
+  # Custom values must be set as a valid pair; if only one is set, fall back to the size-appropriate baseline.
+  rds_gp3_custom                       = var.rds_gp3_iops != null && var.rds_gp3_storage_throughput != null
+  rds_gp3_striped                      = var.rds_allocated_storage >= 400
+  rds_gp3_baseline_iops                = local.rds_gp3_striped ? 12000 : 3000
+  rds_gp3_baseline_tp                  = local.rds_gp3_striped ? 500 : 125
+  rds_gp3_iops_effective               = local.rds_gp3_custom ? var.rds_gp3_iops : local.rds_gp3_baseline_iops
+  rds_gp3_storage_throughput_effective = local.rds_gp3_custom ? var.rds_gp3_storage_throughput : local.rds_gp3_baseline_tp
 }
 
 resource "random_string" "postgres_root_username" {
@@ -111,8 +120,11 @@ resource "aws_db_instance" "postgres" {
   parameter_group_name = aws_db_parameter_group.postgres.name
   storage_type         = "gp3"
 
-  allocated_storage           = 20
-  max_allocated_storage       = 1000
+  iops               = local.rds_gp3_iops_effective
+  storage_throughput = local.rds_gp3_storage_throughput_effective
+
+  allocated_storage           = var.rds_allocated_storage
+  max_allocated_storage       = var.rds_max_allocated_storage
   allow_major_version_upgrade = false
   auto_minor_version_upgrade  = true
   availability_zone           = var.rds_multi_az ? null : var.availability_zones.names[0]

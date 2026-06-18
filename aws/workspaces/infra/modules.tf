@@ -25,6 +25,10 @@ module "postgres" {
   workspace                   = local.workspace
   aws_region                  = var.aws_region
   rds_instance_class          = var.rds_instance_class
+  rds_gp3_iops                = var.rds_gp3_iops
+  rds_gp3_storage_throughput  = var.rds_gp3_storage_throughput
+  rds_allocated_storage       = var.rds_allocated_storage
+  rds_max_allocated_storage   = var.rds_max_allocated_storage
   rds_multi_az                = var.rds_multi_az
   rds_multiple_instances      = var.rds_multiple_instances
   rds_postgres_version        = var.rds_postgres_version

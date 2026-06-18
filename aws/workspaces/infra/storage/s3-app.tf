@@ -49,17 +49,33 @@ resource "aws_s3_bucket_lifecycle_configuration" "app" {
   bucket = aws_s3_bucket.app.id
 
   rule {
-    id = "expiration"
+    id     = "expiration"
+    status = "Enabled"
+
+    filter {}
 
     expiration {
       days = var.app_bucket_expiration
     }
 
-    noncurrent_version_expiration {
-      noncurrent_days = var.app_bucket_expiration
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
     }
 
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+
+  rule {
+    id     = "delete-markers"
     status = "Enabled"
+
+    filter {}
+
+    expiration {
+      expired_object_delete_marker = true
+    }
   }
 }
 

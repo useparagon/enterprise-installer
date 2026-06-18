@@ -72,9 +72,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     id     = "abort-incomplete"
     status = "Enabled"
 
-    filter {
-      prefix = "files/"
-    }
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
@@ -82,11 +80,37 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   }
 
   rule {
-    id     = "expire"
+    id     = "expire-files"
     status = "Enabled"
 
     filter {
       prefix = "files/"
+    }
+
+    expiration {
+      days = 365
+    }
+  }
+
+  rule {
+    id     = "expire-s3-access-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = "s3/"
+    }
+
+    expiration {
+      days = 365
+    }
+  }
+
+  rule {
+    id     = "expire-alb-access-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = "access_logs/"
     }
 
     expiration {
