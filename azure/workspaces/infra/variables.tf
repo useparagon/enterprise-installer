@@ -112,12 +112,6 @@ variable "cloudflare_tunnel_email_domain" {
 }
 
 # postgres
-variable "postgres_redundant" {
-  description = "Enable zone-redundant HA. Recommended: true for production (requires GP/MO SKU, not Burstable)."
-  type        = bool
-  default     = false
-}
-
 variable "postgres_sku_name" {
   description = "PostgreSQL SKU name (e.g. `B_Standard_B2s` or `GP_Standard_D2ds_v5`)"
   type        = string
@@ -140,6 +134,19 @@ variable "postgres_multiple_instances" {
   description = "Whether or not to create multiple Postgres instances. Used for higher volume installations."
   type        = bool
   default     = true
+}
+
+variable "postgres_instances" {
+  description = <<-EOT
+    Per-instance PostgreSQL overrides. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon).
+    Both sku and redundant must be set on each entry you include. Omitted keys use built-in defaults (no HA). Null uses defaults for all instances.
+  EOT
+  type = map(object({
+    sku       = string
+    redundant = bool
+  }))
+  default  = null
+  nullable = true
 }
 
 # redis
@@ -469,6 +476,28 @@ locals {
   # get distinct values from comma-separated list, filter empty values and trim them
   # for `ip_whitelist`, if an ip doesn't contain a range at the end (e.g. `<IP_ADDRESS>/32`), then add `/32` to the end. `1.1.1.1` becomes `1.1.1.1/32`; `2.2.2.2/24` remains unchanged
   ssh_whitelist = distinct([for value in split(",", var.ssh_whitelist) : "${trimspace(value)}${replace(value, "/", "") != value ? "" : "/32"}" if trimspace(value) != ""])
+
+  postgres_instances_defaults = {
+    cerberus     = { sku = var.postgres_base_sku_name, redundant = false }
+    eventlogs    = { sku = var.postgres_base_sku_name, redundant = false }
+    hermes       = { sku = var.postgres_sku_name, redundant = false }
+    triggerkit   = { sku = var.postgres_base_sku_name, redundant = false }
+    zeus         = { sku = var.postgres_base_sku_name, redundant = false }
+    managed_sync = { sku = var.postgres_base_sku_name, redundant = false }
+    paragon      = { sku = var.postgres_sku_name, redundant = false }
+  }
+
+  postgres_instances_config = merge(
+    local.postgres_instances_defaults,
+    var.postgres_instances != null ? var.postgres_instances : {},
+  )
+
+  postgres_instances = var.postgres_multiple_instances ? {
+    for name, cfg in local.postgres_instances_config : name => cfg
+    if name != "paragon" && (var.managed_sync_enabled || name != "managed_sync")
+    } : {
+    paragon = local.postgres_instances_config["paragon"]
+  }
 
   redis_managed_instance_defaults = {
     sku                   = "Balanced_B3"
