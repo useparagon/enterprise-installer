@@ -1,6 +1,18 @@
 # GitOps cluster add-ons: External Secrets Operator, AWS Load Balancer Controller,
 # and external-dns. Wired into eks_blueprints_addons from modules.tf.
 
+# Brownfield: legacy paragon workspace installed LBC as Helm release "ingress" in the
+# paragon namespace, creating cluster-scoped IngressClass / IngressClassParams "alb"
+# without ownership metadata for release aws-load-balancer-controller (kube-system).
+data "kubernetes_resources" "gitops_alb_ingress_class" {
+  count = var.argocd_enabled ? 1 : 0
+
+  api_version = "networking.k8s.io/v1"
+  kind        = "IngressClass"
+
+  depends_on = [module.cluster]
+}
+
 # ---------------------------------------------------------------------------
 # External Secrets Operator (ESO)
 # ---------------------------------------------------------------------------
@@ -47,12 +59,10 @@ locals {
   # infra path must provide the same controllers so Ingress resources provision ALBs
   # and Route 53 records.
 
-  # Brownfield: the legacy paragon Helm "ingress" release left a cluster-scoped
-  # IngressClass "alb" without ownership metadata for the new LBC release. When that
-  # IngressClass already exists, set createIngressClassResource=false to avoid a
-  # conflict. Driven by an explicit var (set per stack) rather than a plan-time cluster
-  # read, which would block the entire plan whenever the API is briefly unreachable.
-  gitops_alb_ingress_class_exists = var.argocd_enabled && var.gitops_alb_ingressclass_exists
+  gitops_alb_ingress_class_exists = var.argocd_enabled && anytrue([
+    for obj in try(data.kubernetes_resources.gitops_alb_ingress_class[0].objects, []) :
+    try(obj.metadata.name, "") == "alb"
+  ])
 
   gitops_aws_load_balancer_controller = merge(
     {

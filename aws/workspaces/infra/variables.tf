@@ -610,13 +610,6 @@ variable "paragon_certificate_arn" {
   }
 }
 
-variable "gitops_alb_ingressclass_exists" {
-  description = "Brownfield flag: set true when a cluster-scoped IngressClass named \"alb\" already exists (e.g. installed by the legacy paragon Helm \"ingress\" release). When true, the AWS Load Balancer Controller is configured with createIngressClassResource=false to avoid an \"already exists\" conflict. Set explicitly per stack instead of probed at plan time (a live cluster read during plan blocks the whole plan when the API is briefly unreachable)."
-  type        = bool
-  default     = false
-  nullable    = false
-}
-
 # ---------------------------------------------------------------------------
 # Locals
 # ---------------------------------------------------------------------------
