@@ -80,8 +80,12 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_msk_kafka_num_broker_nodes"></a> [msk\_kafka\_num\_broker\_nodes](#input\_msk\_kafka\_num\_broker\_nodes) | The number of broker nodes for the MSK cluster. | `number` | `2` | no |
 | <a name="input_msk_kafka_version"></a> [msk\_kafka\_version](#input\_msk\_kafka\_version) | The Kafka version for the MSK cluster. | `string` | `"3.6.0"` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
+| <a name="input_rds_allocated_storage"></a> [rds\_allocated\_storage](#input\_rds\_allocated\_storage) | Initial allocated storage (GiB) for each Postgres RDS instance. | `number` | `20` | no |
 | <a name="input_rds_final_snapshot_enabled"></a> [rds\_final\_snapshot\_enabled](#input\_rds\_final\_snapshot\_enabled) | Specifies that RDS instances should perform a final snapshot before being deleted. | `bool` | `true` | no |
+| <a name="input_rds_gp3_iops"></a> [rds\_gp3\_iops](#input\_rds\_gp3\_iops) | gp3 IOPS for Postgres; null uses size-based baseline (3000 below 400 GiB, 12000 at/above). Set with rds\_gp3\_storage\_throughput to override; only valid when rds\_allocated\_storage >= 400 GiB. | `number` | `null` | no |
+| <a name="input_rds_gp3_storage_throughput"></a> [rds\_gp3\_storage\_throughput](#input\_rds\_gp3\_storage\_throughput) | gp3 throughput (MiB/s); null uses size-based baseline (125 below 400 GiB, 500 at/above). Use a valid pair with rds\_gp3\_iops when overriding. | `number` | `null` | no |
 | <a name="input_rds_instance_class"></a> [rds\_instance\_class](#input\_rds\_instance\_class) | The RDS instance class type used for Postgres. | `string` | `"db.t4g.small"` | no |
+| <a name="input_rds_max_allocated_storage"></a> [rds\_max\_allocated\_storage](#input\_rds\_max\_allocated\_storage) | Maximum storage (GiB) for autoscaling on each Postgres RDS instance. | `number` | `1000` | no |
 | <a name="input_rds_multi_az"></a> [rds\_multi\_az](#input\_rds\_multi\_az) | Whether or not to enable multi-AZ in each RDS instance. | `bool` | `true` | no |
 | <a name="input_rds_multiple_instances"></a> [rds\_multiple\_instances](#input\_rds\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_rds_postgres_version"></a> [rds\_postgres\_version](#input\_rds\_postgres\_version) | Postgres version for the database. | `string` | `"14"` | no |

@@ -85,6 +85,46 @@ variable "rds_final_snapshot_enabled" {
   default     = true
 }
 
+variable "rds_gp3_iops" {
+  description = "gp3 IOPS for Postgres; null uses size-based baseline (3000 below 400 GiB, 12000 at/above). Set with rds_gp3_storage_throughput to override; only valid when rds_allocated_storage >= 400 GiB."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.rds_gp3_iops == null || var.rds_allocated_storage >= 400
+    error_message = "rds_gp3_iops can only be set when rds_allocated_storage is >= 400 GiB (PostgreSQL gp3 minimum at that size is 12000)."
+  }
+}
+
+variable "rds_gp3_storage_throughput" {
+  description = "gp3 throughput (MiB/s); null uses size-based baseline (125 below 400 GiB, 500 at/above). Use a valid pair with rds_gp3_iops when overriding."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition = var.rds_gp3_iops == null || var.rds_gp3_storage_throughput == null || (
+      var.rds_allocated_storage < 400 || (
+        coalesce(var.rds_gp3_iops, 12000) >= 12000 && coalesce(var.rds_gp3_storage_throughput, 500) >= 500
+      )
+    )
+    error_message = "For rds_allocated_storage >= 400 GiB, gp3 requires at least 12000 IOPS and 500 MiB/s throughput."
+  }
+}
+
+variable "rds_allocated_storage" {
+  description = "Initial allocated storage (GiB) for each Postgres RDS instance."
+  type        = number
+  default     = 20
+}
+
+variable "rds_max_allocated_storage" {
+  description = "Maximum storage (GiB) for autoscaling on each Postgres RDS instance."
+  type        = number
+  default     = 1000
+}
+
 # elasticache
 variable "elasticache_node_type" {
   description = "The ElastiCache node type used for Redis."
