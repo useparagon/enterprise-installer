@@ -19,8 +19,6 @@ subchart:
     enabled: false
   hermes:
     enabled: true
-  minio:
-    enabled: false
   passport:
     enabled: true
   pheme:

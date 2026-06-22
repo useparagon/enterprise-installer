@@ -12,11 +12,7 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-| Name | Version |
-|------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
-| <a name="requirement_google"></a> [google](#requirement\_google) | ~> 7.0 |
-| <a name="requirement_google-beta"></a> [google-beta](#requirement\_google-beta) | ~> 7.0 |
+No requirements.
 
 ## Providers
 
@@ -25,7 +21,7 @@ No providers.
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
+| ---- | ------ | ------- |
 | <a name="module_bastion"></a> [bastion](#module\_bastion) | ./bastion | n/a |
 | <a name="module_cluster"></a> [cluster](#module\_cluster) | ./cluster | n/a |
 | <a name="module_kafka"></a> [kafka](#module\_kafka) | ./kafka | n/a |
@@ -41,7 +37,7 @@ No resources.
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to lock the GCS audit logs bucket retention policy. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
 | <a name="input_cloudflare_api_token"></a> [cloudflare\_api\_token](#input\_cloudflare\_api\_token) | Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS` | `string` | `"dummy-cloudflare-tokens-must-be-40-chars"` | no |
@@ -69,7 +65,7 @@ No resources.
 | <a name="input_gmk_vcpu_count"></a> [gmk\_vcpu\_count](#input\_gmk\_vcpu\_count) | Number of vCPUs for the GMK cluster (minimum 3 in GCP). | `number` | `3` | no |
 | <a name="input_k8s_disable_public_endpoint"></a> [k8s\_disable\_public\_endpoint](#input\_k8s\_disable\_public\_endpoint) | Used to disable public endpoint on GKE cluster. | `bool` | `true` | no |
 | <a name="input_k8s_master_authorized_networks"></a> [k8s\_master\_authorized\_networks](#input\_k8s\_master\_authorized\_networks) | List of CIDRs allowed to reach the GKE control plane (Master Authorized Networks). Use [{ cidr\_block = "0.0.0.0/0", display\_name = "all" }] to allow all IPs (e.g. from any country). Empty list = only cluster nodes (restricted). | <pre>list(object({<br/>    cidr_block   = string<br/>    display_name = optional(string, "")<br/>  }))</pre> | `[]` | no |
-| <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `20` | no |
+| <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `50` | no |
 | <a name="input_k8s_min_node_count"></a> [k8s\_min\_node\_count](#input\_k8s\_min\_node\_count) | Minimum number of node Kubernetes can scale down to. | `number` | `2` | no |
 | <a name="input_k8s_ondemand_node_instance_type"></a> [k8s\_ondemand\_node\_instance\_type](#input\_k8s\_ondemand\_node\_instance\_type) | The compute instance type to use for Kubernetes on demand nodes. | `string` | `"e2-standard-4"` | no |
 | <a name="input_k8s_spot_instance_percent"></a> [k8s\_spot\_instance\_percent](#input\_k8s\_spot\_instance\_percent) | The percentage of spot instances to use for Kubernetes nodes. | `number` | `80` | no |
@@ -92,16 +88,16 @@ No resources.
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_auditlogs_bucket"></a> [auditlogs\_bucket](#output\_auditlogs\_bucket) | The bucket used to store audit logs. |
 | <a name="output_bastion"></a> [bastion](#output\_bastion) | Bastion server connection info. |
 | <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | The name of the GKE cluster. |
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka (Managed Sync). OAUTHBEARER or PLAIN; when PLAIN, use cluster\_password\_file\_path for key JSON. |
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | Alias for logs\_container; used by paragon for managed-sync ingress.logsBucket. |
 | <a name="output_logs_container"></a> [logs\_container](#output\_logs\_container) | The bucket used to store system logs. |
-| <a name="output_minio"></a> [minio](#output\_minio) | MinIO server connection info. |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
+| <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->
 

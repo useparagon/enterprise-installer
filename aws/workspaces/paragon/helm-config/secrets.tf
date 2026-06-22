@@ -54,24 +54,23 @@ locals {
     cluster_enabled = try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_CLUSTER_ENABLED"], var.infra_values.redis.value.managed_sync.cluster, var.infra_values.redis.value.cache.cluster, false)
   }
 
+  # Backward compatible with infra workspaces that still emit the legacy "minio" output
+  # instead of the renamed "storage" output.
+  storage_output = try(var.infra_values.storage.value, var.infra_values.minio.value)
+
   storage_type = try(var.base_helm_values.global.env["CLOUD_STORAGE_TYPE"], "S3")
 
   storage_config = {
     buckets = {
-      public       = coalesce(try(var.base_helm_values.global.env["CLOUD_STORAGE_PUBLIC_BUCKET"], null), try(var.base_helm_values.global.env["MINIO_PUBLIC_BUCKET"], null), var.infra_values.minio.value.public_bucket)
-      managed_sync = coalesce(try(var.base_helm_values.global.env["CLOUD_STORAGE_MANAGED_SYNC_BUCKET"], null), var.infra_values.minio.value.managed_sync_bucket)
+      public       = coalesce(try(var.base_helm_values.global.env["CLOUD_STORAGE_PUBLIC_BUCKET"], null), local.storage_output.public_bucket)
+      managed_sync = coalesce(try(var.base_helm_values.global.env["CLOUD_STORAGE_MANAGED_SYNC_BUCKET"], null), local.storage_output.managed_sync_bucket)
     }
     type = try(var.base_helm_values.global.env["CLOUD_STORAGE_TYPE"], "S3")
-    user = try(
-      local.storage_type == "MINIO" ? try(var.base_helm_values.global.env["MINIO_MICROSERVICE_USER"], var.infra_values.minio.value.microservice_user) : try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_USER"], var.infra_values.minio.value.root_user)
-    )
-    pass = try(
-      local.storage_type == "MINIO" ? try(var.base_helm_values.global.env["MINIO_MICROSERVICE_PASS"], var.infra_values.minio.value.microservice_pass) : try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_PASS"], var.infra_values.minio.value.root_password)
-    )
+    user = try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_USER"], local.storage_output.root_user)
+    pass = try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_PASS"], local.storage_output.root_password)
     public_url = coalesce(
       try(var.base_helm_values.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
       local.storage_type == "S3" ? "https://s3.${var.aws_region}.amazonaws.com" : null,
-      try(var.microservices.minio.public_url, null), null
     )
   }
 

@@ -48,7 +48,7 @@ module "helm" {
   public_monitors         = local.public_monitors
   public_services         = local.public_services
   region                  = var.region
-  storage_service_account = try(local.infra_vars.minio.value.service_account, null)
+  storage_service_account = try(local.storage_output.service_account, null)
   infra_vars              = local.infra_vars
   workspace               = local.workspace
 }

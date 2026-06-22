@@ -10,7 +10,7 @@ resource "google_storage_bucket" "app" {
 resource "google_storage_bucket_iam_member" "app" {
   bucket = google_storage_bucket.app.name
   role   = "roles/storage.admin"
-  member = "serviceAccount:${google_service_account.minio.email}"
+  member = "serviceAccount:${google_service_account.storage.email}"
 }
 
 # CDN bucket (private; public asset URLs must use your app/proxy base URL in Helm)
@@ -27,7 +27,7 @@ resource "google_storage_bucket" "cdn" {
 resource "google_storage_bucket_iam_member" "cdn" {
   bucket = google_storage_bucket.cdn.name
   role   = "roles/storage.admin"
-  member = "serviceAccount:${google_service_account.minio.email}"
+  member = "serviceAccount:${google_service_account.storage.email}"
 }
 
 # logs bucket
@@ -42,7 +42,7 @@ resource "google_storage_bucket" "logs" {
 resource "google_storage_bucket_iam_member" "logs" {
   bucket = google_storage_bucket.logs.name
   role   = "roles/storage.admin"
-  member = "serviceAccount:${google_service_account.minio.email}"
+  member = "serviceAccount:${google_service_account.storage.email}"
 }
 
 # audit logs bucket
@@ -66,5 +66,5 @@ resource "google_storage_bucket" "auditlogs" {
 resource "google_storage_bucket_iam_member" "auditlogs" {
   bucket = google_storage_bucket.auditlogs.name
   role   = "roles/storage.admin"
-  member = "serviceAccount:${google_service_account.minio.email}"
+  member = "serviceAccount:${google_service_account.storage.email}"
 }

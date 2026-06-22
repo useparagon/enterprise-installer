@@ -100,12 +100,10 @@ This will produce an `infra-output.json` file that will generally follow the sch
   "logs_container": {
     "value": "<logs-bucket-name>"
   },
-  "minio": {
+  "storage": {
     "value": {
-      "microservice_pass": "<service-password>",
-      "microservice_user": "<service-username>",
       "private_bucket": "<private-bucket-name>",
-      "public_bucket": "<private-bucket-name>",
+      "public_bucket": "<public-bucket-name>",
       "root_password": "<iam-password>",
       "root_user": "<iam-username>"
     }

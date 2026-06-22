@@ -1,6 +1,6 @@
 {{/*
 Standard StatefulSet for services requiring persistent storage.
-Call with: include "statefulset.standard" (dict "root" $ "volumeName" "minio" "mountPath" "/var/paragon" "storageSize" "500M")
+Call with: include "statefulset.standard" (dict "root" $ "volumeName" "grafana" "mountPath" "/var/lib/grafana" "storageSize" "5Gi")
 */}}
 {{- define "statefulset.standard" -}}
 {{- $root := .root -}}
