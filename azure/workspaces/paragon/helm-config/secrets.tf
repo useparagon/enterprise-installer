@@ -107,6 +107,7 @@ locals {
   managed_sync_secrets = {
     HOST_ENV  = "AZURE_K8"
     LOG_LEVEL = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
+    TRIAL_DISABLED = try(var.base_helm_values.global.env["TRIAL_DISABLED"], "true")
 
     CLOUD_STORAGE_TYPE                = local.storage_type
     CLOUD_STORAGE_PUBLIC_BUCKET       = local.storage_config.buckets.public
