@@ -1,31 +1,43 @@
 # SUP-1688: Workday interim image patch commands
 
-Use these commands to update flagged container images **before** a full Paragon upgrade.
-After patching, re-run the DRDRE security scan to confirm high/critical counts are resolved.
+Workday's DRDRE scan blocked four container images (SUP-1688). Use these commands to patch running workloads **before** a full Paragon upgrade so security can re-scan and approve `datalake-prod`.
 
 **Namespace:** `paragon` (adjust if your deployment uses a different namespace)
 
-## Target image tags
+## Strategy
 
-| Image | Current (flagged) | Interim target | Ticket |
+| Audience | OpenObserve target | When |
+| --- | --- | --- |
+| **Workday (interim patch)** | `v0.91.0-rc3` | Now — passes DRDRE with 0 HIGH/CRITICAL on Trivy while we validate internally |
+| **Paragon chart (PARA-22208)** | `v0.91.0` stable | When Zinc Labs publishes GA — official bump in `enterprise`, not an RC |
+
+Do **not** pin the RC in the Helm chart. The chart bump waits for stable `v0.91.0`.
+
+---
+
+## Target image tags (all four flagged images)
+
+| Image | Current (flagged) | Interim patch target | Official chart bump |
 | --- | --- | --- | --- |
-| `public.ecr.aws/zinclabs/openobserve` | `v0.20.1` | `v0.90.3` | [PARA-22208](https://useparagon.atlassian.net/browse/PARA-22208) |
+| `public.ecr.aws/zinclabs/openobserve` | `v0.20.1` | **`v0.91.0-rc3`** | `v0.91.0` stable ([PARA-22208](https://useparagon.atlassian.net/browse/PARA-22208)) |
 | `docker.io/openfga/openfga` | `v1.11.1` | `v1.17.1` | [PARA-22209](https://useparagon.atlassian.net/browse/PARA-22209) |
 | `docker.io/alpine/kubectl` | `1.33.4` | `1.35.4` | [PARA-22209](https://useparagon.atlassian.net/browse/PARA-22209) |
 | `docker.io/groundnuty/k8s-wait-for` | `v2.0` | `no-root-v1.7` | [PARA-22209](https://useparagon.atlassian.net/browse/PARA-22209) |
 
-> **Note:** OpenObserve `v0.90.3` still reports 1 HIGH CVE (OpenSSL) on Trivy. A stable release with that fix is expected soon; `v0.91.0-rc2` scans clean on High/Critical if DRDRE requires zero HIGH findings.
-
 ---
 
-## 1. OpenObserve
+## 1. OpenObserve (interim — use RC3)
+
+Trivy on `v0.91.0-rc3`: **0 HIGH, 0 CRITICAL** (vs 3 Critical + 24 High on `v0.20.1`).
 
 ```bash
 kubectl -n paragon set image statefulset/openobserve \
-  openobserve=public.ecr.aws/zinclabs/openobserve:v0.90.3
+  openobserve=public.ecr.aws/zinclabs/openobserve:v0.91.0-rc3
 
 kubectl -n paragon rollout status statefulset/openobserve --timeout=600s
 ```
+
+After DRDRE approves, upgrade to stable `v0.91.0` when Paragon ships the official chart bump.
 
 ---
 
@@ -38,7 +50,7 @@ kubectl -n paragon set image deployment/openfga \
 kubectl -n paragon rollout status deployment/openfga --timeout=600s
 ```
 
-If OpenFGA runs as a StatefulSet in your cluster:
+If OpenFGA runs as a StatefulSet:
 
 ```bash
 kubectl -n paragon set image statefulset/openfga \
@@ -60,14 +72,10 @@ kubectl -n paragon set image cronjob/restart-paragon-pods-cronjob \
 
 ## 4. groundnuty/k8s-wait-for (init containers)
 
-`k8s-wait-for` is used as an init container across managed-sync workloads. Patch each deployment/statefulset that references it:
-
 ```bash
-# List pods using the old image
 kubectl -n paragon get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .spec.initContainers[*]}{.image}{" "}{end}{"\n"}{end}' \
   | grep k8s-wait-for
 
-# Patch a deployment (repeat for each affected resource)
 kubectl -n paragon patch deployment <DEPLOYMENT_NAME> --type=json -p='[
   {
     "op": "replace",
@@ -77,16 +85,15 @@ kubectl -n paragon patch deployment <DEPLOYMENT_NAME> --type=json -p='[
 ]'
 ```
 
-Adjust the init container index (`initContainers/0`) if `k8s-wait-for` is not the first init container.
+Adjust the init container index if `k8s-wait-for` is not the first init container.
 
 ---
 
-## Verify
+## Verify and re-scan
 
 ```bash
-# Confirm updated images
 kubectl -n paragon get statefulset,deployment,cronjob -o jsonpath='{range .items[*]}{.kind}/{.metadata.name}{": "}{range .spec.template.spec.containers[*]}{.image}{" "}{end}{range .spec.template.spec.initContainers[*]}{.image}{" "}{end}{"\n"}{end}' \
   | grep -E 'openobserve|openfga|kubectl|k8s-wait-for'
 ```
 
-Re-submit the updated images to DRDRE for approval.
+Re-submit the patched images to DRDRE for approval.

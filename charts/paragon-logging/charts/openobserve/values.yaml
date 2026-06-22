@@ -7,8 +7,9 @@ replicaCount: 1
 image:
   repository: public.ecr.aws/zinclabs/openobserve
   pullPolicy: IfNotPresent
-  tag: v0.90.3
+  tag: v0.20.1
   # tag: v0.20.1-debug
+  # PARA-22208: bump to v0.91.0 (stable) when released; interim Workday patch uses v0.91.0-rc3 (see docs/SUP-1688-workday-image-patch-commands.md)
 
 service:
   type: ClusterIP
