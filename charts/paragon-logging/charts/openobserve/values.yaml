@@ -8,7 +8,7 @@ image:
   repository: public.ecr.aws/zinclabs/openobserve
   pullPolicy: IfNotPresent
   tag: v0.91.0
-  # tag: v0.20.1-debug
+  # tag: v0.91.0-debug
 
 service:
   type: ClusterIP
