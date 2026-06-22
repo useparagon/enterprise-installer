@@ -302,14 +302,32 @@ resource "helm_release" "external_dns" {
   timeout          = 600
 
   values = [yamlencode({
+    serviceAccount = {
+      annotations = {
+        "azure.workload.identity/client-id" = azurerm_user_assigned_identity.external_dns[0].client_id
+      }
+    }
+    podLabels = {
+      "azure.workload.identity/use" = "true"
+    }
     provider = {
       name = "azure"
     }
-    azure = {
-      resourceGroup               = var.azure_resource_group_name
-      subscriptionId              = var.azure_subscription_id
-      tenantId                    = var.azure_tenant_id
-      useManagedIdentityExtension = true
+    # The external-dns chart does not render an azure.json from inline values;
+    # it must be mounted. Supply it via secretConfiguration with workload identity
+    # so the pod authenticates through the federated SA instead of the (absent)
+    # node-level /etc/kubernetes/azure.json managed-identity file.
+    secretConfiguration = {
+      enabled   = true
+      mountPath = "/etc/kubernetes"
+      data = {
+        "azure.json" = jsonencode({
+          tenantId                     = var.azure_tenant_id
+          subscriptionId               = var.azure_subscription_id
+          resourceGroup                = var.azure_resource_group_name
+          useWorkloadIdentityExtension = true
+        })
+      }
     }
     policy        = "sync"
     txtOwnerId    = var.workspace
@@ -317,7 +335,11 @@ resource "helm_release" "external_dns" {
     sources       = ["ingress", "service"]
   })]
 
-  depends_on = [helm_release.external_secrets[0]]
+  depends_on = [
+    helm_release.external_secrets[0],
+    azurerm_federated_identity_credential.external_dns[0],
+    azurerm_role_assignment.external_dns_dns_zone[0],
+  ]
 }
 
 resource "helm_release" "alb_controller" {
