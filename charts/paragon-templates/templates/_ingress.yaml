@@ -3,7 +3,19 @@ Standard Ingress for all microservices.
 Call with: include "ingress.standard" $
 */}}
 {{- define "ingress.standard" -}}
-{{- if .Values.ingress.enabled -}}
+{{/*
+Per-service ingress is gated by both the per-service value and an optional global
+override: global.ingress.enabled (when set) is AND-ed with .Values.ingress.enabled.
+This lets a single global.ingress.enabled=false disable every per-service ingress
+(e.g. GCP, which uses the shared-ingress template instead), while per-service
+ingress.enabled=false still disables an individual service. When global.ingress.enabled
+is unset (AWS/Azure), behavior is unchanged.
+*/}}
+{{- $enabled := .Values.ingress.enabled -}}
+{{- if and (hasKey .Values "global") (hasKey .Values.global "ingress") (hasKey .Values.global.ingress "enabled") -}}
+{{- $enabled = and $enabled .Values.global.ingress.enabled -}}
+{{- end -}}
+{{- if $enabled -}}
 {{- $name := .Chart.Name -}}
 {{- $fullName := include (printf "%s.fullname" $name) . -}}
 {{- $svcPort := .Values.service.port -}}
@@ -76,8 +88,14 @@ metadata:
     {{- end }}
     ingress.kubernetes.io/healthcheck-path: {{ .Values.ingress.healthcheck_path | default "/healthz" }}
     kubernetes.io/ingress.allow-http: "true"
-    kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.loadBalancerName }}
-    networking.gke.io/v1beta1.FrontendConfig: {{ .Values.ingress.frontendConfig }}
+    {{- $gcpStaticIp := .Values.ingress.loadBalancerName | default (dig "ingress" "loadBalancerName" "" .Values.global) }}
+    {{- if $gcpStaticIp }}
+    kubernetes.io/ingress.global-static-ip-name: {{ $gcpStaticIp }}
+    {{- end }}
+    {{- $gcpFrontendConfig := .Values.ingress.frontendConfig | default (dig "ingress" "frontendConfig" "" .Values.global) }}
+    {{- if $gcpFrontendConfig }}
+    networking.gke.io/v1beta1.FrontendConfig: {{ $gcpFrontendConfig }}
+    {{- end }}
     {{- else }}
     kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: letsencrypt-prod
@@ -100,7 +118,10 @@ spec:
         - {{ include (printf "%s.ingressHost" $name) . }}
       secretName: {{ .Values.tls_secret | default (printf "%s-tls" (include (printf "%s.fullname" $name) .)) }}
   {{- else if eq .Values.global.env.HOST_ENV "GCP_K8" }}
-  loadBalancerIP: {{ .Values.ingress.loadBalancerIP }}
+  {{- $gcpLbIp := .Values.ingress.loadBalancerIP | default (dig "ingress" "loadBalancerIP" "" .Values.global) }}
+  {{- if $gcpLbIp }}
+  loadBalancerIP: {{ $gcpLbIp }}
+  {{- end }}
   {{- end }}
   rules:
     {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "hermes") }}
