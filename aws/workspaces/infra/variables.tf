@@ -299,6 +299,12 @@ variable "migrated_passwords" {
   default     = {}
 }
 
+variable "cdn_bucket_acl_reset" {
+  description = "Reset the CDN S3 bucket ACL to private before BucketOwnerEnforced. Defaults to false; set true once when migrating a legacy CDN bucket with existing ACL grants, then remove."
+  type        = bool
+  default     = false
+}
+
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync."
   type        = bool
