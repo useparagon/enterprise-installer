@@ -12,7 +12,7 @@ locals {
 
   argocd_redis_cache = try(local.argocd_redis.cache, null)
 
-  argocd_default_redis_url = local.argocd_redis_cache != null ? "${local.argocd_redis_cache.host}:${local.argocd_redis_cache.port}" : null
+  argocd_default_redis_url = local.argocd_redis_cache != null ? "${try(local.argocd_redis_cache.ssl, false) ? "rediss" : "redis"}://${local.argocd_redis_cache.password != null ? ":${urlencode(local.argocd_redis_cache.password)}@" : ""}${local.argocd_redis_cache.host}:${local.argocd_redis_cache.port}" : null
 
   argocd_redis_role_source = {
     cache    = "cache"
@@ -37,8 +37,8 @@ locals {
   }
 
   argocd_redis_url = {
-    for role in keys(local.argocd_redis_endpoint) :
-    role => local.argocd_redis_endpoint[role] != null ? "${local.argocd_redis_endpoint[role].host}:${local.argocd_redis_endpoint[role].port}" : local.argocd_default_redis_url
+    for role, r in local.argocd_redis_endpoint :
+    role => r != null ? "${try(r.ssl, false) ? "rediss" : "redis"}://${r.password != null ? ":${urlencode(r.password)}@" : ""}${r.host}:${r.port}" : local.argocd_default_redis_url
   }
 
   argocd_public_url_subdomains = {
