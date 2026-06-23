@@ -11,12 +11,11 @@ resource "azurerm_user_assigned_identity" "eso" {
 resource "azurerm_federated_identity_credential" "eso" {
   count = local.enabled ? 1 : 0
 
-  name                = "${var.workspace}-eso"
-  resource_group_name = var.azure_resource_group_name
-  parent_id           = azurerm_user_assigned_identity.eso[0].id
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = var.oidc_issuer_url
-  subject             = "system:serviceaccount:${local.gitops_eso_namespace}:${local.gitops_eso_sa_name}"
+  name                      = "${var.workspace}-eso"
+  user_assigned_identity_id = azurerm_user_assigned_identity.eso[0].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = var.oidc_issuer_url
+  subject                   = "system:serviceaccount:${local.gitops_eso_namespace}:${local.gitops_eso_sa_name}"
 }
 
 resource "azurerm_key_vault_access_policy" "eso" {
@@ -40,12 +39,11 @@ resource "azurerm_user_assigned_identity" "external_dns" {
 resource "azurerm_federated_identity_credential" "external_dns" {
   count = local.gitops_ingress_enabled ? 1 : 0
 
-  name                = "${var.workspace}-edns"
-  resource_group_name = var.azure_resource_group_name
-  parent_id           = azurerm_user_assigned_identity.external_dns[0].id
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = var.oidc_issuer_url
-  subject             = "system:serviceaccount:external-dns:external-dns"
+  name                      = "${var.workspace}-edns"
+  user_assigned_identity_id = azurerm_user_assigned_identity.external_dns[0].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = var.oidc_issuer_url
+  subject                   = "system:serviceaccount:external-dns:external-dns"
 }
 
 resource "azurerm_role_assignment" "external_dns_dns_zone" {
@@ -67,12 +65,11 @@ resource "azurerm_user_assigned_identity" "alb_controller" {
 resource "azurerm_federated_identity_credential" "alb_controller" {
   count = local.gitops_ingress_enabled ? 1 : 0
 
-  name                = "${var.workspace}-alb-ctrl"
-  resource_group_name = var.azure_resource_group_name
-  parent_id           = azurerm_user_assigned_identity.alb_controller[0].id
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = var.oidc_issuer_url
-  subject             = "system:serviceaccount:azure-alb-system:alb-controller-sa"
+  name                      = "${var.workspace}-alb-ctrl"
+  user_assigned_identity_id = azurerm_user_assigned_identity.alb_controller[0].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = var.oidc_issuer_url
+  subject                   = "system:serviceaccount:azure-alb-system:alb-controller-sa"
 }
 
 resource "azurerm_role_assignment" "alb_controller_node_rg" {

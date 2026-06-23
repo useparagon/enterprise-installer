@@ -1,5 +1,7 @@
 # Nested JSON handoff secrets for the paragon Terraform workspace (postgres, redis,
-# storage, kafka). Always created so paragon can read infra_vars via Secrets Manager.
+# storage, kafka, bastion). Always created so paragon can read infra_vars via Secrets
+# Manager and operators can retrieve sensitive infra outputs (e.g. the bastion private
+# key) without pulling Terraform state.
 # When argocd_enabled, infra additionally writes a flat paragon/<ws>/env secret for GitOps.
 
 locals {
@@ -55,6 +57,8 @@ resource "aws_secretsmanager_secret_version" "runtime_storage" {
     public_bucket       = module.storage.s3.public_bucket
     private_bucket      = module.storage.s3.private_bucket
     managed_sync_bucket = module.storage.s3.managed_sync_bucket
+    logs_bucket         = module.storage.s3.logs_bucket
+    auditlogs_bucket    = module.storage.s3.auditlogs_bucket
     microservice_user   = module.storage.s3.minio_microservice_user
     microservice_pass   = module.storage.s3.minio_microservice_pass
     root_user           = module.storage.s3.access_key_id
@@ -85,5 +89,24 @@ resource "aws_secretsmanager_secret_version" "runtime_kafka" {
     cluster_password          = module.kafka[0].kafka_credentials.password
     cluster_mechanism         = module.kafka[0].kafka_credentials.mechanism
     cluster_tls_enabled       = module.kafka[0].cluster_tls_enabled
+  })
+}
+
+resource "aws_secretsmanager_secret" "runtime_bastion" {
+  name                    = "${local.runtime_secret_prefix}/bastion"
+  description             = "Bastion SSH connection info for ${var.organization}"
+  recovery_window_in_days = var.secrets_recovery_window_in_days
+
+  tags = {
+    Name         = "${local.runtime_secret_prefix}/bastion"
+    Organization = var.organization
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "runtime_bastion" {
+  secret_id = aws_secretsmanager_secret.runtime_bastion.id
+  secret_string = jsonencode({
+    public_dns  = module.bastion.connection.bastion_dns
+    private_key = module.bastion.connection.private_key
   })
 }

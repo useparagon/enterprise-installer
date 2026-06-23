@@ -15,6 +15,6 @@ resource "cloudflare_record" "paragon_nameserver" {
   zone_id = var.cloudflare_zone_id
   name    = trimspace(var.paragon_domain)
   type    = "NS"
-  value   = google_dns_managed_zone.paragon[0].name_servers[count.index]
+  content = google_dns_managed_zone.paragon[0].name_servers[count.index]
   ttl     = 86400
 }
