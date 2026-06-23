@@ -173,6 +173,32 @@ locals {
           }]
         }
       }) : null,
+      local.secrets_ready ? yamlencode({
+        apiVersion = "external-secrets.io/v1beta1"
+        kind       = "ExternalSecret"
+        metadata = {
+          name      = "redis-ca-cert"
+          namespace = var.destination_namespace
+        }
+        spec = {
+          refreshInterval = "1h"
+          secretStoreRef = {
+            name = var.cluster_secret_store_name
+            kind = "ClusterSecretStore"
+          }
+          target = {
+            name           = "redis-ca-cert"
+            creationPolicy = "Owner"
+          }
+          data = [{
+            secretKey = "server-ca.pem"
+            remoteRef = {
+              key      = "${var.workspace}-redis-ca-cert"
+              property = "server-ca.pem"
+            }
+          }]
+        }
+      }) : null,
     ]) : yamldecode(m)
   ]
 
