@@ -1,4 +1,8 @@
 locals {
+  # api-sync is only in var.microservices when managed_sync_enabled is true, but locals
+  # are always evaluated — use try() so plan succeeds when managed sync is disabled.
+  api_sync_host = replace(replace(try(var.microservices["api-sync"].public_url, ""), "https://", ""), "http://", "")
+
   # openfga-migrate is a post-install hook while the openfga ServiceAccount is normally
   # a regular resource. On first install, AKS can create the Job before the SA is
   # visible, producing: serviceaccount "openfga" not found.
@@ -31,7 +35,7 @@ locals {
       ingress = {
         class     = "nginx"
         className = "nginx"
-        host      = replace(replace(var.microservices["api-sync"].public_url, "https://", ""), "http://", "")
+        host      = local.api_sync_host
         annotations = {
           "kubernetes.io/ingress.class"    = "nginx"
           "cert-manager.io/cluster-issuer" = "letsencrypt-prod"
@@ -89,7 +93,7 @@ resource "helm_release" "managed_sync" {
 
   set {
     name  = "ingress.host"
-    value = replace(replace(var.microservices["api-sync"].public_url, "https://", ""), "http://", "")
+    value = local.api_sync_host
   }
 
   set {
