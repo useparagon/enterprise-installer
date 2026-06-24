@@ -22,7 +22,6 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 5.100.0 |
 | <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | 4.52.7 |
-| <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | 2.38.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | 3.9.0 |
 | <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
 | <a name="provider_time"></a> [time](#provider\_time) | 0.14.0 |
@@ -50,10 +49,12 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | ---- | ---- |
 | [aws_route53_record.paragon_caa](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_record) | resource |
 | [aws_route53_zone.paragon](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_zone) | resource |
+| [aws_secretsmanager_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret_version.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
@@ -65,7 +66,6 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | [time_sleep.gitops_eso_crds](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_eks_cluster_auth.gitops](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/eks_cluster_auth) | data source |
-| [kubernetes_resources.gitops_alb_ingress_class](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/data-sources/resources) | data source |
 
 ## Inputs
 
@@ -121,6 +121,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_elasticache_node_type"></a> [elasticache\_node\_type](#input\_elasticache\_node\_type) | The ElastiCache node type used for Redis. | `string` | `"cache.r6g.large"` | no |
 | <a name="input_eso_addon_overrides"></a> [eso\_addon\_overrides](#input\_eso\_addon\_overrides) | Optional overrides for the Blueprints external-secrets addon (merged into the default external\_secrets map). | `map(any)` | `{}` | no |
 | <a name="input_eso_chart_version"></a> [eso\_chart\_version](#input\_eso\_chart\_version) | Helm chart version for external-secrets operator. | `string` | `"0.14.4"` | no |
+| <a name="input_gitops_alb_ingressclass_exists"></a> [gitops\_alb\_ingressclass\_exists](#input\_gitops\_alb\_ingressclass\_exists) | Brownfield flag: set true when a cluster-scoped IngressClass named "alb" already exists (e.g. installed by the legacy paragon Helm "ingress" release). When true, the AWS Load Balancer Controller is configured with createIngressClassResource=false to avoid an "already exists" conflict. Set explicitly per stack instead of probed at plan time — a live cluster read during plan blocks the entire plan (and any destroy) for minutes whenever the EKS API is unreachable. | `bool` | `false` | no |
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.35"` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
 | <a name="input_master_guardduty_account_id"></a> [master\_guardduty\_account\_id](#input\_master\_guardduty\_account\_id) | Optional AWS account id to delegate GuardDuty control to. | `string` | `null` | no |
