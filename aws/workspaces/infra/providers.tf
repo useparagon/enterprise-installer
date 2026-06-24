@@ -52,23 +52,30 @@ provider "cloudflare" {
 # access entries on the cluster — not the bastion host.
 # Gated on argocd_enabled so the providers are configured with empty credentials
 # when ArgoCD is disabled (e.g. during teardown), preventing client-go API
-# discovery hangs against the EKS endpoint.
+# discovery hangs against the EKS endpoint. The host must also be empty (not just
+# the token) because client-go hangs on API discovery even with no auth token.
 data "aws_eks_cluster_auth" "gitops" {
   count = var.argocd_enabled ? 1 : 0
   name  = module.cluster.eks_cluster.name
 }
 
+locals {
+  k8s_host  = var.argocd_enabled ? module.cluster.eks_cluster.cluster_endpoint : ""
+  k8s_ca    = var.argocd_enabled ? base64decode(module.cluster.eks_cluster.cluster_certificate_authority_data) : ""
+  k8s_token = try(data.aws_eks_cluster_auth.gitops[0].token, "")
+}
+
 provider "kubernetes" {
-  host                   = try(module.cluster.eks_cluster.cluster_endpoint, "")
-  cluster_ca_certificate = try(base64decode(module.cluster.eks_cluster.cluster_certificate_authority_data), "")
-  token                  = try(data.aws_eks_cluster_auth.gitops[0].token, "")
+  host                   = local.k8s_host
+  cluster_ca_certificate = local.k8s_ca
+  token                  = local.k8s_token
 }
 
 provider "helm" {
   kubernetes {
-    host                   = try(module.cluster.eks_cluster.cluster_endpoint, "")
-    cluster_ca_certificate = try(base64decode(module.cluster.eks_cluster.cluster_certificate_authority_data), "")
-    token                  = try(data.aws_eks_cluster_auth.gitops[0].token, "")
+    host                   = local.k8s_host
+    cluster_ca_certificate = local.k8s_ca
+    token                  = local.k8s_token
   }
 }
 
@@ -76,8 +83,8 @@ provider "helm" {
 # NOT validate the GroupVersionKind at plan-time. This is required for CRs (ClusterSecretStore,
 # ExternalSecret, ArgoCD Application) whose CRDs are installed earlier in the same apply.
 provider "kubectl" {
-  host                   = try(module.cluster.eks_cluster.cluster_endpoint, "")
-  cluster_ca_certificate = try(base64decode(module.cluster.eks_cluster.cluster_certificate_authority_data), "")
-  token                  = try(data.aws_eks_cluster_auth.gitops[0].token, "")
+  host                   = local.k8s_host
+  cluster_ca_certificate = local.k8s_ca
+  token                  = local.k8s_token
   load_config_file       = false
 }
