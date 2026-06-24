@@ -1,0 +1,69 @@
+## Release Changelog (manual dispatch caller)
+##
+## Calls the org-wide reusable changelog workflow in
+## useparagon-internal/paragon-release-changelogs. That workflow:
+##   1. release-scope   — resolves the from_tag..to_tag window, collects every
+##                        merged PR in the window, attaches them to a milestone.
+##   2. release-compose — builds the release package + an AI Release Summary
+##                        (cursor-agent, read-only ask mode over the PR/Jira
+##                        digest) with a deterministic categorized fallback.
+##   3. release-publish — creates/updates the GitHub Release (with the PR list +
+##                        AI summary) and the Confluence/Jira changelog page.
+##
+## This file is the MANUAL entry point. The companion changelog-auto-trigger.yaml
+## fires this automatically on each new release tag.
+##
+## Required on this repo before a live run:
+##   secrets: ATLASSIAN_API_TOKEN, ATLASSIAN_EMAIL  (and optionally CURSOR_API_KEY
+##            to enable the AI summary; without it a deterministic fallback runs)
+##   vars:    JIRA_BASE_URL  (e.g. https://useparagon.atlassian.net) — must be a
+##            repository/org VARIABLE, not a secret.
+
+name: release-changelog
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_tag:
+        description: "Start tag — the previous release (e.g. 2026.0608.1108-f0557563)."
+        required: true
+        type: string
+      to_tag:
+        description: "End tag — the new release (e.g. 2026.0612.1204-9346a7d4)."
+        required: true
+        type: string
+      jira_project_keys:
+        description: "Jira project key filter (comma-separated). Leave default for PARA only."
+        required: false
+        type: string
+        default: "PARA"
+      draft:
+        description: "Publish as a draft release (banner + open milestone + unreleased Jira version)."
+        required: false
+        type: boolean
+        default: false
+      verbose:
+        description: "Enable verbose diagnostic logging."
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  changelog:
+    # TODO: pin to @vX.Y.Z once paragon-release-changelogs cuts a tagged release.
+    uses: useparagon-internal/paragon-release-changelogs/.github/workflows/release-changelog.yml@main
+    with:
+      repository: ${{ github.repository }}
+      scope_mode: tag
+      from_tag: ${{ inputs.from_tag }}
+      to_tag: ${{ inputs.to_tag }}
+      jira_base_url: ${{ vars.JIRA_BASE_URL }}
+      confluence_space_key: PARARELEASES
+      confluence_folder_path: Repositories/${{ github.event.repository.name }}
+      jira_project_keys: ${{ inputs.jira_project_keys }}
+      draft: ${{ inputs.draft }}
+      verbose: ${{ inputs.verbose }}
+    secrets:
+      ATLASSIAN_API_TOKEN: ${{ secrets.ATLASSIAN_API_TOKEN }}
+      ATLASSIAN_EMAIL: ${{ secrets.ATLASSIAN_EMAIL }}
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
