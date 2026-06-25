@@ -247,8 +247,6 @@ module "argocd" {
   paragon_domain          = local.paragon_domain_trimmed
 
   app_chart_repository         = var.argocd_app_chart_repository
-  paragon_chart_version        = var.paragon_chart_version
-  paragon_monitor_version      = var.paragon_monitor_version
   paragon_managed_sync_version = var.paragon_managed_sync_version
   paragon_monitors_enabled     = var.paragon_monitors_enabled
   managed_sync_enabled         = var.managed_sync_enabled

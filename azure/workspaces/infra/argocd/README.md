@@ -34,14 +34,17 @@ No modules.
 | [azurerm_dns_zone.paragon](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/dns_zone) | resource |
 | [azurerm_federated_identity_credential.alb_controller](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential) | resource |
 | [azurerm_federated_identity_credential.eso](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential) | resource |
+| [azurerm_federated_identity_credential.external_dns](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential) | resource |
 | [azurerm_key_vault_access_policy.eso](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_access_policy) | resource |
 | [azurerm_key_vault_secret.docker_cfg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.env](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.managed_sync](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.openobserve](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_role_assignment.alb_controller_node_rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_role_assignment.external_dns_dns_zone](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_user_assigned_identity.alb_controller](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity) | resource |
 | [azurerm_user_assigned_identity.eso](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity) | resource |
+| [azurerm_user_assigned_identity.external_dns](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity) | resource |
 | [cloudflare_record.paragon_nameserver](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/record) | resource |
 | [helm_release.alb_controller](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
 | [helm_release.argocd](https://registry.terraform.io/providers/hashicorp/helm/latest/docs/resources/release) | resource |
@@ -64,6 +67,7 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_app_chart_repository"></a> [app\_chart\_repository](#input\_app\_chart\_repository) | Helm chart repository URL for Paragon application charts. | `string` | `""` | no |
 | <a name="input_argocd_addon_overrides"></a> [argocd\_addon\_overrides](#input\_argocd\_addon\_overrides) | Optional overrides merged into the ArgoCD Helm values. | `map(any)` | `{}` | no |
+| <a name="input_argocd_enabled"></a> [argocd\_enabled](#input\_argocd\_enabled) | When false, no ArgoCD/GitOps resources are created in this module. | `bool` | `false` | no |
 | <a name="input_argocd_helm_chart_version"></a> [argocd\_helm\_chart\_version](#input\_argocd\_helm\_chart\_version) | Version of the argo-cd Helm chart. | `string` | n/a | yes |
 | <a name="input_argocd_namespace"></a> [argocd\_namespace](#input\_argocd\_namespace) | Namespace to install ArgoCD into. | `string` | `"argocd"` | no |
 | <a name="input_argocd_release_name"></a> [argocd\_release\_name](#input\_argocd\_release\_name) | Argo CD Helm release name used for in-cluster secret discovery. | `string` | `"argo-cd"` | no |
@@ -96,10 +100,8 @@ No modules.
 | <a name="input_managed_sync_config"></a> [managed\_sync\_config](#input\_managed\_sync\_config) | Managed-sync secret data to write to Key Vault. Null when managed sync is disabled. | `map(string)` | `null` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether managed sync is enabled. | `bool` | `false` | no |
 | <a name="input_oidc_issuer_url"></a> [oidc\_issuer\_url](#input\_oidc\_issuer\_url) | OIDC issuer URL for Workload Identity federation. | `string` | n/a | yes |
-| <a name="input_paragon_chart_version"></a> [paragon\_chart\_version](#input\_paragon\_chart\_version) | Target chart version for Paragon charts. | `string` | `null` | no |
 | <a name="input_paragon_domain"></a> [paragon\_domain](#input\_paragon\_domain) | Customer-facing Paragon domain. | `string` | `""` | no |
 | <a name="input_paragon_managed_sync_version"></a> [paragon\_managed\_sync\_version](#input\_paragon\_managed\_sync\_version) | Chart version for managed-sync. | `string` | `null` | no |
-| <a name="input_paragon_monitor_version"></a> [paragon\_monitor\_version](#input\_paragon\_monitor\_version) | Chart version for the monitoring stack. | `string` | `null` | no |
 | <a name="input_paragon_monitors_enabled"></a> [paragon\_monitors\_enabled](#input\_paragon\_monitors\_enabled) | Whether monitoring charts are deployed via Argo CD. | `bool` | `false` | no |
 | <a name="input_self_heal"></a> [self\_heal](#input\_self\_heal) | Whether to enable self-healing on the bootstrap Application. | `bool` | `true` | no |
 | <a name="input_workspace"></a> [workspace](#input\_workspace) | Workspace name used for resource naming. | `string` | n/a | yes |

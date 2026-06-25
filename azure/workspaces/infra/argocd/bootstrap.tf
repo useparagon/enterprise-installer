@@ -193,12 +193,6 @@ locals {
     trimspace(var.app_chart_repository) != "" ? {
       app_chart_repository = trimspace(var.app_chart_repository)
     } : {},
-    var.paragon_chart_version != null && trimspace(var.paragon_chart_version) != "" ? {
-      paragon_chart_version = trimspace(var.paragon_chart_version)
-    } : {},
-    var.paragon_monitor_version != null && trimspace(var.paragon_monitor_version) != "" ? {
-      paragon_monitor_version = trimspace(var.paragon_monitor_version)
-    } : {},
     var.paragon_managed_sync_version != null && trimspace(var.paragon_managed_sync_version) != "" ? {
       paragon_managed_sync_version = trimspace(var.paragon_managed_sync_version)
     } : {},

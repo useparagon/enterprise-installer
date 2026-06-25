@@ -488,23 +488,11 @@ variable "argocd_bootstrap_repo_private" {
   nullable    = false
 }
 
-variable "paragon_chart_version" {
-  description = "Target chart version or constraint for Paragon charts deployed via ArgoCD. Required when argocd_enabled is true."
-  type        = string
-  default     = null
-}
-
 variable "paragon_monitors_enabled" {
   description = "Whether monitoring charts should be deployed via ArgoCD."
   type        = bool
   default     = false
   nullable    = false
-}
-
-variable "paragon_monitor_version" {
-  description = "Chart version for the monitoring stack when deployed via ArgoCD."
-  type        = string
-  default     = null
 }
 
 variable "paragon_managed_sync_config" {
@@ -605,17 +593,6 @@ resource "terraform_data" "validate_argocd_versions" {
 
   lifecycle {
     precondition {
-      condition     = var.paragon_chart_version == null || trimspace(var.paragon_chart_version) != ""
-      error_message = "paragon_chart_version cannot be empty when set."
-    }
-    precondition {
-      condition = (
-        !var.argocd_enabled ||
-        (var.paragon_chart_version != null && trimspace(var.paragon_chart_version) != "")
-      )
-      error_message = "paragon_chart_version is required when argocd_enabled is true."
-    }
-    precondition {
       condition     = trimspace(var.argocd_app_chart_repository) != ""
       error_message = "argocd_app_chart_repository cannot be empty."
     }
@@ -638,10 +615,6 @@ resource "terraform_data" "validate_argocd_versions" {
         (var.paragon_managed_sync_config != null && length(var.paragon_managed_sync_config) > 0)
       )
       error_message = "paragon_managed_sync_config is required when argocd_enabled and managed_sync_enabled are both true."
-    }
-    precondition {
-      condition     = !var.paragon_monitors_enabled || (var.paragon_monitor_version != null && trimspace(var.paragon_monitor_version) != "")
-      error_message = "paragon_monitor_version must be set when paragon_monitors_enabled is true."
     }
     precondition {
       condition     = contains(["external", "internal"], var.argocd_ingress_scheme)

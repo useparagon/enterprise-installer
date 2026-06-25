@@ -148,18 +148,6 @@ variable "app_chart_repository" {
   default     = ""
 }
 
-variable "paragon_chart_version" {
-  description = "Target chart version or constraint for Paragon charts (GitOps bridge annotation)."
-  type        = string
-  default     = null
-}
-
-variable "paragon_monitor_version" {
-  description = "Chart version for the monitoring stack when deployed via Argo CD (GitOps bridge annotation)."
-  type        = string
-  default     = null
-}
-
 variable "paragon_managed_sync_version" {
   description = "Chart version for managed-sync when deployed via Argo CD (GitOps bridge annotation)."
   type        = string

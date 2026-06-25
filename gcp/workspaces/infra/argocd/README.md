@@ -32,7 +32,13 @@ No modules.
 | Name | Type |
 | ---- | ---- |
 | [cloudflare_record.paragon_nameserver](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/record) | resource |
+| [google_certificate_manager_certificate.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/certificate_manager_certificate) | resource |
+| [google_certificate_manager_certificate_map.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/certificate_manager_certificate_map) | resource |
+| [google_certificate_manager_certificate_map_entry.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/certificate_manager_certificate_map_entry) | resource |
+| [google_certificate_manager_dns_authorization.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/certificate_manager_dns_authorization) | resource |
+| [google_compute_global_address.loadbalancer](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_global_address) | resource |
 | [google_dns_managed_zone.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/dns_managed_zone) | resource |
+| [google_dns_record_set.cert_auth](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/dns_record_set) | resource |
 | [google_project_iam_member.eso_secret_accessor](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
 | [google_project_iam_member.external_dns_dns_admin](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
 | [google_secret_manager_secret.docker_cfg](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
@@ -66,6 +72,7 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_app_chart_repository"></a> [app\_chart\_repository](#input\_app\_chart\_repository) | Helm chart repository URL for Paragon application charts (GitOps bridge annotation). | `string` | `""` | no |
 | <a name="input_argocd_addon_overrides"></a> [argocd\_addon\_overrides](#input\_argocd\_addon\_overrides) | Optional overrides merged into the ArgoCD Helm values. | `map(any)` | `{}` | no |
+| <a name="input_argocd_enabled"></a> [argocd\_enabled](#input\_argocd\_enabled) | When false, no ArgoCD/GitOps resources are created in this module. | `bool` | `false` | no |
 | <a name="input_argocd_helm_chart_version"></a> [argocd\_helm\_chart\_version](#input\_argocd\_helm\_chart\_version) | Version of the argo-cd Helm chart. | `string` | `"9.5.15"` | no |
 | <a name="input_argocd_namespace"></a> [argocd\_namespace](#input\_argocd\_namespace) | Namespace to install ArgoCD into. | `string` | `"argocd"` | no |
 | <a name="input_argocd_release_name"></a> [argocd\_release\_name](#input\_argocd\_release\_name) | Argo CD Helm release name used for in-cluster secret discovery. | `string` | `"argo-cd"` | no |
@@ -92,10 +99,8 @@ No modules.
 | <a name="input_labels"></a> [labels](#input\_labels) | Labels to apply to GCP resources (must be lowercase key/value pairs). | `map(string)` | `{}` | no |
 | <a name="input_managed_sync_config"></a> [managed\_sync\_config](#input\_managed\_sync\_config) | Optional managed-sync secret data (null when managed sync is disabled). | `map(string)` | `null` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether managed sync is enabled (GitOps bridge annotation). | `bool` | `false` | no |
-| <a name="input_paragon_chart_version"></a> [paragon\_chart\_version](#input\_paragon\_chart\_version) | Target chart version or constraint for Paragon charts (GitOps bridge annotation). | `string` | `null` | no |
 | <a name="input_paragon_domain"></a> [paragon\_domain](#input\_paragon\_domain) | Customer-facing Paragon domain (GitOps bridge annotation paragon\_domain). | `string` | `""` | no |
 | <a name="input_paragon_managed_sync_version"></a> [paragon\_managed\_sync\_version](#input\_paragon\_managed\_sync\_version) | Chart version for managed-sync (GitOps bridge annotation). | `string` | `null` | no |
-| <a name="input_paragon_monitor_version"></a> [paragon\_monitor\_version](#input\_paragon\_monitor\_version) | Chart version for the monitoring stack (GitOps bridge annotation). | `string` | `null` | no |
 | <a name="input_paragon_monitors_enabled"></a> [paragon\_monitors\_enabled](#input\_paragon\_monitors\_enabled) | Whether monitoring charts are deployed via Argo CD (GitOps bridge annotation). | `bool` | `false` | no |
 | <a name="input_self_heal"></a> [self\_heal](#input\_self\_heal) | Whether to enable self-healing on the bootstrap Application. | `bool` | `true` | no |
 | <a name="input_workspace"></a> [workspace](#input\_workspace) | Workspace name used for resource naming. | `string` | n/a | yes |
@@ -109,4 +114,7 @@ No modules.
 | <a name="output_cluster_secret_store_name"></a> [cluster\_secret\_store\_name](#output\_cluster\_secret\_store\_name) | Name of the ClusterSecretStore. |
 | <a name="output_eso_gsa_email"></a> [eso\_gsa\_email](#output\_eso\_gsa\_email) | GSA email for the External Secrets Operator. |
 | <a name="output_gitops_bridge_secret_name"></a> [gitops\_bridge\_secret\_name](#output\_gitops\_bridge\_secret\_name) | Name of the GitOps bridge cluster secret. |
+| <a name="output_ingress_certificate_map_name"></a> [ingress\_certificate\_map\_name](#output\_ingress\_certificate\_map\_name) | Certificate Manager cert-map name (global.ingress.certificate). |
+| <a name="output_ingress_static_ip_address"></a> [ingress\_static\_ip\_address](#output\_ingress\_static\_ip\_address) | Reserved global static IP address for the shared Ingress. |
+| <a name="output_ingress_static_ip_name"></a> [ingress\_static\_ip\_name](#output\_ingress\_static\_ip\_name) | Name of the reserved global static IP (global.ingress.loadBalancerName). |
 <!-- END_TF_DOCS -->

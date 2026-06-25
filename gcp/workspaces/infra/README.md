@@ -48,17 +48,22 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 
 | Name | Type |
 | ---- | ---- |
+| [google_gke_hub_membership.cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/gke_hub_membership) | resource |
+| [google_secret_manager_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_redis_ca_cert](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret_version.runtime_bastion](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_postgres](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_redis](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_redis_ca_cert](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_storage](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [terraform_data.validate_argocd_versions](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
+| [google_client_config.default](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/client_config) | data source |
+| [google_project.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/project) | data source |
 
 ## Inputs
 
@@ -121,11 +126,9 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.33"` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync (GMK cluster, managed\_sync bucket, postgres and redis instances). | `bool` | `false` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
-| <a name="input_paragon_chart_version"></a> [paragon\_chart\_version](#input\_paragon\_chart\_version) | Target chart version or constraint for Paragon charts deployed via ArgoCD. Required when argocd\_enabled is true. | `string` | `null` | no |
 | <a name="input_paragon_domain"></a> [paragon\_domain](#input\_paragon\_domain) | Customer-facing Paragon domain (e.g. customer.example.com). Written to Secret Manager as PARAGON\_DOMAIN and derived *\_PUBLIC\_URL values when argocd\_enabled. | `string` | `null` | no |
 | <a name="input_paragon_managed_sync_config"></a> [paragon\_managed\_sync\_config](#input\_paragon\_managed\_sync\_config) | Optional managed-sync secret data to write to Secret Manager. Null when managed sync is disabled. | `map(string)` | `null` | no |
 | <a name="input_paragon_managed_sync_version"></a> [paragon\_managed\_sync\_version](#input\_paragon\_managed\_sync\_version) | Chart version for managed-sync when deployed via ArgoCD. Required when argocd\_enabled and managed\_sync\_enabled are both true. | `string` | `null` | no |
-| <a name="input_paragon_monitor_version"></a> [paragon\_monitor\_version](#input\_paragon\_monitor\_version) | Chart version for the monitoring stack when deployed via ArgoCD. | `string` | `null` | no |
 | <a name="input_paragon_monitors_enabled"></a> [paragon\_monitors\_enabled](#input\_paragon\_monitors\_enabled) | Whether monitoring charts should be deployed via ArgoCD. | `bool` | `false` | no |
 | <a name="input_postgres_multiple_instances"></a> [postgres\_multiple\_instances](#input\_postgres\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_postgres_tier"></a> [postgres\_tier](#input\_postgres\_tier) | The instance type to use for Postgres. | `string` | `"db-custom-2-7680"` | no |

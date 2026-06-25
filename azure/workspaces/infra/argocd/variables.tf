@@ -215,18 +215,6 @@ variable "app_chart_repository" {
   default     = ""
 }
 
-variable "paragon_chart_version" {
-  description = "Target chart version for Paragon charts."
-  type        = string
-  default     = null
-}
-
-variable "paragon_monitor_version" {
-  description = "Chart version for the monitoring stack."
-  type        = string
-  default     = null
-}
-
 variable "paragon_managed_sync_version" {
   description = "Chart version for managed-sync."
   type        = string
