@@ -148,7 +148,7 @@ variable "elasticache_multi_az" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.33"
+  default     = "1.34"
 }
 
 variable "eks_ondemand_node_instance_type" {
@@ -321,7 +321,7 @@ variable "managed_sync_enabled" {
 variable "msk_kafka_version" {
   description = "The Kafka version for the MSK cluster."
   type        = string
-  default = "3.9.x"
+  default     = "3.9.x"
 }
 
 variable "msk_kafka_num_broker_nodes" {
