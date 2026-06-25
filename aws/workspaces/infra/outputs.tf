@@ -64,3 +64,8 @@ output "cluster_name" {
   description = "The name of the EKS cluster."
   value       = module.cluster.eks_cluster.name
 }
+
+output "enable_legacy_mng_pools" {
+  description = "Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional NTH."
+  value       = module.cluster.enable_legacy_mng_pools
+}

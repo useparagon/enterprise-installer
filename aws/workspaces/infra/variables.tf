@@ -197,6 +197,117 @@ variable "create_autoscaling_linked_role" {
   default     = true
 }
 
+variable "enable_karpenter" {
+  description = "Enable Karpenter autoscaling (SQS, IAM, Helm controller, EC2NodeClass, NodePools)."
+  type        = bool
+  default     = false
+}
+
+variable "enable_legacy_mng_pools" {
+  description = "Keep legacy on-demand and spot EKS managed node groups during Karpenter migration."
+  type        = bool
+  default     = true
+
+  validation {
+    condition     = var.enable_karpenter || var.enable_legacy_mng_pools
+    error_message = "At least one worker capacity source must be enabled: enable_karpenter or enable_legacy_mng_pools."
+  }
+}
+
+variable "karpenter_chart_version" {
+  description = "Karpenter Helm chart version (OCI public.ecr.aws/karpenter/karpenter)."
+  type        = string
+  default     = "1.13.0"
+}
+
+variable "karpenter_iam_names" {
+  description = "Optional override for Karpenter IAM role names."
+  type = object({
+    controller_role_name = optional(string)
+    node_role_name       = optional(string)
+  })
+  default = {}
+}
+
+variable "karpenter_defaults" {
+  description = "Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults."
+  type = object({
+    ec2_node_class_name             = optional(string)
+    ami_selector_alias              = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+    expire_after             = optional(string)
+    termination_grace_period = optional(string)
+    ec2_name_tag             = optional(string)
+    ec2_kubelet_max_pods     = optional(number)
+  })
+  default = {}
+}
+
+variable "karpenter_node_pool_overrides" {
+  description = "Optional per-NodePool overrides (limits, disruption, instance types). Not required for normal Paragon deploys."
+  type = map(object({
+    instance_types                  = optional(list(string))
+    instance_categories             = optional(list(string))
+    cpu_limit                       = optional(string)
+    memory_limit                    = optional(string)
+    nodes_limit                     = optional(number)
+    expire_after                    = optional(string)
+    termination_grace_period        = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+  }))
+  default = {}
+}
+
+variable "karpenter_node_pools" {
+  description = "Additional custom NodePool definitions beyond default-spot and default-ondemand."
+  type = map(object({
+    capacity_types      = list(string)
+    weight              = optional(number)
+    capacity_type_label = optional(string)
+    instance_types      = optional(list(string))
+    cpu_limit           = optional(string)
+    memory_limit        = optional(string)
+    nodes_limit         = optional(number)
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
+    labels = optional(map(string))
+  }))
+  default = {}
+}
+
+variable "eks_system_managed_node_group" {
+  description = "System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default)."
+  type = object({
+    map_key         = optional(string, "node-default")
+    name            = optional(string)
+    use_name_prefix = optional(bool, false)
+    ec2_name_tag    = optional(string)
+    instance_types  = optional(list(string), ["m6a.large"])
+    min_size        = optional(number, 2)
+    max_size        = optional(number, 3)
+    desired_size    = optional(number, 2)
+    labels          = optional(map(string), { "karpenter.sh/controller" = "true" })
+  })
+  default = {}
+}
+
 # security
 variable "master_guardduty_account_id" {
   description = "Optional AWS account id to delegate GuardDuty control to."

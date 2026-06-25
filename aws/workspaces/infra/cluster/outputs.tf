@@ -10,3 +10,8 @@ output "eks_cluster" {
     cluster_certificate_authority_data = module.eks.cluster_certificate_authority_data
   }
 }
+
+output "enable_legacy_mng_pools" {
+  description = "Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional NTH."
+  value       = var.enable_karpenter ? var.enable_legacy_mng_pools : true
+}

@@ -112,7 +112,8 @@ module "bastion" {
 module "cluster" {
   source = "./cluster"
 
-  workspace = local.workspace
+  workspace  = local.workspace
+  aws_region = var.aws_region
 
   bastion_role_arn          = module.bastion.bastion_role_arn
   bastion_security_group_id = module.bastion.security_group.host[0]
@@ -125,6 +126,15 @@ module "cluster" {
   eks_spot_instance_percent       = var.eks_spot_instance_percent
   eks_spot_node_instance_type     = local.eks_spot_node_instance_type
   k8s_version                     = var.k8s_version
+
+  enable_karpenter              = var.enable_karpenter
+  enable_legacy_mng_pools         = var.enable_legacy_mng_pools
+  karpenter_chart_version         = var.karpenter_chart_version
+  karpenter_iam_names             = var.karpenter_iam_names
+  karpenter_defaults              = var.karpenter_defaults
+  karpenter_node_pool_overrides   = var.karpenter_node_pool_overrides
+  karpenter_node_pools            = var.karpenter_node_pools
+  eks_system_managed_node_group   = var.eks_system_managed_node_group
 
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id

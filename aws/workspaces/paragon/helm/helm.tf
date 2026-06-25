@@ -256,8 +256,10 @@ resource "helm_release" "metricsserver" {
   ]
 }
 
-# graceful handling of spot evictions
+# graceful handling of spot evictions on legacy managed node groups
 module "aws_node_termination_handler" {
+  count = try(local.infra_vars.enable_legacy_mng_pools.value, true) ? 1 : 0
+
   source  = "qvest-digital/aws-node-termination-handler/kubernetes"
   version = "4.0.0"
 
