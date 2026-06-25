@@ -60,15 +60,15 @@ locals {
     use_name_prefix = coalesce(var.eks_system_managed_node_group.use_name_prefix, false)
   }
 
-  managed_node_groups = var.enable_karpenter ? merge(
-    { system = local.system_node_group },
-    var.enable_legacy_mng_pools ? local.legacy_node_groups : {},
-  ) : local.legacy_node_groups
+  managed_node_groups = merge(
+    var.enable_karpenter ? { system = local.system_node_group } : {},
+    (!var.enable_karpenter || var.enable_legacy_mng_pools) ? local.legacy_node_groups : {},
+  )
 
-  cluster_autoscaler_node_groups = var.enable_karpenter ? merge(
-    { system = local.system_node_group },
-    var.enable_legacy_mng_pools ? local.legacy_node_groups : {},
-  ) : local.legacy_node_groups
+  cluster_autoscaler_node_groups = merge(
+    var.enable_karpenter ? { system = local.system_node_group } : {},
+    (!var.enable_karpenter || var.enable_legacy_mng_pools) ? local.legacy_node_groups : {},
+  )
 
   cluster_autoscaler_enabled = length(local.cluster_autoscaler_node_groups) > 0
 
