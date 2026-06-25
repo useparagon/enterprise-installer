@@ -55,14 +55,21 @@ variable "kms_admin_role" {
   default     = null
 }
 
+variable "bastion_enabled" {
+  description = "Whether the bastion host is enabled."
+  type        = bool
+}
+
 variable "bastion_role_arn" {
   description = "ARN of IAM role associated with Bastion."
   type        = string
+  default     = null
 }
 
 variable "bastion_security_group_id" {
   description = "Security Group ID associated with Bastion."
   type        = string
+  default     = null
 }
 
 variable "create_autoscaling_linked_role" {

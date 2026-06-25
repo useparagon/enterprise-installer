@@ -67,7 +67,7 @@ module "storage" {
   app_bucket_expiration    = var.app_bucket_expiration
   auditlogs_retention_days = var.auditlogs_retention_days
   auditlogs_lock_enabled   = var.auditlogs_lock_enabled
-  managed_sync_enabled   = var.managed_sync_enabled
+  managed_sync_enabled     = var.managed_sync_enabled
 
   migrated             = var.migrated_workspace != null
   cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
@@ -89,6 +89,7 @@ module "kafka" {
 }
 
 module "bastion" {
+  count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
 
   workspace     = local.workspace
@@ -114,8 +115,9 @@ module "cluster" {
 
   workspace = local.workspace
 
-  bastion_role_arn          = module.bastion.bastion_role_arn
-  bastion_security_group_id = module.bastion.security_group.host[0]
+  bastion_enabled           = var.bastion_enabled
+  bastion_role_arn          = var.bastion_enabled ? module.bastion[0].bastion_role_arn : null
+  bastion_security_group_id = var.bastion_enabled ? module.bastion[0].security_group.host[0] : null
 
   create_autoscaling_linked_role  = var.create_autoscaling_linked_role
   eks_admin_arns                  = var.eks_admin_arns

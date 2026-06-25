@@ -11,3 +11,7 @@ provider "azuread" {
   client_secret = var.azure_client_secret
   tenant_id     = var.azure_tenant_id
 }
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
