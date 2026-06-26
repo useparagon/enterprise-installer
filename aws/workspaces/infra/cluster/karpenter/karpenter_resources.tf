@@ -177,6 +177,15 @@ resource "helm_release" "karpenter" {
   ]
 }
 
+# Helm can finish before EC2NodeClass / NodePool CRDs are registered on the API server.
+resource "time_sleep" "wait_for_karpenter_crds" {
+  count = var.create ? 1 : 0
+
+  create_duration = "60s"
+
+  depends_on = [helm_release.karpenter]
+}
+
 resource "kubernetes_manifest" "ec2_node_class" {
   for_each = var.create ? var.ec2_node_classes : {}
 
@@ -193,7 +202,7 @@ resource "kubernetes_manifest" "ec2_node_class" {
     force_conflicts = true
   }
 
-  depends_on = [helm_release.karpenter]
+  depends_on = [time_sleep.wait_for_karpenter_crds]
 }
 
 resource "kubernetes_manifest" "node_pool" {
