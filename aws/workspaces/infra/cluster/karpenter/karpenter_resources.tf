@@ -182,40 +182,57 @@ resource "helm_release" "karpenter" {
   ]
 }
 
-resource "kubectl_manifest" "ec2_node_class" {
+resource "kubernetes_manifest" "ec2_node_class" {
   for_each = var.create ? var.ec2_node_classes : {}
 
-  yaml_body = yamlencode({
+  manifest = {
     apiVersion = "karpenter.k8s.aws/v1"
     kind       = "EC2NodeClass"
     metadata = {
       name = each.key
     }
     spec = local.karpenter_ec2_node_class_specs[each.key]
-  })
+  }
 
-  server_side_apply = true
-  force_conflicts   = true
-  wait              = true
+  field_manager {
+    force_conflicts = true
+  }
 
   depends_on = [helm_release.karpenter]
 }
 
-resource "kubectl_manifest" "node_pool" {
+resource "kubernetes_manifest" "node_pool" {
   for_each = var.create ? var.node_pool_definitions : {}
 
-  yaml_body = yamlencode({
+  manifest = {
     apiVersion = "karpenter.sh/v1"
     kind       = "NodePool"
     metadata = {
       name = each.key
     }
     spec = local.karpenter_node_pool_specs[each.key]
-  })
+  }
 
-  server_side_apply = true
-  force_conflicts   = true
-  wait              = true
+  field_manager {
+    force_conflicts = true
+  }
 
-  depends_on = [kubectl_manifest.ec2_node_class]
+  depends_on = [kubernetes_manifest.ec2_node_class]
+}
+
+# Adopt existing Karpenter CRs from kubectl_manifest without deleting them in the cluster.
+removed {
+  from = kubectl_manifest.ec2_node_class
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+removed {
+  from = kubectl_manifest.node_pool
+
+  lifecycle {
+    destroy = false
+  }
 }
