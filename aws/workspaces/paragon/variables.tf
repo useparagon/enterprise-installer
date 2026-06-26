@@ -104,6 +104,97 @@ variable "karpenter_node_volume_size_gib" {
   default     = 75
 }
 
+variable "eks_ondemand_node_instance_type" {
+  description = "Comma-separated instance types for the default on-demand Karpenter NodePool."
+  type        = string
+  default     = "m6a.xlarge"
+}
+
+variable "eks_spot_node_instance_type" {
+  description = "Comma-separated instance types for the default spot Karpenter NodePool."
+  type        = string
+  default     = "t3a.xlarge,t3.xlarge,m5a.xlarge,m5.xlarge,m6a.xlarge,m6i.xlarge,m7a.xlarge,m7i.xlarge,r5a.xlarge,m4.xlarge"
+}
+
+variable "eks_spot_instance_percent" {
+  description = "Spot share of worker capacity for default Karpenter NodePools."
+  type        = number
+  default     = 75
+
+  validation {
+    condition     = var.eks_spot_instance_percent >= 0 && var.eks_spot_instance_percent <= 100
+    error_message = "Value must be between 0 - 100."
+  }
+}
+
+variable "eks_max_node_count" {
+  description = "Maximum worker nodes used to derive Karpenter NodePool limits."
+  type        = number
+  default     = 50
+}
+
+variable "karpenter_defaults" {
+  description = "Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults."
+  type = object({
+    ami_selector_alias              = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+    expire_after             = optional(string)
+    termination_grace_period = optional(string)
+    ec2_kubelet_max_pods     = optional(number)
+  })
+  default = {}
+}
+
+variable "karpenter_node_pool_overrides" {
+  description = "Optional per-NodePool overrides (limits, disruption, instance types)."
+  type = map(object({
+    instance_types                  = optional(list(string))
+    instance_categories             = optional(list(string))
+    ec2_name_tag                    = optional(string)
+    cpu_limit                       = optional(string)
+    memory_limit                    = optional(string)
+    nodes_limit                     = optional(number)
+    expire_after                    = optional(string)
+    termination_grace_period        = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+  }))
+  default = {}
+}
+
+variable "karpenter_node_pools" {
+  description = "Additional custom NodePool definitions beyond default-spot and default-ondemand."
+  type = map(object({
+    capacity_types      = list(string)
+    weight              = optional(number)
+    capacity_type_label = optional(string)
+    instance_types      = optional(list(string))
+    cpu_limit           = optional(string)
+    memory_limit        = optional(string)
+    nodes_limit         = optional(number)
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
+    labels = optional(map(string))
+  }))
+  default = {}
+}
+
 variable "dns_provider" {
   description = "DNS provider to use."
   type        = string
@@ -494,8 +585,8 @@ locals {
   logs_bucket      = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
   auditlogs_bucket = try(local.infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs")
 
-  karpenter_enabled = try(local.infra_vars.enable_karpenter.value, false) && try(local.infra_vars.karpenter.value, null) != null
-  karpenter_config  = try(local.infra_vars.karpenter.value, null)
+  eks_ondemand_node_instance_type = distinct([for value in split(",", var.eks_ondemand_node_instance_type) : trimspace(value)])
+  eks_spot_node_instance_type     = distinct([for value in split(",", var.eks_spot_node_instance_type) : trimspace(value)])
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)

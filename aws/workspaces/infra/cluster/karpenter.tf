@@ -54,5 +54,6 @@ module "karpenter" {
     aws_eks_addon.coredns,
     aws_eks_addon.aws_ebs_csi_driver,
     aws_eks_addon.eks_pod_identity_agent,
+    time_sleep.wait_for_eks_api,
   ]
 }

@@ -1,18 +1,20 @@
 locals {
+  ec2 = local.karpenter.ec2_node_class
+
   karpenter_ec2_node_class_spec_base = {
-    role = var.node_iam_role_name
+    role = local.ec2.role
     amiSelectorTerms = [
-      { alias = var.ami_selector_alias }
+      { alias = local.ec2.ami_selector_alias }
     ]
     subnetSelectorTerms = [
       {
         tags = {
-          "karpenter.sh/discovery" = var.discovery_tag_value
+          "karpenter.sh/discovery" = local.karpenter.discovery_tag_value
         }
       }
     ]
     securityGroupSelectorTerms = [
-      for sg_id in var.node_security_group_ids : {
+      for sg_id in local.ec2.security_group_ids : {
         id = sg_id
       }
     ]
@@ -25,70 +27,70 @@ locals {
           iops                = 3000
           throughput          = 125
           encrypted           = true
-          kmsKeyID            = var.ebs_kms_key_arn
+          kmsKeyID            = local.ec2.ebs_kms_key_arn
           deleteOnTermination = true
         }
       }
     ]
     metadataOptions = {
-      httpEndpoint            = var.metadata_options.http_endpoint
-      httpTokens              = var.metadata_options.http_tokens
-      httpPutResponseHopLimit = var.metadata_options.http_put_response_hop_limit
+      httpEndpoint            = local.ec2.metadata_options.http_endpoint
+      httpTokens              = local.ec2.metadata_options.http_tokens
+      httpPutResponseHopLimit = local.ec2.metadata_options.http_put_response_hop_limit
     }
   }
 
   karpenter_ec2_node_class_specs = {
-    for class_name, cfg in var.ec2_node_classes : class_name => merge(
+    for class_name, cfg in local.ec2.node_classes : class_name => merge(
       local.karpenter_ec2_node_class_spec_base,
       {
         tags = {
           Name                                   = cfg.ec2_name_tag
-          "useparagon.io/eks-kubernetes-version" = var.kubernetes_version
+          "useparagon.io/eks-kubernetes-version" = local.karpenter.kubernetes_version
         }
       },
-      var.ec2_kubelet_max_pods != null ? { kubelet = { maxPods = var.ec2_kubelet_max_pods } } : {},
+      try(local.ec2.kubelet_max_pods, null) != null ? { kubelet = { maxPods = local.ec2.kubelet_max_pods } } : {},
     )
   }
 
   karpenter_requirements_for_pool = {
-    for pool_name, pe in var.node_pool_effective : pool_name => [
+    for pool_name, pool in local.karpenter.node_pools : pool_name => [
       {
         key      = "karpenter.k8s.aws/instance-category"
         operator = "In"
-        values   = pe.instance_categories
+        values   = pool.requirements.instance_categories
       },
       {
         key      = "node.kubernetes.io/instance-type"
         operator = "In"
-        values   = pe.instance_types
+        values   = pool.requirements.instance_types
       },
       {
         key      = "karpenter.k8s.aws/instance-hypervisor"
         operator = "In"
-        values   = pe.instance_hypervisor_values
+        values   = pool.requirements.instance_hypervisor_values
       },
       {
         key      = "kubernetes.io/arch"
         operator = "In"
-        values   = pe.architectures
+        values   = pool.requirements.architectures
       },
       {
         key      = "topology.kubernetes.io/zone"
         operator = "In"
-        values   = var.availability_zones
+        values   = local.karpenter.availability_zones
       },
     ]
   }
 
   karpenter_disruption_for_pool = {
-    for pool_name, pe in var.node_pool_effective : pool_name => merge(
+    for pool_name, pool in local.karpenter.node_pools : pool_name => merge(
       {
-        consolidateAfter    = pe.disruption_consolidate_after
-        consolidationPolicy = pe.disruption_consolidation_policy
+        consolidateAfter    = pool.disruption.consolidate_after
+        consolidationPolicy = pool.disruption.consolidation_policy
       },
-      length(pe.disruption_budgets) > 0 ? {
+      length(pool.disruption.budgets) > 0 ? {
         budgets = [
-          for b in pe.disruption_budgets : merge(
+          for b in pool.disruption.budgets : merge(
             { nodes = b.nodes },
             try(b.reasons, null) != null ? { reasons = b.reasons } : {},
             try(b.schedule, null) != null && try(b.duration, null) != null ? { schedule = b.schedule, duration = b.duration } : {}
@@ -99,44 +101,44 @@ locals {
   }
 
   karpenter_node_pool_specs = {
-    for name, cfg in var.node_pool_definitions : name => merge(
+    for name, pool in local.karpenter.node_pools : name => merge(
       {
         limits = {
-          cpu    = var.node_pool_effective[name].cpu_limit
-          memory = var.node_pool_effective[name].memory_limit
-          nodes  = var.node_pool_effective[name].nodes_limit
+          cpu    = pool.limits.cpu
+          memory = pool.limits.memory
+          nodes  = pool.limits.nodes
         }
         disruption = local.karpenter_disruption_for_pool[name]
         template = {
           metadata = {
             labels = merge(
               {
-                "useparagon.com/capacityType" = cfg.capacity_type_label
+                "useparagon.com/capacityType" = pool.capacity_type_label
               },
-              coalesce(try(cfg.labels, {}), {}),
+              coalesce(try(pool.labels, {}), {}),
             )
           }
           spec = merge(
             {
-              expireAfter            = var.node_pool_effective[name].expire_after
-              terminationGracePeriod = var.node_pool_effective[name].termination_grace_period
+              expireAfter            = pool.expire_after
+              terminationGracePeriod = pool.termination_grace_period
               nodeClassRef = {
                 group = "karpenter.k8s.aws"
                 kind  = "EC2NodeClass"
-                name  = var.node_pool_effective[name].ec2_node_class_name
+                name  = pool.ec2_node_class
               }
               requirements = concat(
                 local.karpenter_requirements_for_pool[name],
                 [{
                   key      = "karpenter.sh/capacity-type"
                   operator = "In"
-                  values   = cfg.capacity_types
+                  values   = pool.capacity_types
                 }],
               )
             },
-            length(coalesce(try(cfg.taints, []), [])) > 0 ? {
+            length(coalesce(try(pool.taints, []), [])) > 0 ? {
               taints = [
-                for taint in cfg.taints : {
+                for taint in pool.taints : {
                   key    = taint.key
                   value  = try(taint.value, null)
                   effect = taint.effect
@@ -146,13 +148,13 @@ locals {
           )
         }
       },
-      try(cfg.weight, null) != null ? { weight = cfg.weight } : {},
+      try(pool.weight, null) != null ? { weight = pool.weight } : {},
     )
   }
 }
 
 resource "kubernetes_manifest" "ec2_node_class" {
-  for_each = var.ec2_node_classes
+  for_each = local.ec2.node_classes
 
   manifest = {
     apiVersion = "karpenter.k8s.aws/v1"
@@ -169,7 +171,7 @@ resource "kubernetes_manifest" "ec2_node_class" {
 }
 
 resource "kubernetes_manifest" "node_pool" {
-  for_each = var.node_pool_definitions
+  for_each = local.karpenter.node_pools
 
   manifest = {
     apiVersion = "karpenter.sh/v1"

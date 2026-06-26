@@ -1,37 +1,10 @@
-variable "kubernetes_version" {
+variable "workspace" {
+  description = "EKS cluster / workspace name (karpenter.sh/discovery tag value)."
+  type        = string
+}
+
+variable "k8s_version" {
   description = "EKS control plane version for EC2NodeClass drift tagging."
-  type        = string
-}
-
-variable "node_iam_role_name" {
-  description = "IAM role name for EC2NodeClass.spec.role."
-  type        = string
-}
-
-variable "node_security_group_ids" {
-  description = "Security group IDs for Karpenter worker nodes."
-  type        = list(string)
-}
-
-variable "discovery_tag_value" {
-  description = "Value for karpenter.sh/discovery subnet selector tag."
-  type        = string
-}
-
-variable "availability_zones" {
-  description = "VPC availability zone names for NodePool topology requirements."
-  type        = list(string)
-}
-
-variable "ec2_node_classes" {
-  description = "EC2NodeClass definitions keyed by class name."
-  type = map(object({
-    ec2_name_tag = string
-  }))
-}
-
-variable "ebs_kms_key_arn" {
-  description = "KMS key ARN for encrypted root volumes on Karpenter nodes."
   type        = string
 }
 
@@ -40,66 +13,87 @@ variable "ebs_volume_size_gib" {
   type        = number
 }
 
-variable "ami_selector_alias" {
-  description = "Bottlerocket AMI selector alias for EC2NodeClass."
-  type        = string
-}
-
-variable "ec2_kubelet_max_pods" {
-  description = "Optional kubelet maxPods for EC2NodeClass."
-  type        = number
-  default     = null
-}
-
-variable "metadata_options" {
-  description = "EC2 instance metadata options for Karpenter workers."
+variable "aws" {
+  description = "Karpenter AWS resources created by the infra workspace."
   type = object({
-    http_endpoint               = string
-    http_tokens                 = string
-    http_put_response_hop_limit = number
+    node_role_name     = string
+    security_group_ids = list(string)
+    ebs_kms_key_arn    = string
   })
 }
 
-variable "node_pool_definitions" {
-  description = "NodePool definitions (capacity, weight, labels)."
-  type = map(object({
-    capacity_types      = list(string)
-    weight              = optional(number)
-    capacity_type_label = string
-    taints = optional(list(object({
-      key    = string
-      value  = optional(string)
-      effect = string
-    })))
-    labels = optional(map(string))
-  }))
+variable "eks_ondemand_node_instance_type" {
+  description = "Instance types for the default on-demand Karpenter NodePool."
+  type        = list(string)
 }
 
-variable "node_pool_effective" {
-  description = "Merged per-NodePool settings (limits, requirements, disruption)."
-  type = map(object({
-    cpu_limit                       = string
-    memory_limit                    = string
-    nodes_limit                     = number
-    instance_types                  = list(string)
-    instance_categories             = list(string)
-    architectures                   = list(string)
-    instance_hypervisor_values      = list(string)
-    disruption_consolidation_policy = string
-    disruption_consolidate_after    = string
-    disruption_budgets = list(object({
+variable "eks_spot_node_instance_type" {
+  description = "Instance types for the default spot Karpenter NodePool."
+  type        = list(string)
+}
+
+variable "eks_spot_instance_percent" {
+  description = "Spot share of worker capacity (drives default-spot vs default-ondemand weights and limits)."
+  type        = number
+}
+
+variable "eks_max_node_count" {
+  description = "Maximum worker nodes used to derive Karpenter NodePool limits."
+  type        = number
+}
+
+variable "karpenter_defaults" {
+  description = "Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults."
+  type = object({
+    ami_selector_alias              = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
       nodes    = string
       reasons  = optional(list(string))
       schedule = optional(string)
       duration = optional(string)
-    }))
-    expire_after             = string
-    termination_grace_period = string
-    weight                   = optional(number)
-    capacity_types           = list(string)
-    capacity_type_label      = string
-    ec2_node_class_name      = string
-    ec2_name_tag             = string
+    })))
+    expire_after         = optional(string)
+    termination_grace_period = optional(string)
+    ec2_kubelet_max_pods = optional(number)
+  })
+  default = {}
+}
+
+variable "karpenter_node_pool_overrides" {
+  description = "Optional per-NodePool overrides (limits, disruption, instance types)."
+  type = map(object({
+    instance_types                  = optional(list(string))
+    instance_categories             = optional(list(string))
+    ec2_name_tag                    = optional(string)
+    cpu_limit                       = optional(string)
+    memory_limit                    = optional(string)
+    nodes_limit                     = optional(number)
+    expire_after                    = optional(string)
+    termination_grace_period        = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+  }))
+  default = {}
+}
+
+variable "karpenter_node_pools" {
+  description = "Additional custom NodePool definitions beyond default-spot and default-ondemand."
+  type = map(object({
+    capacity_types      = list(string)
+    weight              = optional(number)
+    capacity_type_label = optional(string)
+    instance_types      = optional(list(string))
+    cpu_limit           = optional(string)
+    memory_limit        = optional(string)
+    nodes_limit         = optional(number)
     taints = optional(list(object({
       key    = string
       value  = optional(string)
@@ -107,4 +101,5 @@ variable "node_pool_effective" {
     })))
     labels = optional(map(string))
   }))
+  default = {}
 }

@@ -76,6 +76,6 @@ output "enable_legacy_mng_pools" {
 }
 
 output "karpenter" {
-  description = "Karpenter NodePool and EC2NodeClass inputs for the paragon workspace."
+  description = "AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace."
   value       = module.cluster.karpenter
 }

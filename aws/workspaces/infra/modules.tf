@@ -131,9 +131,6 @@ module "cluster" {
   enable_legacy_mng_pools         = var.enable_legacy_mng_pools
   karpenter_chart_version         = var.karpenter_chart_version
   karpenter_iam_names             = var.karpenter_iam_names
-  karpenter_defaults              = var.karpenter_defaults
-  karpenter_node_pool_overrides   = var.karpenter_node_pool_overrides
-  karpenter_node_pools            = var.karpenter_node_pools
   eks_system_managed_node_group   = var.eks_system_managed_node_group
 
   vpc_id             = module.network.vpc.id

@@ -56,9 +56,17 @@ module "helm" {
   public_microservices   = local.public_microservices
   public_monitors        = local.public_monitors
   waf_web_acl_arn         = local.waf_active ? module.waf[0].web_acl_arn : ""
-  enable_legacy_mng_pools = try(local.infra_vars.enable_legacy_mng_pools.value, true)
-  karpenter_config               = local.karpenter_enabled ? local.karpenter_config : null
+  enable_legacy_mng_pools        = try(local.infra_vars.enable_legacy_mng_pools.value, true)
+  karpenter_enabled              = try(local.infra_vars.enable_karpenter.value, false)
+  karpenter_aws                  = try(local.infra_vars.karpenter.value, null)
   karpenter_node_volume_size_gib = var.karpenter_node_volume_size_gib
+  eks_ondemand_node_instance_type = local.eks_ondemand_node_instance_type
+  eks_spot_node_instance_type     = local.eks_spot_node_instance_type
+  eks_spot_instance_percent       = var.eks_spot_instance_percent
+  eks_max_node_count              = var.eks_max_node_count
+  karpenter_defaults              = var.karpenter_defaults
+  karpenter_node_pool_overrides   = var.karpenter_node_pool_overrides
+  karpenter_node_pools            = var.karpenter_node_pools
   workspace                      = local.workspace
 }
 

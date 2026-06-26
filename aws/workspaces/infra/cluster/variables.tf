@@ -102,68 +102,6 @@ variable "karpenter_iam_names" {
   })
 }
 
-variable "karpenter_defaults" {
-  description = "Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults. Unset fields are derived from eks_* variables."
-  type = object({
-    ec2_node_class_name             = optional(string)
-    ami_selector_alias              = optional(string)
-    disruption_consolidation_policy = optional(string)
-    disruption_consolidate_after    = optional(string)
-    disruption_budgets = optional(list(object({
-      nodes    = string
-      reasons  = optional(list(string))
-      schedule = optional(string)
-      duration = optional(string)
-    })))
-    expire_after             = optional(string)
-    termination_grace_period = optional(string)
-    ec2_name_tag             = optional(string)
-    ec2_kubelet_max_pods     = optional(number)
-  })
-}
-
-variable "karpenter_node_pool_overrides" {
-  description = "Optional per-NodePool overrides (limits, disruption, instance types). Empty by default."
-  type = map(object({
-    instance_types                  = optional(list(string))
-    instance_categories             = optional(list(string))
-    ec2_node_class_name             = optional(string)
-    ec2_name_tag                    = optional(string)
-    cpu_limit                       = optional(string)
-    memory_limit                    = optional(string)
-    nodes_limit                     = optional(number)
-    expire_after                    = optional(string)
-    termination_grace_period        = optional(string)
-    disruption_consolidation_policy = optional(string)
-    disruption_consolidate_after    = optional(string)
-    disruption_budgets = optional(list(object({
-      nodes    = string
-      reasons  = optional(list(string))
-      schedule = optional(string)
-      duration = optional(string)
-    })))
-  }))
-}
-
-variable "karpenter_node_pools" {
-  description = "Additional custom NodePool definitions beyond default-spot and default-ondemand."
-  type = map(object({
-    capacity_types      = list(string)
-    weight              = optional(number)
-    capacity_type_label = optional(string)
-    instance_types      = optional(list(string))
-    cpu_limit           = optional(string)
-    memory_limit        = optional(string)
-    nodes_limit         = optional(number)
-    taints = optional(list(object({
-      key    = string
-      value  = optional(string)
-      effect = string
-    })))
-    labels = optional(map(string))
-  }))
-}
-
 variable "eks_system_managed_node_group" {
   description = "System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default)."
   type = object({

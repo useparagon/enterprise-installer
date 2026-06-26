@@ -22,19 +22,10 @@ output "enable_legacy_mng_pools" {
 }
 
 output "karpenter" {
-  description = "Karpenter NodePool and EC2NodeClass inputs for the paragon workspace. Null when enable_karpenter is false."
+  description = "AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace."
   value = var.enable_karpenter ? {
-    kubernetes_version      = var.k8s_version
-    node_iam_role_name      = module.iam[0].node_iam_role_name
-    node_security_group_ids = local.eks_worker_security_group_ids
-    discovery_tag_value     = var.workspace
-    availability_zones      = data.aws_availability_zones.available.names
-    ec2_node_classes        = local.karpenter_ec2_node_classes
-    ebs_kms_key_arn         = module.ebs_kms_key.key_arn
-    ami_selector_alias      = local.karpenter_defaults_effective.ami_selector_alias
-    ec2_kubelet_max_pods    = try(local.karpenter_defaults_effective.ec2_kubelet_max_pods, null)
-    metadata_options        = local.metadata_options
-    node_pool_definitions   = local.karpenter_node_pool_definitions
-    node_pool_effective     = local.karpenter_pool_effective_with_names
+    node_role_name     = module.iam[0].node_iam_role_name
+    security_group_ids = local.eks_worker_security_group_ids
+    ebs_kms_key_arn    = module.ebs_kms_key.key_arn
   } : null
 }
