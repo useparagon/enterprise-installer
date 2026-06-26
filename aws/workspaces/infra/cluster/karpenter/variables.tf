@@ -35,7 +35,7 @@ variable "node_iam_role_name" {
 }
 
 variable "node_security_group_ids" {
-  description = "Security group IDs for Karpenter worker nodes."
+  description = "Security group IDs for Karpenter worker nodes. Must match eks_managed_node_group (cluster primary + cluster SG from the EKS module)."
   type        = list(string)
 }
 

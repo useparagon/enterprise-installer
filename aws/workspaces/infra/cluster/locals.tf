@@ -308,8 +308,11 @@ locals {
   karpenter_controller_role_name = coalesce(var.karpenter_iam_names.controller_role_name, "${var.workspace}-karpenter-controller")
   karpenter_node_role_name       = coalesce(var.karpenter_iam_names.node_role_name, "${var.workspace}-karpenter-node")
 
+  # Must match eks_managed_node_group in cluster.tf (cluster primary + cluster SG).
+  # Do not use node_security_group_id alone — that SG is not attached to MNG workers.
   eks_worker_security_group_ids = compact([
-    module.eks.node_security_group_id,
+    module.eks.cluster_primary_security_group_id,
+    module.eks.cluster_security_group_id,
   ])
 
   karpenter_node_iam_additional_policies = {
