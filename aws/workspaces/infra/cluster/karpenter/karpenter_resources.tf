@@ -177,49 +177,40 @@ resource "helm_release" "karpenter" {
   ]
 }
 
-# Helm can finish before EC2NodeClass / NodePool CRDs are registered on the API server.
-resource "time_sleep" "wait_for_karpenter_crds" {
-  count = var.create ? 1 : 0
-
-  create_duration = "60s"
-
-  depends_on = [helm_release.karpenter]
-}
-
-resource "kubernetes_manifest" "ec2_node_class" {
+resource "kubectl_manifest" "ec2_node_class" {
   for_each = var.create ? var.ec2_node_classes : {}
 
-  manifest = {
+  yaml_body = yamlencode({
     apiVersion = "karpenter.k8s.aws/v1"
     kind       = "EC2NodeClass"
     metadata = {
       name = each.key
     }
     spec = local.karpenter_ec2_node_class_specs[each.key]
-  }
+  })
 
-  field_manager {
-    force_conflicts = true
-  }
+  server_side_apply = true
+  force_conflicts   = true
+  wait              = true
 
-  depends_on = [time_sleep.wait_for_karpenter_crds]
+  depends_on = [helm_release.karpenter]
 }
 
-resource "kubernetes_manifest" "node_pool" {
+resource "kubectl_manifest" "node_pool" {
   for_each = var.create ? var.node_pool_definitions : {}
 
-  manifest = {
+  yaml_body = yamlencode({
     apiVersion = "karpenter.sh/v1"
     kind       = "NodePool"
     metadata = {
       name = each.key
     }
     spec = local.karpenter_node_pool_specs[each.key]
-  }
+  })
 
-  field_manager {
-    force_conflicts = true
-  }
+  server_side_apply = true
+  force_conflicts   = true
+  wait              = true
 
-  depends_on = [kubernetes_manifest.ec2_node_class]
+  depends_on = [kubectl_manifest.ec2_node_class]
 }
