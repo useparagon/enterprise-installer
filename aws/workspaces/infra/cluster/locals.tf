@@ -30,7 +30,6 @@ locals {
         max_count      = ceil(var.eks_max_node_count * (1 - (var.eks_spot_instance_percent / 100)))
         instance_types = var.eks_ondemand_node_instance_type
         capacity       = "ON_DEMAND"
-        ami_type       = var.enable_karpenter ? "BOTTLEROCKET_x86_64" : null
         labels = {
           "useparagon.com/capacityType" = "ondemand"
         }
@@ -40,7 +39,6 @@ locals {
         max_count      = ceil(var.eks_max_node_count * (var.eks_spot_instance_percent / 100))
         instance_types = var.eks_spot_node_instance_type
         capacity       = "SPOT"
-        ami_type       = var.enable_karpenter ? "BOTTLEROCKET_x86_64" : null
         labels = {
           "useparagon.com/capacityType" = "spot"
         }
@@ -65,10 +63,7 @@ locals {
     (!var.enable_karpenter || var.enable_legacy_mng_pools) ? local.legacy_node_groups : {},
   )
 
-  cluster_autoscaler_node_groups = merge(
-    var.enable_karpenter ? { system = local.system_node_group } : {},
-    (!var.enable_karpenter || var.enable_legacy_mng_pools) ? local.legacy_node_groups : {},
-  )
+  cluster_autoscaler_node_groups = (!var.enable_karpenter || var.enable_legacy_mng_pools) ? local.legacy_node_groups : {}
 
   cluster_autoscaler_enabled = length(local.cluster_autoscaler_node_groups) > 0
 
