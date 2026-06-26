@@ -55,8 +55,9 @@ module "helm" {
   openobserve_password   = var.openobserve_password
   public_microservices   = local.public_microservices
   public_monitors        = local.public_monitors
-  waf_web_acl_arn        = local.waf_active ? module.waf[0].web_acl_arn : ""
-  workspace              = local.workspace
+  waf_web_acl_arn         = local.waf_active ? module.waf[0].web_acl_arn : ""
+  enable_legacy_mng_pools = try(local.infra_vars.enable_legacy_mng_pools.value, true)
+  workspace               = local.workspace
 }
 
 module "managed_sync_config" {

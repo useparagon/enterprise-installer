@@ -143,6 +143,12 @@ variable "waf_web_acl_arn" {
   default     = ""
 }
 
+variable "enable_legacy_mng_pools" {
+  description = "Whether legacy on-demand and spot managed node groups are active (from infra output)."
+  type        = bool
+  default     = true
+}
+
 locals {
   chart_names     = var.monitors_enabled ? ["paragon-logging", "paragon-monitoring", "paragon-onprem"] : ["paragon-logging", "paragon-onprem"]
   chart_directory = "../charts"
