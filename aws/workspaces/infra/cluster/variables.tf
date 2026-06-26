@@ -142,7 +142,7 @@ variable "karpenter_node_pool_overrides" {
       schedule = optional(string)
       duration = optional(string)
     })))
-  })
+  }))
 }
 
 variable "karpenter_node_pools" {
