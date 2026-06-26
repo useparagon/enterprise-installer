@@ -65,7 +65,17 @@ output "cluster_name" {
   value       = module.cluster.eks_cluster.name
 }
 
+output "enable_karpenter" {
+  description = "Whether Karpenter autoscaling is enabled. Consumed by paragon workspace for EC2NodeClass and NodePool manifests."
+  value       = module.cluster.enable_karpenter
+}
+
 output "enable_legacy_mng_pools" {
   description = "Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional NTH."
   value       = module.cluster.enable_legacy_mng_pools
+}
+
+output "karpenter" {
+  description = "Karpenter NodePool and EC2NodeClass inputs for the paragon workspace."
+  value       = module.cluster.karpenter
 }

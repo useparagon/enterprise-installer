@@ -149,6 +149,17 @@ variable "enable_legacy_mng_pools" {
   default     = true
 }
 
+variable "karpenter_config" {
+  description = "Karpenter EC2NodeClass and NodePool inputs from infra output. Null when Karpenter is disabled."
+  type        = any
+  default     = null
+}
+
+variable "karpenter_node_volume_size_gib" {
+  description = "Root volume size in GiB for Karpenter worker nodes."
+  type        = number
+}
+
 locals {
   chart_names     = var.monitors_enabled ? ["paragon-logging", "paragon-monitoring", "paragon-onprem"] : ["paragon-logging", "paragon-onprem"]
   chart_directory = "../charts"

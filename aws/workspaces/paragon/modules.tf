@@ -57,7 +57,9 @@ module "helm" {
   public_monitors        = local.public_monitors
   waf_web_acl_arn         = local.waf_active ? module.waf[0].web_acl_arn : ""
   enable_legacy_mng_pools = try(local.infra_vars.enable_legacy_mng_pools.value, true)
-  workspace               = local.workspace
+  karpenter_config               = local.karpenter_enabled ? local.karpenter_config : null
+  karpenter_node_volume_size_gib = var.karpenter_node_volume_size_gib
+  workspace                      = local.workspace
 }
 
 module "managed_sync_config" {

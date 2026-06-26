@@ -1,6 +1,6 @@
 # module.eks outputs (not data.aws_eks_cluster) so greenfield can create the cluster and
-# Kubernetes resources in one apply. hashicorp/kubernetes and helm defer unknown endpoint
-# until the cluster exists; alekc/kubectl does not, so Karpenter CRs use kubernetes_manifest.
+# the Karpenter Helm controller in one infra apply. EC2NodeClass / NodePool CRs are applied
+# from the paragon workspace after infra apply (data.aws_eks_cluster).
 
 data "aws_eks_cluster_auth" "this" {
   name = module.eks.cluster_name

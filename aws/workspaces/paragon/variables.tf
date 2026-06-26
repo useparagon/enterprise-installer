@@ -98,6 +98,12 @@ variable "k8s_version" {
   default     = "1.31"
 }
 
+variable "karpenter_node_volume_size_gib" {
+  description = "Root volume size in GiB for Karpenter worker nodes (EC2NodeClass block device)."
+  type        = number
+  default     = 75
+}
+
 variable "dns_provider" {
   description = "DNS provider to use."
   type        = string
@@ -487,6 +493,9 @@ locals {
   cluster_name     = try(local.infra_vars.cluster_name.value, local.workspace)
   logs_bucket      = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
   auditlogs_bucket = try(local.infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs")
+
+  karpenter_enabled = try(local.infra_vars.enable_karpenter.value, false) && try(local.infra_vars.karpenter.value, null) != null
+  karpenter_config  = try(local.infra_vars.karpenter.value, null)
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)

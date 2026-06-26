@@ -21,7 +21,6 @@ variable "private_subnet_ids" {
 variable "eks_admin_arns" {
   description = "Array of ARNs for IAM users, groups or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard."
   type        = list(string)
-  default     = []
 }
 
 variable "k8s_version" {
@@ -78,13 +77,11 @@ variable "create_autoscaling_linked_role" {
 variable "enable_karpenter" {
   description = "Enable Karpenter autoscaling (SQS, IAM, Helm controller, EC2NodeClass, NodePools)."
   type        = bool
-  default     = false
 }
 
 variable "enable_legacy_mng_pools" {
   description = "Keep legacy on-demand and spot EKS managed node groups (migration mode). Requires enable_karpenter or this flag for worker capacity."
   type        = bool
-  default     = true
 
   validation {
     condition     = var.enable_karpenter || var.enable_legacy_mng_pools
@@ -95,7 +92,6 @@ variable "enable_legacy_mng_pools" {
 variable "karpenter_chart_version" {
   description = "Karpenter Helm chart version (OCI public.ecr.aws/karpenter/karpenter)."
   type        = string
-  default     = "1.13.0"
 }
 
 variable "karpenter_iam_names" {
@@ -104,7 +100,6 @@ variable "karpenter_iam_names" {
     controller_role_name = optional(string)
     node_role_name       = optional(string)
   })
-  default = {}
 }
 
 variable "karpenter_defaults" {
@@ -125,7 +120,6 @@ variable "karpenter_defaults" {
     ec2_name_tag             = optional(string)
     ec2_kubelet_max_pods     = optional(number)
   })
-  default = {}
 }
 
 variable "karpenter_node_pool_overrides" {
@@ -148,8 +142,7 @@ variable "karpenter_node_pool_overrides" {
       schedule = optional(string)
       duration = optional(string)
     })))
-  }))
-  default = {}
+  })
 }
 
 variable "karpenter_node_pools" {
@@ -169,7 +162,6 @@ variable "karpenter_node_pools" {
     })))
     labels = optional(map(string))
   }))
-  default = {}
 }
 
 variable "eks_system_managed_node_group" {
@@ -185,7 +177,6 @@ variable "eks_system_managed_node_group" {
     desired_size    = optional(number, 2)
     labels          = optional(map(string), { "karpenter.sh/controller" = "true" })
   })
-  default = {}
 }
 
 data "aws_caller_identity" "current" {}

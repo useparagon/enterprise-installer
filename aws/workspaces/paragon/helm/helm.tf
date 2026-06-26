@@ -239,6 +239,8 @@ resource "helm_release" "ingress" {
     name  = "replicaCount"
     value = "3"
   }
+
+  depends_on = [module.karpenter]
 }
 
 # metrics server for hpa
@@ -257,7 +259,8 @@ resource "helm_release" "metricsserver" {
   verify           = false
 
   depends_on = [
-    helm_release.ingress
+    module.karpenter,
+    helm_release.ingress,
   ]
 }
 
@@ -298,11 +301,12 @@ resource "helm_release" "paragon_on_prem" {
   ]
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     kubernetes_secret.docker_login,
     kubernetes_secret.paragon_secrets,
     kubernetes_storage_class_v1.gp3_encrypted,
-    kubernetes_config_map.feature_flag_content
+    kubernetes_config_map.feature_flag_content,
   ]
 }
 
@@ -363,9 +367,10 @@ resource "helm_release" "paragon_logging" {
   }
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     kubernetes_secret.docker_login,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }
 
@@ -407,9 +412,10 @@ resource "helm_release" "paragon_monitoring" {
   }
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     helm_release.paragon_on_prem,
     kubernetes_secret.docker_login,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }
