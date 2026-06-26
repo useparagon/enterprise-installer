@@ -1,24 +1,28 @@
-data "aws_eks_cluster_auth" "eks_cluster" {
+data "aws_eks_cluster" "this" {
+  name = var.workspace
+}
+
+data "aws_eks_cluster_auth" "this" {
   name = var.workspace
 }
 
 provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  token                  = data.aws_eks_cluster_auth.eks_cluster.token
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  host                   = data.aws_eks_cluster.this.endpoint
+  token                  = data.aws_eks_cluster_auth.this.token
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
 }
 
 provider "helm" {
   kubernetes {
-    host                   = module.eks.cluster_endpoint
-    token                  = data.aws_eks_cluster_auth.eks_cluster.token
-    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    host                   = data.aws_eks_cluster.this.endpoint
+    token                  = data.aws_eks_cluster_auth.this.token
+    cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
   }
 }
 
 provider "kubectl" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-  token                  = data.aws_eks_cluster_auth.eks_cluster.token
+  host                   = data.aws_eks_cluster.this.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
+  token                  = data.aws_eks_cluster_auth.this.token
   load_config_file       = false
 }
