@@ -298,13 +298,16 @@ locals {
     }
   }
 
-  eks_addon_versions = {
-    for name, cfg in local.cluster_addons_karpenter : name => cfg.version
-  }
+  eks_addon_versions = merge(
+    { for name, cfg in local.cluster_addons_legacy : name => cfg.version },
+    {
+      "eks-pod-identity-agent" = local.cluster_addons_karpenter["eks-pod-identity-agent"].version
+    },
+  )
 
   eks_addon_resolve_conflicts = {
     resolve_conflicts_on_create = "OVERWRITE"
-    resolve_conflicts_on_update = "OVERWRITE"
+    resolve_conflicts_on_update = "PRESERVE"
   }
 
   karpenter_controller_role_name = coalesce(var.karpenter_iam_names.controller_role_name, "${var.workspace}-karpenter-controller")

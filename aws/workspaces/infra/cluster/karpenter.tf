@@ -61,6 +61,10 @@ module "karpenter" {
     module.eks_managed_node_group,
     module.sqs,
     module.iam,
+    aws_eks_addon.vpc_cni,
+    aws_eks_addon.kube_proxy,
+    aws_eks_addon.coredns,
+    aws_eks_addon.aws_ebs_csi_driver,
     aws_eks_addon.eks_pod_identity_agent,
   ]
 }
