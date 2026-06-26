@@ -231,6 +231,11 @@ resource "helm_release" "ingress" {
   }
 
   set {
+    name  = "region"
+    value = var.aws_region
+  }
+
+  set {
     name  = "replicaCount"
     value = "3"
   }

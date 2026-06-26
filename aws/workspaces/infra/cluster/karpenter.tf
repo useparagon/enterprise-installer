@@ -53,6 +53,7 @@ module "karpenter" {
   ebs_volume_size_gib     = local.node_volume_size
   ami_selector_alias      = local.karpenter_defaults_effective.ami_selector_alias
   ec2_kubelet_max_pods    = try(local.karpenter_defaults_effective.ec2_kubelet_max_pods, null)
+  metadata_options        = local.metadata_options
   node_pool_definitions   = local.karpenter_node_pool_definitions
   node_pool_effective     = local.karpenter_pool_effective_with_names
 

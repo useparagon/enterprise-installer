@@ -30,6 +30,11 @@ locals {
         }
       }
     ]
+    metadataOptions = {
+      httpEndpoint            = var.metadata_options.http_endpoint
+      httpTokens              = var.metadata_options.http_tokens
+      httpPutResponseHopLimit = var.metadata_options.http_put_response_hop_limit
+    }
   }
 
   karpenter_ec2_node_class_specs = {

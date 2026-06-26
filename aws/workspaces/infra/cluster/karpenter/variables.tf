@@ -78,6 +78,15 @@ variable "ec2_kubelet_max_pods" {
   default     = null
 }
 
+variable "metadata_options" {
+  description = "EC2 instance metadata options for Karpenter workers. Must match eks_managed_node_group so pods can reach IMDS when needed."
+  type = object({
+    http_endpoint               = string
+    http_tokens                 = string
+    http_put_response_hop_limit = number
+  })
+}
+
 variable "node_pool_definitions" {
   description = "NodePool definitions (capacity, weight, labels)."
   type = map(object({
