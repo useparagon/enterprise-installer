@@ -21,26 +21,6 @@ moved {
   to   = aws_eks_addon.aws_ebs_csi_driver
 }
 
-moved {
-  from = aws_eks_addon.vpc_cni[0]
-  to   = aws_eks_addon.vpc_cni
-}
-
-moved {
-  from = aws_eks_addon.kube_proxy[0]
-  to   = aws_eks_addon.kube_proxy
-}
-
-moved {
-  from = aws_eks_addon.coredns[0]
-  to   = aws_eks_addon.coredns
-}
-
-moved {
-  from = aws_eks_addon.aws_ebs_csi_driver[0]
-  to   = aws_eks_addon.aws_ebs_csi_driver
-}
-
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "vpc-cni"
