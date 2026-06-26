@@ -1,28 +1,27 @@
-data "aws_eks_cluster" "this" {
-  name = var.workspace
-}
+# Use module.eks outputs (not data.aws_eks_cluster) so greenfield apply can create the
+# cluster and Kubernetes resources in one run without a pre-existing cluster in AWS.
 
 data "aws_eks_cluster_auth" "this" {
-  name = var.workspace
+  name = module.eks.cluster_name
 }
 
 provider "kubernetes" {
-  host                   = data.aws_eks_cluster.this.endpoint
+  host                   = module.eks.cluster_endpoint
   token                  = data.aws_eks_cluster_auth.this.token
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
 }
 
 provider "helm" {
   kubernetes {
-    host                   = data.aws_eks_cluster.this.endpoint
+    host                   = module.eks.cluster_endpoint
     token                  = data.aws_eks_cluster_auth.this.token
-    cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
   }
 }
 
 provider "kubectl" {
-  host                   = data.aws_eks_cluster.this.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.this.certificate_authority[0].data)
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
   token                  = data.aws_eks_cluster_auth.this.token
   load_config_file       = false
 }
