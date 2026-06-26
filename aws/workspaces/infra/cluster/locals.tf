@@ -17,10 +17,22 @@ locals {
     "${var.workspace}-${local.system_node_group_map_key}",
   )
 
+  system_node_instance_types = [
+    "t3a.medium",
+    "t3a.large",
+    "t3a.xlarge",
+    "t3.medium",
+    "t3.large",
+    "t3.xlarge",
+  ]
+
   node_instance_types_all = toset(distinct(concat(
     var.eks_ondemand_node_instance_type,
     var.eks_spot_node_instance_type,
-    var.eks_system_managed_node_group.instance_types,
+    var.enable_karpenter ? coalesce(
+      try(var.eks_system_managed_node_group.instance_types, null),
+      local.system_node_instance_types,
+    ) : [],
   )))
 
   legacy_node_groups = {
@@ -51,7 +63,10 @@ locals {
     min_count      = var.eks_system_managed_node_group.min_size
     max_count      = var.eks_system_managed_node_group.max_size
     desired_size   = var.eks_system_managed_node_group.desired_size
-    instance_types = var.eks_system_managed_node_group.instance_types
+    instance_types = coalesce(
+      try(var.eks_system_managed_node_group.instance_types, null),
+      local.system_node_instance_types,
+    )
     capacity       = "ON_DEMAND"
     ami_type        = "BOTTLEROCKET_x86_64"
     labels          = var.eks_system_managed_node_group.labels
@@ -118,18 +133,18 @@ locals {
   )
 
   karpenter_spot_defaults = {
-    cpu_limit       = local.spot_pool_cpu_limit
-    memory_limit    = local.spot_pool_memory_limit
-    nodes_limit     = local.spot_nodes_max
-    instance_types  = var.eks_spot_node_instance_type
+    cpu_limit           = local.spot_pool_cpu_limit
+    memory_limit        = local.spot_pool_memory_limit
+    nodes_limit         = local.spot_nodes_max
+    instance_types      = var.eks_spot_node_instance_type
     instance_categories = distinct([for instance_type in var.eks_spot_node_instance_type : substr(instance_type, 0, 1)])
   }
 
   karpenter_ondemand_defaults = {
-    cpu_limit       = local.ondemand_pool_cpu_limit
-    memory_limit    = local.ondemand_pool_memory_limit
-    nodes_limit     = local.ondemand_nodes_max
-    instance_types  = var.eks_ondemand_node_instance_type
+    cpu_limit           = local.ondemand_pool_cpu_limit
+    memory_limit        = local.ondemand_pool_memory_limit
+    nodes_limit         = local.ondemand_nodes_max
+    instance_types      = var.eks_ondemand_node_instance_type
     instance_categories = distinct([for instance_type in var.eks_ondemand_node_instance_type : substr(instance_type, 0, 1)])
   }
 

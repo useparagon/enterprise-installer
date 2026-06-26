@@ -171,7 +171,7 @@ variable "eks_system_managed_node_group" {
     name            = optional(string)
     use_name_prefix = optional(bool, false)
     ec2_name_tag    = optional(string)
-    instance_types  = optional(list(string), ["m6a.large"])
+    instance_types  = optional(list(string))
     min_size        = optional(number, 2)
     max_size        = optional(number, 3)
     desired_size    = optional(number, 2)
