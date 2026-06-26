@@ -42,6 +42,12 @@ resource "aws_autoscaling_group_tag" "cluster_autoscaler_label_tags" {
   }
 }
 
+# Module gained count for conditional enablement; preserve existing cluster-autoscaler state.
+moved {
+  from = module.cluster_autoscaler
+  to   = module.cluster_autoscaler[0]
+}
+
 module "cluster_autoscaler" {
   count = local.cluster_autoscaler_enabled ? 1 : 0
 
