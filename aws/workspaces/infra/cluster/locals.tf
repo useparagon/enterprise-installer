@@ -10,7 +10,7 @@ locals {
   karpenter_controller_taint = {
     key    = "karpenter.sh/controller"
     value  = "true"
-    effect = "NoSchedule"
+    effect = "NO_SCHEDULE"
   }
 
   # Reserve system MNG for Karpenter controller and cluster add-ons; worker/monitoring workloads use Karpenter nodes.
@@ -32,7 +32,7 @@ locals {
         key      = local.karpenter_controller_taint.key
         operator = "Equal"
         value    = local.karpenter_controller_taint.value
-        effect   = local.karpenter_controller_taint.effect
+        effect   = local.taint_effects[local.karpenter_controller_taint.effect]
       },
     ]
   }) : null
