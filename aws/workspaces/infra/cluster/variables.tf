@@ -114,6 +114,11 @@ variable "eks_system_managed_node_group" {
     max_size        = optional(number, 3)
     desired_size    = optional(number, 2)
     labels          = optional(map(string), { "karpenter.sh/controller" = "true" })
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
   })
 }
 

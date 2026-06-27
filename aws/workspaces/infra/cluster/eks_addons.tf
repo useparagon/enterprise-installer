@@ -45,6 +45,7 @@ resource "aws_eks_addon" "coredns" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "coredns"
   addon_version               = local.eks_addon_versions["coredns"]
+  configuration_values        = local.coredns_addon_configuration_values
   resolve_conflicts_on_create = local.eks_addon_resolve_conflicts.resolve_conflicts_on_create
   resolve_conflicts_on_update = local.eks_addon_resolve_conflicts.resolve_conflicts_on_update
 

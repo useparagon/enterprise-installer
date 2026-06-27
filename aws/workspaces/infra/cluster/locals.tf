@@ -7,6 +7,36 @@ locals {
     "${var.workspace}-${local.system_node_group_map_key}",
   )
 
+  karpenter_controller_taint = {
+    key    = "karpenter.sh/controller"
+    value  = "true"
+    effect = "NoSchedule"
+  }
+
+  # Reserve system MNG for Karpenter controller and cluster add-ons; worker/monitoring workloads use Karpenter nodes.
+  system_node_group_taints = try(var.eks_system_managed_node_group.taints, null) != null ? var.eks_system_managed_node_group.taints : (
+    var.enable_karpenter ? [local.karpenter_controller_taint] : []
+  )
+
+  coredns_addon_configuration_values = var.enable_karpenter ? jsonencode({
+    tolerations = [
+      {
+        key      = "CriticalAddonsOnly"
+        operator = "Exists"
+      },
+      {
+        operator = "Exists"
+        effect   = "NoExecute"
+      },
+      {
+        key      = local.karpenter_controller_taint.key
+        operator = "Equal"
+        value    = local.karpenter_controller_taint.value
+        effect   = local.karpenter_controller_taint.effect
+      },
+    ]
+  }) : null
+
   system_node_instance_types = [
     "t3a.medium",
     "t3a.large",
@@ -52,6 +82,7 @@ locals {
     ami_type        = "BOTTLEROCKET_x86_64"
     labels          = var.eks_system_managed_node_group.labels
     use_name_prefix = coalesce(var.eks_system_managed_node_group.use_name_prefix, false)
+    taints          = local.system_node_group_taints
   }
 
   managed_node_groups = merge(

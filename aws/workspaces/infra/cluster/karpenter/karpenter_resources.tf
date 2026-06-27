@@ -18,6 +18,18 @@ resource "helm_release" "karpenter" {
       nodeSelector = {
         "karpenter.sh/controller" = "true"
       }
+      tolerations = [
+        {
+          key      = "karpenter.sh/controller"
+          operator = "Equal"
+          value    = "true"
+          effect   = "NoSchedule"
+        },
+        {
+          key      = "CriticalAddonsOnly"
+          operator = "Exists"
+        },
+      ]
       dnsPolicy = "ClusterFirst"
       settings = {
         clusterName       = var.cluster_name
