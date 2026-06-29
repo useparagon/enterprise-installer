@@ -143,6 +143,7 @@ Notes:
 
 - Toggling this on an existing deployment changes the bucket default encryption in place. New objects are encrypted with KMS; previously written objects keep their existing encryption until rewritten.
 - The `logs` bucket always stays on SSE-S3. ALB access logs and S3 server access logs do not support SSE-KMS destination buckets, so it is intentionally excluded.
+- Setting `s3_kms_encryption_enabled` back to false sets module.s3_kms_key count to zero, so Terraform schedules the managed CMK for deletion. Bucket default encryption reverts to SSE-S3, but existing objects stay SSE-KMS with that key and can become unreadable after the key is removed.
 
 ## Updates
 
