@@ -1,14 +1,14 @@
 locals {
   postgres_family = "postgres${split(".", var.rds_postgres_version)[0]}" // e.g. `postgres11`, `postgres12`, etc
 
-  # gp3 baseline depends on allocated size: PostgreSQL stripes at >= 400 GiB (12k IOPS / 500 MiB/s).
-  # Custom values must be set as a valid pair; if only one is set, fall back to the size-appropriate baseline.
-  rds_gp3_custom                       = var.rds_gp3_iops != null && var.rds_gp3_storage_throughput != null
+  # gp3 PostgreSQL stripes at >= 400 GiB (12k IOPS / 500 MiB/s baseline). Below 400 GiB gp3 uses a
+  # fixed 3000 IOPS / 125 MiB/s that AWS does NOT allow you to specify; passing iops/storage_throughput
+  # for those sizes fails with InvalidParameterCombination, so they must be omitted (null).
+  # Custom values must be set as a valid pair and are only honored at >= 400 GiB (enforced by variable validation).
   rds_gp3_striped                      = var.rds_allocated_storage >= 400
-  rds_gp3_baseline_iops                = local.rds_gp3_striped ? 12000 : 3000
-  rds_gp3_baseline_tp                  = local.rds_gp3_striped ? 500 : 125
-  rds_gp3_iops_effective               = local.rds_gp3_custom ? var.rds_gp3_iops : local.rds_gp3_baseline_iops
-  rds_gp3_storage_throughput_effective = local.rds_gp3_custom ? var.rds_gp3_storage_throughput : local.rds_gp3_baseline_tp
+  rds_gp3_custom                       = var.rds_gp3_iops != null && var.rds_gp3_storage_throughput != null
+  rds_gp3_iops_effective               = local.rds_gp3_striped ? (local.rds_gp3_custom ? var.rds_gp3_iops : 12000) : null
+  rds_gp3_storage_throughput_effective = local.rds_gp3_striped ? (local.rds_gp3_custom ? var.rds_gp3_storage_throughput : 500) : null
 }
 
 resource "random_string" "postgres_root_username" {

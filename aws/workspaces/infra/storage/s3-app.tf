@@ -86,7 +86,7 @@ data "aws_iam_policy_document" "app" {
     sid       = "AllowSSLRequestsOnly"
     actions   = ["s3:*"]
     effect    = "Deny"
-    resources = ["${aws_s3_bucket.app.arn}", "${aws_s3_bucket.app.arn}/*"]
+    resources = [aws_s3_bucket.app.arn, "${aws_s3_bucket.app.arn}/*"]
 
     condition {
       test     = "Bool"
@@ -150,11 +150,11 @@ resource "aws_iam_group_policy" "app" {
           ],
           "Effect" : "Allow",
           "Resource" : concat([
-            "${aws_s3_bucket.app.arn}",
-            "${aws_s3_bucket.cdn.arn}",
-            "${aws_s3_bucket.auditlogs.arn}"
+            aws_s3_bucket.app.arn,
+            aws_s3_bucket.cdn.arn,
+            aws_s3_bucket.auditlogs.arn
             ], var.managed_sync_enabled ? [
-            "${aws_s3_bucket.managed_sync[0].arn}"
+            aws_s3_bucket.managed_sync[0].arn
           ] : [])
         },
         {

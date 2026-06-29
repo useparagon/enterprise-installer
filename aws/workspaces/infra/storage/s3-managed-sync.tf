@@ -94,7 +94,7 @@ data "aws_iam_policy_document" "managed_sync" {
     sid       = "AllowSSLRequestsOnly"
     actions   = ["s3:*"]
     effect    = "Deny"
-    resources = ["${aws_s3_bucket.managed_sync[0].arn}", "${aws_s3_bucket.managed_sync[0].arn}/*"]
+    resources = [aws_s3_bucket.managed_sync[0].arn, "${aws_s3_bucket.managed_sync[0].arn}/*"]
 
     condition {
       test     = "Bool"

@@ -29,7 +29,7 @@ data "aws_iam_policy_document" "logs_bucket_policy" {
     actions = ["s3:PutObject"]
     effect  = "Allow"
     resources = [
-      "${aws_s3_bucket.logs.arn}",
+      aws_s3_bucket.logs.arn,
       "${aws_s3_bucket.logs.arn}/access_logs/AWSLogs/${data.aws_caller_identity.current.account_id}/*",
     ]
     principals {
@@ -48,7 +48,7 @@ data "aws_iam_policy_document" "logs_bucket_policy" {
     ]
     effect = "Allow"
     resources = [
-      "${aws_s3_bucket.logs.arn}",
+      aws_s3_bucket.logs.arn,
       "${aws_s3_bucket.logs.arn}/*",
     ]
     principals {
