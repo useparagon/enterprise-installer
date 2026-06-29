@@ -352,6 +352,138 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "waf_enabled" {
+  description = "Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf_managed_rule_groups, rate limits, or IP lists in tfvars."
+  type        = bool
+  default     = false
+}
+
+variable "waf_ip_whitelist" {
+  description = "CIDRs to bypass WAF rules (office IPs). Empty list = no whitelist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_ip_blacklist" {
+  description = "CIDRs to always block. Empty list = no blacklist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_rate_limit_global" {
+  description = "Max requests per IP across all endpoints in the evaluation window. null or 0 = no global rate limit rule."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.waf_rate_limit_global == null || var.waf_rate_limit_global == 0 || coalesce(var.waf_rate_limit_global, 100) >= 100
+    error_message = "waf_rate_limit_global must be null, 0 (disabled), or >= 100 (AWS WAF minimum)."
+  }
+}
+
+variable "waf_rate_limit_global_window_sec" {
+  description = "Evaluation window for global rate limit (60, 120, 300, or 600)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_global_window_sec)
+    error_message = "waf_rate_limit_global_window_sec must be 60, 120, 300, or 600."
+  }
+}
+
+variable "waf_rate_limit_paths" {
+  description = "Map of URI path prefix to max requests per IP per window. Paths without a leading / are normalized. Empty = no path rate limit rules."
+  type        = map(number)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for limit in values(var.waf_rate_limit_paths) : limit >= 100])
+    error_message = "waf_rate_limit_paths values must be >= 100 (AWS WAF minimum)."
+  }
+}
+
+variable "waf_rate_limit_path_window_sec" {
+  description = "Evaluation window for path rate limits (60, 120, 300, or 600)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_path_window_sec)
+    error_message = "waf_rate_limit_path_window_sec must be 60, 120, 300, or 600."
+  }
+}
+
+variable "waf_managed_rule_groups" {
+  description = <<-EOT
+    Map of AWS WAF managed rule groups to attach to the Web ACL. Empty by default — you choose which groups to enable.
+
+    Each key is the Web ACL rule name (unique). Each value configures one managed rule group:
+
+    - name (required): e.g. AWSManagedRulesCommonRuleSet, AWSManagedRulesAmazonIpReputationList
+    - vendor_name: default "AWS"
+    - priority: evaluation order (lower first). Auto-assigned after IP/rate rules when omitted.
+    - override_action: "none" (enforce) or "count" (observe only, no block)
+    - excluded_rules: rule names to count (not block); translated to rule_action_overrides internally
+    - rule_action_overrides: per-rule override — "count", "block", or "allow"
+    - bot_control_inspection_level: "COMMON" or "TARGETED" for AWSManagedRulesBotControlRuleSet only
+
+    Reference config (Paragon SaaS): paragon/terraform/workspaces/environment/shared/waf.tf
+  EOT
+  type = map(object({
+    name                         = string
+    vendor_name                  = optional(string, "AWS")
+    priority                     = optional(number)
+    override_action              = optional(string, "none")
+    excluded_rules               = optional(list(string), [])
+    rule_action_overrides        = optional(map(string), {})
+    bot_control_inspection_level = optional(string)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      contains(["none", "count"], coalesce(rule.override_action, "none"))
+    ])
+    error_message = "waf_managed_rule_groups.override_action must be \"none\" or \"count\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      alltrue([
+        for action in values(coalesce(rule.rule_action_overrides, {})) :
+        contains(["count", "block", "allow"], action)
+      ])
+    ])
+    error_message = "waf_managed_rule_groups.rule_action_overrides values must be \"count\", \"block\", or \"allow\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      rule.bot_control_inspection_level == null ? true : contains(["COMMON", "TARGETED"], rule.bot_control_inspection_level)
+    ])
+    error_message = "waf_managed_rule_groups.bot_control_inspection_level must be \"COMMON\" or \"TARGETED\" when set."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      rule.bot_control_inspection_level == null || rule.name == "AWSManagedRulesBotControlRuleSet"
+    ])
+    error_message = "bot_control_inspection_level is only valid when name is AWSManagedRulesBotControlRuleSet."
+  }
+}
+
+variable "waf_logs_retention_days" {
+  description = "Number of days to retain WAF logs in S3 before lifecycle expiration. Only applies when waf_enabled is true."
+  type        = number
+  default     = 30
+}
+
 locals {
   # hash of account ID to help ensure uniqueness of resources like S3 bucket names
   hash        = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)
@@ -369,9 +501,18 @@ locals {
   use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
   legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
 
+  # `local.infra_vars` is resolved in infra_secrets.tf (legacy infra.json when provided,
+  # otherwise infra secrets sourced from external secrets). Backward compatible with infra
+  # workspaces that still emit the legacy "minio" output instead of the renamed "storage"
+  # output; null-safe when neither is present.
+  storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
+
   default_workspace = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
   workspace         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace
 
+  waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
+
+  # use default where standard value can be determined
   cluster_name     = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
   logs_bucket      = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
   auditlogs_bucket = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
@@ -432,11 +573,6 @@ locals {
       "healthcheck_path" = "/healthz"
       "port"             = try(local.helm_vars.global.env["HERMES_PORT"], 1702)
       "public_url"       = try(local.helm_vars.global.env["HERMES_PUBLIC_URL"], "https://hermes.${var.domain}")
-    }
-    "minio" = {
-      "healthcheck_path" = "/minio/health/live"
-      "port"             = try(local.helm_vars.global.env["MINIO_PORT"], 9000)
-      "public_url"       = try(local.helm_vars.global.env["MINIO_PUBLIC_URL"], "https://minio.${var.domain}")
     }
     "passport" = {
       "healthcheck_path" = "/healthz"
@@ -543,7 +679,7 @@ locals {
   microservices = {
     for microservice, config in local.all_microservices :
     microservice => config
-    if !contains(var.excluded_microservices, microservice) && !(microservice == "minio" && local.cloud_storage_type == "S3")
+    if !contains(var.excluded_microservices, microservice)
   }
 
   public_microservices = {
@@ -666,7 +802,6 @@ locals {
           HADES_PORT              = try(local.microservices.hades.port, null)
           HEALTH_CHECKER_PORT     = try(local.microservices["health-checker"].port, null)
           HERMES_PORT             = try(local.microservices.hermes.port, null)
-          MINIO_PORT              = try(local.microservices.minio.port, null)
           PASSPORT_PORT           = try(local.microservices.passport.port, null)
           PHEME_PORT              = try(local.microservices.pheme.port, null)
           RELEASE_PORT            = try(local.microservices.release.port, null)
@@ -693,7 +828,6 @@ locals {
           HADES_PRIVATE_URL              = try("http://hades:${local.microservices.hades.port}", null)
           HEALTH_CHECKER_PRIVATE_URL     = try("http://health-checker:${local.microservices["health-checker"].port}", null)
           HERMES_PRIVATE_URL             = try("http://hermes:${local.microservices.hermes.port}", null)
-          MINIO_PRIVATE_URL              = try("http://minio:${local.microservices.minio.port}", null)
           PASSPORT_PRIVATE_URL           = try("http://passport:${local.microservices.passport.port}", null)
           PHEME_PRIVATE_URL              = try("http://pheme:${local.microservices.pheme.port}", null)
           RELEASE_PRIVATE_URL            = try("http://release:${local.microservices.release.port}", null)
@@ -719,7 +853,6 @@ locals {
           HADES_PUBLIC_URL              = try(local.microservices.hades.public_url, null)
           HEALTH_CHECKER_PUBLIC_URL     = try(local.microservices["health-checker"].public_url, null)
           HERMES_PUBLIC_URL             = try(local.microservices.hermes.public_url, null)
-          MINIO_PUBLIC_URL              = try(local.microservices.minio.public_url, null)
           PASSPORT_PUBLIC_URL           = try(local.microservices.passport.public_url, null)
           PHEME_PUBLIC_URL              = try(local.microservices.pheme.public_url, null)
           PUBLIC_UPLOAD_PROXY_BASE_URL  = try("${local.microservices.zeus.public_url}/public-upload-proxy", null)
@@ -800,36 +933,21 @@ locals {
           WORKFLOW_REDIS_URL             = try("${local.workflow_redis.host}:${local.workflow_redis.port}", local.default_redis_url)
 
           # Cloud Storage configurations
-          CLOUD_STORAGE_MICROSERVICE_PASS = local.cloud_storage_type == "S3" ? local.infra_vars.minio.value.root_password : local.infra_vars.minio.value.microservice_pass
-          CLOUD_STORAGE_MICROSERVICE_USER = local.cloud_storage_type == "S3" ? local.infra_vars.minio.value.root_user : local.infra_vars.minio.value.microservice_user
-          CLOUD_STORAGE_PUBLIC_BUCKET     = try(local.infra_vars.minio.value.public_bucket, "${local.workspace}-cdn")
-          CLOUD_STORAGE_SYSTEM_BUCKET     = try(local.infra_vars.minio.value.private_bucket, "${local.workspace}-app")
+          CLOUD_STORAGE_MICROSERVICE_PASS = try(local.storage_output.root_password, null)
+          CLOUD_STORAGE_MICROSERVICE_USER = try(local.storage_output.root_user, null)
+          CLOUD_STORAGE_PUBLIC_BUCKET     = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
+          CLOUD_STORAGE_SYSTEM_BUCKET     = try(local.storage_output.private_bucket, "${local.workspace}-app")
           CLOUD_STORAGE_TYPE              = local.cloud_storage_type
           CLOUD_STORAGE_REGION            = var.aws_region
 
           CLOUD_STORAGE_PUBLIC_URL = coalesce(
             try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
             local.cloud_storage_type == "S3" ? "https://s3.${var.aws_region}.amazonaws.com" : null,
-            try(local.microservices.minio.public_url, null), null
           )
           CLOUD_STORAGE_PRIVATE_URL = coalesce(
             try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
             local.cloud_storage_type == "S3" ? "https://s3.${var.aws_region}.amazonaws.com" : null,
-            try(local.microservices.minio.public_url, null), null
           )
-
-          # MinIO configurations
-          MINIO_BROWSER           = "off"
-          MINIO_INSTANCE_COUNT    = "1"
-          MINIO_MICROSERVICE_PASS = local.infra_vars.minio.value.microservice_pass
-          MINIO_MICROSERVICE_USER = local.infra_vars.minio.value.microservice_user
-          MINIO_MODE              = "gateway-s3"
-          MINIO_NGINX_PROXY       = "on"
-          MINIO_PUBLIC_BUCKET     = try(local.infra_vars.minio.value.public_bucket, "${local.workspace}-cdn")
-          MINIO_REGION            = var.aws_region
-          MINIO_ROOT_PASSWORD     = local.infra_vars.minio.value.root_password
-          MINIO_ROOT_USER         = local.infra_vars.minio.value.root_user
-          MINIO_SYSTEM_BUCKET     = try(local.infra_vars.minio.value.private_bucket, "${local.workspace}-app")
 
           # Monitor configurations
           MONITOR_BULL_EXPORTER_HOST               = "http://bull-exporter"

@@ -58,17 +58,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "app" {
       days = var.app_bucket_expiration
     }
 
-    noncurrent_version_expiration {
-      noncurrent_days = 7
-    }
-
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
     }
   }
 
   rule {
-    id     = "markers"
+    id     = "delete-markers"
     status = "Enabled"
 
     filter {}

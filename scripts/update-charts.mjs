@@ -20,6 +20,9 @@ const ignoredServices = [
   'prometheus-ecs-discovery',
   'redis-streams-exporter',
   'alb-log-parser',
+  // MinIO was retired (PARA-21646); its chart is removed, but atlas input may
+  // still list it while datastores/minio remains in the monorepo.
+  'minio',
 ];
 
 /**

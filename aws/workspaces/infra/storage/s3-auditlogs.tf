@@ -62,7 +62,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "auditlogs" {
   bucket = aws_s3_bucket.auditlogs.id
 
   rule {
-    id = "expiration"
+    id     = "expiration"
+    status = "Enabled"
 
     filter {}
 
@@ -70,10 +71,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "auditlogs" {
       days = var.auditlogs_retention_days
     }
 
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+
     noncurrent_version_expiration {
       noncurrent_days = var.auditlogs_retention_days
     }
+  }
 
+  rule {
+    id     = "delete-markers"
     status = "Enabled"
+
+    filter {}
+
+    expiration {
+      expired_object_delete_marker = true
+    }
   }
 }

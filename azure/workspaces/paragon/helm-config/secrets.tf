@@ -77,23 +77,24 @@ locals {
   # URL scheme but still requires MANAGED_SYNC_REDIS_TLS_ENABLED to enable TLS in the client.
   managed_sync_redis_url = "${local.redis_config.redis_tls_enabled ? "rediss" : "redis"}://${local.redis_config.password != null ? ":${urlencode(local.redis_config.password)}@" : ""}${local.redis_config.host}:${local.redis_config.port}"
 
+  # Backward compatible with infra workspaces that still emit the legacy "minio" output
+  # instead of the renamed "storage" output. Null-safe when infra secrets come from
+  # external secrets instead of an infra.json (no infra_values are provided).
+  storage_output = try(var.infra_values.storage.value, var.infra_values.minio.value, {})
+
   storage_type = try(var.base_helm_values.global.env["CLOUD_STORAGE_TYPE"], "AZURE")
 
   storage_config = {
     buckets = {
-      public       = coalesce(try(var.base_helm_values.global.env["CLOUD_STORAGE_PUBLIC_BUCKET"], null), try(var.base_helm_values.global.env["MINIO_PUBLIC_BUCKET"], null), var.infra_values.minio.value.public_bucket)
-      managed_sync = coalesce(try(var.base_helm_values.global.env["CLOUD_STORAGE_MANAGED_SYNC_BUCKET"], null), var.infra_values.minio.value.managed_sync_bucket)
+      public       = coalesce(try(var.base_helm_values.global.env["CLOUD_STORAGE_PUBLIC_BUCKET"], null), try(var.base_helm_values.global.env["MINIO_PUBLIC_BUCKET"], null), try(local.storage_output.public_bucket, null))
+      managed_sync = coalesce(try(var.base_helm_values.global.env["CLOUD_STORAGE_MANAGED_SYNC_BUCKET"], null), try(local.storage_output.managed_sync_bucket, null))
     }
     type = try(var.base_helm_values.global.env["CLOUD_STORAGE_TYPE"], "AZURE")
-    user = try(
-      local.storage_type == "MINIO" ? try(var.base_helm_values.global.env["MINIO_MICROSERVICE_USER"], var.infra_values.minio.value.microservice_user) : try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_USER"], var.infra_values.minio.value.root_user)
-    )
-    pass = try(
-      local.storage_type == "MINIO" ? try(var.base_helm_values.global.env["MINIO_MICROSERVICE_PASS"], var.infra_values.minio.value.microservice_pass) : try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_PASS"], var.infra_values.minio.value.root_password)
-    )
+    user = try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_USER"], local.storage_output.root_user, null)
+    pass = try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_PASS"], local.storage_output.root_password, null)
     public_url = coalesce(
       try(var.base_helm_values.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
-      local.storage_type == "AZURE" ? "https://${try(var.infra_values.minio.value.public_storage_account_name, var.infra_values.minio.value.root_user)}.blob.core.windows.net" : null,
+      local.storage_type == "AZURE" ? "https://${try(local.storage_output.public_storage_account_name, local.storage_output.root_user, "")}.blob.core.windows.net" : null,
       try(var.microservices.minio.public_url, null), null
     )
   }
@@ -106,8 +107,9 @@ locals {
   }
 
   managed_sync_secrets = {
-    HOST_ENV  = "AZURE_K8"
-    LOG_LEVEL = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
+    HOST_ENV       = "AZURE_K8"
+    LOG_LEVEL      = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
+    TRIAL_DISABLED = try(var.base_helm_values.global.env["TRIAL_DISABLED"], "true")
 
     CLOUD_STORAGE_TYPE                = local.storage_type
     CLOUD_STORAGE_PUBLIC_BUCKET       = local.storage_config.buckets.public
@@ -140,11 +142,11 @@ locals {
 
     # Redis from infra when present (managed-sync, then cache). Do not override from
     # base_helm_values when infra provides credentials.
-    MANAGED_SYNC_REDIS_URL              = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
-    MANAGED_SYNC_REDIS_PASSWORD         = local.redis_config.password != null ? local.redis_config.password : ""
-    MANAGED_SYNC_REDIS_CLUSTER_ENABLED  = local.redis_config.cluster_enabled
-    MANAGED_SYNC_REDIS_TLS_ENABLED      = tostring(local.redis_config.redis_tls_enabled)
-    MANAGED_SYNC_REDIS_CA_CERT          = local.redis_config.redis_ca_certificate != null ? local.redis_config.redis_ca_certificate : ""
+    MANAGED_SYNC_REDIS_URL             = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
+    MANAGED_SYNC_REDIS_PASSWORD        = local.redis_config.password != null ? local.redis_config.password : ""
+    MANAGED_SYNC_REDIS_CLUSTER_ENABLED = local.redis_config.cluster_enabled
+    MANAGED_SYNC_REDIS_TLS_ENABLED     = tostring(local.redis_config.redis_tls_enabled)
+    MANAGED_SYNC_REDIS_CA_CERT         = local.redis_config.redis_ca_certificate != null ? local.redis_config.redis_ca_certificate : ""
 
     SYNC_INSTANCE_POSTGRES_HOST        = local.postgres_config.sync_instance.host
     SYNC_INSTANCE_POSTGRES_PORT        = local.postgres_config.sync_instance.port

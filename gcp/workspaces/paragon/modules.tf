@@ -55,7 +55,7 @@ module "helm" {
   public_services         = local.public_services
   redis_ca_cert_secret_name = local.infra_secret_names.redis_ca_cert
   region                  = var.region
-  storage_service_account = try(local.infra_vars.minio.value.service_account, null)
+  storage_service_account = try(local.storage_output.service_account, null)
   infra_vars              = local.infra_vars
   workspace               = local.workspace
 }

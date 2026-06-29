@@ -396,9 +396,15 @@ locals {
 
   dns_enabled = var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
 
-  infra_json_path      = var.infra_json_path != null ? abspath(var.infra_json_path) : null
+  infra_json_path       = var.infra_json_path != null ? abspath(var.infra_json_path) : null
   use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
-  legacy_infra_vars    = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
+  legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
+
+  # `local.infra_vars` is resolved in infra_secrets.tf (legacy infra.json when provided,
+  # otherwise infra secrets sourced from external secrets). Backward compatible with infra
+  # workspaces that still emit the legacy "minio" output instead of the renamed "storage"
+  # output; null-safe when neither is present.
+  storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
   workspace        = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
   cluster_name     = coalesce(var.cluster_name_override, local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, null) : null, "${local.workspace}-cluster")
@@ -422,7 +428,7 @@ locals {
   })
 
   # WIF deployments store the storage SA key in infra secrets; static JSON creds otherwise.
-  gcp_creds = var.gcp_assume_role ? try(base64decode(local.infra_vars.minio.value.root_password), null) : local.gcp_provider_credentials
+  gcp_creds = var.gcp_assume_role ? try(base64decode(local.storage_output.root_password), null) : local.gcp_provider_credentials
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "GCP")
 
@@ -476,11 +482,6 @@ locals {
       "healthcheck_path" = "/healthz"
       "port"             = try(local.helm_vars.global.env["HERMES_PORT"], 1702)
       "public_url"       = try(local.helm_vars.global.env["HERMES_PUBLIC_URL"], "https://hermes.${var.domain}")
-    }
-    "minio" = {
-      "healthcheck_path" = "/minio/health/live"
-      "port"             = try(local.helm_vars.global.env["MINIO_PORT"], 9000)
-      "public_url"       = try(local.helm_vars.global.env["MINIO_PUBLIC_URL"], "https://minio.${var.domain}")
     }
     "passport" = {
       "healthcheck_path" = "/healthz"
@@ -562,7 +563,7 @@ locals {
   microservices = {
     for microservice, config in local.all_microservices :
     microservice => config
-    if !contains(var.excluded_microservices, microservice) && !(microservice == "minio" && local.cloud_storage_type == "GCP")
+    if !contains(var.excluded_microservices, microservice)
   }
 
   public_microservices = {
@@ -691,7 +692,6 @@ locals {
         HADES_PORT              = try(local.microservices.hades.port, null)
         HEALTH_CHECKER_PORT     = try(local.microservices["health-checker"].port, null)
         HERMES_PORT             = try(local.microservices.hermes.port, null)
-        MINIO_PORT              = try(local.microservices.minio.port, null)
         PASSPORT_PORT           = try(local.microservices.passport.port, null)
         PHEME_PORT              = try(local.microservices.pheme.port, null)
         RELEASE_PORT            = try(local.microservices.release.port, null)
@@ -719,7 +719,6 @@ locals {
         HADES_PRIVATE_URL              = try("http://hades:${local.microservices.hades.port}", null)
         HEALTH_CHECKER_PRIVATE_URL     = try("http://health-checker:${local.microservices["health-checker"].port}", null)
         HERMES_PRIVATE_URL             = try("http://hermes:${local.microservices.hermes.port}", null)
-        MINIO_PRIVATE_URL              = try("http://minio:${local.microservices.minio.port}", null)
         PASSPORT_PRIVATE_URL           = try("http://passport:${local.microservices.passport.port}", null)
         PHEME_PRIVATE_URL              = try("http://pheme:${local.microservices.pheme.port}", null)
         RELEASE_PRIVATE_URL            = try("http://release:${local.microservices.release.port}", null)
@@ -745,7 +744,6 @@ locals {
         HADES_PUBLIC_URL              = try(local.microservices.hades.public_url, null)
         HEALTH_CHECKER_PUBLIC_URL     = try(local.microservices["health-checker"].public_url, null)
         HERMES_PUBLIC_URL             = try(local.microservices.hermes.public_url, null)
-        MINIO_PUBLIC_URL              = try(local.microservices.minio.public_url, null)
         PASSPORT_PUBLIC_URL           = try(local.microservices.passport.public_url, null)
         PHEME_PUBLIC_URL              = try(local.microservices.pheme.public_url, null)
         PUBLIC_UPLOAD_PROXY_BASE_URL  = try("${local.microservices.zeus.public_url}/public-upload-proxy", null)
@@ -834,35 +832,21 @@ locals {
         WORKFLOW_REDIS_URL             = try(local.redis_instance_urls["workflow"], local.default_redis_url)
 
         # Cloud Storage configurations
-        CLOUD_STORAGE_MICROSERVICE_PASS = local.cloud_storage_type == "GCP" ? local.infra_vars.minio.value.root_password : local.infra_vars.minio.value.microservice_pass
-        CLOUD_STORAGE_MICROSERVICE_USER = local.cloud_storage_type == "GCP" ? local.infra_vars.minio.value.root_user : local.infra_vars.minio.value.microservice_user
-        CLOUD_STORAGE_PUBLIC_BUCKET     = try(local.infra_vars.minio.value.public_bucket, "${local.workspace}-cdn")
-        CLOUD_STORAGE_SYSTEM_BUCKET     = try(local.infra_vars.minio.value.private_bucket, "${local.workspace}-app")
+        CLOUD_STORAGE_MICROSERVICE_PASS = try(local.storage_output.root_password, null)
+        CLOUD_STORAGE_MICROSERVICE_USER = try(local.storage_output.root_user, null)
+        CLOUD_STORAGE_PUBLIC_BUCKET     = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
+        CLOUD_STORAGE_SYSTEM_BUCKET     = try(local.storage_output.private_bucket, "${local.workspace}-app")
         CLOUD_STORAGE_TYPE              = local.cloud_storage_type
 
         CLOUD_STORAGE_PUBLIC_URL = coalesce(
           try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
           local.cloud_storage_type == "GCP" ? "https://storage.googleapis.com" : null,
-          try(local.microservices.minio.public_url, null), null
         )
         # TODO: In the future, we should use a private link to access the storage account so traffic stays within the VPC. This affects costs and performance.
         CLOUD_STORAGE_PRIVATE_URL = coalesce(
           try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
           local.cloud_storage_type == "GCP" ? "https://storage.googleapis.com" : null,
-          try(local.microservices.minio.public_url, null), null
         )
-
-        # MinIO configurations
-        MINIO_BROWSER           = "off"
-        MINIO_INSTANCE_COUNT    = "1"
-        MINIO_MICROSERVICE_PASS = local.infra_vars.minio.value.microservice_pass
-        MINIO_MICROSERVICE_USER = local.infra_vars.minio.value.microservice_user
-        MINIO_MODE              = "gateway-gcp"
-        MINIO_NGINX_PROXY       = "on"
-        MINIO_PUBLIC_BUCKET     = try(local.infra_vars.minio.value.public_bucket, "${local.workspace}-cdn")
-        MINIO_ROOT_PASSWORD     = local.infra_vars.minio.value.root_password
-        MINIO_ROOT_USER         = local.infra_vars.minio.value.root_user
-        MINIO_SYSTEM_BUCKET     = try(local.infra_vars.minio.value.private_bucket, "${local.workspace}-app")
 
         # Monitor configurations
         MONITOR_BULL_EXPORTER_HOST              = "http://bull-exporter"
@@ -899,8 +883,8 @@ locals {
     })
   })
 
-  bootstrap_values     = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
-  runtime_secret_keys  = toset(try(local.bootstrap_values.secretKeys, []))
+  bootstrap_values    = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
+  runtime_secret_keys = toset(try(local.bootstrap_values.secretKeys, []))
   helm_secret_values = {
     for key, value in local.helm_values.global.env :
     key => tostring(value)

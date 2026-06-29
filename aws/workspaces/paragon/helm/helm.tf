@@ -63,14 +63,17 @@ locals {
 
   public_microservice_values = yamlencode({
     for microservice_name, microservice_config in var.public_microservices : microservice_name => {
-      ingress = {
-        className          = "alb"
-        host               = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
-        scheme             = var.ingress_scheme
-        certificate        = var.certificate
-        load_balancer_name = var.workspace
-        logs_bucket        = var.logs_bucket
-      }
+      ingress = merge(
+        {
+          className          = "alb"
+          host               = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
+          scheme             = var.ingress_scheme
+          certificate        = var.certificate
+          load_balancer_name = var.workspace
+          logs_bucket        = var.logs_bucket
+        },
+        var.waf_web_acl_arn != "" ? { wafv2_acl_arn = var.waf_web_acl_arn } : {}
+      )
     }
   })
 
@@ -87,13 +90,16 @@ locals {
 
   public_monitor_values = yamlencode({
     for monitor_name, monitor_config in var.public_monitors : monitor_name => {
-      ingress = {
-        className          = "alb"
-        host               = replace(replace(monitor_config.public_url, "https://", ""), "http://", "")
-        scheme             = var.ingress_scheme
-        certificate        = var.certificate
-        load_balancer_name = var.workspace
-      }
+      ingress = merge(
+        {
+          className          = "alb"
+          host               = replace(replace(monitor_config.public_url, "https://", ""), "http://", "")
+          scheme             = var.ingress_scheme
+          certificate        = var.certificate
+          load_balancer_name = var.workspace
+        },
+        var.waf_web_acl_arn != "" ? { wafv2_acl_arn = var.waf_web_acl_arn } : {}
+      )
     }
   })
 

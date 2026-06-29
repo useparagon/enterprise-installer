@@ -56,12 +56,6 @@ Hermes API endpoint URL.
 {{- printf "http://%s-hermes" .Release.Name -}}
 {{- end -}}
 {{/*
-Minio API endpoint URL.
-*/}}
-{{- define "global.minio.url" -}}
-{{- printf "http://%s-minio" .Release.Name -}}
-{{- end -}}
-{{/*
 Passport API endpoint URL.
 */}}
 {{- define "global.passport.url" -}}

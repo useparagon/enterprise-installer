@@ -41,6 +41,9 @@ metadata:
     {{- if hasKey .Values.ingress "ip_whitelist" }}
     alb.ingress.kubernetes.io/inbound-cidrs: {{ .Values.ingress.ip_whitelist }}
     {{- end }}
+    {{- if and .Values.ingress.wafv2_acl_arn (ne .Values.ingress.wafv2_acl_arn "none") }}
+    alb.ingress.kubernetes.io/wafv2-acl-arn: {{ .Values.ingress.wafv2_acl_arn }}
+    {{- end }}
     {{- else if eq .Values.global.env.HOST_ENV "AZURE_K8" }}
     kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: letsencrypt-prod
