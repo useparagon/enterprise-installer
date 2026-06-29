@@ -21,6 +21,6 @@ resource "random_password" "openobserve_password" {
 }
 
 locals {
-  openobserve_email = var.openobserve_email != null ? var.openobserve_email : "${random_string.openobserve_email[0].result}@useparagon.com"
+  openobserve_email    = var.openobserve_email != null ? var.openobserve_email : "${random_string.openobserve_email[0].result}@useparagon.com"
   openobserve_password = var.openobserve_password != null ? var.openobserve_password : random_password.openobserve_password[0].result
 }
