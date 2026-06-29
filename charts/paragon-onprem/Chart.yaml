@@ -42,10 +42,6 @@ dependencies:
     repository: file://charts/hermes
     version: __PARAGON_VERSION__
     condition: subchart.hermes.enabled
-  - name: minio
-    repository: file://charts/minio
-    version: __PARAGON_VERSION__
-    condition: subchart.minio.enabled
   - name: passport
     repository: file://charts/passport
     version: __PARAGON_VERSION__

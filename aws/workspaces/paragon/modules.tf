@@ -1,3 +1,19 @@
+module "waf" {
+  source = "./waf"
+  count  = local.waf_active ? 1 : 0
+
+  aws_region                       = var.aws_region
+  workspace                        = local.workspace
+  waf_logs_retention_days          = var.waf_logs_retention_days
+  waf_ip_whitelist                 = var.waf_ip_whitelist
+  waf_ip_blacklist                 = var.waf_ip_blacklist
+  waf_rate_limit_global            = var.waf_rate_limit_global
+  waf_rate_limit_global_window_sec = var.waf_rate_limit_global_window_sec
+  waf_rate_limit_paths             = var.waf_rate_limit_paths
+  waf_rate_limit_path_window_sec   = var.waf_rate_limit_path_window_sec
+  waf_managed_rule_groups          = var.waf_managed_rule_groups
+}
+
 module "alb" {
   source = "./alb"
 
@@ -16,24 +32,24 @@ module "alb" {
 module "helm" {
   source = "./helm"
 
-  certificate                = module.alb.certificate
+  argocd_enabled             = var.argocd_enabled
   aws_region                 = var.aws_region
+  certificate                = module.alb.certificate
   cluster_name               = local.cluster_name
+  docker_cfg_secret_name     = local.runtime_docker_cfg_secret_name
   docker_email               = var.docker_email
   docker_password            = var.docker_password
   docker_registry_server     = var.docker_registry_server
   docker_username            = var.docker_username
-  docker_cfg_secret_name     = local.runtime_docker_cfg_secret_name
   env_secret_name            = local.runtime_env_secret_name
   eso_role_arn               = local.eso_role_arn
   feature_flags_content      = local.feature_flags_content
   flipt_options              = local.flipt_options
   helm_values                = local.helm_values_public
+  infra_gitops_ready         = var.infra_gitops_ready
   ingress_scheme             = var.ingress_scheme
-  argocd_enabled             = var.argocd_enabled
   install_external_secrets   = !var.argocd_enabled
   install_ingress_controller = !var.argocd_enabled
-  infra_gitops_ready         = var.infra_gitops_ready
   k8s_version                = var.k8s_version
   logs_bucket                = local.logs_bucket
   managed_sync_enabled       = var.managed_sync_enabled
@@ -48,6 +64,7 @@ module "helm" {
   openobserve_secret_name    = local.runtime_openobserve_secret_name
   public_microservices       = local.public_microservices
   public_monitors            = local.public_monitors
+  waf_web_acl_arn            = local.waf_active ? module.waf[0].web_acl_arn : ""
   workspace                  = local.workspace
 
   runtime_secrets_ready = terraform_data.runtime_secrets_populated.id

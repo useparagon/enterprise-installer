@@ -34,6 +34,7 @@ resource "aws_s3_bucket_public_access_block" "cdn" {
 # Reset bucket ACL to owner-only before BucketOwnerEnforced; AWS rejects PutBucketOwnershipControls
 # while the bucket ACL still grants other principals (e.g. legacy public-read or OAI grants).
 resource "aws_s3_bucket_acl" "cdn" {
+  count  = var.cdn_bucket_acl_reset ? 1 : 0
   bucket = aws_s3_bucket.cdn.id
   acl    = "private"
 
@@ -52,7 +53,10 @@ resource "aws_s3_bucket_ownership_controls" "cdn" {
     object_ownership = "BucketOwnerEnforced"
   }
 
-  depends_on = [aws_s3_bucket_acl.cdn]
+  depends_on = [
+    aws_s3_bucket_public_access_block.cdn,
+    aws_s3_bucket_acl.cdn,
+  ]
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "cdn" {
@@ -70,5 +74,35 @@ resource "aws_s3_bucket_versioning" "cdn" {
 
   versioning_configuration {
     status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "cdn" {
+  bucket = aws_s3_bucket.cdn.id
+
+  rule {
+    id     = "cleanup"
+    status = "Enabled"
+
+    filter {}
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+
+  rule {
+    id     = "delete-markers"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      expired_object_delete_marker = true
+    }
   }
 }

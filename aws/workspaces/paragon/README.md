@@ -29,6 +29,7 @@
 | <a name="module_managed_sync_config"></a> [managed\_sync\_config](#module\_managed\_sync\_config) | ./helm-config | n/a |
 | <a name="module_monitors"></a> [monitors](#module\_monitors) | ./monitors | n/a |
 | <a name="module_uptime"></a> [uptime](#module\_uptime) | ./uptime | n/a |
+| <a name="module_waf"></a> [waf](#module\_waf) | ./waf | n/a |
 
 ## Resources
 
@@ -128,6 +129,15 @@
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that should not be publicly exposed (filtered from public\_microservices and public\_monitors). | `list(string)` | `[]` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
 | <a name="input_uptime_company"></a> [uptime\_company](#input\_uptime\_company) | Optional pretty company name to include in BetterStack Uptime monitors. | `string` | `null` | no |
+| <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf\_enabled) | Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf\_managed\_rule\_groups, rate limits, or IP lists in tfvars. | `bool` | `false` | no |
+| <a name="input_waf_ip_blacklist"></a> [waf\_ip\_blacklist](#input\_waf\_ip\_blacklist) | CIDRs to always block. Empty list = no blacklist rule. | `list(string)` | `[]` | no |
+| <a name="input_waf_ip_whitelist"></a> [waf\_ip\_whitelist](#input\_waf\_ip\_whitelist) | CIDRs to bypass WAF rules (office IPs). Empty list = no whitelist rule. | `list(string)` | `[]` | no |
+| <a name="input_waf_logs_retention_days"></a> [waf\_logs\_retention\_days](#input\_waf\_logs\_retention\_days) | Number of days to retain WAF logs in S3 before lifecycle expiration. Only applies when waf\_enabled is true. | `number` | `30` | no |
+| <a name="input_waf_managed_rule_groups"></a> [waf\_managed\_rule\_groups](#input\_waf\_managed\_rule\_groups) | Map of AWS WAF managed rule groups to attach to the Web ACL. Empty by default — you choose which groups to enable.<br/><br/>Each key is the Web ACL rule name (unique). Each value configures one managed rule group:<br/><br/>- name (required): e.g. AWSManagedRulesCommonRuleSet, AWSManagedRulesAmazonIpReputationList<br/>- vendor\_name: default "AWS"<br/>- priority: evaluation order (lower first). Auto-assigned after IP/rate rules when omitted.<br/>- override\_action: "none" (enforce) or "count" (observe only, no block)<br/>- excluded\_rules: rule names to count (not block); translated to rule\_action\_overrides internally<br/>- rule\_action\_overrides: per-rule override — "count", "block", or "allow"<br/>- bot\_control\_inspection\_level: "COMMON" or "TARGETED" for AWSManagedRulesBotControlRuleSet only<br/><br/>Reference config (Paragon SaaS): paragon/terraform/workspaces/environment/shared/waf.tf | <pre>map(object({<br/>    name                         = string<br/>    vendor_name                  = optional(string, "AWS")<br/>    priority                     = optional(number)<br/>    override_action              = optional(string, "none")<br/>    excluded_rules               = optional(list(string), [])<br/>    rule_action_overrides        = optional(map(string), {})<br/>    bot_control_inspection_level = optional(string)<br/>  }))</pre> | `{}` | no |
+| <a name="input_waf_rate_limit_global"></a> [waf\_rate\_limit\_global](#input\_waf\_rate\_limit\_global) | Max requests per IP across all endpoints in the evaluation window. null or 0 = no global rate limit rule. | `number` | `null` | no |
+| <a name="input_waf_rate_limit_global_window_sec"></a> [waf\_rate\_limit\_global\_window\_sec](#input\_waf\_rate\_limit\_global\_window\_sec) | Evaluation window for global rate limit (60, 120, 300, or 600). | `number` | `300` | no |
+| <a name="input_waf_rate_limit_path_window_sec"></a> [waf\_rate\_limit\_path\_window\_sec](#input\_waf\_rate\_limit\_path\_window\_sec) | Evaluation window for path rate limits (60, 120, 300, or 600). | `number` | `300` | no |
+| <a name="input_waf_rate_limit_paths"></a> [waf\_rate\_limit\_paths](#input\_waf\_rate\_limit\_paths) | Map of URI path prefix to max requests per IP per window. Paths without a leading / are normalized. Empty = no path rate limit rules. | `map(number)` | `{}` | no |
 
 ## Outputs
 
@@ -142,6 +152,8 @@
 | <a name="output_pgadmin_admin_email"></a> [pgadmin\_admin\_email](#output\_pgadmin\_admin\_email) | PGAdmin admin login email. |
 | <a name="output_pgadmin_admin_password"></a> [pgadmin\_admin\_password](#output\_pgadmin\_admin\_password) | PGAdmin admin login password. |
 | <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime\_webhook) | Uptime webhook URL |
+| <a name="output_waf_logs_bucket"></a> [waf\_logs\_bucket](#output\_waf\_logs\_bucket) | S3 bucket name for WAF traffic logs when WAF is enabled, otherwise null. |
+| <a name="output_waf_web_acl_arn"></a> [waf\_web\_acl\_arn](#output\_waf\_web\_acl\_arn) | ARN of the regional WAFv2 Web ACL when WAF is enabled, otherwise null. |
 <!-- END_TF_DOCS -->
 
 ## Updates

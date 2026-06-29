@@ -32,6 +32,16 @@ output "alb_arn" {
   value       = module.alb.alb_arn
 }
 
+output "waf_web_acl_arn" {
+  description = "ARN of the regional WAFv2 Web ACL when WAF is enabled, otherwise null."
+  value       = local.waf_active ? module.waf[0].web_acl_arn : null
+}
+
+output "waf_logs_bucket" {
+  description = "S3 bucket name for WAF traffic logs when WAF is enabled, otherwise null."
+  value       = local.waf_active ? module.waf[0].waf_logs_bucket : null
+}
+
 output "uptime_webhook" {
   description = "Uptime webhook URL"
   value       = module.uptime.webhook

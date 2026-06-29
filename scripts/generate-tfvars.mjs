@@ -11,11 +11,12 @@ const USAGE = `Usage: node ${SCRIPT_NAME} <variables.tf> <output.tfvars> [provid
 
 const AZURE_INFRA_RECOMMENDATIONS = [
   "",
-  "# PostgreSQL Zone-Redundant HA (recommended for production).",
-  "# Requires General Purpose or Memory Optimized SKUs (not Burstable).",
-  "# Remove or comment out these lines if not required.",
-  'postgres_redundant     = true',
-  'postgres_base_sku_name = "GP_Standard_D2ads_v5"',
+  "# PostgreSQL per-instance config (recommended for production).",
+  "# Requires General Purpose or Memory Optimized SKUs for zone-redundant HA (not Burstable).",
+  "# Remove or comment out if not required.",
+  "postgres_instances = {",
+  '  hermes = { sku = "GP_Standard_D2ds_v5", redundant = true }',
+  "}",
   "",
 ].join("\n");
 

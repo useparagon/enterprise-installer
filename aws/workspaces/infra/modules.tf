@@ -25,6 +25,10 @@ module "postgres" {
   workspace                   = local.workspace
   aws_region                  = var.aws_region
   rds_instance_class          = var.rds_instance_class
+  rds_gp3_iops                = var.rds_gp3_iops
+  rds_gp3_storage_throughput  = var.rds_gp3_storage_throughput
+  rds_allocated_storage       = var.rds_allocated_storage
+  rds_max_allocated_storage   = var.rds_max_allocated_storage
   rds_multi_az                = var.rds_multi_az
   rds_multiple_instances      = var.rds_multiple_instances
   rds_postgres_version        = var.rds_postgres_version
@@ -63,9 +67,10 @@ module "storage" {
   app_bucket_expiration    = var.app_bucket_expiration
   auditlogs_retention_days = var.auditlogs_retention_days
   auditlogs_lock_enabled   = var.auditlogs_lock_enabled
-  managed_sync_enabled     = var.managed_sync_enabled
+  managed_sync_enabled   = var.managed_sync_enabled
 
-  migrated = var.migrated_workspace != null
+  migrated             = var.migrated_workspace != null
+  cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
 }
 
 module "kafka" {

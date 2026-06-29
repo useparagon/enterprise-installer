@@ -188,6 +188,12 @@ variable "openobserve_secret_name" {
   default     = null
 }
 
+variable "waf_web_acl_arn" {
+  description = "Regional WAFv2 Web ACL ARN for the shared ALB. Empty disables WAF association."
+  type        = string
+  default     = ""
+}
+
 locals {
   chart_names     = var.monitors_enabled ? ["paragon-logging", "paragon-monitoring", "paragon-onprem"] : ["paragon-logging", "paragon-onprem"]
   chart_directory = "../charts"
