@@ -203,7 +203,7 @@ variable "openobserve_email" {
 }
 
 variable "openobserve_password" {
-  description = "OpenObserve admin login password."
+  description = "OpenObserve admin login password. Leave null to auto-generate (special chars, O2 v0.91+). Existing clusters: terraform apply, then scripts/migrate-openobserve-password.sh (--hoop or --o2-host + --old-password)."
   type        = string
   default     = null
 }
