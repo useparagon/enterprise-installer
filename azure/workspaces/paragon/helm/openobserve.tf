@@ -14,8 +14,10 @@ resource "random_password" "openobserve_password" {
   length  = 32
   lower   = true
   numeric = true
-  special = false
+  special = true
   upper   = true
+  min_special      = 2
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 locals {
