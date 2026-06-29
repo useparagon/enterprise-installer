@@ -57,8 +57,6 @@ resource "azurerm_key_vault_secret" "runtime_storage" {
     managed_sync_bucket         = module.storage.blob.managed_sync_container
     logs_container              = module.storage.blob.logs_container
     auditlogs_container         = module.storage.blob.auditlogs_container
-    microservice_user           = module.storage.blob.minio_microservice_user
-    microservice_pass           = module.storage.blob.minio_microservice_pass
     root_user                   = module.storage.blob.name
     root_password               = module.storage.blob.access_key
   })

@@ -1,5 +1,4 @@
 # Flat chart-native env secret for GitOps (ESO -> paragon-secrets).
-# GCP-specific: storage uses GCS (project_id/private_key for MinIO GCP gateway).
 
 locals {
   argocd_domain = var.paragon_domain != null ? trimspace(var.paragon_domain) : ""
@@ -100,7 +99,6 @@ locals {
   argocd_domain_env = local.argocd_domain != "" ? {
     PARAGON_DOMAIN               = local.argocd_domain
     PUBLIC_UPLOAD_PROXY_BASE_URL = "https://zeus.${local.argocd_domain}/public-upload-proxy"
-    MINIO_PUBLIC_URL             = "https://minio.${local.argocd_domain}"
   } : {}
 
   argocd_infra_env = merge(local.argocd_domain_env, {
@@ -131,17 +129,6 @@ locals {
 
     PUBLIC_URL  = local.argocd_gcs_public_url
     PRIVATE_URL = local.argocd_gcs_private_url
-
-    MINIO_MODE              = "gateway-gcp"
-    MINIO_BROWSER           = "off"
-    MINIO_INSTANCE_COUNT    = "1"
-    MINIO_NGINX_PROXY       = "on"
-    MINIO_ROOT_USER         = local.argocd_storage.project_id
-    MINIO_ROOT_PASSWORD     = local.argocd_storage.private_key
-    MINIO_MICROSERVICE_USER = local.argocd_storage.minio_microservice_user
-    MINIO_MICROSERVICE_PASS = local.argocd_storage.minio_microservice_pass
-    MINIO_PUBLIC_BUCKET     = local.argocd_storage.public_bucket
-    MINIO_SYSTEM_BUCKET     = local.argocd_storage.private_bucket
   })
 
   argocd_app_secret_overrides = var.argocd_app_secrets != null ? var.argocd_app_secrets : {}

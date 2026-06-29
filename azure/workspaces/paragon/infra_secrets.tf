@@ -49,7 +49,7 @@ locals {
       }
       postgres = { value = jsondecode(data.azurerm_key_vault_secret.infra_postgres[0].value) }
       redis    = { value = jsondecode(data.azurerm_key_vault_secret.infra_redis[0].value) }
-      minio    = { value = jsondecode(data.azurerm_key_vault_secret.infra_storage[0].value) }
+      storage  = { value = jsondecode(data.azurerm_key_vault_secret.infra_storage[0].value) }
     },
     var.managed_sync_enabled ? {
       kafka = { value = jsondecode(data.azurerm_key_vault_secret.infra_kafka[0].value) }

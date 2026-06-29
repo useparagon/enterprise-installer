@@ -59,8 +59,6 @@ resource "aws_secretsmanager_secret_version" "runtime_storage" {
     managed_sync_bucket = module.storage.s3.managed_sync_bucket
     logs_bucket         = module.storage.s3.logs_bucket
     auditlogs_bucket    = module.storage.s3.auditlogs_bucket
-    microservice_user   = module.storage.s3.minio_microservice_user
-    microservice_pass   = module.storage.s3.minio_microservice_pass
     root_user           = module.storage.s3.access_key_id
     root_password       = module.storage.s3.access_key_secret
   })

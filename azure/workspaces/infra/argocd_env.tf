@@ -98,7 +98,6 @@ locals {
   argocd_domain_env = local.argocd_domain != "" ? {
     PARAGON_DOMAIN               = local.argocd_domain
     PUBLIC_UPLOAD_PROXY_BASE_URL = "https://zeus.${local.argocd_domain}/public-upload-proxy"
-    MINIO_PUBLIC_URL             = "https://minio.${local.argocd_domain}"
   } : {}
 
   argocd_infra_env = merge(local.argocd_domain_env, {
@@ -126,17 +125,6 @@ locals {
     CLOUD_STORAGE_SYSTEM_BUCKET     = local.argocd_storage.private_container
     CLOUD_STORAGE_COMPLIANCE_BUCKET = local.argocd_storage.auditlogs_container
     CLOUD_STORAGE_REGION            = var.location
-
-    MINIO_MODE              = "gateway-azure"
-    MINIO_BROWSER           = "off"
-    MINIO_INSTANCE_COUNT    = "1"
-    MINIO_NGINX_PROXY       = "on"
-    MINIO_ROOT_USER         = local.argocd_storage.name
-    MINIO_ROOT_PASSWORD     = local.argocd_storage.access_key
-    MINIO_MICROSERVICE_USER = local.argocd_storage.minio_microservice_user
-    MINIO_MICROSERVICE_PASS = local.argocd_storage.minio_microservice_pass
-    MINIO_PUBLIC_BUCKET     = local.argocd_storage.public_container
-    MINIO_SYSTEM_BUCKET     = local.argocd_storage.private_container
   })
 
   argocd_app_secret_overrides = var.argocd_app_secrets != null ? var.argocd_app_secrets : {}
