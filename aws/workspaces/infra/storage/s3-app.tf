@@ -23,8 +23,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "app" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = local.s3_kms_enabled ? "aws:kms" : "AES256"
+      kms_master_key_id = local.s3_kms_enabled ? local.s3_kms_key_arn : null
     }
+    bucket_key_enabled = local.s3_kms_enabled ? true : null
   }
 }
 
@@ -133,7 +135,7 @@ resource "aws_iam_group_policy" "app" {
   policy = jsonencode(
     {
       "Version" : "2012-10-17",
-      "Statement" : [
+      "Statement" : concat([
         {
           "Sid" : "AllowReadBucketOperations",
           "Action" : [
@@ -190,7 +192,20 @@ resource "aws_iam_group_policy" "app" {
             "${aws_s3_bucket.managed_sync[0].arn}/*"
           ] : [])
         }
-      ]
+        ], local.s3_kms_enabled ? [
+        {
+          "Sid" : "AllowS3KMSEncryption",
+          "Action" : [
+            "kms:Decrypt",
+            "kms:Encrypt",
+            "kms:GenerateDataKey",
+            "kms:ReEncrypt*",
+            "kms:DescribeKey"
+          ],
+          "Effect" : "Allow",
+          "Resource" : [local.s3_kms_key_arn]
+        }
+      ] : [])
     }
   )
 }

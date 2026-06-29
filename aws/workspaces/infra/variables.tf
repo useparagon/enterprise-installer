@@ -246,6 +246,18 @@ variable "auditlogs_lock_enabled" {
   default     = false
 }
 
+variable "s3_kms_encryption_enabled" {
+  description = "Encrypt the app, CDN, audit logs, and managed sync S3 buckets with AWS KMS (SSE-KMS) instead of S3-managed keys (SSE-S3). Existing deployments default to SSE-S3; enable for new installs or to migrate existing buckets to KMS. The logs bucket always uses SSE-S3 because ALB and S3 server access logs do not support SSE-KMS."
+  type        = bool
+  default     = false
+}
+
+variable "s3_kms_key_arn" {
+  description = "ARN of an existing KMS key to use for S3 bucket encryption. When null and s3_kms_encryption_enabled is true, a dedicated KMS key is created and managed by Terraform. Ignored when s3_kms_encryption_enabled is false."
+  type        = string
+  default     = null
+}
+
 # cloudflare
 variable "cloudflare_api_token" {
   description = "Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS`"
@@ -360,4 +372,27 @@ locals {
   # split instance types by comma, trim, and remove duplicates
   eks_ondemand_node_instance_type = distinct([for value in split(",", var.eks_ondemand_node_instance_type) : trimspace(value)])
   eks_spot_node_instance_type     = distinct([for value in split(",", var.eks_spot_node_instance_type) : trimspace(value)])
+
+  # When using an assumed role the role itself must be referenced instead of the
+  # current session identity arn, otherwise KMS key policies are rejected with
+  # MalformedPolicyDocumentException.
+  is_assumed_role = can(regex("assumed-role", data.aws_caller_identity.current.arn))
+  assumed_role_parts = split(
+    "/",
+    replace(
+      replace(
+        data.aws_caller_identity.current.arn,
+        ":sts:",
+        ":iam:"
+      ),
+      ":assumed-role/",
+      local.is_assumed_role && strcontains(data.aws_caller_identity.current.arn, ":assumed-role/AWSReservedSSO") ? ":role__TEMPORARY_DIVIDER__aws-reserved__TEMPORARY_DIVIDER__sso.amazonaws.com/" : ":role/"
+    )
+  )
+  caller_arn = local.is_assumed_role ? replace(format("%s/%s", local.assumed_role_parts[0], local.assumed_role_parts[1]), "__TEMPORARY_DIVIDER__", "/") : data.aws_caller_identity.current.arn
+
+  admin_arns = distinct(compact(concat(
+    var.eks_admin_arns,
+    [local.caller_arn]
+  )))
 }

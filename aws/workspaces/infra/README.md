@@ -9,9 +9,6 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 2.6.0 |
-| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.12.0 |
-| <a name="requirement_time"></a> [time](#requirement\_time) | ~> 0.9 |
 
 ## Providers
 
@@ -90,6 +87,8 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_rds_multiple_instances"></a> [rds\_multiple\_instances](#input\_rds\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_rds_postgres_version"></a> [rds\_postgres\_version](#input\_rds\_postgres\_version) | Postgres version for the database. | `string` | `"14"` | no |
 | <a name="input_rds_restore_from_snapshot"></a> [rds\_restore\_from\_snapshot](#input\_rds\_restore\_from\_snapshot) | Specifies that RDS instances should be restored from a snapshot. | `bool` | `false` | no |
+| <a name="input_s3_kms_encryption_enabled"></a> [s3\_kms\_encryption\_enabled](#input\_s3\_kms\_encryption\_enabled) | Encrypt the app, CDN, audit logs, and managed sync S3 buckets with AWS KMS (SSE-KMS) instead of S3-managed keys (SSE-S3). Existing deployments default to SSE-S3; enable for new installs or to migrate existing buckets to KMS. The logs bucket always uses SSE-S3 because ALB and S3 server access logs do not support SSE-KMS. | `bool` | `false` | no |
+| <a name="input_s3_kms_key_arn"></a> [s3\_kms\_key\_arn](#input\_s3\_kms\_key\_arn) | ARN of an existing KMS key to use for S3 bucket encryption. When null and s3\_kms\_encryption\_enabled is true, a dedicated KMS key is created and managed by Terraform. Ignored when s3\_kms\_encryption\_enabled is false. | `string` | `null` | no |
 | <a name="input_ssh_whitelist"></a> [ssh\_whitelist](#input\_ssh\_whitelist) | An optional list of IP addresses to whitelist ssh access. | `string` | `""` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR for the VPC. | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_vpc_cidr_newbits"></a> [vpc\_cidr\_newbits](#input\_vpc\_cidr\_newbits) | Newbits used for calculating subnets. | `number` | `3` | no |
@@ -120,6 +119,30 @@ cdn_bucket_acl_reset = true
 ```
 
 After `BucketOwnerEnforced` is active, ACL updates are ignored via `lifecycle.ignore_changes` to avoid S3 API errors on subsequent applies.
+
+## S3 bucket encryption (SSE-S3 vs SSE-KMS)
+
+By default the S3 buckets use server-side encryption with S3-managed keys (SSE-S3 / `AES256`). This preserves the behavior of existing deployments.
+
+To meet compliance requirements that mandate AWS KMS, set `s3_kms_encryption_enabled = true`. This switches the app, CDN, audit logs, and managed sync buckets to SSE-KMS (with S3 Bucket Keys enabled to limit KMS request costs):
+
+```hcl
+s3_kms_encryption_enabled = true
+```
+
+When enabled, Terraform creates a dedicated customer-managed KMS key (alias `s3/<workspace>`) with rotation enabled, grants the application's S3 IAM user permission to use it, and adds the configured `eks_admin_arns` plus the Terraform caller as key administrators.
+
+To use a pre-existing KMS key instead of creating one, also set `s3_kms_key_arn`. The key policy must allow the application's S3 IAM user to `Decrypt`/`GenerateDataKey`, or enable IAM-based access so the attached IAM policy grant applies:
+
+```hcl
+s3_kms_encryption_enabled = true
+s3_kms_key_arn            = "arn:aws:kms:us-east-1:123456789012:key/abcd-..."
+```
+
+Notes:
+
+- Toggling this on an existing deployment changes the bucket default encryption in place. New objects are encrypted with KMS; previously written objects keep their existing encryption until rewritten.
+- The `logs` bucket always stays on SSE-S3. ALB access logs and S3 server access logs do not support SSE-KMS destination buckets, so it is intentionally excluded.
 
 ## Updates
 

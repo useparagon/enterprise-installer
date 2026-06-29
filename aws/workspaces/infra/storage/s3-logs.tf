@@ -11,6 +11,9 @@ resource "aws_s3_bucket_ownership_controls" "logs" {
   }
 }
 
+# Always SSE-S3: this bucket receives ALB access logs and S3 server access logs,
+# neither of which support SSE-KMS destination buckets (delivery fails / objects
+# remain SSE-S3). Do not switch this bucket to aws:kms.
 resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
   bucket = aws_s3_bucket.logs.id
   rule {

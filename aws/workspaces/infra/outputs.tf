@@ -47,6 +47,7 @@ output "storage" {
     managed_sync_bucket = module.storage.s3.managed_sync_bucket
     root_user           = module.storage.s3.access_key_id
     root_password       = module.storage.s3.access_key_secret
+    kms_key_arn         = module.storage.s3.kms_key_arn
   }
   sensitive = true
 }
