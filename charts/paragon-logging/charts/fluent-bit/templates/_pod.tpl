@@ -1,14 +1,9 @@
 {{- define "fluent-bit.pod" -}}
 serviceAccountName: {{ include "fluent-bit.serviceAccountName" . }}
-{{- with .Values.imagePullSecrets }}
-imagePullSecrets:
-  {{- toYaml . | nindent 2 }}
-{{- else }}
 {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
 {{- if $pullSecrets }}
 imagePullSecrets:
   {{- $pullSecrets | nindent 2 }}
-{{- end }}
 {{- end }}
 {{- if .Values.priorityClass.name }}
 priorityClassName: {{ .Values.priorityClass.name }}

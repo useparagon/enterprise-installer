@@ -172,7 +172,7 @@ spec:
           {{- toYaml . | nindent 10 }}
           {{- end }}
         imagePullPolicy: {{ .Values.kubeRBACProxy.image.pullPolicy }}
-        image: {{ include "paragon.image" (dict "root" . "repository" .Values.kubeRBACProxy.image.repository "tag" (.Values.kubeRBACProxy.image.tag | default .Chart.AppVersion) "registry" .Values.kubeRBACProxy.image.registry) | quote }}
+        image: {{ include "paragon.image" (dict "root" . "repository" .Values.kubeRBACProxy.image.repository "tag" (.Values.kubeRBACProxy.image.tag | default .Chart.AppVersion) "registry" .Values.kubeRBACProxy.image.registry "sha" (.Values.kubeRBACProxy.image.sha | default "")) | quote }}
         ports:
           - containerPort: {{ .Values.service.port | default 8080}}
             name: "http"
@@ -210,7 +210,7 @@ spec:
           {{- toYaml . | nindent 10 }}
           {{- end }}
         imagePullPolicy: {{ .Values.kubeRBACProxy.image.pullPolicy }}
-        image: {{ include "paragon.image" (dict "root" . "repository" .Values.kubeRBACProxy.image.repository "tag" (.Values.kubeRBACProxy.image.tag | default .Chart.AppVersion) "registry" .Values.kubeRBACProxy.image.registry) | quote }}
+        image: {{ include "paragon.image" (dict "root" . "repository" .Values.kubeRBACProxy.image.repository "tag" (.Values.kubeRBACProxy.image.tag | default .Chart.AppVersion) "registry" .Values.kubeRBACProxy.image.registry "sha" (.Values.kubeRBACProxy.image.sha | default "")) | quote }}
         ports:
           - containerPort: {{ .Values.selfMonitor.telemetryPort | default 8081 }}
             name: "metrics"

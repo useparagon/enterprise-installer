@@ -24,16 +24,18 @@ Skips rewrite when repository already includes a registry host (first path segme
 {{- end -}}
 
 {{/*
-Build a full container image reference (repository:tag).
-Input: (dict "root" $ "repository" "useparagon/account" "tag" "1.0.0" "registry" "" "useMigrationRegistry" false)
+Build a full container image reference (repository:tag or repository:tag@sha).
+Input: (dict "root" $ "repository" "useparagon/account" "tag" "1.0.0" "registry" "" "useMigrationRegistry" false "sha" "")
 Optional registry supports split registry/repository fields (e.g. quay.io + brancz/kube-rbac-proxy).
 useMigrationRegistry selects global.migrationImageRegistry before global.imageRegistry.
+Optional sha appends @digest when set.
 */}}
 {{- define "paragon.image" -}}
 {{- $root := .root -}}
 {{- $repository := include "paragon.resolveRepository" . -}}
 {{- $tag := required "tag" .tag -}}
 {{- $registry := .registry | default "" -}}
+{{- $sha := .sha | default "" -}}
 {{- $useMigrationRegistry := .useMigrationRegistry | default false -}}
 {{- $globalRegistry := "" -}}
 {{- if and $root.Values.global $useMigrationRegistry -}}
@@ -43,14 +45,20 @@ useMigrationRegistry selects global.migrationImageRegistry before global.imageRe
 {{- end -}}
 {{- $parts := splitList "/" $repository -}}
 {{- $first := index $parts 0 | default $repository -}}
+{{- $ref := "" -}}
 {{- if contains "." $first -}}
-{{- printf "%s:%s" $repository $tag -}}
+{{- $ref = printf "%s:%s" $repository $tag -}}
 {{- else if $globalRegistry -}}
-{{- printf "%s/%s:%s" $globalRegistry $repository $tag -}}
+{{- $ref = printf "%s/%s:%s" $globalRegistry $repository $tag -}}
 {{- else if $registry -}}
-{{- printf "%s/%s:%s" $registry $repository $tag -}}
+{{- $ref = printf "%s/%s:%s" $registry $repository $tag -}}
 {{- else -}}
-{{- printf "%s:%s" $repository $tag -}}
+{{- $ref = printf "%s:%s" $repository $tag -}}
+{{- end -}}
+{{- if $sha -}}
+{{- printf "%s@%s" $ref $sha -}}
+{{- else -}}
+{{- $ref -}}
 {{- end -}}
 {{- end -}}
 
@@ -62,7 +70,7 @@ For statefulsets pass tagFallback from image.tag via the tag param.
 {{- define "paragon.containerImage" -}}
 {{- $root := .root -}}
 {{- $tag := .tag | default ($root.Values.global.paragon_version | default $root.Values.global.env.VERSION) -}}
-{{- include "paragon.image" (dict "root" $root "repository" $root.Values.image.repository "tag" $tag "registry" ($root.Values.image.registry | default "") "useMigrationRegistry" (.useMigrationRegistry | default false)) -}}
+{{- include "paragon.image" (dict "root" $root "repository" $root.Values.image.repository "tag" $tag "registry" ($root.Values.image.registry | default "") "useMigrationRegistry" (.useMigrationRegistry | default false) "sha" ($root.Values.image.sha | default "")) -}}
 {{- end -}}
 
 {{/*
