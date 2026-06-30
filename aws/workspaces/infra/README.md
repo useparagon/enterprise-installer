@@ -5,10 +5,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-| Name | Version |
-| ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
+No requirements.
 
 ## Providers
 
@@ -47,6 +44,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_aws_secret_access_key"></a> [aws\_secret\_access\_key](#input\_aws\_secret\_access\_key) | AWS Secret Access Key for AWS account to provision resources on. | `string` | n/a | yes |
 | <a name="input_aws_session_token"></a> [aws\_session\_token](#input\_aws\_session\_token) | AWS session token. | `string` | `null` | no |
 | <a name="input_az_count"></a> [az\_count](#input\_az\_count) | Number of AZs to cover in a given region. | `number` | `2` | no |
+| <a name="input_bastion_enabled"></a> [bastion\_enabled](#input\_bastion\_enabled) | Whether to create the bastion host and its associated Cloudflare tunnel. | `bool` | `true` | no |
 | <a name="input_cdn_bucket_acl_reset"></a> [cdn\_bucket\_acl\_reset](#input\_cdn\_bucket\_acl\_reset) | Reset the CDN S3 bucket ACL to private before BucketOwnerEnforced. Defaults to false; set true once when migrating a legacy CDN bucket with existing ACL grants, then remove. | `bool` | `false` | no |
 | <a name="input_cloudflare_api_token"></a> [cloudflare\_api\_token](#input\_cloudflare\_api\_token) | Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS` | `string` | `"dummy-cloudflare-tokens-must-be-40-chars"` | no |
 | <a name="input_cloudflare_tunnel_account_id"></a> [cloudflare\_tunnel\_account\_id](#input\_cloudflare\_tunnel\_account\_id) | Account ID for Cloudflare account | `string` | `""` | no |
@@ -75,7 +73,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_msk_autoscaling_enabled"></a> [msk\_autoscaling\_enabled](#input\_msk\_autoscaling\_enabled) | Whether to enable autoscaling for the MSK cluster. | `bool` | `true` | no |
 | <a name="input_msk_instance_type"></a> [msk\_instance\_type](#input\_msk\_instance\_type) | The instance type for the MSK cluster. | `string` | `"kafka.t3.small"` | no |
 | <a name="input_msk_kafka_num_broker_nodes"></a> [msk\_kafka\_num\_broker\_nodes](#input\_msk\_kafka\_num\_broker\_nodes) | The number of broker nodes for the MSK cluster. | `number` | `2` | no |
-| <a name="input_msk_kafka_version"></a> [msk\_kafka\_version](#input\_msk\_kafka\_version) | The Kafka version for the MSK cluster. | `string` | `"3.6.0"` | no |
+| <a name="input_msk_kafka_version"></a> [msk\_kafka\_version](#input\_msk\_kafka\_version) | The Kafka version for the MSK cluster. | `string` | `"3.9.x"` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
 | <a name="input_rds_allocated_storage"></a> [rds\_allocated\_storage](#input\_rds\_allocated\_storage) | Initial allocated storage (GiB) for each Postgres RDS instance. | `number` | `20` | no |
 | <a name="input_rds_final_snapshot_enabled"></a> [rds\_final\_snapshot\_enabled](#input\_rds\_final\_snapshot\_enabled) | Specifies that RDS instances should perform a final snapshot before being deleted. | `bool` | `true` | no |

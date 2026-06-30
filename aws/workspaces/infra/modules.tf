@@ -92,6 +92,7 @@ module "kafka" {
 }
 
 module "bastion" {
+  count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
 
   workspace     = local.workspace
@@ -117,8 +118,9 @@ module "cluster" {
 
   workspace = local.workspace
 
-  bastion_role_arn          = module.bastion.bastion_role_arn
-  bastion_security_group_id = module.bastion.security_group.host[0]
+  bastion_enabled           = var.bastion_enabled
+  bastion_role_arn          = var.bastion_enabled ? module.bastion[0].bastion_role_arn : null
+  bastion_security_group_id = var.bastion_enabled ? module.bastion[0].security_group.host[0] : null
 
   create_autoscaling_linked_role  = var.create_autoscaling_linked_role
   eks_admin_arns                  = local.admin_arns

@@ -54,10 +54,10 @@ output "storage" {
 
 output "bastion" {
   description = "Bastion server connection info."
-  value = {
-    public_dns  = module.bastion.connection.bastion_dns
-    private_key = module.bastion.connection.private_key
-  }
+  value = var.bastion_enabled ? {
+    public_dns  = module.bastion[0].connection.bastion_dns
+    private_key = module.bastion[0].connection.private_key
+  } : null
   sensitive = true
 }
 

@@ -70,6 +70,13 @@ variable "auditlogs_lock_enabled" {
   default     = false
 }
 
+# bastion
+variable "bastion_enabled" {
+  description = "Whether to create the bastion host and its associated Cloudflare tunnel."
+  type        = bool
+  default     = true
+}
+
 # cloudflare
 variable "cloudflare_api_token" {
   description = "Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS`"

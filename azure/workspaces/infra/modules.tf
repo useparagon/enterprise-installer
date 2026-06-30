@@ -8,6 +8,7 @@ module "network" {
 }
 
 module "bastion" {
+  count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
 
   azure_client_id       = var.azure_client_id

@@ -258,6 +258,13 @@ variable "s3_kms_key_arn" {
   default     = null
 }
 
+# bastion
+variable "bastion_enabled" {
+  description = "Whether to create the bastion host and its associated Cloudflare tunnel."
+  type        = bool
+  default     = true
+}
+
 # cloudflare
 variable "cloudflare_api_token" {
   description = "Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS`"
@@ -326,9 +333,7 @@ variable "managed_sync_enabled" {
 variable "msk_kafka_version" {
   description = "The Kafka version for the MSK cluster."
   type        = string
-  // NOTE: to use a small instance type like `kafka.t3.small`, we need to use an older version that uses zookeeper
-  // we're default to an older version to keep costs low, but we can override this if we use a supported larger instance type
-  default = "3.6.0"
+  default     = "3.9.x"
 }
 
 variable "msk_kafka_num_broker_nodes" {
