@@ -36,9 +36,21 @@ variable "certificate" {
 }
 
 variable "docker_registry_server" {
-  description = "Docker container registry server."
+  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
   default     = "docker.io"
+}
+
+variable "docker_pull_secret_name" {
+  description = "Kubernetes secret name for registry pull credentials."
+  type        = string
+  default     = "docker-cfg"
+}
+
+variable "create_docker_pull_secret" {
+  description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
+  type        = bool
+  default     = true
 }
 
 variable "docker_username" {

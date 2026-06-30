@@ -63,12 +63,29 @@ Create the name of the service account to use
 {{- end -}}
 
 {{/*
-Fluent-bit image with tag/digest
+Fluent-bit image with tag/digest. Pass root in the dict for global registry support.
 */}}
 {{- define "fluent-bit.image" -}}
-{{- $tag := ternary "" (printf ":%s" (toString .tag)) (or (empty .tag) (eq "-" (toString .tag))) -}}
-{{- $digest := ternary "" (printf "@%s" .digest) (empty .digest) -}}
-{{- printf "%s%s%s" .repository $tag $digest -}}
+{{- $root := .root -}}
+{{- $repository := .repository -}}
+{{- $tag := .tag -}}
+{{- $digest := .digest | default "" -}}
+{{- if $root -}}
+{{- $resolvedTag := $tag -}}
+{{- if or (empty $tag) (eq "-" (toString $tag)) -}}
+{{- $resolvedTag = $root.Chart.AppVersion -}}
+{{- end -}}
+{{- if $digest -}}
+{{- $base := include "paragon.image" (dict "root" $root "repository" $repository "tag" $resolvedTag) -}}
+{{- printf "%s@%s" $base $digest -}}
+{{- else -}}
+{{- include "paragon.image" (dict "root" $root "repository" $repository "tag" $resolvedTag) -}}
+{{- end -}}
+{{- else -}}
+{{- $tagSuffix := ternary "" (printf ":%s" (toString .tag)) (or (empty .tag) (eq "-" (toString .tag))) -}}
+{{- $digestSuffix := ternary "" (printf "@%s" .digest) (empty .digest) -}}
+{{- printf "%s%s%s" .repository $tagSuffix $digestSuffix -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
