@@ -41,7 +41,7 @@ module "eks" {
         }
       }
     },
-    { for arn in local.eks_admin_arns : arn => {
+    { for arn in var.eks_admin_arns : arn => {
       kubernetes_groups = ["admin", "cluster-admin"]
       principal_arn     = arn
 
