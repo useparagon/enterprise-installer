@@ -1,0 +1,44 @@
+# Stub so workflow_dispatch registers on the default branch before the full
+# release-changelog pipeline lands. GitHub only exposes workflow_dispatch (and
+# only accepts dispatches against other refs) for workflows whose definition
+# exists on the default branch, so this stub is merged first.
+#
+# The inputs below intentionally mirror the full workflow's inputs so the real
+# implementation can be dispatched from a feature branch via:
+#   gh workflow run release-changelog.yaml --ref <branch> -f to_tag=... -f from_tag=...
+#
+# Replace this file with the full release-changelog workflow in a follow-up PR.
+name: release-changelog
+
+on:
+  workflow_dispatch:
+    inputs:
+      to_tag:
+        description: "End tag — the release to publish notes for (e.g. 2026.0625.1155-d32adb48). Defaults to the newest tag."
+        required: false
+        type: string
+      from_tag:
+        description: "Start tag — the previous release. Defaults to the tag before to_tag."
+        required: false
+        type: string
+      draft:
+        description: "Publish the GitHub Release as a draft."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  release-changelog:
+    name: Stub (no-op)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: |
+          echo "release-changelog: no-op stub on the default branch."
+          echo "to_tag input:   ${{ inputs.to_tag }}"
+          echo "from_tag input: ${{ inputs.from_tag }}"
+          echo "Run the full workflow from a branch that includes the implementation:"
+          echo "  gh workflow run release-changelog.yaml --ref <branch> -f to_tag=... -f from_tag=..."
