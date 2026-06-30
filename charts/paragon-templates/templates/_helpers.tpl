@@ -1,14 +1,26 @@
 {{/*
+Returns non-empty when a path segment looks like a registry host
+(e.g. artifactory.example.com, localhost:5000, registry:5000).
+Input: path segment string.
+*/}}
+{{- define "paragon.isRegistryHost" -}}
+{{- $segment := . -}}
+{{- if or (contains "." $segment) (contains ":" $segment) (eq $segment "localhost") -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
 Resolve repository path with optional useparagon/ prefix rewrite.
 Input: (dict "root" $ "repository" "useparagon/account")
-Skips rewrite when repository already includes a registry host (first path segment contains ".").
+Skips rewrite when repository already includes a registry host.
 */}}
 {{- define "paragon.resolveRepository" -}}
 {{- $root := .root -}}
 {{- $repository := required "repository" .repository -}}
 {{- $parts := splitList "/" $repository -}}
 {{- $first := index $parts 0 | default $repository -}}
-{{- if contains "." $first -}}
+{{- if include "paragon.isRegistryHost" $first -}}
 {{- $repository -}}
 {{- else if and $root.Values.global (hasKey $root.Values.global "imageRepositoryPrefix") -}}
 {{- if hasPrefix "useparagon/" $repository -}}
@@ -46,7 +58,7 @@ Optional sha appends @digest when set.
 {{- $parts := splitList "/" $repository -}}
 {{- $first := index $parts 0 | default $repository -}}
 {{- $ref := "" -}}
-{{- if contains "." $first -}}
+{{- if include "paragon.isRegistryHost" $first -}}
 {{- $ref = printf "%s:%s" $repository $tag -}}
 {{- else if $globalRegistry -}}
 {{- $ref = printf "%s/%s:%s" $globalRegistry $repository $tag -}}
