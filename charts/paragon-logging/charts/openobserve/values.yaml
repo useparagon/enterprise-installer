@@ -10,6 +10,9 @@ image:
   tag: v0.91.0
   # tag: v0.91.0-debug
 
+imagePullSecrets:
+  - name: docker-cfg
+
 service:
   type: ClusterIP
   port: 5080

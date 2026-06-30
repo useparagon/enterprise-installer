@@ -3,6 +3,9 @@ image:
   pullPolicy: IfNotPresent
   tag: 'latest'
 
+imagePullSecrets:
+  - name: docker-cfg
+
 fullnameOverride: 'node-exporter'
 
 service:

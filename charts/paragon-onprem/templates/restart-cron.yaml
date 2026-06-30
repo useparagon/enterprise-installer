@@ -10,9 +10,14 @@ spec:
       template:
         spec:
           serviceAccountName: paragon-restart-manager
+          {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+          {{- if $pullSecrets }}
+          imagePullSecrets:
+            {{- $pullSecrets | nindent 12 }}
+          {{- end }}
           containers:
           - name: restart-pods
-            image: alpine/kubectl:1.33.4
+            image: {{ include "paragon.kubectlImage" (dict "root" .) | quote }}
             command:
             - /bin/sh
             - -c

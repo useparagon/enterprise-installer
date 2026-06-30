@@ -516,7 +516,7 @@ initContainers: []
 # Array mode
 # initContainers:
 #   - name: do-something
-#     image: alpine/kubectl:1.33.4
+#     image: alpine/kubectl:1.36.2
 #     command: ['kubectl', 'version']
 
 # String mode
