@@ -219,6 +219,9 @@ $(cat "$ai_input")"
   else
     log "cursor-agent returned an empty response."
   fi
+  log "----- cursor-agent stdout (begin) -----"
+  cat "$out" >&2 || true
+  log "----- cursor-agent stdout (end) -----"
   log "----- cursor-agent stderr (begin) -----"
   cat "$agent_log" >&2 || true
   log "----- cursor-agent stderr (end) -----"
