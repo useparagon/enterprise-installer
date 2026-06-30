@@ -144,4 +144,5 @@ jobs:
         with:
           name: release-changelog
           path: .release-changelog/
+          include-hidden-files: true
           if-no-files-found: ignore

@@ -203,15 +203,25 @@ $(cat "$ai_input")"
   local model_args=()
   [ -n "${CURSOR_MODEL:-}" ] && model_args=(--model "$CURSOR_MODEL")
 
-  if timeout 420 cursor-agent -p "${model_args[@]}" --output-format text "$prompt" > "$out" 2>"$OUTPUT_DIR/cursor-agent.log"; then
-    # Guard against an empty / whitespace-only response.
-    if [ -s "$out" ] && grep -q '[^[:space:]]' "$out"; then
-      return 0
-    fi
-    log "cursor-agent returned an empty response."
-  else
-    log "cursor-agent invocation failed (see cursor-agent.log)."
+  local agent_log="$OUTPUT_DIR/cursor-agent.log"
+  log "Invoking cursor-agent (model: ${CURSOR_MODEL:-default})..."
+  local rc=0
+  timeout 420 cursor-agent -p "${model_args[@]}" --output-format text "$prompt" \
+    > "$out" 2>"$agent_log" || rc=$?
+
+  if [ "$rc" -eq 0 ] && [ -s "$out" ] && grep -q '[^[:space:]]' "$out"; then
+    return 0
   fi
+
+  # Surface diagnostics directly in the job log (artifacts may be unavailable).
+  if [ "$rc" -ne 0 ]; then
+    log "cursor-agent exited with code ${rc}."
+  else
+    log "cursor-agent returned an empty response."
+  fi
+  log "----- cursor-agent stderr (begin) -----"
+  cat "$agent_log" >&2 || true
+  log "----- cursor-agent stderr (end) -----"
   return 1
 }
 
@@ -261,10 +271,12 @@ publish_release() {
     gh release edit "$to_tag" --repo "$REPO" \
       --notes-file "$body_md" --title "$to_tag" "${draft_flag[@]}"
   else
+    # The git tag already exists (pushed by the release automation), so we do
+    # NOT pass --target: gh attaches the release to the existing tag. Passing a
+    # tag name as --target is rejected (target_commitish must be a branch/SHA).
     log "Creating release ${to_tag}."
     gh release create "$to_tag" --repo "$REPO" \
-      --title "$to_tag" --notes-file "$body_md" \
-      --target "$to_tag" "${draft_flag[@]}"
+      --title "$to_tag" --notes-file "$body_md" "${draft_flag[@]}"
   fi
 }
 
