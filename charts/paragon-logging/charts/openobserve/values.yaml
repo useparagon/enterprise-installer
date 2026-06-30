@@ -10,8 +10,7 @@ image:
   tag: v0.91.0
   # tag: v0.91.0-debug
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 
 service:
   type: ClusterIP

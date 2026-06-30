@@ -170,7 +170,13 @@ locals {
             }
           ),
           paragon_version = local.version
-        }
+        },
+        var.create_docker_pull_secret ? {
+          imagePullSecrets = concat(
+            try(nonsensitive(var.helm_values.global.imagePullSecrets), []),
+            [{ name = var.docker_pull_secret_name }]
+          )
+        } : {}
       )
     }
   ))
