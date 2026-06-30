@@ -1,13 +1,28 @@
-# Stub so workflow_dispatch registers on the default branch before the full
-# release-changelog pipeline lands. GitHub only exposes workflow_dispatch (and
-# only accepts dispatches against other refs) for workflows whose definition
-# exists on the default branch, so this stub is merged first.
+# Release Changelog
 #
-# The inputs below intentionally mirror the full workflow's inputs so the real
-# implementation can be dispatched from a feature branch via:
-#   gh workflow run release-changelog.yaml --ref <branch> -f to_tag=... -f from_tag=...
+# Publishes a GitHub Release for the newest release tag, listing every merged
+# pull request in the tag window and an AI-generated, public-facing bullet-point
+# summary produced by the Cursor Agent CLI (cursor-agent).
 #
-# Replace this file with the full release-changelog workflow in a follow-up PR.
+# Tags in this repo are date-based (YYYY.MMDD.HHMM-<sha8>) and are pushed by the
+# external release automation on each main-branch push; canary tags
+# (…-canary) are ignored. The release is created against — and therefore tied
+# to — the resolved to_tag.
+#
+# Triggers:
+#   * push to main      — auto-publishes notes for the latest tag window. The
+#                         release tag is created by external automation shortly
+#                         after the push, so this job waits briefly for it.
+#   * workflow_dispatch  — manual run; pass to_tag/from_tag to (re)generate notes
+#                         for any historical window. This is the path used to
+#                         test the workflow from a feature branch:
+#                           gh workflow run release-changelog.yaml \
+#                             --ref <branch> -f to_tag=... -f from_tag=...
+#
+# Secrets / config:
+#   CURSOR_API_KEY (optional) — enables the AI summary. Without it the job still
+#                               succeeds using a deterministic categorized
+#                               fallback summary.
 name: release-changelog
 
 on:
@@ -26,19 +41,107 @@ on:
         required: false
         type: boolean
         default: false
+  push:
+    branches: [main]
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: release-changelog
+  cancel-in-progress: false
 
 jobs:
   release-changelog:
-    name: Stub (no-op)
+    name: Publish release changelog
     runs-on: ubuntu-latest
     steps:
-      - name: Placeholder
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Wait for the new release tag (push events only)
+        if: ${{ github.event_name == 'push' }}
+        env:
+          BASELINE_SHA: ${{ github.sha }}
         run: |
-          echo "release-changelog: no-op stub on the default branch."
-          echo "to_tag input:   ${{ inputs.to_tag }}"
-          echo "from_tag input: ${{ inputs.from_tag }}"
-          echo "Run the full workflow from a branch that includes the implementation:"
-          echo "  gh workflow run release-changelog.yaml --ref <branch> -f to_tag=... -f from_tag=..."
+          set -euo pipefail
+          # The external release automation creates the date tag on a follow-up
+          # commit a short time after this push. Poll for a stable tag newer than
+          # what we have, up to ~6 minutes, before giving up and using the newest
+          # tag already available.
+          newest_stable() {
+            git fetch --tags --quiet origin || true
+            git for-each-ref --sort=-creatordate \
+              --format='%(refname:short)' 'refs/tags/20[0-9][0-9].*' \
+              | grep -v -- '-canary' | head -1 || true
+          }
+          start_tag="$(newest_stable)"
+          echo "Newest stable tag at start: ${start_tag:-<none>}"
+          for i in $(seq 1 24); do
+            current="$(newest_stable)"
+            if [ -n "$current" ] && [ "$current" != "$start_tag" ]; then
+              echo "New release tag detected: $current"
+              exit 0
+            fi
+            echo "Attempt $i: no new tag yet (latest: ${current:-<none>}); sleeping 15s."
+            sleep 15
+          done
+          echo "::warning::No new release tag appeared; proceeding with the latest available tag."
+
+      - name: Install Cursor Agent CLI
+        run: |
+          set -euo pipefail
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Cursor Agent CLI
+        run: |
+          set -euo pipefail
+          if command -v cursor-agent >/dev/null 2>&1; then
+            cursor-agent --version || true
+          else
+            echo "::warning::cursor-agent not found on PATH; the deterministic fallback summary will be used."
+          fi
+
+      - name: Generate changelog and publish release
+        id: changelog
+        env:
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TO_TAG: ${{ inputs.to_tag }}
+          INPUT_FROM_TAG: ${{ inputs.from_tag }}
+          DRAFT: ${{ inputs.draft }}
+          CREATE_RELEASE: "true"
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/release-changelog.sh build
+
+      - name: Job summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Release Changelog"
+            if [ -f .release-changelog/release-body.md ]; then
+              echo "- **Window:** \`${{ steps.changelog.outputs.from_tag }}\` → \`${{ steps.changelog.outputs.to_tag }}\`"
+              echo ""
+              echo "<details><summary>Generated release body</summary>"
+              echo ""
+              cat .release-changelog/release-body.md
+              echo ""
+              echo "</details>"
+            else
+              echo "No release body was produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload changelog artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-changelog
+          path: .release-changelog/
+          if-no-files-found: ignore
