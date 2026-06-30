@@ -116,6 +116,8 @@ jobs:
           DRAFT: ${{ inputs.draft }}
           CREATE_RELEASE: "true"
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          # Claude 4.5 Sonnet (Thinking) — the reasoning-enabled Sonnet in the CLI.
+          CURSOR_MODEL: sonnet-4.5-thinking
         run: |
           set -euo pipefail
           bash .github/scripts/release-changelog.sh build
