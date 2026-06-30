@@ -95,7 +95,7 @@ variable "ingress_scheme" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.31"
+  default     = "1.34"
 }
 
 variable "dns_provider" {
