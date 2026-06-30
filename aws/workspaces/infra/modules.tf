@@ -62,12 +62,15 @@ module "redis" {
 module "storage" {
   source = "./storage"
 
-  workspace                = local.workspace
-  force_destroy            = var.disable_deletion_protection
-  app_bucket_expiration    = var.app_bucket_expiration
-  auditlogs_retention_days = var.auditlogs_retention_days
-  auditlogs_lock_enabled   = var.auditlogs_lock_enabled
-  managed_sync_enabled     = var.managed_sync_enabled
+  workspace                 = local.workspace
+  force_destroy             = var.disable_deletion_protection
+  app_bucket_expiration     = var.app_bucket_expiration
+  auditlogs_retention_days  = var.auditlogs_retention_days
+  auditlogs_lock_enabled    = var.auditlogs_lock_enabled
+  managed_sync_enabled      = var.managed_sync_enabled
+  s3_kms_encryption_enabled = var.s3_kms_encryption_enabled
+  s3_kms_key_arn            = var.s3_kms_key_arn
+  admin_arns                = local.admin_arns
 
   migrated             = var.migrated_workspace != null
   cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
@@ -120,7 +123,7 @@ module "cluster" {
   bastion_security_group_id = var.bastion_enabled ? module.bastion[0].security_group.host[0] : null
 
   create_autoscaling_linked_role  = var.create_autoscaling_linked_role
-  eks_admin_arns                  = var.eks_admin_arns
+  eks_admin_arns                  = local.admin_arns
   eks_max_node_count              = var.eks_max_node_count
   eks_min_node_count              = var.eks_min_node_count
   eks_ondemand_node_instance_type = local.eks_ondemand_node_instance_type

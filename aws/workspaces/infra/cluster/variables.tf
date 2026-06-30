@@ -14,9 +14,8 @@ variable "private_subnet_ids" {
 }
 
 variable "eks_admin_arns" {
-  description = "Array of ARNs for IAM users, groups or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard."
+  description = "Array of ARNs for IAM users, groups or roles that should have admin access to cluster. Includes the Terraform caller."
   type        = list(string)
-  default     = []
 }
 
 variable "k8s_version" {
@@ -149,30 +148,4 @@ locals {
     http_tokens                 = "required"
     http_put_response_hop_limit = 2
   }
-
-  # when using an assumed role the role itself must be used instead of the current identity arn
-  # so convert identity arn (e.g. arn:aws:sts::123456789:assumed-role/ParagonAssumedRole/SessionName)
-  # to role arn (e.g. arn:aws:iam::123456789:role/ParagonAssumedRole)
-  is_assumed_role = can(regex("assumed-role", data.aws_caller_identity.current.arn))
-  assumed_role_parts = split(
-    "/",
-    replace(
-      replace(
-        data.aws_caller_identity.current.arn,
-        ":sts:",
-        ":iam:"
-      ),
-      ":assumed-role/",
-      # in the case of AWS SSO, the arn is in the format of arn:aws:sts::123456789:assumed-role/ParagonAssumedRole/SessionName
-      # but we need to convert it to arn:aws:iam::123456789:role/aws-reserved/sso.amazonaws.com/ParagonAssumedRole
-      local.is_assumed_role && strcontains(data.aws_caller_identity.current.arn, ":assumed-role/AWSReservedSSO") ? ":role__TEMPORARY_DIVIDER__aws-reserved__TEMPORARY_DIVIDER__sso.amazonaws.com/" : ":role/"
-    )
-  )
-  caller_arn = local.is_assumed_role ? replace(format("%s/%s", local.assumed_role_parts[0], local.assumed_role_parts[1]), "__TEMPORARY_DIVIDER__", "/") : data.aws_caller_identity.current.arn
-
-  # include current user as EKS admin
-  eks_admin_arns = distinct(compact(concat(
-    var.eks_admin_arns,
-    [local.caller_arn]
-  )))
 }
