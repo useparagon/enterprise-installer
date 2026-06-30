@@ -206,8 +206,12 @@ $(cat "$ai_input")"
   local agent_log="$OUTPUT_DIR/cursor-agent.log"
   log "Invoking cursor-agent (model: ${CURSOR_MODEL:-default})..."
   local rc=0
-  timeout 420 cursor-agent -p "${model_args[@]}" --output-format text "$prompt" \
-    > "$out" 2>"$agent_log" || rc=$?
+  # --trust: the CI checkout is an untrusted workspace; without this the agent
+  #          stops at the "Workspace Trust Required" gate and exits with no output.
+  # --mode ask: read-only Q&A — we only want it to summarize the supplied data,
+  #          never edit the repo or run commands.
+  timeout 420 cursor-agent -p --trust --mode ask "${model_args[@]}" \
+    --output-format text "$prompt" > "$out" 2>"$agent_log" || rc=$?
 
   if [ "$rc" -eq 0 ] && [ -s "$out" ] && grep -q '[^[:space:]]' "$out"; then
     return 0
