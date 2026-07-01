@@ -13,10 +13,59 @@ locals {
     effect = "NO_SCHEDULE"
   }
 
+  system_node_os_volume_size_gib   = 15
+  system_node_data_volume_size_gib = 50
+
+  system_node_group_custom_taints = try(var.eks_system_managed_node_group.taints, null)
+
   # Reserve system MNG for Karpenter controller and cluster add-ons; worker/monitoring workloads use Karpenter nodes.
-  system_node_group_taints = try(var.eks_system_managed_node_group.taints, null) != null ? var.eks_system_managed_node_group.taints : (
-    var.enable_karpenter ? [local.karpenter_controller_taint] : []
-  )
+  system_node_group_taints = var.enable_karpenter ? (
+    local.system_node_group_custom_taints != null && length(local.system_node_group_custom_taints) > 0
+    ? local.system_node_group_custom_taints
+    : [local.karpenter_controller_taint]
+  ) : coalesce(local.system_node_group_custom_taints, [])
+
+  bottlerocket_system_block_device_mappings = {
+    xvda = {
+      device_name = "/dev/xvda"
+      ebs = {
+        volume_size           = local.system_node_os_volume_size_gib
+        volume_type           = "gp3"
+        iops                  = 3000
+        throughput            = 125
+        encrypted             = true
+        kms_key_id            = module.ebs_kms_key.key_arn
+        delete_on_termination = true
+      }
+    }
+    xvdb = {
+      device_name = "/dev/xvdb"
+      ebs = {
+        volume_size           = local.system_node_data_volume_size_gib
+        volume_type           = "gp3"
+        iops                  = 3000
+        throughput            = 125
+        encrypted             = true
+        kms_key_id            = module.ebs_kms_key.key_arn
+        delete_on_termination = true
+      }
+    }
+  }
+
+  default_block_device_mappings = {
+    xvda = {
+      device_name = "/dev/xvda"
+      ebs = {
+        volume_size           = local.node_volume_size
+        volume_type           = "gp3"
+        iops                  = 3000
+        throughput            = 125
+        encrypted             = true
+        kms_key_id            = module.ebs_kms_key.key_arn
+        delete_on_termination = true
+      }
+    }
+  }
 
   coredns_addon_configuration_values = var.enable_karpenter ? jsonencode({
     tolerations = [

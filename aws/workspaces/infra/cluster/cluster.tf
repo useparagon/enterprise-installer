@@ -154,20 +154,7 @@ module "eks_managed_node_group" {
   ebs_optimized           = true
   disable_api_termination = false
   enable_monitoring       = true
-  block_device_mappings = {
-    xvda = {
-      device_name = "/dev/xvda"
-      ebs = {
-        volume_size           = local.node_volume_size
-        volume_type           = "gp3"
-        iops                  = 3000
-        throughput            = 125
-        encrypted             = true
-        kms_key_id            = module.ebs_kms_key.key_arn
-        delete_on_termination = true
-      }
-    }
-  }
+  block_device_mappings = each.key == "system" && try(each.value.ami_type, null) == "BOTTLEROCKET_x86_64" ? local.bottlerocket_system_block_device_mappings : local.default_block_device_mappings
 
   depends_on = [
     module.eks,
