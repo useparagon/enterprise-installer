@@ -8,8 +8,13 @@ variable "k8s_version" {
   type        = string
 }
 
+variable "ebs_os_volume_size_gib" {
+  description = "Bottlerocket OS (control) volume size in GiB for Karpenter worker nodes (/dev/xvda)."
+  type        = number
+}
+
 variable "ebs_volume_size_gib" {
-  description = "Root volume size in GiB for Karpenter worker nodes."
+  description = "Bottlerocket container data volume size in GiB for Karpenter worker nodes (/dev/xvdb)."
   type        = number
 }
 
@@ -22,28 +27,31 @@ variable "aws" {
   })
 }
 
-variable "eks_ondemand_node_instance_type" {
-  description = "Instance types for the default on-demand Karpenter NodePool."
-  type        = list(string)
-}
+variable "karpenter_node_pools" {
+  description = "Karpenter NodePool definitions. Map key is the NodePool name."
+  type = map(object({
+    capacity_types = list(string)
+    instance_types = list(string)
+    cpu_limit      = string
+    memory_limit   = string
+    nodes_limit    = number
+    weight         = number
+    labels         = optional(map(string))
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
+  }))
 
-variable "eks_spot_node_instance_type" {
-  description = "Instance types for the default spot Karpenter NodePool."
-  type        = list(string)
-}
-
-variable "eks_spot_instance_percent" {
-  description = "Spot share of worker capacity (drives default-spot vs default-ondemand weights and limits)."
-  type        = number
-}
-
-variable "eks_max_node_count" {
-  description = "Maximum worker nodes used to derive Karpenter NodePool limits."
-  type        = number
+  validation {
+    condition     = length(var.karpenter_node_pools) > 0
+    error_message = "At least one Karpenter NodePool must be defined in karpenter_node_pools."
+  }
 }
 
 variable "karpenter_defaults" {
-  description = "Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults."
+  description = "Optional overrides for shared EC2NodeClass and NodePool defaults (disruption, AMI, etc.)."
   type = object({
     ami_selector_alias              = optional(string)
     disruption_consolidation_policy = optional(string)
@@ -54,52 +62,9 @@ variable "karpenter_defaults" {
       schedule = optional(string)
       duration = optional(string)
     })))
-    expire_after         = optional(string)
+    expire_after             = optional(string)
     termination_grace_period = optional(string)
-    ec2_kubelet_max_pods = optional(number)
+    ec2_kubelet_max_pods     = optional(number)
   })
-  default = {}
-}
-
-variable "karpenter_node_pool_overrides" {
-  description = "Optional per-NodePool overrides (limits, disruption, instance types)."
-  type = map(object({
-    instance_types                  = optional(list(string))
-    instance_categories             = optional(list(string))
-    ec2_name_tag                    = optional(string)
-    cpu_limit                       = optional(string)
-    memory_limit                    = optional(string)
-    nodes_limit                     = optional(number)
-    expire_after                    = optional(string)
-    termination_grace_period        = optional(string)
-    disruption_consolidation_policy = optional(string)
-    disruption_consolidate_after    = optional(string)
-    disruption_budgets = optional(list(object({
-      nodes    = string
-      reasons  = optional(list(string))
-      schedule = optional(string)
-      duration = optional(string)
-    })))
-  }))
-  default = {}
-}
-
-variable "karpenter_node_pools" {
-  description = "Additional custom NodePool definitions beyond default-spot and default-ondemand."
-  type = map(object({
-    capacity_types      = list(string)
-    weight              = optional(number)
-    capacity_type_label = optional(string)
-    instance_types      = optional(list(string))
-    cpu_limit           = optional(string)
-    memory_limit        = optional(string)
-    nodes_limit         = optional(number)
-    taints = optional(list(object({
-      key    = string
-      value  = optional(string)
-      effect = string
-    })))
-    labels = optional(map(string))
-  }))
   default = {}
 }

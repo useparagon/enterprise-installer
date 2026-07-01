@@ -1,6 +1,15 @@
 locals {
   ec2 = local.karpenter.ec2_node_class
 
+  karpenter_bottlerocket_ebs = {
+    volumeType          = "gp3"
+    iops                = 3000
+    throughput          = 125
+    encrypted           = true
+    kmsKeyID            = local.ec2.ebs_kms_key_arn
+    deleteOnTermination = true
+  }
+
   karpenter_ec2_node_class_spec_base = {
     role = local.ec2.role
     amiSelectorTerms = [
@@ -21,16 +30,16 @@ locals {
     blockDeviceMappings = [
       {
         deviceName = "/dev/xvda"
-        ebs = {
-          volumeSize          = "${var.ebs_volume_size_gib}Gi"
-          volumeType          = "gp3"
-          iops                = 3000
-          throughput          = 125
-          encrypted           = true
-          kmsKeyID            = local.ec2.ebs_kms_key_arn
-          deleteOnTermination = true
-        }
-      }
+        ebs = merge(local.karpenter_bottlerocket_ebs, {
+          volumeSize = "${var.ebs_os_volume_size_gib}Gi"
+        })
+      },
+      {
+        deviceName = "/dev/xvdb"
+        ebs = merge(local.karpenter_bottlerocket_ebs, {
+          volumeSize = "${var.ebs_volume_size_gib}Gi"
+        })
+      },
     ]
     metadataOptions = {
       httpEndpoint            = local.ec2.metadata_options.http_endpoint

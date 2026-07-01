@@ -98,39 +98,64 @@ variable "k8s_version" {
   default     = "1.31"
 }
 
+variable "karpenter_node_os_volume_size_gib" {
+  description = "Bottlerocket OS (control) volume size in GiB for Karpenter worker nodes (/dev/xvda)."
+  type        = number
+  default     = 15
+}
+
 variable "karpenter_node_volume_size_gib" {
-  description = "Root volume size in GiB for Karpenter worker nodes (EC2NodeClass block device)."
-  type        = number
-  default     = 75
-}
-
-variable "eks_ondemand_node_instance_type" {
-  description = "Comma-separated instance types for the default on-demand Karpenter NodePool."
-  type        = string
-  default     = "m6a.xlarge"
-}
-
-variable "eks_spot_node_instance_type" {
-  description = "Comma-separated instance types for the default spot Karpenter NodePool."
-  type        = string
-  default     = "t3a.xlarge,t3.xlarge,m5a.xlarge,m5.xlarge,m6a.xlarge,m6i.xlarge,m7a.xlarge,m7i.xlarge,r5a.xlarge,m4.xlarge"
-}
-
-variable "eks_spot_instance_percent" {
-  description = "Spot share of worker capacity for default Karpenter NodePools."
-  type        = number
-  default     = 75
-
-  validation {
-    condition     = var.eks_spot_instance_percent >= 0 && var.eks_spot_instance_percent <= 100
-    error_message = "Value must be between 0 - 100."
-  }
-}
-
-variable "eks_max_node_count" {
-  description = "Maximum worker nodes used to derive Karpenter NodePool limits."
+  description = "Bottlerocket container data volume size in GiB for Karpenter worker nodes (/dev/xvdb)."
   type        = number
   default     = 50
+}
+
+variable "karpenter_node_pools" {
+  description = "Karpenter NodePool definitions. Map key is the NodePool name."
+  type = map(object({
+    capacity_types = list(string)
+    instance_types = list(string)
+    cpu_limit      = string
+    memory_limit   = string
+    nodes_limit    = number
+    weight         = number
+    labels         = optional(map(string))
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
+  }))
+
+  default = {
+    "default-spot" = {
+      capacity_types = ["spot"]
+      instance_types = [
+        "t3a.xlarge", "t3.xlarge",
+        "m5a.xlarge", "m5.xlarge",
+        "m6a.xlarge", "m6i.xlarge",
+        "m7a.xlarge", "m7i.xlarge",
+        "r5a.xlarge", "m4.xlarge",
+      ]
+      cpu_limit    = "152"
+      memory_limit = "608Gi"
+      nodes_limit  = 38
+      weight       = 75
+    }
+    "default-ondemand" = {
+      capacity_types = ["on-demand"]
+      instance_types = ["m6a.xlarge"]
+      cpu_limit      = "52"
+      memory_limit   = "208Gi"
+      nodes_limit    = 13
+      weight         = 25
+    }
+  }
+
+  validation {
+    condition     = length(var.karpenter_node_pools) > 0
+    error_message = "At least one Karpenter NodePool must be defined in karpenter_node_pools."
+  }
 }
 
 variable "karpenter_defaults" {
@@ -149,49 +174,6 @@ variable "karpenter_defaults" {
     termination_grace_period = optional(string)
     ec2_kubelet_max_pods     = optional(number)
   })
-  default = {}
-}
-
-variable "karpenter_node_pool_overrides" {
-  description = "Optional per-NodePool overrides (limits, disruption, instance types)."
-  type = map(object({
-    instance_types                  = optional(list(string))
-    instance_categories             = optional(list(string))
-    ec2_name_tag                    = optional(string)
-    cpu_limit                       = optional(string)
-    memory_limit                    = optional(string)
-    nodes_limit                     = optional(number)
-    expire_after                    = optional(string)
-    termination_grace_period        = optional(string)
-    disruption_consolidation_policy = optional(string)
-    disruption_consolidate_after    = optional(string)
-    disruption_budgets = optional(list(object({
-      nodes    = string
-      reasons  = optional(list(string))
-      schedule = optional(string)
-      duration = optional(string)
-    })))
-  }))
-  default = {}
-}
-
-variable "karpenter_node_pools" {
-  description = "Additional custom NodePool definitions beyond default-spot and default-ondemand."
-  type = map(object({
-    capacity_types      = list(string)
-    weight              = optional(number)
-    capacity_type_label = optional(string)
-    instance_types      = optional(list(string))
-    cpu_limit           = optional(string)
-    memory_limit        = optional(string)
-    nodes_limit         = optional(number)
-    taints = optional(list(object({
-      key    = string
-      value  = optional(string)
-      effect = string
-    })))
-    labels = optional(map(string))
-  }))
   default = {}
 }
 
@@ -584,9 +566,6 @@ locals {
   cluster_name     = try(local.infra_vars.cluster_name.value, local.workspace)
   logs_bucket      = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
   auditlogs_bucket = try(local.infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs")
-
-  eks_ondemand_node_instance_type = distinct([for value in split(",", var.eks_ondemand_node_instance_type) : trimspace(value)])
-  eks_spot_node_instance_type     = distinct([for value in split(",", var.eks_spot_node_instance_type) : trimspace(value)])
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
