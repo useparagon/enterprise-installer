@@ -94,7 +94,7 @@ resource "aws_msk_cluster" "kafka" {
 }
 
 resource "aws_msk_configuration" "kafka" {
-  name = "${var.workspace}-config"
+  name = "${var.workspace}-config-${replace(var.msk_kafka_version, ".", "-")}"
 
   kafka_versions = [var.msk_kafka_version]
 
@@ -106,6 +106,10 @@ num.partitions = 3
 default.replication.factor = ${ceil(var.msk_kafka_num_broker_nodes / 2)}
 min.insync.replicas = ${ceil(var.msk_kafka_num_broker_nodes / 2)}
 PROPERTIES
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_appautoscaling_target" "kafka" {

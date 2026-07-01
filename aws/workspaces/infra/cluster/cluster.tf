@@ -12,21 +12,11 @@ module "eks" {
   vpc_id                         = var.vpc_id
 
   # access
+  # NOTE: the bastion access entry is managed separately (see aws_eks_access_entry.bastion
+  # below) to avoid a race where the entry is created before the bastion IAM role has
+  # propagated, which intermittently fails the apply.
   access_entries = merge(
     {
-      bastion = {
-        kubernetes_groups = ["admin", "cluster-admin"]
-        principal_arn     = var.bastion_role_arn
-
-        policy_associations = {
-          bastion = {
-            policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-            access_scope = {
-              type = "cluster"
-            }
-          }
-        }
-      },
       eks-admins = {
         kubernetes_groups = ["admin", "cluster-admin"]
         principal_arn     = aws_iam_role.eks_cluster_admin.arn
@@ -41,7 +31,7 @@ module "eks" {
         }
       }
     },
-    { for arn in local.eks_admin_arns : arn => {
+    { for arn in var.eks_admin_arns : arn => {
       kubernetes_groups = ["admin", "cluster-admin"]
       principal_arn     = arn
 
@@ -56,7 +46,7 @@ module "eks" {
     } if arn != "" }
   )
 
-  cluster_security_group_additional_rules = {
+  cluster_security_group_additional_rules = var.bastion_enabled ? {
     bastion_api_access = {
       description              = "Bastion to cluster API"
       protocol                 = "tcp"
@@ -65,7 +55,7 @@ module "eks" {
       type                     = "ingress"
       source_security_group_id = var.bastion_security_group_id
     }
-  }
+  } : {}
 
   node_security_group_tags = var.enable_karpenter ? {
     "karpenter.sh/discovery" = var.workspace
@@ -88,6 +78,33 @@ module "eks" {
   }
 
   depends_on = [aws_iam_role.eks_cluster_admin]
+}
+
+# Managed outside the EKS module so creation is ordered after the cluster (and the
+# bastion IAM role) exists, avoiding the intermittent race on bastion upgrades.
+resource "aws_eks_access_entry" "bastion" {
+  count = var.bastion_enabled ? 1 : 0
+
+  cluster_name      = module.eks.cluster_name
+  principal_arn     = var.bastion_role_arn
+  kubernetes_groups = ["admin", "cluster-admin"]
+  type              = "STANDARD"
+
+  depends_on = [module.eks]
+}
+
+resource "aws_eks_access_policy_association" "bastion" {
+  count = var.bastion_enabled ? 1 : 0
+
+  cluster_name  = module.eks.cluster_name
+  principal_arn = var.bastion_role_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [aws_eks_access_entry.bastion]
 }
 
 resource "random_string" "node_group" {

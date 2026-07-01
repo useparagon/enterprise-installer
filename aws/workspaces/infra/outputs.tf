@@ -47,16 +47,17 @@ output "storage" {
     managed_sync_bucket = module.storage.s3.managed_sync_bucket
     root_user           = module.storage.s3.access_key_id
     root_password       = module.storage.s3.access_key_secret
+    kms_key_arn         = module.storage.s3.kms_key_arn
   }
   sensitive = true
 }
 
 output "bastion" {
   description = "Bastion server connection info."
-  value = {
-    public_dns  = module.bastion.connection.bastion_dns
-    private_key = module.bastion.connection.private_key
-  }
+  value = var.bastion_enabled ? {
+    public_dns  = module.bastion[0].connection.bastion_dns
+    private_key = module.bastion[0].connection.private_key
+  } : null
   sensitive = true
 }
 
