@@ -137,17 +137,17 @@ variable "karpenter_node_pools" {
         "m7a.xlarge", "m7i.xlarge",
         "r5a.xlarge", "m4.xlarge",
       ]
-      cpu_limit    = "152"
-      memory_limit = "608Gi"
-      nodes_limit  = 38
+      cpu_limit    = "160"
+      memory_limit = "610Gi"
+      nodes_limit  = 40
       weight       = 75
     }
     "default-ondemand" = {
       capacity_types = ["on-demand"]
       instance_types = ["m6a.xlarge"]
-      cpu_limit      = "52"
-      memory_limit   = "208Gi"
-      nodes_limit    = 13
+      cpu_limit      = "60"
+      memory_limit   = "210Gi"
+      nodes_limit    = 20
       weight         = 25
     }
   }
