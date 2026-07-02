@@ -45,16 +45,15 @@ locals {
 
   # Unified connections map - combines all non-PostgreSQL connection types
   connections_merge = merge(
-    # Redis connections
+    # Redis: TLS when ssl=true; --cacert when ca_certificate is set; REDISCLI_AUTH for password.
     try(var.infra_vars.redis.value, null) != null ? {
       for instance_name, instance_config in var.infra_vars.redis.value :
       "redis-${instance_name}" => {
         name    = "${local.connection_prefix}-redis-${instance_name}"
         type    = "custom"
         subtype = "redis"
-        # Memorystore: TLS + CA file + AUTH; no -c (not Redis Cluster). Direct redis-cli for web terminal I/O.
         command = concat(
-          ["redis-cli", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"],
+          ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"],
           try(instance_config.ssl, false) ? ["--tls"] : [],
           try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? ["--cacert", "$REDIS_CACERT"] : [],
         )

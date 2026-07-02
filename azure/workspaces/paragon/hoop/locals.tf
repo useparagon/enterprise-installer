@@ -43,47 +43,80 @@ locals {
     }
   } : {}
 
+  legacy_redis = try(var.infra_vars.redis.value, null) != null ? var.infra_vars.redis.value : {}
+
+  # During migration, output redis points at legacy and redis_managed at Azure Managed Redis.
+  # Skip managed hoop entries when host matches legacy (post-cutover both outputs are the same).
+  managed_redis_hoop_instances = try(var.infra_vars.redis_managed.value, null) != null ? {
+    for name, cfg in var.infra_vars.redis_managed.value :
+    name => cfg
+    if !contains(keys(local.legacy_redis), name) || try(local.legacy_redis[name].host, "") != cfg.host
+  } : {}
+
+  redis_hoop_entries = merge(
+    {
+      for instance_name, instance_config in local.legacy_redis :
+      "redis-${instance_name}" => {
+        connection_name = "${local.connection_prefix}-redis-${instance_name}"
+        config          = instance_config
+      }
+    },
+    {
+      for instance_name, instance_config in local.managed_redis_hoop_instances :
+      "redis-managed-${instance_name}" => {
+        connection_name = "${local.connection_prefix}-redis-managed-${instance_name}"
+        config          = instance_config
+      }
+    },
+  )
+
+  redis_connection_tags = {
+    environment     = local.connection_environment
+    customer_facing = var.customer_facing
+    criticality     = "critical"
+    access-level    = "private"
+    impact          = "high"
+    service-type    = "cache"
+    database-type   = "redis"
+    cloud           = local.detected_cloud
+  }
+
   # Unified connections map - combines all non-PostgreSQL connection types
   connections_merge = merge(
-    # Redis connections
-    try(var.infra_vars.redis.value, null) != null ? {
-      for instance_name, instance_config in var.infra_vars.redis.value :
-      "redis-${instance_name}" => {
-        name    = "${local.connection_prefix}-redis-${instance_name}"
+    # Redis: TLS when ssl=true; --cacert when ca_certificate is set; REDISCLI_AUTH for password.
+    length(local.redis_hoop_entries) > 0 ? {
+      for connection_key, entry in local.redis_hoop_entries :
+      connection_key => {
+        name    = entry.connection_name
         type    = "custom"
         subtype = "redis"
-        command = ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"]
+        command = concat(
+          ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"],
+          try(entry.config.ssl, false) ? ["--tls"] : [],
+          try(entry.config.ssl, false) && try(entry.config.ca_certificate, null) != null && try(entry.config.ca_certificate, "") != "" ? ["--cacert", "$REDIS_CACERT"] : [],
+        )
         secrets = merge(
           {
-            "envvar:HOST"      = instance_config.host
-            "envvar:PORT"      = tostring(instance_config.port)
-            "envvar:DB_NUMBER" = tostring(try(instance_config.db_number, 0))
+            "envvar:HOST"      = entry.config.host
+            "envvar:PORT"      = tostring(entry.config.port)
+            "envvar:DB_NUMBER" = tostring(try(entry.config.db_number, 0))
           },
-          try(instance_config.ssl, false) == true ? { "envvar:REDIS_TLS" = "1" } : {},
-          try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {},
-          {
-            for k, v in {
-              "envvar:PASS" = try(instance_config.password, null)
-              "envvar:USER" = try(instance_config.user, null)
-            } : k => v
-            if v != null && v != ""
-          }
+          try(entry.config.ssl, false) && try(entry.config.ca_certificate, null) != null && try(entry.config.ca_certificate, "") != "" ? {
+            "filesystem:REDIS_CACERT" = entry.config.ca_certificate
+          } : {},
+          try(entry.config.password, null) != null && try(entry.config.password, "") != "" ? {
+            "envvar:REDISCLI_AUTH" = entry.config.password
+          } : {},
+          try(entry.config.user, null) != null && try(entry.config.user, "") != "" ? {
+            "envvar:USER" = entry.config.user
+          } : {},
         )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"
         access_mode_connect  = "disabled"
         access_schema        = "disabled"
         guardrail_rules      = var.hoop_redis_guardrail_rules
-        tags = {
-          environment     = local.connection_environment
-          customer_facing = var.customer_facing
-          criticality     = "critical"
-          access-level    = "private"
-          impact          = "high"
-          service-type    = "cache"
-          database-type   = "redis"
-          cloud           = local.detected_cloud
-        }
+        tags                 = local.redis_connection_tags
       }
     } : {},
     # Standard application connections

@@ -127,6 +127,19 @@ variable "infra_vars" {
         port           = number
         db_number      = optional(number, 0)
         ssl            = optional(bool, false)
+        cluster        = optional(bool, false)
+        ca_certificate = optional(string, null)
+        password       = optional(string)
+        user           = optional(string)
+      })), {})
+    }))
+    redis_managed = optional(object({
+      value = optional(map(object({
+        host           = string
+        port           = number
+        db_number      = optional(number, 0)
+        ssl            = optional(bool, false)
+        cluster        = optional(bool, false)
         ca_certificate = optional(string, null)
         password       = optional(string)
         user           = optional(string)
@@ -134,8 +147,9 @@ variable "infra_vars" {
     }))
   })
   default = {
-    postgres = null
-    redis    = null
+    postgres      = null
+    redis         = null
+    redis_managed = null
   }
 }
 

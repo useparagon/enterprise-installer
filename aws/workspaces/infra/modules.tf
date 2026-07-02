@@ -49,9 +49,10 @@ module "redis" {
 
   workspace                      = local.workspace
   aws_region                     = var.aws_region
-  elasticache_node_type          = var.elasticache_node_type
-  elasticache_multi_az           = var.elasticache_multi_az
-  elasticache_multiple_instances = var.elasticache_multiple_instances
+  elasticache_node_type                  = var.elasticache_node_type
+  elasticache_multi_az                   = var.elasticache_multi_az
+  elasticache_transit_encryption_enabled = var.elasticache_transit_encryption_enabled
+  elasticache_multiple_instances         = var.elasticache_multiple_instances
   managed_sync_enabled           = var.managed_sync_enabled
 
   vpc            = module.network.vpc

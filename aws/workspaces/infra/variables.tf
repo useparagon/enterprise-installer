@@ -144,6 +144,17 @@ variable "elasticache_multi_az" {
   default     = true
 }
 
+variable "elasticache_transit_encryption_enabled" {
+  description = "Enable in-transit encryption (TLS) on ElastiCache replication groups. Requires TLS clients (redis-cli --tls, rediss://). Standalone instances (queue, system) are unchanged."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.elasticache_transit_encryption_enabled || var.elasticache_multiple_instances
+    error_message = "elasticache_transit_encryption_enabled requires elasticache_multiple_instances = true (replication groups)."
+  }
+}
+
 # eks
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."

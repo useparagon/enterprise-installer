@@ -21,6 +21,13 @@ resource "aws_elasticache_subnet_group" "main" {
   subnet_ids = local.cache_subnet_ids
 }
 
+resource "random_password" "redis_auth_token" {
+  count = var.elasticache_transit_encryption_enabled ? local.elasticache_replication_group_count : 0
+
+  length  = 32
+  special = false
+}
+
 resource "aws_elasticache_parameter_group" "redis" {
   for_each = toset(["cluster", "standalone"])
 
@@ -81,6 +88,10 @@ resource "aws_elasticache_replication_group" "redis" {
   automatic_failover_enabled = true
   num_node_groups            = 1
   replicas_per_node_group    = var.elasticache_multi_az ? 1 : 0
+
+  transit_encryption_enabled = var.elasticache_transit_encryption_enabled
+  auth_token                 = var.elasticache_transit_encryption_enabled ? random_password.redis_auth_token[count.index].result : null
+  auth_token_update_strategy = var.elasticache_transit_encryption_enabled ? "SET" : null
 
   # don't let terraform undo any autoscaling
   lifecycle {
