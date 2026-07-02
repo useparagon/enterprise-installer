@@ -10,3 +10,22 @@ output "eks_cluster" {
     cluster_certificate_authority_data = module.eks.cluster_certificate_authority_data
   }
 }
+
+output "enable_karpenter" {
+  description = "Whether Karpenter autoscaling is enabled. Consumed by paragon workspace for EC2NodeClass and NodePool manifests."
+  value       = var.enable_karpenter
+}
+
+output "enable_legacy_mng_pools" {
+  description = "Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional NTH."
+  value       = var.enable_karpenter ? var.enable_legacy_mng_pools : true
+}
+
+output "karpenter" {
+  description = "AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace."
+  value = var.enable_karpenter ? {
+    node_role_name     = module.iam[0].node_iam_role_name
+    security_group_ids = local.eks_worker_security_group_ids
+    ebs_kms_key_arn    = module.ebs_kms_key.key_arn
+  } : null
+}

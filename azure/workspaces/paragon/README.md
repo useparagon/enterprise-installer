@@ -25,7 +25,6 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
 | <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | >= 0.0.19 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
-| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 
 ## Providers
 
