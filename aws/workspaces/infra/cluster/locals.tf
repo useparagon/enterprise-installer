@@ -58,23 +58,38 @@ locals {
     }
   }
 
+  taint_effects = {
+    NO_SCHEDULE        = "NoSchedule"
+    NO_EXECUTE         = "NoExecute"
+    PREFER_NO_SCHEDULE = "PreferNoSchedule"
+  }
+
+  # System MNG is tainted for Karpenter; core add-on controllers must tolerate it until worker NodePools scale.
+  karpenter_system_addon_tolerations = [
+    {
+      key      = "CriticalAddonsOnly"
+      operator = "Exists"
+    },
+    {
+      operator = "Exists"
+      effect   = "NoExecute"
+    },
+    {
+      key      = local.karpenter_controller_taint.key
+      operator = "Equal"
+      value    = local.karpenter_controller_taint.value
+      effect   = local.taint_effects[local.karpenter_controller_taint.effect]
+    },
+  ]
+
   coredns_addon_configuration_values = var.enable_karpenter ? jsonencode({
-    tolerations = [
-      {
-        key      = "CriticalAddonsOnly"
-        operator = "Exists"
-      },
-      {
-        operator = "Exists"
-        effect   = "NoExecute"
-      },
-      {
-        key      = local.karpenter_controller_taint.key
-        operator = "Equal"
-        value    = local.karpenter_controller_taint.value
-        effect   = local.taint_effects[local.karpenter_controller_taint.effect]
-      },
-    ]
+    tolerations = local.karpenter_system_addon_tolerations
+  }) : null
+
+  ebs_csi_addon_configuration_values = var.enable_karpenter ? jsonencode({
+    controller = {
+      tolerations = local.karpenter_system_addon_tolerations
+    }
   }) : null
 
   system_node_instance_types = [
@@ -222,10 +237,4 @@ locals {
     var.eks_admin_arns,
     [local.caller_arn]
   )))
-
-  taint_effects = {
-    NO_SCHEDULE        = "NoSchedule"
-    NO_EXECUTE         = "NoExecute"
-    PREFER_NO_SCHEDULE = "PreferNoSchedule"
-  }
 }

@@ -56,6 +56,7 @@ resource "aws_eks_addon" "aws_ebs_csi_driver" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "aws-ebs-csi-driver"
   addon_version               = local.eks_addon_versions["aws-ebs-csi-driver"]
+  configuration_values        = local.ebs_csi_addon_configuration_values
   resolve_conflicts_on_create = local.eks_addon_resolve_conflicts.resolve_conflicts_on_create
   resolve_conflicts_on_update = local.eks_addon_resolve_conflicts.resolve_conflicts_on_update
   service_account_role_arn    = module.aws_ebs_csi_driver_iam_role.iam_role_arn
