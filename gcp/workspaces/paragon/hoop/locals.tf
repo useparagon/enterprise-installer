@@ -52,12 +52,11 @@ locals {
         name    = "${local.connection_prefix}-redis-${instance_name}"
         type    = "custom"
         subtype = "redis"
-        # Memorystore requires --tls + --cacert; plain redis-cli causes 0x15 protocol error.
+        # Memorystore: TLS + CA file + AUTH; no -c (not Redis Cluster). Direct redis-cli for web terminal I/O.
         command = concat(
-          ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"],
+          ["redis-cli", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"],
           try(instance_config.ssl, false) ? ["--tls"] : [],
           try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? ["--cacert", "$REDIS_CACERT"] : [],
-          try(instance_config.password, null) != null && try(instance_config.password, "") != "" ? ["-a", "$PASS"] : [],
         )
         secrets = merge(
           {
@@ -66,15 +65,14 @@ locals {
             "envvar:DB_NUMBER" = tostring(try(instance_config.db_number, 0))
           },
           try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? {
-            "b64-filesystem:REDIS_CACERT" = base64encode(instance_config.ca_certificate)
+            "filesystem:REDIS_CACERT" = instance_config.ca_certificate
           } : {},
-          {
-            for k, v in {
-              "envvar:PASS" = try(instance_config.password, null)
-              "envvar:USER" = try(instance_config.user, null)
-            } : k => v
-            if v != null && v != ""
-          }
+          try(instance_config.password, null) != null && try(instance_config.password, "") != "" ? {
+            "envvar:REDISCLI_AUTH" = instance_config.password
+          } : {},
+          try(instance_config.user, null) != null && try(instance_config.user, "") != "" ? {
+            "envvar:USER" = instance_config.user
+          } : {},
         )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"
