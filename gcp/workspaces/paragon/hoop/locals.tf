@@ -52,15 +52,22 @@ locals {
         name    = "${local.connection_prefix}-redis-${instance_name}"
         type    = "custom"
         subtype = "redis"
-        command = ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"]
+        # Memorystore requires --tls + --cacert; plain redis-cli causes 0x15 protocol error.
+        command = concat(
+          ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"],
+          try(instance_config.ssl, false) ? ["--tls"] : [],
+          try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? ["--cacert", "$REDIS_CACERT"] : [],
+          try(instance_config.password, null) != null && try(instance_config.password, "") != "" ? ["-a", "$PASS"] : [],
+        )
         secrets = merge(
           {
             "envvar:HOST"      = instance_config.host
             "envvar:PORT"      = tostring(instance_config.port)
             "envvar:DB_NUMBER" = tostring(try(instance_config.db_number, 0))
           },
-          try(instance_config.ssl, false) == true ? { "envvar:REDIS_TLS" = "1" } : {},
-          try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {},
+          try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? {
+            "b64-filesystem:REDIS_CACERT" = base64encode(instance_config.ca_certificate)
+          } : {},
           {
             for k, v in {
               "envvar:PASS" = try(instance_config.password, null)
