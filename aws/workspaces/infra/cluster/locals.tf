@@ -16,15 +16,6 @@ locals {
   system_node_os_volume_size_gib   = 15
   system_node_data_volume_size_gib = 50
 
-  system_node_group_custom_taints = try(var.eks_system_managed_node_group.taints, null)
-
-  # Reserve system MNG for Karpenter controller and cluster add-ons; worker/monitoring workloads use Karpenter nodes.
-  system_node_group_taints = var.enable_karpenter ? (
-    local.system_node_group_custom_taints != null && length(local.system_node_group_custom_taints) > 0
-    ? local.system_node_group_custom_taints
-    : [local.karpenter_controller_taint]
-  ) : coalesce(local.system_node_group_custom_taints, [])
-
   bottlerocket_system_block_device_mappings = {
     xvda = {
       device_name = "/dev/xvda"
@@ -131,15 +122,16 @@ locals {
     ami_type        = "BOTTLEROCKET_x86_64"
     labels          = var.eks_system_managed_node_group.labels
     use_name_prefix = coalesce(var.eks_system_managed_node_group.use_name_prefix, false)
-    taints          = local.system_node_group_taints
+    taints          = [local.karpenter_controller_taint]
   }
 
+  # Karpenter on → dedicated system MNG. Legacy pools are independent (migration coexistence).
   managed_node_groups = merge(
     var.enable_karpenter ? { system = local.system_node_group } : {},
-    (!var.enable_karpenter || var.enable_legacy_mng_pools) ? local.legacy_node_groups : {},
+    var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
   )
 
-  cluster_autoscaler_node_groups = (!var.enable_karpenter || var.enable_legacy_mng_pools) ? local.legacy_node_groups : {}
+  cluster_autoscaler_node_groups = var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {}
 
   cluster_autoscaler_enabled = length(local.cluster_autoscaler_node_groups) > 0
 
