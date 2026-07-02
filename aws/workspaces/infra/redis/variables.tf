@@ -30,12 +30,6 @@ variable "elasticache_multi_az" {
   type        = bool
 }
 
-variable "elasticache_transit_encryption_enabled" {
-  description = "Enable in-transit encryption (TLS) on ElastiCache replication groups. Requires TLS clients (redis-cli --tls, rediss://). Standalone cluster resources do not support TLS."
-  type        = bool
-  default     = false
-}
-
 variable "elasticache_multiple_instances" {
   description = "Whether or not to create multiple Redis instances."
   type        = bool
@@ -96,11 +90,4 @@ locals {
   }
 
   redis_version = "6.x"
-
-  elasticache_replication_group_count = var.elasticache_multiple_instances ? (var.managed_sync_enabled ? 2 : 1) : 0
-
-  replication_group_index = merge(
-    { cache = 0 },
-    var.managed_sync_enabled && var.elasticache_multiple_instances ? { managed_sync = 1 } : {},
-  )
 }
