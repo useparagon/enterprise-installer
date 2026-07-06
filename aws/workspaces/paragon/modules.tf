@@ -38,6 +38,8 @@ module "helm" {
   docker_email                      = var.docker_email
   docker_password                   = var.docker_password
   docker_registry_server            = var.docker_registry_server
+  docker_pull_secret_name           = var.docker_pull_secret_name
+  create_docker_pull_secret         = var.create_docker_pull_secret
   docker_username                   = var.docker_username
   feature_flags_content             = local.feature_flags_content
   flipt_options                     = local.flipt_options

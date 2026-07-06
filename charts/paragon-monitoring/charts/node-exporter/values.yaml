@@ -3,6 +3,8 @@ image:
   pullPolicy: IfNotPresent
   tag: 'latest'
 
+imagePullSecrets: []
+
 fullnameOverride: 'node-exporter'
 
 service:

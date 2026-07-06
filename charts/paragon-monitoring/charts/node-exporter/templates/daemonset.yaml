@@ -13,6 +13,11 @@ spec:
       labels:
         {{- include "node-exporter.selectorLabels" . | nindent 8 }}
     spec:
+      {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+      {{- if $pullSecrets }}
+      imagePullSecrets:
+        {{- $pullSecrets | nindent 8 }}
+      {{- end }}
       hostNetwork: {{ .Values.hostNetwork }}
       hostPID: {{ .Values.hostPID }}
       {{- if .Values.priorityClass.name }}
@@ -20,8 +25,8 @@ spec:
       {{- end }}
       containers:
         - name: node-exporter
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ include "paragon.image" (dict "root" . "repository" .Values.image.repository "tag" .Values.image.tag) | quote }}
+          imagePullPolicy: {{ include "paragon.imagePullPolicy" (dict "root" .) }}
           args:
             - --path.procfs=/host/proc
             - --path.sysfs=/host/sys
