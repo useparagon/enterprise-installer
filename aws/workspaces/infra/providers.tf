@@ -58,10 +58,11 @@ provider "cloudflare" {
 # Kubernetes API access for GitOps bootstrap (ArgoCD, ESO, platform manifests).
 # Uses the same credentials as the AWS provider (Spacelift / assumed role) via EKS
 # access entries on the cluster — not the bastion host.
-# Gated on argocd_enabled (or k8s_providers_enabled for destroy) so the providers are
-# configured with empty credentials when GitOps is off, preventing client-go API
-# discovery hangs against the EKS endpoint. The host must also be empty (not just
-# the token) because client-go hangs on API discovery even with no auth token.
+#
+# These providers are only consumed by the count-gated `argocd` module. When GitOps is
+# disabled (or k8s_providers_enabled is false), hashicorp/kubernetes and helm tolerate an
+# empty host, but alekc/kubectl errors at configure time ("no configuration has been
+# provided"). Feed all three a static placeholder when disabled; they stay unused.
 data "aws_eks_cluster_auth" "gitops" {
   count = local.k8s_providers_enabled ? 1 : 0
   name  = module.cluster.eks_cluster.name
@@ -69,9 +70,9 @@ data "aws_eks_cluster_auth" "gitops" {
 
 locals {
   k8s_providers_enabled = var.argocd_enabled || var.k8s_providers_enabled
-  k8s_host              = local.k8s_providers_enabled ? module.cluster.eks_cluster.cluster_endpoint : ""
+  k8s_host              = local.k8s_providers_enabled ? module.cluster.eks_cluster.cluster_endpoint : "https://localhost"
   k8s_ca                = local.k8s_providers_enabled ? base64decode(module.cluster.eks_cluster.cluster_certificate_authority_data) : ""
-  k8s_token             = try(data.aws_eks_cluster_auth.gitops[0].token, "")
+  k8s_token             = local.k8s_providers_enabled ? try(data.aws_eks_cluster_auth.gitops[0].token, "") : ""
 }
 
 provider "kubernetes" {
