@@ -245,9 +245,16 @@ resource "helm_release" "ingress" {
   }
 
   set {
+    name  = "region"
+    value = var.aws_region
+  }
+
+  set {
     name  = "replicaCount"
     value = "3"
   }
+
+  depends_on = [module.karpenter]
 }
 
 # metrics server for hpa
@@ -266,16 +273,25 @@ resource "helm_release" "metricsserver" {
   verify           = false
 
   depends_on = [
-    helm_release.ingress
+    module.karpenter,
+    helm_release.ingress,
   ]
 }
 
-# graceful handling of spot evictions
+# graceful handling of spot evictions on legacy managed node groups
 module "aws_node_termination_handler" {
+  count = var.enable_legacy_mng_pools ? 1 : 0
+
   source  = "qvest-digital/aws-node-termination-handler/kubernetes"
   version = "4.0.0"
 
   json_logging = true
+
+  # Legacy MNG spot nodes only — avoids duplicate draining on Karpenter workers during migration.
+  k8s_node_selector = {
+    "useparagon.com/capacityType" = "spot"
+  }
+  k8s_node_tolerations = []
 }
 
 # microservices deployment
@@ -305,11 +321,12 @@ resource "helm_release" "paragon_on_prem" {
   ]
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     kubernetes_secret.docker_login,
     kubernetes_secret.paragon_secrets,
     kubernetes_storage_class_v1.gp3_encrypted,
-    kubernetes_config_map.feature_flag_content
+    kubernetes_config_map.feature_flag_content,
   ]
 }
 
@@ -370,9 +387,10 @@ resource "helm_release" "paragon_logging" {
   }
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     kubernetes_secret.docker_login,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }
 
@@ -414,9 +432,10 @@ resource "helm_release" "paragon_monitoring" {
   }
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     helm_release.paragon_on_prem,
     kubernetes_secret.docker_login,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }
