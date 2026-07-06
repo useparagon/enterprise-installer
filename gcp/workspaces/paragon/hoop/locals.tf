@@ -55,7 +55,7 @@ locals {
         command = concat(
           ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"],
           try(instance_config.ssl, false) ? ["--tls"] : [],
-          try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? ["--cacert", "$REDIS_CACERT"] : [],
+          try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? ["--cacert", "$REDIS_CACERT_PATH"] : [],
         )
         secrets = merge(
           {
@@ -64,13 +64,10 @@ locals {
             "envvar:DB_NUMBER" = tostring(try(instance_config.db_number, 0))
           },
           try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? {
-            "filesystem:REDIS_CACERT" = instance_config.ca_certificate
+            "filesystem:REDIS_CACERT_PATH" = instance_config.ca_certificate
           } : {},
           try(instance_config.password, null) != null && try(instance_config.password, "") != "" ? {
             "envvar:REDISCLI_AUTH" = instance_config.password
-          } : {},
-          try(instance_config.user, null) != null && try(instance_config.user, "") != "" ? {
-            "envvar:USER" = instance_config.user
           } : {},
         )
         access_mode_runbooks = "enabled"
