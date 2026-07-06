@@ -224,13 +224,22 @@ resource "kubernetes_secret" "paragon_secrets" {
 }
 
 # ingress controller; provisions load balancer
+#
+# Upgrade order (per cluster, before paragon terraform apply):
+#   1. kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+#   2. terraform apply (paragon workspace)
+# CRD apply is safe while v2.x controller is still running; skip risks v3.4 crash-loop.
+#
+# Scheduling: prefer on-demand nodes but allow spot when the on-demand pool is small.
+# Pod anti-affinity (preferred) spreads replicas across hosts. PDB + safe-to-evict: false
+# protect against cluster-autoscaler disruption regardless of node pool.
 resource "helm_release" "ingress" {
   name        = "ingress"
   description = "AWS Ingress Controller"
 
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
-  version    = "1.9.1"
+  version    = "3.4.0"
 
   namespace        = kubernetes_namespace.paragon.id
   atomic           = true
@@ -248,6 +257,51 @@ resource "helm_release" "ingress" {
     name  = "replicaCount"
     value = "3"
   }
+
+  set {
+    name  = "podDisruptionBudget.maxUnavailable"
+    value = "1"
+  }
+
+  set {
+    name  = "podAnnotations.cluster-autoscaler\\.kubernetes\\.io/safe-to-evict"
+    value = "false"
+  }
+
+  # Custom affinity replaces chart default (configureDefaultAffinity); include both
+  # preferred on-demand placement and preferred per-host spread.
+  values = [yamlencode({
+    configureDefaultAffinity = false
+    affinity = {
+      nodeAffinity = {
+        preferredDuringSchedulingIgnoredDuringExecution = [{
+          weight = 100
+          preference = {
+            matchExpressions = [{
+              key      = "useparagon.com/capacityType"
+              operator = "In"
+              values   = ["ondemand"]
+            }]
+          }
+        }]
+      }
+      podAntiAffinity = {
+        preferredDuringSchedulingIgnoredDuringExecution = [{
+          weight = 100
+          podAffinityTerm = {
+            labelSelector = {
+              matchExpressions = [{
+                key      = "app.kubernetes.io/name"
+                operator = "In"
+                values   = ["aws-load-balancer-controller"]
+              }]
+            }
+            topologyKey = "kubernetes.io/hostname"
+          }
+        }]
+      }
+    }
+  })]
 }
 
 # metrics server for hpa
@@ -276,6 +330,12 @@ module "aws_node_termination_handler" {
   version = "4.0.0"
 
   json_logging = true
+
+  # Spot nodes are labeled in infra (cluster.tf); avoid legacy lifecycle=Ec2Spot default.
+  k8s_node_selector = {
+    "useparagon.com/capacityType" = "spot"
+  }
+  k8s_node_tolerations = []
 }
 
 # microservices deployment

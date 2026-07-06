@@ -29,6 +29,16 @@ module "cluster_autoscaler" {
   cluster_identity_oidc_issuer_arn = module.eks.oidc_provider_arn
   irsa_role_name_prefix            = "${var.workspace}-irsa"
 
+  # Slightly conservative scale-down to reduce churn on critical system pods.
+  # Ingress controller pods are also protected via safe-to-evict: "false".
+  values = yamlencode({
+    extraArgs = {
+      scale-down-utilization-threshold = "0.65"
+      scale-down-unneeded-time         = "15m"
+      skip-nodes-with-system-pods      = true
+    }
+  })
+
   depends_on = [
     module.eks,
     module.eks_managed_node_group
