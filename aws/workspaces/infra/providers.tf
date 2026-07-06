@@ -57,44 +57,33 @@ provider "cloudflare" {
 
 # Kubernetes providers:
 # - kubernetes/helm: always target the EKS API (cluster-autoscaler Helm runs when argocd is off).
-#   Use aws eks get-token exec auth so apply works once the cluster exists without a plan-time
-#   aws_eks_cluster_auth read against a not-yet-created cluster.
+#   Token auth via aws_eks_cluster_auth uses the same assumed-role AWS session as the provider
+#   (required for Spacelift; aws eks get-token exec only sees backend env creds).
 # - kubectl: only used by the count-gated argocd module. alekc/kubectl rejects an empty host at
 #   configure time, so use a localhost placeholder when GitOps is off (providers stay unused).
+data "aws_eks_cluster_auth" "cluster" {
+  name = module.cluster.eks_cluster.name
+}
+
 locals {
   k8s_gitops_enabled = var.argocd_enabled || var.k8s_providers_enabled
-  k8s_cluster_name   = module.cluster.eks_cluster.name
   k8s_host           = module.cluster.eks_cluster.cluster_endpoint
   k8s_ca             = base64decode(module.cluster.eks_cluster.cluster_certificate_authority_data)
-  k8s_exec = {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", local.k8s_cluster_name, "--region", var.aws_region]
-  }
-  kubectl_host = local.k8s_gitops_enabled ? local.k8s_host : "https://localhost"
+  k8s_token          = data.aws_eks_cluster_auth.cluster.token
+  kubectl_host       = local.k8s_gitops_enabled ? local.k8s_host : "https://localhost"
 }
 
 provider "kubernetes" {
   host                   = local.k8s_host
   cluster_ca_certificate = local.k8s_ca
-
-  exec {
-    api_version = local.k8s_exec.api_version
-    command     = local.k8s_exec.command
-    args        = local.k8s_exec.args
-  }
+  token                  = local.k8s_token
 }
 
 provider "helm" {
   kubernetes {
     host                   = local.k8s_host
     cluster_ca_certificate = local.k8s_ca
-
-    exec {
-      api_version = local.k8s_exec.api_version
-      command     = local.k8s_exec.command
-      args        = local.k8s_exec.args
-    }
+    token                  = local.k8s_token
   }
 }
 
@@ -104,14 +93,6 @@ provider "helm" {
 provider "kubectl" {
   host                   = local.kubectl_host
   cluster_ca_certificate = local.k8s_gitops_enabled ? local.k8s_ca : ""
+  token                  = local.k8s_gitops_enabled ? local.k8s_token : ""
   load_config_file       = false
-
-  dynamic "exec" {
-    for_each = local.k8s_gitops_enabled ? [1] : []
-    content {
-      api_version = local.k8s_exec.api_version
-      command     = local.k8s_exec.command
-      args        = local.k8s_exec.args
-    }
-  }
 }
