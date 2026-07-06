@@ -61,8 +61,9 @@ module "hoop" {
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections
   infra_vars = {
-    postgres = try(local.infra_vars.postgres, null)
-    redis    = try(local.infra_vars.redis, null)
+    postgres      = try(local.infra_vars.postgres, null)
+    redis         = try(local.infra_vars.redis, null)
+    redis_managed = try(local.infra_vars.redis_managed, null)
   }
 }
 
