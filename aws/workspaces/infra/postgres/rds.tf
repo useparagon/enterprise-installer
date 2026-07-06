@@ -120,8 +120,8 @@ resource "aws_db_instance" "postgres" {
   parameter_group_name = aws_db_parameter_group.postgres.name
   storage_type         = "gp3"
 
-  iops               = local.rds_gp3_iops_effective
-  storage_throughput = local.rds_gp3_storage_throughput_effective
+  iops               = local.rds_gp3_striped ? local.rds_gp3_iops_effective : null
+  storage_throughput = local.rds_gp3_striped ? local.rds_gp3_storage_throughput_effective : null
 
   allocated_storage           = var.rds_allocated_storage
   max_allocated_storage       = var.rds_max_allocated_storage
