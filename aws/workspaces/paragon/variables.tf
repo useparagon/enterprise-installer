@@ -135,7 +135,7 @@ variable "karpenter_node_pools" {
         "m5a.xlarge", "m5.xlarge",
         "m6a.xlarge", "m6i.xlarge",
         "m7a.xlarge", "m7i.xlarge",
-        "r5a.xlarge", "m4.xlarge",
+        "r5a.xlarge",
       ]
       cpu_limit    = "160"
       memory_limit = "610Gi"
@@ -563,8 +563,9 @@ locals {
   waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
 
   # use default where standard value can be determined
-  cluster_name     = try(local.infra_vars.cluster_name.value, local.workspace)
-  logs_bucket      = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
+  cluster_name        = try(local.infra_vars.cluster_name.value, local.workspace)
+  cluster_k8s_version = try(local.infra_vars.k8s_version.value, var.k8s_version)
+  logs_bucket         = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
   auditlogs_bucket = try(local.infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs")
 
   helm_yaml_path = abspath(var.helm_yaml_path)

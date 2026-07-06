@@ -71,6 +71,11 @@ output "enable_karpenter" {
   value       = module.cluster.enable_karpenter
 }
 
+output "k8s_version" {
+  description = "EKS control plane version. Consumed by paragon workspace for Karpenter drift tagging."
+  value       = module.cluster.k8s_version
+}
+
 output "enable_legacy_mng_pools" {
   description = "Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional NTH."
   value       = module.cluster.enable_legacy_mng_pools

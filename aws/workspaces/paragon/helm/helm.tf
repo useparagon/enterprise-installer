@@ -272,6 +272,12 @@ module "aws_node_termination_handler" {
   version = "4.0.0"
 
   json_logging = true
+
+  # Legacy MNG spot nodes only — avoids duplicate draining on Karpenter workers during migration.
+  k8s_node_selector = {
+    "useparagon.com/capacityType" = "spot"
+  }
+  k8s_node_tolerations = []
 }
 
 # microservices deployment

@@ -3,7 +3,7 @@ module "karpenter" {
   source = "../karpenter"
 
   workspace              = var.workspace
-  k8s_version            = var.k8s_version
+  k8s_version            = var.cluster_k8s_version
   ebs_os_volume_size_gib = var.karpenter_node_os_volume_size_gib
   ebs_volume_size_gib    = var.karpenter_node_volume_size_gib
   aws                    = var.karpenter_aws

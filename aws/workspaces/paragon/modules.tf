@@ -44,6 +44,7 @@ module "helm" {
   helm_values                       = local.helm_values
   ingress_scheme                    = var.ingress_scheme
   k8s_version                       = var.k8s_version
+  cluster_k8s_version               = local.cluster_k8s_version
   logs_bucket                       = local.logs_bucket
   managed_sync_enabled              = var.managed_sync_enabled
   managed_sync_version              = var.managed_sync_version

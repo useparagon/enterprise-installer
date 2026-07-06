@@ -127,6 +127,11 @@ variable "k8s_version" {
   type        = string
 }
 
+variable "cluster_k8s_version" {
+  description = "EKS control plane version from infra output. Used for Karpenter EC2NodeClass drift tagging."
+  type        = string
+}
+
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync."
   type        = bool
