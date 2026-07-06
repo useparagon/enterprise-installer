@@ -1,8 +1,8 @@
-# Flat chart-native env secret for GitOps (ESO -> paragon-secrets).
+# Flat chart-native env secret for ESO (paragon/<workspace>/env).
 # Replaces the nested postgres/redis/storage JSON handoff used by the legacy
 # paragon workspace. Infra-derived values are computed below; optional
 # var.argocd_env_overrides can replace any of them; var.argocd_app_secrets
-# (LICENSE, OAuth, SMTP, …) merges last.
+# (LICENSE, OAuth, SMTP, …) merges last. Written by module.secrets on every apply.
 
 locals {
   argocd_domain = var.paragon_domain != null ? trimspace(var.paragon_domain) : ""

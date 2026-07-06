@@ -81,25 +81,31 @@ output "argocd_namespace" {
 
 output "eso_role_arn" {
   description = "IAM role ARN used by the External Secrets Operator."
-  value       = var.argocd_enabled ? try(module.eks_blueprints_addons.external_secrets.iam_role_arn, null) : null
+  value       = var.argocd_enabled ? module.argocd[0].eso_role_arn : null
 }
 
 output "secrets_manager_env_secret" {
   description = "Name of the Secrets Manager secret containing Paragon env config."
-  value       = var.argocd_enabled && local.argocd_secrets_ready ? module.secrets[0].env_secret_name : null
+  value       = module.secrets.env_secret_name
+  sensitive   = true
+}
+
+output "secrets_manager_secret_arns" {
+  description = "ARNs of application Secrets Manager secrets (env, docker-cfg, managed-sync, openobserve)."
+  value       = module.secrets.secret_arns
 }
 
 output "paragon_certificate_arn" {
   description = "ACM certificate ARN used for Paragon ALB ingress (GitOps bridge annotation paragon_certificate_arn)."
-  value       = var.argocd_enabled ? local.paragon_certificate_arn : null
+  value       = var.argocd_enabled ? module.argocd[0].paragon_certificate_arn : null
 }
 
 output "paragon_route53_zone_id" {
   description = "Route 53 hosted zone ID for paragon_domain (used by external-dns)."
-  value       = local.create_paragon_zone ? aws_route53_zone.paragon[0].zone_id : null
+  value       = var.argocd_enabled ? module.argocd[0].paragon_route53_zone_id : null
 }
 
 output "paragon_route53_name_servers" {
   description = "Route 53 name servers for paragon_domain. Delegate from Cloudflare (or parent DNS) when not auto-managed."
-  value       = local.create_paragon_zone ? aws_route53_zone.paragon[0].name_servers : null
+  value       = var.argocd_enabled ? module.argocd[0].paragon_route53_name_servers : null
 }

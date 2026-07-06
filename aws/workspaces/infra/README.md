@@ -7,9 +7,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 
 | Name | Version |
 | ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
@@ -23,10 +21,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | Name | Version |
 | ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 5.100.0 |
-| <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | 4.52.7 |
-| <a name="provider_random"></a> [random](#provider\_random) | 3.9.0 |
 | <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
-| <a name="provider_time"></a> [time](#provider\_time) | 0.14.0 |
 
 ## Modules
 
@@ -36,10 +31,8 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="module_bastion"></a> [bastion](#module\_bastion) | ./bastion | n/a |
 | <a name="module_cloudtrail"></a> [cloudtrail](#module\_cloudtrail) | ./cloudtrail | n/a |
 | <a name="module_cluster"></a> [cluster](#module\_cluster) | ./cluster | n/a |
-| <a name="module_eks_blueprints_addons"></a> [eks\_blueprints\_addons](#module\_eks\_blueprints\_addons) | aws-ia/eks-blueprints-addons/aws | ~> 1.23 |
 | <a name="module_kafka"></a> [kafka](#module\_kafka) | ./kafka | n/a |
 | <a name="module_network"></a> [network](#module\_network) | ./network | n/a |
-| <a name="module_paragon_acm"></a> [paragon\_acm](#module\_paragon\_acm) | cloudposse/acm-request-certificate/aws | 0.17.0 |
 | <a name="module_postgres"></a> [postgres](#module\_postgres) | ./postgres | n/a |
 | <a name="module_redis"></a> [redis](#module\_redis) | ./redis | n/a |
 | <a name="module_secrets"></a> [secrets](#module\_secrets) | ./secrets | n/a |
@@ -49,8 +42,6 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 
 | Name | Type |
 | ---- | ---- |
-| [aws_route53_record.paragon_caa](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_record) | resource |
-| [aws_route53_zone.paragon](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_zone) | resource |
 | [aws_secretsmanager_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
@@ -61,11 +52,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | [aws_secretsmanager_secret_version.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
-| [cloudflare_record.paragon_nameserver](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/record) | resource |
-| [random_password.openobserve_password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
-| [random_string.openobserve_email](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [terraform_data.validate_argocd_versions](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
-| [time_sleep.gitops_eso_crds](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_eks_cluster_auth.gitops](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/eks_cluster_auth) | data source |
 
@@ -74,7 +61,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_app_bucket_expiration"></a> [app\_bucket\_expiration](#input\_app\_bucket\_expiration) | The number of days to retain S3 app data before deleting | `number` | `90` | no |
-| <a name="input_argocd_addon_overrides"></a> [argocd\_addon\_overrides](#input\_argocd\_addon\_overrides) | Optional overrides merged into the EKS Blueprints Argo CD addon map. | `map(any)` | `{}` | no |
+| <a name="input_argocd_addon_overrides"></a> [argocd\_addon\_overrides](#input\_argocd\_addon\_overrides) | Optional Helm set overrides for the Argo CD release. | `map(any)` | `{}` | no |
 | <a name="input_argocd_app_chart_repository"></a> [argocd\_app\_chart\_repository](#input\_argocd\_app\_chart\_repository) | Helm chart repository URL for Paragon application charts (e.g. OCI registry or HTTPS repo). | `string` | `"https://paragon-helm-production.s3.amazonaws.com"` | no |
 | <a name="input_argocd_app_secrets"></a> [argocd\_app\_secrets](#input\_argocd\_app\_secrets) | Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides argocd\_env\_overrides when the same key is set in both. | `map(string)` | `null` | no |
 | <a name="input_argocd_auto_sync"></a> [argocd\_auto\_sync](#input\_argocd\_auto\_sync) | Whether ArgoCD Applications should auto-sync on git/chart changes. | `bool` | `true` | no |
@@ -122,9 +109,10 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_elasticache_multi_az"></a> [elasticache\_multi\_az](#input\_elasticache\_multi\_az) | Whether or not to enable multi-AZ in each ElastiCache instance. | `bool` | `true` | no |
 | <a name="input_elasticache_multiple_instances"></a> [elasticache\_multiple\_instances](#input\_elasticache\_multiple\_instances) | Whether or not to create multiple ElastiCache instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_elasticache_node_type"></a> [elasticache\_node\_type](#input\_elasticache\_node\_type) | The ElastiCache node type used for Redis. | `string` | `"cache.r6g.large"` | no |
-| <a name="input_eso_addon_overrides"></a> [eso\_addon\_overrides](#input\_eso\_addon\_overrides) | Optional overrides for the Blueprints external-secrets addon (merged into the default external\_secrets map). | `map(any)` | `{}` | no |
+| <a name="input_eso_addon_overrides"></a> [eso\_addon\_overrides](#input\_eso\_addon\_overrides) | Optional values merged into the external-secrets Helm release values map. | `map(any)` | `{}` | no |
 | <a name="input_eso_chart_version"></a> [eso\_chart\_version](#input\_eso\_chart\_version) | Helm chart version for external-secrets operator. | `string` | `"0.14.4"` | no |
 | <a name="input_gitops_alb_ingressclass_exists"></a> [gitops\_alb\_ingressclass\_exists](#input\_gitops\_alb\_ingressclass\_exists) | Brownfield flag: set true when a cluster-scoped IngressClass named "alb" already exists (e.g. installed by the legacy paragon Helm "ingress" release). When true, the AWS Load Balancer Controller is configured with createIngressClassResource=false to avoid an "already exists" conflict. Set explicitly per stack instead of probed at plan time — a live cluster read during plan blocks the entire plan (and any destroy) for minutes whenever the EKS API is unreachable. | `bool` | `false` | no |
+| <a name="input_k8s_providers_enabled"></a> [k8s\_providers\_enabled](#input\_k8s\_providers\_enabled) | Configure kubernetes/helm/kubectl providers against the EKS API. Defaults to false; set true when destroying a stack that still has GitOps resources in state while argocd\_enabled is false. | `bool` | `false` | no |
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.35"` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
 | <a name="input_master_guardduty_account_id"></a> [master\_guardduty\_account\_id](#input\_master\_guardduty\_account\_id) | Optional AWS account id to delegate GuardDuty control to. | `string` | `null` | no |
@@ -151,7 +139,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_rds_multiple_instances"></a> [rds\_multiple\_instances](#input\_rds\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_rds_postgres_version"></a> [rds\_postgres\_version](#input\_rds\_postgres\_version) | Postgres version for the database. | `string` | `"16"` | no |
 | <a name="input_rds_restore_from_snapshot"></a> [rds\_restore\_from\_snapshot](#input\_rds\_restore\_from\_snapshot) | Specifies that RDS instances should be restored from a snapshot. | `bool` | `false` | no |
-| <a name="input_secrets_recovery_window_in_days"></a> [secrets\_recovery\_window\_in\_days](#input\_secrets\_recovery\_window\_in\_days) | Secrets Manager deletion recovery window for ArgoCD application secrets (env, docker-cfg, managed-sync, openobserve). Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection. | `number` | `0` | no |
+| <a name="input_secrets_recovery_window_in_days"></a> [secrets\_recovery\_window\_in\_days](#input\_secrets\_recovery\_window\_in\_days) | Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve) and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection. | `number` | `0` | no |
 | <a name="input_ssh_whitelist"></a> [ssh\_whitelist](#input\_ssh\_whitelist) | An optional list of IP addresses to whitelist ssh access. | `string` | `""` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR for the VPC. | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_vpc_cidr_newbits"></a> [vpc\_cidr\_newbits](#input\_vpc\_cidr\_newbits) | Newbits used for calculating subnets. | `number` | `3` | no |
@@ -174,6 +162,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
 | <a name="output_secrets_manager_env_secret"></a> [secrets\_manager\_env\_secret](#output\_secrets\_manager\_env\_secret) | Name of the Secrets Manager secret containing Paragon env config. |
+| <a name="output_secrets_manager_secret_arns"></a> [secrets\_manager\_secret\_arns](#output\_secrets\_manager\_secret\_arns) | ARNs of application Secrets Manager secrets (env, docker-cfg, managed-sync, openobserve). |
 | <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->

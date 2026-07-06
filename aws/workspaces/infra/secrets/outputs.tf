@@ -1,8 +1,8 @@
 output "secret_arns" {
-  description = "ARNs of all Secrets Manager secrets created."
+  description = "ARNs of all application Secrets Manager secrets created by this module."
   value = compact([
     aws_secretsmanager_secret.env.arn,
-    aws_secretsmanager_secret.docker_cfg.arn,
+    try(aws_secretsmanager_secret.docker_cfg[0].arn, ""),
     try(aws_secretsmanager_secret.managed_sync[0].arn, ""),
     try(aws_secretsmanager_secret.openobserve[0].arn, ""),
   ])
@@ -14,8 +14,8 @@ output "env_secret_name" {
 }
 
 output "docker_cfg_secret_name" {
-  description = "Name of the Docker config secret in Secrets Manager."
-  value       = aws_secretsmanager_secret.docker_cfg.name
+  description = "Name of the Docker config secret in Secrets Manager (null if docker_config was not provided)."
+  value       = try(aws_secretsmanager_secret.docker_cfg[0].name, null)
 }
 
 output "managed_sync_secret_name" {

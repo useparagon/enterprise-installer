@@ -1,8 +1,4 @@
 locals {
-  eso_namespace = "external-secrets"
-  # eks-blueprints-addons names the IRSA service account "{release-name}-sa".
-  eso_sa_name = "external-secrets-sa"
-
   bootstrap_repo_url_trimmed = trimspace(var.bootstrap_repo_url)
 
   bootstrap_repo_token_trimmed = var.bootstrap_repo_token != null ? trimspace(var.bootstrap_repo_token) : ""
@@ -37,7 +33,6 @@ locals {
         name      = "${var.workspace}-bootstrap"
         namespace = var.argocd_namespace
         annotations = local.bootstrap_repo_credential_enabled ? {
-          # Bumps when repo credentials change so Argo CD re-fetches Git after apply.
           "paragon.io/bootstrap-repo-creds-checksum" = sha256(local.bootstrap_repo_token_trimmed)
         } : {}
         finalizers = [
@@ -63,9 +58,14 @@ locals {
     }) : null
   )
 
+  env_secret_name          = var.env_secret_name
+  docker_cfg_secret_name   = var.docker_cfg_secret_name
+  managed_sync_secret_name = var.managed_sync_secret_name
+  openobserve_secret_name  = var.openobserve_secret_name
+
   external_secret_docs = [
     for m in compact([
-      var.env_secret_name != null ? yamlencode({
+      local.env_secret_name != null ? yamlencode({
         apiVersion = "external-secrets.io/v1beta1"
         kind       = "ExternalSecret"
         metadata = {
@@ -84,12 +84,12 @@ locals {
           }
           dataFrom = [{
             extract = {
-              key = var.env_secret_name
+              key = local.env_secret_name
             }
           }]
         }
       }) : null,
-      var.docker_cfg_secret_name != null ? yamlencode({
+      local.docker_cfg_secret_name != null ? yamlencode({
         apiVersion = "external-secrets.io/v1beta1"
         kind       = "ExternalSecret"
         metadata = {
@@ -115,13 +115,13 @@ locals {
           data = [{
             secretKey = "dockerconfigjson"
             remoteRef = {
-              key      = var.docker_cfg_secret_name
+              key      = local.docker_cfg_secret_name
               property = "dockerconfigjson"
             }
           }]
         }
       }) : null,
-      var.managed_sync_secret_name != null ? yamlencode({
+      local.managed_sync_secret_name != null ? yamlencode({
         apiVersion = "external-secrets.io/v1beta1"
         kind       = "ExternalSecret"
         metadata = {
@@ -140,12 +140,12 @@ locals {
           }
           dataFrom = [{
             extract = {
-              key = var.managed_sync_secret_name
+              key = local.managed_sync_secret_name
             }
           }]
         }
       }) : null,
-      var.openobserve_secret_name != null ? yamlencode({
+      local.openobserve_secret_name != null ? yamlencode({
         apiVersion = "external-secrets.io/v1beta1"
         kind       = "ExternalSecret"
         metadata = {
@@ -164,7 +164,7 @@ locals {
           }
           dataFrom = [{
             extract = {
-              key = var.openobserve_secret_name
+              key = local.openobserve_secret_name
             }
           }]
         }
@@ -172,8 +172,6 @@ locals {
     ]) : yamldecode(m)
   ]
 
-  # ExternalSecret manifests only contain secret *names* (not values); mark
-  # nonsensitive so they are valid for for_each keys.
   external_secret_manifests = nonsensitive({ for idx, doc in local.external_secret_docs : "es-${idx}" => doc })
 
   gitops_bridge_annotations = merge(
@@ -194,21 +192,16 @@ locals {
       paragon_managed_sync_version = trimspace(var.paragon_managed_sync_version)
     } : {},
     length(var.secrets_manager_secret_arns) > 0 ? {
-      "secrets_manager_prefix" = "paragon/${var.workspace}"
+      "secrets_manager_prefix" = local.secret_prefix
     } : {},
-    trimspace(var.paragon_certificate_arn) != "" ? {
-      paragon_certificate_arn = trimspace(var.paragon_certificate_arn)
+    trimspace(local.paragon_certificate_arn_resolved) != "" ? {
+      paragon_certificate_arn = trimspace(local.paragon_certificate_arn_resolved)
     } : {},
     trimspace(var.paragon_domain) != "" ? {
       paragon_domain = trimspace(var.paragon_domain)
     } : {}
   )
 }
-
-# Namespaces and gp3 StorageClass are not managed here: legacy SSM bootstrap (and
-# Helm create_namespace) already created them on brownfield clusters, and
-# kubernetes_manifest cannot adopt without a prior import. The paragon namespace
-# is labeled by Argo CD Applications (CreateNamespace=true).
 
 resource "kubernetes_storage_class_v1" "gp3" {
   count = var.create_gp3_storage_class ? 1 : 0
@@ -232,17 +225,142 @@ resource "kubernetes_storage_class_v1" "gp3" {
   }
 }
 
-# ESO is installed by eks-blueprints-addons. Parent module time_sleep.gitops_eso_crds
-# waits for the Helm release and CRD registration before this module applies manifests.
-resource "terraform_data" "eso_crds_ready" {
-  input = var.eso_crds_ready
+resource "helm_release" "argocd" {
+  count = local.enabled ? 1 : 0
+
+  name             = var.argocd_release_name
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-cd"
+  version          = var.argocd_helm_chart_version
+  namespace        = var.argocd_namespace
+  create_namespace = true
+  wait             = true
+  timeout          = 600
+
+  values = [yamlencode({
+    global = {
+      image = {
+        tag = var.argocd_version
+      }
+    }
+    configs = {
+      params = {
+        "server.insecure" = true
+      }
+    }
+    crds = {
+      install = true
+      keep    = true
+    }
+  })]
+
+  dynamic "set" {
+    for_each = var.argocd_addon_overrides
+    content {
+      name  = set.key
+      value = set.value
+    }
+  }
+
+  depends_on = [time_sleep.eso_crds]
 }
 
-# GitOps bridge metadata (EKS Blueprints pattern): create the in-cluster Argo CD cluster
-# secret so ApplicationSets can read cloud/IAM context. Blueprints installs Argo CD but
-# does not create this secret; annotating a non-existent resource fails at apply time.
-# https://aws-ia.github.io/terraform-aws-eks-blueprints/patterns/gitops/gitops-getting-started-argocd/
+resource "helm_release" "external_secrets" {
+  count = local.enabled ? 1 : 0
+
+  name             = "external-secrets"
+  repository       = "https://charts.external-secrets.io"
+  chart            = "external-secrets"
+  version          = var.eso_chart_version
+  namespace        = local.eso_namespace
+  create_namespace = true
+  wait             = true
+  timeout          = 600
+
+  values = [yamlencode(merge({
+    installCRDs = true
+    crds = {
+      createClusterSecretStore    = true
+      createClusterExternalSecret = true
+      createClusterGenerator      = true
+      createPushSecret            = true
+    }
+    serviceAccount = {
+      name = local.eso_sa_name
+      annotations = {
+        "eks.amazonaws.com/role-arn" = aws_iam_role.eso[0].arn
+      }
+    }
+  }, var.eso_addon_overrides))]
+
+  depends_on = [helm_release.argocd]
+}
+
+resource "helm_release" "aws_load_balancer_controller" {
+  count = local.gitops_ingress_enabled ? 1 : 0
+
+  name             = "aws-load-balancer-controller"
+  repository       = "https://aws.github.io/eks-charts"
+  chart            = "aws-load-balancer-controller"
+  version          = "3.3.0"
+  namespace        = local.lbc_namespace
+  create_namespace = false
+  wait             = true
+  timeout          = 600
+
+  values = [yamlencode(merge(
+    {
+      clusterName = var.cluster_name
+      serviceAccount = {
+        name = local.lbc_sa_name
+        annotations = {
+          "eks.amazonaws.com/role-arn" = aws_iam_role.aws_load_balancer_controller[0].arn
+        }
+      }
+    },
+    local.gitops_alb_ingress_class_exists ? {
+      createIngressClassResource = false
+    } : {}
+  ))]
+
+  depends_on = [helm_release.external_secrets]
+}
+
+resource "helm_release" "external_dns" {
+  count = local.gitops_ingress_enabled ? 1 : 0
+
+  name             = "external-dns"
+  repository       = "https://kubernetes-sigs.github.io/external-dns/"
+  chart            = "external-dns"
+  version          = "1.15.0"
+  namespace        = local.external_dns_namespace
+  create_namespace = true
+  wait             = true
+  timeout          = 600
+
+  values = [yamlencode({
+    serviceAccount = {
+      name = local.external_dns_sa_name
+      annotations = {
+        "eks.amazonaws.com/role-arn" = aws_iam_role.external_dns[0].arn
+      }
+    }
+    provider      = "aws"
+    policy        = "sync"
+    txtOwnerId    = var.workspace
+    domainFilters = [trimspace(var.paragon_domain)]
+    sources       = ["ingress", "service"]
+  })]
+
+  depends_on = [
+    helm_release.external_secrets,
+    aws_iam_role_policy.external_dns[0],
+  ]
+}
+
 resource "kubernetes_secret_v1" "gitops_bridge_cluster" {
+  count = local.enabled ? 1 : 0
+
   metadata {
     name      = "${var.argocd_release_name}-cluster"
     namespace = var.argocd_namespace
@@ -268,14 +386,11 @@ resource "kubernetes_secret_v1" "gitops_bridge_cluster" {
     })
   }
 
-  depends_on = [terraform_data.eso_crds_ready]
+  depends_on = [time_sleep.eso_crds, helm_release.argocd]
 }
 
-# Argo CD repository credential (GitHub PAT over HTTPS). Same secret covers bootstrap
-# Application + ApplicationSet $values refs. kubernetes_secret_v1 `data` must be plain
-# text; the provider base64-encodes for the Kubernetes API.
 resource "kubernetes_secret_v1" "bootstrap_repo" {
-  count = local.bootstrap_repo_credential_enabled ? 1 : 0
+  count = local.enabled && local.bootstrap_repo_credential_enabled ? 1 : 0
 
   metadata {
     name      = "${var.workspace}-bootstrap-repo"
@@ -294,13 +409,12 @@ resource "kubernetes_secret_v1" "bootstrap_repo" {
     password = local.bootstrap_repo_token_trimmed
   }
 
-  depends_on = [terraform_data.eso_crds_ready]
+  depends_on = [time_sleep.eso_crds, helm_release.argocd]
 }
 
-# Custom resources use kubectl_manifest (server-side apply, applied at apply-time) so the
-# plan does not require the CRDs to already exist on the cluster. The CRDs are installed by
-# eks-blueprints-addons earlier in the same apply; terraform_data.eso_crds_ready gates ordering.
 resource "kubectl_manifest" "cluster_secret_store" {
+  count = local.enabled ? 1 : 0
+
   yaml_body = yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ClusterSecretStore"
@@ -328,11 +442,11 @@ resource "kubectl_manifest" "cluster_secret_store" {
   server_side_apply = true
   wait              = true
 
-  depends_on = [terraform_data.eso_crds_ready]
+  depends_on = [time_sleep.eso_crds, helm_release.external_secrets]
 }
 
 resource "kubectl_manifest" "app_of_apps" {
-  count = local.app_of_apps_manifest != null ? 1 : 0
+  count = local.enabled && local.app_of_apps_manifest != null ? 1 : 0
 
   yaml_body = local.app_of_apps_manifest
 
@@ -351,10 +465,8 @@ resource "kubectl_manifest" "app_of_apps" {
   ]
 }
 
-# ExternalSecrets live in the destination namespace. Create it (server-side apply adopts an
-# existing namespace on brownfield clusters) so the CRs have a namespace to land in.
 resource "kubectl_manifest" "destination_namespace" {
-  count = length(local.external_secret_manifests) > 0 ? 1 : 0
+  count = local.enabled && length(local.external_secret_manifests) > 0 ? 1 : 0
 
   yaml_body = yamlencode({
     apiVersion = "v1"
@@ -373,8 +485,7 @@ resource "kubectl_manifest" "external_secrets" {
   yaml_body = yamlencode(each.value)
 
   server_side_apply = true
-  # Reclaim fields after out-of-band kubectl edits (e.g. hotfixing remoteRef.property).
-  force_conflicts = true
+  force_conflicts   = true
 
   depends_on = [
     kubectl_manifest.cluster_secret_store,

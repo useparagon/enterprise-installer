@@ -122,5 +122,5 @@ resource "kubectl_manifest" "cluster_autoscaler_application" {
     }
   })
 
-  depends_on = [terraform_data.eso_crds_ready]
+  depends_on = [time_sleep.eso_crds, helm_release.argocd]
 }

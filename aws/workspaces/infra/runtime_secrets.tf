@@ -2,7 +2,7 @@
 # storage, kafka, bastion). Always created so paragon can read infra_vars via Secrets
 # Manager and operators can retrieve sensitive infra outputs (e.g. the bastion private
 # key) without pulling Terraform state.
-# When argocd_enabled, infra additionally writes a flat paragon/<ws>/env secret for GitOps.
+# When argocd_enabled, infra additionally syncs these via ESO ExternalSecrets.
 
 locals {
   runtime_secret_prefix = "paragon/${local.workspace}"
