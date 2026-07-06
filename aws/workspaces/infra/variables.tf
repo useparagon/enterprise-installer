@@ -28,6 +28,12 @@ variable "aws_session_token" {
   default     = null
 }
 
+variable "aws_assume_role_arn" {
+  description = "Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift backend account)."
+  type        = string
+  default     = null
+}
+
 # ---------------------------------------------------------------------------
 # Account
 # ---------------------------------------------------------------------------
