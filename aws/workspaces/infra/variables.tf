@@ -148,7 +148,7 @@ variable "elasticache_multi_az" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.33"
+  default     = "1.34"
 }
 
 variable "eks_ondemand_node_instance_type" {

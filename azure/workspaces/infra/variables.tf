@@ -298,7 +298,7 @@ variable "redis_managed_public_network_access" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.33"
+  default     = "1.34"
 }
 
 variable "k8s_min_node_count" {

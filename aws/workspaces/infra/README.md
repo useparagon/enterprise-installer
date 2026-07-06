@@ -67,7 +67,7 @@ No requirements.
 | <a name="input_elasticache_node_type"></a> [elasticache\_node\_type](#input\_elasticache\_node\_type) | The ElastiCache node type used for Redis. | `string` | `"cache.r6g.large"` | no |
 | <a name="input_enable_karpenter"></a> [enable\_karpenter](#input\_enable\_karpenter) | Enable Karpenter autoscaling (SQS, IAM, Helm controller, EC2NodeClass, NodePools). | `bool` | `false` | no |
 | <a name="input_enable_legacy_mng_pools"></a> [enable\_legacy\_mng\_pools](#input\_enable\_legacy\_mng\_pools) | Keep legacy on-demand and spot EKS managed node groups during Karpenter migration. | `bool` | `true` | no |
-| <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.33"` | no |
+| <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.34"` | no |
 | <a name="input_karpenter_chart_version"></a> [karpenter\_chart\_version](#input\_karpenter\_chart\_version) | Karpenter Helm chart version (OCI public.ecr.aws/karpenter/karpenter). | `string` | `"1.13.0"` | no |
 | <a name="input_karpenter_iam_names"></a> [karpenter\_iam\_names](#input\_karpenter\_iam\_names) | Optional override for Karpenter IAM role names. | <pre>object({<br/>    controller_role_name = optional(string)<br/>    node_role_name       = optional(string)<br/>  })</pre> | `{}` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
