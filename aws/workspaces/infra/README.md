@@ -104,7 +104,7 @@ No requirements.
 | <a name="output_bastion"></a> [bastion](#output\_bastion) | Bastion server connection info. |
 | <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | The name of the EKS cluster. |
 | <a name="output_enable_karpenter"></a> [enable\_karpenter](#output\_enable\_karpenter) | Whether Karpenter autoscaling is enabled. Consumed by paragon workspace for EC2NodeClass and NodePool manifests. |
-| <a name="output_enable_legacy_mng_pools"></a> [enable\_legacy\_mng\_pools](#output\_enable\_legacy\_mng\_pools) | Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional NTH. |
+| <a name="output_enable_legacy_mng_pools"></a> [enable\_legacy\_mng\_pools](#output\_enable\_legacy\_mng\_pools) | Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional AWS Node Termination Handler (NTH) deployment on legacy managed node groups. |
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka. |
 | <a name="output_karpenter"></a> [karpenter](#output\_karpenter) | AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace. |
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | The bucket used to store system logs. |

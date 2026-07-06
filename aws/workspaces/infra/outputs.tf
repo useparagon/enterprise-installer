@@ -77,7 +77,7 @@ output "k8s_version" {
 }
 
 output "enable_legacy_mng_pools" {
-  description = "Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional NTH."
+  description = "Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional AWS Node Termination Handler (NTH) deployment on legacy managed node groups."
   value       = module.cluster.enable_legacy_mng_pools
 }
 

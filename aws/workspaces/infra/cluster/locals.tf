@@ -92,6 +92,7 @@ locals {
     }
   }) : null
 
+  # x86 only: t4g is Graviton/ARM and would require BOTTLEROCKET_ARM_64 and a Karpenter architectures change.
   system_node_instance_types = [
     "t3a.medium",
     "t3a.large",

@@ -132,7 +132,7 @@ module "cluster" {
   eks_spot_node_instance_type     = local.eks_spot_node_instance_type
   k8s_version                     = var.k8s_version
 
-  enable_karpenter              = var.enable_karpenter
+  enable_karpenter                = var.enable_karpenter
   enable_legacy_mng_pools         = var.enable_legacy_mng_pools
   karpenter_chart_version         = var.karpenter_chart_version
   karpenter_iam_names             = var.karpenter_iam_names
