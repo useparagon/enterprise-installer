@@ -65,3 +65,23 @@ output "cluster_name" {
   description = "The name of the EKS cluster."
   value       = module.cluster.eks_cluster.name
 }
+
+output "enable_karpenter" {
+  description = "Whether Karpenter autoscaling is enabled. Consumed by paragon workspace for EC2NodeClass and NodePool manifests."
+  value       = module.cluster.enable_karpenter
+}
+
+output "k8s_version" {
+  description = "EKS control plane version. Consumed by paragon workspace for Karpenter drift tagging."
+  value       = module.cluster.k8s_version
+}
+
+output "enable_legacy_mng_pools" {
+  description = "Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional AWS Node Termination Handler (NTH) deployment on legacy managed node groups."
+  value       = module.cluster.enable_legacy_mng_pools
+}
+
+output "karpenter" {
+  description = "AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace."
+  value       = module.cluster.karpenter
+}
