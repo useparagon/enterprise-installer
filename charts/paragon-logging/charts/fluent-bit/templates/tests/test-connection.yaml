@@ -14,13 +14,14 @@ metadata:
 spec:
   containers:
     - name: wget
-      image: {{ include "fluent-bit.image" .Values.testFramework.image | quote }}
+      image: {{ include "fluent-bit.image" (merge .Values.testFramework.image (dict "root" .)) | quote }}
       imagePullPolicy: {{ .Values.testFramework.image.pullPolicy }}
       command: ["sh"]
       args: ["-c", "wget -O- {{ include "fluent-bit.fullname" . }}:{{ .Values.service.port }}"]
-  {{- with .Values.imagePullSecrets }}
+  {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+  {{- if $pullSecrets }}
   imagePullSecrets:
-    {{- toYaml . | nindent 4 }}
+    {{- $pullSecrets | nindent 4 }}
   {{- end }}
   restartPolicy: Never
 {{- end }}

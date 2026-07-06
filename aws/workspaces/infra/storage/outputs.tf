@@ -7,6 +7,7 @@ output "s3" {
     auditlogs_bucket    = aws_s3_bucket.auditlogs.bucket
     logs_bucket         = aws_s3_bucket.logs.bucket
     managed_sync_bucket = var.managed_sync_enabled ? aws_s3_bucket.managed_sync[0].bucket : null
+    kms_key_arn         = local.s3_kms_key_arn
   }
   sensitive = true
 }

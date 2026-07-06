@@ -13,3 +13,7 @@ provider "google-beta" {
   region         = var.region
   zone           = var.region_zone
 }
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}

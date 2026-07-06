@@ -21,6 +21,18 @@ subchart:
     enabled: true
 
 global:
+  # Optional private registry / Artifactory proxy (prepended to image repository paths).
+  imageRegistry: ""
+  # When set (including ""), rewrites useparagon/ prefix in repository paths. Omit to preserve useparagon/.
+  # imageRepositoryPrefix: null
+  migrationImageRegistry: ""
+  imagePullSecrets: []
   pullPolicy: IfNotPresent
+  testImage:
+    repository: busybox
+    tag: latest
+  kubectlImage:
+    repository: alpine/kubectl
+    tag: "1.36.2"
   namespace: paragon
   env: {}

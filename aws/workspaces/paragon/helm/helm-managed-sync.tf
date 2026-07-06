@@ -55,9 +55,10 @@ resource "helm_release" "managed_sync" {
   }
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     kubernetes_secret.docker_login,
     kubernetes_secret.paragon_secrets,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }

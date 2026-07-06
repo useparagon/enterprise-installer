@@ -197,6 +197,54 @@ variable "create_autoscaling_linked_role" {
   default     = true
 }
 
+variable "enable_karpenter" {
+  description = "Enable Karpenter autoscaling (SQS, IAM, Helm controller, EC2NodeClass, NodePools)."
+  type        = bool
+  default     = false
+}
+
+variable "enable_legacy_mng_pools" {
+  description = "Keep legacy on-demand and spot EKS managed node groups during Karpenter migration."
+  type        = bool
+  default     = true
+
+  validation {
+    condition     = var.enable_karpenter || var.enable_legacy_mng_pools
+    error_message = "At least one worker capacity source must be enabled: enable_karpenter or enable_legacy_mng_pools."
+  }
+}
+
+variable "karpenter_chart_version" {
+  description = "Karpenter Helm chart version (OCI public.ecr.aws/karpenter/karpenter)."
+  type        = string
+  default     = "1.13.0"
+}
+
+variable "karpenter_iam_names" {
+  description = "Optional override for Karpenter IAM role names."
+  type = object({
+    controller_role_name = optional(string)
+    node_role_name       = optional(string)
+  })
+  default = {}
+}
+
+variable "eks_system_managed_node_group" {
+  description = "System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default)."
+  type = object({
+    map_key         = optional(string, "node-default")
+    name            = optional(string)
+    use_name_prefix = optional(bool, false)
+    ec2_name_tag    = optional(string)
+    instance_types  = optional(list(string))
+    min_size        = optional(number, 2)
+    max_size        = optional(number, 3)
+    desired_size    = optional(number, 2)
+    labels          = optional(map(string), { "karpenter.sh/controller" = "true" })
+  })
+  default = {}
+}
+
 # security
 variable "master_guardduty_account_id" {
   description = "Optional AWS account id to delegate GuardDuty control to."
@@ -244,6 +292,25 @@ variable "auditlogs_lock_enabled" {
   description = "Whether to enable S3 Object Lock for the audit logs bucket."
   type        = bool
   default     = false
+}
+
+variable "s3_kms_encryption_enabled" {
+  description = "Encrypt the app, CDN, audit logs, and managed sync S3 buckets with AWS KMS (SSE-KMS) instead of S3-managed keys (SSE-S3). Existing deployments default to SSE-S3; enable for new installs or to migrate existing buckets to KMS. The logs bucket always uses SSE-S3 because ALB and S3 server access logs do not support SSE-KMS."
+  type        = bool
+  default     = false
+}
+
+variable "s3_kms_key_arn" {
+  description = "ARN of an existing KMS key to use for S3 bucket encryption. When null and s3_kms_encryption_enabled is true, a dedicated KMS key is created and managed by Terraform. Ignored when s3_kms_encryption_enabled is false."
+  type        = string
+  default     = null
+}
+
+# bastion
+variable "bastion_enabled" {
+  description = "Whether to create the bastion host and its associated Cloudflare tunnel."
+  type        = bool
+  default     = true
 }
 
 # cloudflare
@@ -314,9 +381,7 @@ variable "managed_sync_enabled" {
 variable "msk_kafka_version" {
   description = "The Kafka version for the MSK cluster."
   type        = string
-  // NOTE: to use a small instance type like `kafka.t3.small`, we need to use an older version that uses zookeeper
-  // we're default to an older version to keep costs low, but we can override this if we use a supported larger instance type
-  default = "3.6.0"
+  default     = "3.9.x"
 }
 
 variable "msk_kafka_num_broker_nodes" {
@@ -360,4 +425,27 @@ locals {
   # split instance types by comma, trim, and remove duplicates
   eks_ondemand_node_instance_type = distinct([for value in split(",", var.eks_ondemand_node_instance_type) : trimspace(value)])
   eks_spot_node_instance_type     = distinct([for value in split(",", var.eks_spot_node_instance_type) : trimspace(value)])
+
+  # When using an assumed role the role itself must be referenced instead of the
+  # current session identity arn, otherwise KMS key policies are rejected with
+  # MalformedPolicyDocumentException.
+  is_assumed_role = can(regex("assumed-role", data.aws_caller_identity.current.arn))
+  assumed_role_parts = split(
+    "/",
+    replace(
+      replace(
+        data.aws_caller_identity.current.arn,
+        ":sts:",
+        ":iam:"
+      ),
+      ":assumed-role/",
+      local.is_assumed_role && strcontains(data.aws_caller_identity.current.arn, ":assumed-role/AWSReservedSSO") ? ":role__TEMPORARY_DIVIDER__aws-reserved__TEMPORARY_DIVIDER__sso.amazonaws.com/" : ":role/"
+    )
+  )
+  caller_arn = local.is_assumed_role ? replace(format("%s/%s", local.assumed_role_parts[0], local.assumed_role_parts[1]), "__TEMPORARY_DIVIDER__", "/") : data.aws_caller_identity.current.arn
+
+  admin_arns = distinct(compact(concat(
+    var.eks_admin_arns,
+    [local.caller_arn]
+  )))
 }

@@ -103,6 +103,13 @@ locals {
     }
   })
 
+  docker_pull_secret_global_values = var.create_docker_pull_secret ? {
+    imagePullSecrets = concat(
+      try(nonsensitive(var.helm_values.global.imagePullSecrets), []),
+      [{ name = var.docker_pull_secret_name }]
+    )
+  } : {}
+
   global_values = yamlencode({
     global = merge(
       nonsensitive(var.helm_values.global),
@@ -115,16 +122,21 @@ locals {
           }
         ),
         paragon_version = local.version
-      }
+      },
+      local.docker_pull_secret_global_values
     )
   })
 
   global_values_minus_env = yamlencode(merge(
     nonsensitive(var.helm_values),
     {
-      global = merge(nonsensitive(var.helm_values).global, { env = {
-        HOST_ENV = "AWS_K8"
-      } })
+      global = merge(
+        nonsensitive(var.helm_values).global,
+        { env = {
+          HOST_ENV = "AWS_K8"
+        } },
+        local.docker_pull_secret_global_values
+      )
     }
   ))
 
@@ -162,10 +174,12 @@ resource "kubernetes_config_map" "feature_flag_content" {
   }
 }
 
-# kubernetes secret to pull docker image from docker hub
+# kubernetes secret to pull container images from a registry (Docker Hub, Artifactory, etc.)
 resource "kubernetes_secret" "docker_login" {
+  count = var.create_docker_pull_secret ? 1 : 0
+
   metadata {
-    name      = "docker-cfg"
+    name      = var.docker_pull_secret_name
     namespace = kubernetes_namespace.paragon.id
   }
 
@@ -231,9 +245,16 @@ resource "helm_release" "ingress" {
   }
 
   set {
+    name  = "region"
+    value = var.aws_region
+  }
+
+  set {
     name  = "replicaCount"
     value = "3"
   }
+
+  depends_on = [module.karpenter]
 }
 
 # metrics server for hpa
@@ -252,16 +273,25 @@ resource "helm_release" "metricsserver" {
   verify           = false
 
   depends_on = [
-    helm_release.ingress
+    module.karpenter,
+    helm_release.ingress,
   ]
 }
 
-# graceful handling of spot evictions
+# graceful handling of spot evictions on legacy managed node groups
 module "aws_node_termination_handler" {
+  count = var.enable_legacy_mng_pools ? 1 : 0
+
   source  = "qvest-digital/aws-node-termination-handler/kubernetes"
   version = "4.0.0"
 
   json_logging = true
+
+  # Legacy MNG spot nodes only — avoids duplicate draining on Karpenter workers during migration.
+  k8s_node_selector = {
+    "useparagon.com/capacityType" = "spot"
+  }
+  k8s_node_tolerations = []
 }
 
 # microservices deployment
@@ -291,11 +321,12 @@ resource "helm_release" "paragon_on_prem" {
   ]
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     kubernetes_secret.docker_login,
     kubernetes_secret.paragon_secrets,
     kubernetes_storage_class_v1.gp3_encrypted,
-    kubernetes_config_map.feature_flag_content
+    kubernetes_config_map.feature_flag_content,
   ]
 }
 
@@ -356,9 +387,10 @@ resource "helm_release" "paragon_logging" {
   }
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     kubernetes_secret.docker_login,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }
 
@@ -400,9 +432,10 @@ resource "helm_release" "paragon_monitoring" {
   }
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     helm_release.paragon_on_prem,
     kubernetes_secret.docker_login,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }
