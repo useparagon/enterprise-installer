@@ -106,6 +106,13 @@ locals {
     }
   })
 
+  docker_pull_secret_global_values = var.create_docker_pull_secret ? {
+    imagePullSecrets = concat(
+      try(nonsensitive(var.helm_values.global.imagePullSecrets), []),
+      [{ name = var.docker_pull_secret_name }]
+    )
+  } : {}
+
   global_values = yamlencode({
     global = merge(
       nonsensitive(var.helm_values.global),
@@ -118,16 +125,21 @@ locals {
           }
         ),
         paragon_version = local.version
-      }
+      },
+      local.docker_pull_secret_global_values
     )
   })
 
   global_values_minus_env = yamlencode(merge(
     nonsensitive(var.helm_values),
     {
-      global = merge(nonsensitive(var.helm_values).global, { env = {
-        HOST_ENV = "AZURE_K8"
-      } })
+      global = merge(
+        nonsensitive(var.helm_values).global,
+        { env = {
+          HOST_ENV = "AZURE_K8"
+        } },
+        local.docker_pull_secret_global_values
+      )
     }
   ))
 
@@ -161,10 +173,12 @@ resource "kubernetes_config_map" "feature_flag_content" {
   }
 }
 
-# kubernetes secret to pull docker image from docker hub
+# kubernetes secret to pull container images from a registry (Docker Hub, Artifactory, etc.)
 resource "kubernetes_secret" "docker_login" {
+  count = var.create_docker_pull_secret ? 1 : 0
+
   metadata {
-    name      = "docker-cfg"
+    name      = var.docker_pull_secret_name
     namespace = kubernetes_namespace.paragon.id
   }
 

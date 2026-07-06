@@ -32,31 +32,33 @@ module "alb" {
 module "helm" {
   source = "./helm"
 
-  certificate            = module.alb.certificate
-  aws_region             = var.aws_region
-  cluster_name           = local.cluster_name
-  docker_email           = var.docker_email
-  docker_password        = var.docker_password
-  docker_registry_server = var.docker_registry_server
-  docker_username        = var.docker_username
-  feature_flags_content  = local.feature_flags_content
-  flipt_options          = local.flipt_options
-  helm_values            = local.helm_values
-  ingress_scheme         = var.ingress_scheme
-  k8s_version            = var.k8s_version
-  logs_bucket            = local.logs_bucket
-  managed_sync_enabled   = var.managed_sync_enabled
-  managed_sync_version   = var.managed_sync_version
-  microservices          = local.microservices
-  monitor_version        = local.monitor_version
-  monitors               = local.monitors
-  monitors_enabled       = var.monitors_enabled
-  openobserve_email      = var.openobserve_email
-  openobserve_password   = var.openobserve_password
-  public_microservices   = local.public_microservices
-  public_monitors        = local.public_monitors
-  waf_web_acl_arn        = local.waf_active ? module.waf[0].web_acl_arn : ""
-  workspace              = local.workspace
+  certificate               = module.alb.certificate
+  aws_region                = var.aws_region
+  cluster_name              = local.cluster_name
+  docker_email              = var.docker_email
+  docker_password           = var.docker_password
+  docker_registry_server    = var.docker_registry_server
+  docker_pull_secret_name   = var.docker_pull_secret_name
+  create_docker_pull_secret = var.create_docker_pull_secret
+  docker_username           = var.docker_username
+  feature_flags_content     = local.feature_flags_content
+  flipt_options             = local.flipt_options
+  helm_values               = local.helm_values
+  ingress_scheme            = var.ingress_scheme
+  k8s_version               = var.k8s_version
+  logs_bucket               = local.logs_bucket
+  managed_sync_enabled      = var.managed_sync_enabled
+  managed_sync_version      = var.managed_sync_version
+  microservices             = local.microservices
+  monitor_version           = local.monitor_version
+  monitors                  = local.monitors
+  monitors_enabled          = var.monitors_enabled
+  openobserve_email         = var.openobserve_email
+  openobserve_password      = var.openobserve_password
+  public_microservices      = local.public_microservices
+  public_monitors           = local.public_monitors
+  waf_web_acl_arn           = local.waf_active ? module.waf[0].web_acl_arn : ""
+  workspace                 = local.workspace
 }
 
 module "managed_sync_config" {
