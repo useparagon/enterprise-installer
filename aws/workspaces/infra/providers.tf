@@ -59,8 +59,9 @@ provider "cloudflare" {
 # - kubernetes/helm: always target the EKS API (cluster-autoscaler Helm runs when argocd is off).
 #   Token auth via aws_eks_cluster_auth uses the same assumed-role AWS session as the provider
 #   (required for Spacelift; aws eks get-token exec only sees backend env creds).
-# - kubectl: only used by the count-gated argocd module. alekc/kubectl rejects an empty host at
-#   configure time, so use a localhost placeholder when GitOps is off (providers stay unused).
+# - kubectl: only used by the count-gated argocd module. alekc/kubectl rejects unknown/empty
+#   host at configure time unless lazy_load=true (greenfield: cluster endpoint is unknown
+#   until EKS is created in the same apply). Use localhost when GitOps is off.
 data "aws_eks_cluster_auth" "cluster" {
   name = module.cluster.eks_cluster.name
 }
@@ -95,4 +96,5 @@ provider "kubectl" {
   cluster_ca_certificate = local.k8s_gitops_enabled ? local.k8s_ca : ""
   token                  = local.k8s_gitops_enabled ? local.k8s_token : ""
   load_config_file       = false
+  lazy_load              = true
 }
