@@ -39,8 +39,6 @@ resource "aws_secretsmanager_secret_version" "env" {
 }
 
 resource "aws_secretsmanager_secret" "docker_cfg" {
-  count = var.docker_config != null ? 1 : 0
-
   name                    = "${local.secret_prefix}/docker-cfg"
   description             = "Docker registry credentials for ${var.organization}"
   recovery_window_in_days = var.recovery_window_in_days
@@ -52,10 +50,10 @@ resource "aws_secretsmanager_secret" "docker_cfg" {
 }
 
 resource "aws_secretsmanager_secret_version" "docker_cfg" {
-  count = var.docker_config != null ? 1 : 0
-
-  secret_id     = aws_secretsmanager_secret.docker_cfg[0].id
-  secret_string = var.docker_config
+  secret_id = aws_secretsmanager_secret.docker_cfg.id
+  secret_string = var.docker_config != null ? var.docker_config : jsonencode({
+    dockerconfigjson = jsonencode({ auths = {} })
+  })
 }
 
 resource "aws_secretsmanager_secret" "managed_sync" {
