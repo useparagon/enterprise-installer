@@ -159,7 +159,7 @@ locals {
       version = "v1.13.2-eksbuild.11"
     }
     kube-proxy = {
-      version = "v1.34.6-eksbuild.13"
+      version = "v1.35.3-eksbuild.8"
     }
     vpc-cni = {
       version = "v1.21.1-eksbuild.3"
@@ -176,7 +176,7 @@ locals {
       version = "v1.3.10-eksbuild.3"
     }
     kube-proxy = {
-      version = "v1.34.6-eksbuild.13"
+      version = "v1.35.3-eksbuild.8"
     }
     coredns = {
       version = "v1.13.2-eksbuild.11"
