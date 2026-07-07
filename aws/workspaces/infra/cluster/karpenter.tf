@@ -18,12 +18,12 @@ module "iam" {
   count  = var.enable_karpenter ? 1 : 0
   source = "./iam"
 
-  cluster_name           = module.eks.cluster_name
-  aws_region             = var.aws_region
-  controller_role_name   = local.karpenter_controller_role_name
-  node_role_name         = local.karpenter_node_role_name
-  interruption_queue_arn = module.sqs[0].queue_arn
-  kms_key_arn            = module.ebs_kms_key.key_arn
+  cluster_name                      = module.eks.cluster_name
+  aws_region                        = var.aws_region
+  controller_role_name              = local.karpenter_controller_role_name
+  node_role_name                    = local.karpenter_node_role_name
+  interruption_queue_arn            = module.sqs[0].queue_arn
+  kms_key_arn                       = module.ebs_kms_key.key_arn
   node_iam_role_additional_policies = local.karpenter_node_iam_additional_policies
   tags = {
     ClusterName = var.workspace

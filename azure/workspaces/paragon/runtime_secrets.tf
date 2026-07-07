@@ -1,9 +1,9 @@
 locals {
   runtime_secret_names = {
-    env         = "env"
-    docker_cfg  = "docker-cfg"
+    env          = "env"
+    docker_cfg   = "docker-cfg"
     managed_sync = "managed-sync"
-    openobserve = "openobserve"
+    openobserve  = "openobserve"
   }
 }
 

@@ -127,14 +127,14 @@ locals {
   }
 
   system_node_group = {
-    min_count      = var.eks_system_managed_node_group.min_size
-    max_count      = var.eks_system_managed_node_group.max_size
-    desired_size   = var.eks_system_managed_node_group.desired_size
+    min_count    = var.eks_system_managed_node_group.min_size
+    max_count    = var.eks_system_managed_node_group.max_size
+    desired_size = var.eks_system_managed_node_group.desired_size
     instance_types = coalesce(
       try(var.eks_system_managed_node_group.instance_types, null),
       local.system_node_instance_types,
     )
-    capacity       = "ON_DEMAND"
+    capacity        = "ON_DEMAND"
     ami_type        = "BOTTLEROCKET_x86_64"
     labels          = var.eks_system_managed_node_group.labels
     use_name_prefix = coalesce(var.eks_system_managed_node_group.use_name_prefix, false)
