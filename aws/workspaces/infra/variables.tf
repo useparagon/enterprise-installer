@@ -680,6 +680,31 @@ variable "argocd_docker_email" {
   default     = null
 }
 
+variable "docker_registry_server" {
+  description = "Docker registry server for application image pulls (PARA-21726). Falls back to argocd_docker_registry_server when unset."
+  type        = string
+  default     = null
+}
+
+variable "docker_username" {
+  description = "Docker username for application image pulls (PARA-21726). Falls back to argocd_docker_username when unset."
+  type        = string
+  default     = null
+}
+
+variable "docker_password" {
+  description = "Docker password for application image pulls (PARA-21726). Falls back to argocd_docker_password when unset."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "docker_email" {
+  description = "Docker email for application image pulls (PARA-21726). Falls back to argocd_docker_email when unset."
+  type        = string
+  default     = null
+}
+
 variable "secrets_recovery_window_in_days" {
   description = "Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve) and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection."
   type        = number
@@ -759,9 +784,14 @@ locals {
   # GitOps bundle (paragon-secrets + docker-cfg ExternalSecrets).
   app_secrets_ready = (
     local.argocd_domain != "" &&
-    var.argocd_docker_username != null &&
-    var.argocd_docker_password != null
+    local.secrets_docker_username != null &&
+    local.secrets_docker_password != null
   )
+
+  secrets_docker_registry_server = coalesce(var.docker_registry_server, var.argocd_docker_registry_server)
+  secrets_docker_username        = coalesce(var.docker_username, var.argocd_docker_username)
+  secrets_docker_password        = coalesce(var.docker_password, var.argocd_docker_password)
+  secrets_docker_email           = coalesce(var.docker_email, var.argocd_docker_email)
 
   # When using an assumed role the role itself must be referenced instead of the
   # current session identity arn, otherwise KMS key policies are rejected with

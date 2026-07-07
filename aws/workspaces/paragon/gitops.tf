@@ -29,7 +29,7 @@ resource "kubernetes_annotations" "paragon_env_eso_force_sync" {
   }
 
   annotations = {
-    "force-sync" = aws_secretsmanager_secret_version.env_paragon_overlay[0].version_id
+    "force-sync" = aws_secretsmanager_secret_version.env_paragon_overlay.version_id
   }
 
   depends_on = [

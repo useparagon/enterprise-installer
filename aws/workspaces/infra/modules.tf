@@ -144,12 +144,11 @@ module "cluster" {
 }
 
 # ---------------------------------------------------------------------------
-# Application secrets (flat env for ESO) — infra-owned when GitOps is enabled.
-# Legacy (argocd_enabled=false) keeps secrets in the paragon workspace (main behavior).
+# Application secrets (flat env for ESO) — always created by infra (PARA-21726).
+# Paragon workspace reads these secrets and overlays chart-specific values only.
 # ---------------------------------------------------------------------------
 
 module "secrets" {
-  count  = var.argocd_enabled ? 1 : 0
   source = "./secrets"
 
   workspace    = local.workspace
@@ -157,16 +156,16 @@ module "secrets" {
   env_config   = local.argocd_env_secret
 
   docker_config = (
-    var.argocd_docker_username != null &&
-    var.argocd_docker_password != null
+    local.secrets_docker_username != null &&
+    local.secrets_docker_password != null
     ) ? jsonencode({
       dockerconfigjson = jsonencode({
         auths = {
-          (var.argocd_docker_registry_server) = {
-            username = var.argocd_docker_username
-            password = var.argocd_docker_password
-            email    = var.argocd_docker_email
-            auth     = base64encode("${var.argocd_docker_username}:${var.argocd_docker_password}")
+          (local.secrets_docker_registry_server) = {
+            username = local.secrets_docker_username
+            password = local.secrets_docker_password
+            email    = local.secrets_docker_email
+            auth     = base64encode("${local.secrets_docker_username}:${local.secrets_docker_password}")
           }
         }
       })
@@ -194,11 +193,11 @@ module "argocd" {
   aws_region        = var.aws_region
 
   # Application secrets — from root secrets module
-  secrets_manager_secret_arns = module.secrets[0].secret_arns
-  env_secret_name             = module.secrets[0].env_secret_name
-  docker_cfg_secret_name      = module.secrets[0].docker_cfg_secret_name
-  managed_sync_secret_name    = module.secrets[0].managed_sync_secret_name
-  openobserve_secret_name     = module.secrets[0].openobserve_secret_name
+  secrets_manager_secret_arns = module.secrets.secret_arns
+  env_secret_name             = module.secrets.env_secret_name
+  docker_cfg_secret_name      = module.secrets.docker_cfg_secret_name
+  managed_sync_secret_name    = module.secrets.managed_sync_secret_name
+  openobserve_secret_name     = module.secrets.openobserve_secret_name
 
   # DNS / Cloudflare / TLS
   cloudflare_api_token           = var.cloudflare_api_token

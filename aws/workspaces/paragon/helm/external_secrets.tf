@@ -195,7 +195,7 @@ resource "kubectl_manifest" "external_secret_paragon" {
 }
 
 resource "kubectl_manifest" "external_secret_docker" {
-  count = var.install_external_secrets ? 1 : 0
+  count = var.install_external_secrets && var.docker_cfg_secret_name != null ? 1 : 0
 
   yaml_body  = local.external_secret_docker_yaml
   depends_on = [kubectl_manifest.secret_store[0]]
