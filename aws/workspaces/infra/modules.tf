@@ -186,11 +186,12 @@ module "argocd" {
   argocd_enabled = true
 
   # Identity / cluster
-  cluster_name      = module.cluster.eks_cluster.name
-  oidc_provider_arn = module.cluster.eks_cluster.oidc_provider_arn
-  oidc_issuer_url   = module.cluster.eks_cluster.cluster_oidc_issuer_url
-  workspace         = local.workspace
-  aws_region        = var.aws_region
+  cluster_name               = module.cluster.eks_cluster.name
+  cluster_autoscaler_enabled = module.cluster.cluster_autoscaler_enabled
+  oidc_provider_arn          = module.cluster.eks_cluster.oidc_provider_arn
+  oidc_issuer_url            = module.cluster.eks_cluster.cluster_oidc_issuer_url
+  workspace                  = local.workspace
+  aws_region                 = var.aws_region
 
   # Application secrets — from root secrets module
   secrets_manager_secret_arns = module.secrets.secret_arns

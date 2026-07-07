@@ -10,6 +10,13 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "cluster_autoscaler_enabled" {
+  description = "Deploy cluster-autoscaler via Argo CD when legacy managed node groups are active."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 variable "oidc_provider_arn" {
   description = "ARN of the OIDC provider for the EKS cluster."
   type        = string

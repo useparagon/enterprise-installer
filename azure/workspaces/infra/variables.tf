@@ -636,6 +636,13 @@ variable "argocd_enabled" {
   nullable    = false
 }
 
+variable "k8s_providers_enabled" {
+  description = "Configure kubernetes/helm/kubectl providers against the AKS API. Defaults to false; set true when destroying a stack that still has GitOps resources in state while argocd_enabled is false."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 # ---------------------------------------------------------------------------
 # ArgoCD / GitOps — tooling
 # ---------------------------------------------------------------------------

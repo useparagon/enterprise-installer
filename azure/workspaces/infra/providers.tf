@@ -70,10 +70,11 @@ provider "cloudflare" {
 # static placeholder (they stay unused); when it is enabled the cluster already exists from a
 # prior apply, so the real, known kube_config values are used.
 locals {
-  k8s_host = var.argocd_enabled ? module.cluster.kubernetes.host : "https://localhost"
-  k8s_cert = var.argocd_enabled ? base64decode(module.cluster.kubernetes.client_certificate) : ""
-  k8s_key  = var.argocd_enabled ? base64decode(module.cluster.kubernetes.client_key) : ""
-  k8s_ca   = var.argocd_enabled ? base64decode(module.cluster.kubernetes.cluster_ca_certificate) : ""
+  k8s_gitops_enabled = var.argocd_enabled || var.k8s_providers_enabled
+  k8s_host           = local.k8s_gitops_enabled ? module.cluster.kubernetes.host : "https://localhost"
+  k8s_cert           = local.k8s_gitops_enabled ? base64decode(module.cluster.kubernetes.client_certificate) : ""
+  k8s_key            = local.k8s_gitops_enabled ? base64decode(module.cluster.kubernetes.client_key) : ""
+  k8s_ca             = local.k8s_gitops_enabled ? base64decode(module.cluster.kubernetes.cluster_ca_certificate) : ""
 }
 
 provider "kubernetes" {
