@@ -258,8 +258,6 @@ resource "helm_release" "argocd" {
       var.argocd_addon_overrides
     ))
   ]
-
-  depends_on = [time_sleep.eso_crds]
 }
 
 resource "helm_release" "external_secrets" {
@@ -290,7 +288,7 @@ resource "helm_release" "external_secrets" {
     }
   })]
 
-  depends_on = [time_sleep.eso_crds]
+  depends_on = [helm_release.argocd]
 }
 
 resource "helm_release" "external_dns" {
@@ -324,7 +322,7 @@ resource "helm_release" "external_dns" {
     sources       = ["ingress", "service", "gateway-httproute"]
   })]
 
-  depends_on = [time_sleep.eso_crds]
+  depends_on = [helm_release.argocd]
 }
 
 resource "kubernetes_secret_v1" "gitops_bridge_cluster" {

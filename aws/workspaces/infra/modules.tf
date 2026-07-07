@@ -144,10 +144,12 @@ module "cluster" {
 }
 
 # ---------------------------------------------------------------------------
-# Application secrets (flat env for ESO) — always created, independent of ArgoCD
+# Application secrets (flat env for ESO) — infra-owned when GitOps is enabled.
+# Legacy (argocd_enabled=false) keeps secrets in the paragon workspace (main behavior).
 # ---------------------------------------------------------------------------
 
 module "secrets" {
+  count  = var.argocd_enabled ? 1 : 0
   source = "./secrets"
 
   workspace    = local.workspace
@@ -192,11 +194,11 @@ module "argocd" {
   aws_region        = var.aws_region
 
   # Application secrets — from root secrets module
-  secrets_manager_secret_arns = module.secrets.secret_arns
-  env_secret_name             = module.secrets.env_secret_name
-  docker_cfg_secret_name      = module.secrets.docker_cfg_secret_name
-  managed_sync_secret_name    = module.secrets.managed_sync_secret_name
-  openobserve_secret_name     = module.secrets.openobserve_secret_name
+  secrets_manager_secret_arns = module.secrets[0].secret_arns
+  env_secret_name             = module.secrets[0].env_secret_name
+  docker_cfg_secret_name      = module.secrets[0].docker_cfg_secret_name
+  managed_sync_secret_name    = module.secrets[0].managed_sync_secret_name
+  openobserve_secret_name     = module.secrets[0].openobserve_secret_name
 
   # DNS / Cloudflare / TLS
   cloudflare_api_token           = var.cloudflare_api_token

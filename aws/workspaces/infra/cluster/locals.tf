@@ -151,6 +151,13 @@ locals {
 
   cluster_autoscaler_enabled = length(local.cluster_autoscaler_node_groups) > 0
 
+  kube_proxy_addon_versions = {
+    "1.33" = "v1.33.5-eksbuild.2"
+    "1.34" = "v1.34.6-eksbuild.13"
+    "1.35" = "v1.35.3-eksbuild.8"
+  }
+  kube_proxy_addon_version = lookup(local.kube_proxy_addon_versions, var.k8s_version, "v1.35.3-eksbuild.8")
+
   cluster_addons_legacy = {
     aws-ebs-csi-driver = {
       version = "v1.55.0-eksbuild.2"
@@ -159,7 +166,7 @@ locals {
       version = "v1.13.2-eksbuild.11"
     }
     kube-proxy = {
-      version = "v1.35.3-eksbuild.8"
+      version = local.kube_proxy_addon_version
     }
     vpc-cni = {
       version = "v1.21.1-eksbuild.3"
@@ -176,7 +183,7 @@ locals {
       version = "v1.3.10-eksbuild.3"
     }
     kube-proxy = {
-      version = "v1.35.3-eksbuild.8"
+      version = local.kube_proxy_addon_version
     }
     coredns = {
       version = "v1.13.2-eksbuild.11"

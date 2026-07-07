@@ -87,13 +87,13 @@ output "eso_role_arn" {
 
 output "secrets_manager_env_secret" {
   description = "Name of the Secrets Manager secret containing Paragon env config."
-  value       = module.secrets.env_secret_name
+  value       = var.argocd_enabled ? module.secrets[0].env_secret_name : null
   sensitive   = true
 }
 
 output "secrets_manager_secret_arns" {
   description = "ARNs of application Secrets Manager secrets (env, docker-cfg, managed-sync, openobserve)."
-  value       = module.secrets.secret_arns
+  value       = var.argocd_enabled ? module.secrets[0].secret_arns : {}
 }
 
 output "paragon_certificate_arn" {

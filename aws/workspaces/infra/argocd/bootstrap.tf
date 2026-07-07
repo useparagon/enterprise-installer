@@ -261,8 +261,6 @@ resource "helm_release" "argocd" {
       value = set.value
     }
   }
-
-  depends_on = [time_sleep.eso_crds]
 }
 
 resource "helm_release" "external_secrets" {

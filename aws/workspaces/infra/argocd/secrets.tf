@@ -6,7 +6,9 @@ resource "time_sleep" "eso_crds" {
 
   create_duration = "120s"
 
+  depends_on = [helm_release.external_secrets]
+
   triggers = {
-    cluster_name = var.cluster_name
+    eso_release = helm_release.external_secrets[0].id
   }
 }
