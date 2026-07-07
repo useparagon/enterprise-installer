@@ -28,6 +28,8 @@ module "helm" {
   docker_email                           = var.docker_email
   docker_password                        = var.docker_password
   docker_registry_server                 = var.docker_registry_server
+  docker_pull_secret_name                = var.docker_pull_secret_name
+  create_docker_pull_secret              = var.create_docker_pull_secret
   docker_username                        = var.docker_username
   domain                                 = var.domain
   env_secret_name                        = google_secret_manager_secret.env.secret_id

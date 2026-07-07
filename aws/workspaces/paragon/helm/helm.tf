@@ -103,6 +103,13 @@ locals {
     }
   })
 
+  docker_pull_secret_global_values = var.create_docker_pull_secret ? {
+    imagePullSecrets = concat(
+      try(nonsensitive(var.helm_values.global.imagePullSecrets), []),
+      [{ name = var.docker_pull_secret_name }]
+    )
+  } : {}
+
   global_values = yamlencode({
     global = merge(
       nonsensitive(var.helm_values.global),
@@ -121,7 +128,8 @@ locals {
           }
         ),
         paragon_version = local.version
-      }
+      },
+      local.docker_pull_secret_global_values
     )
   })
 
@@ -147,14 +155,19 @@ locals {
   global_values_minus_env = yamlencode(merge(
     nonsensitive(var.helm_values),
     {
-      global = merge(nonsensitive(var.helm_values).global, {
-        podAnnotations = {
-          "reloader.stakater.com/auto" = "true"
-        }
-        env = {
-          HOST_ENV = "AWS_K8"
-        }
-      })
+      global = merge(
+        nonsensitive(var.helm_values).global,
+        {
+          podAnnotations = merge(
+            try(nonsensitive(var.helm_values).global.podAnnotations, {}),
+            { "reloader.stakater.com/auto" = "true" }
+          )
+          env = {
+            HOST_ENV = "AWS_K8"
+          }
+        },
+        local.docker_pull_secret_global_values
+      )
     }
   ))
 
@@ -177,7 +190,41 @@ resource "kubernetes_config_map" "feature_flag_content" {
   }
 }
 
+# kubernetes secret to pull container images from a registry (Docker Hub, Artifactory, etc.)
+resource "kubernetes_secret" "docker_login" {
+  count = var.create_docker_pull_secret && !var.install_external_secrets ? 1 : 0
+
+  metadata {
+    name      = var.docker_pull_secret_name
+    namespace = local.paragon_namespace
+  }
+
+  type = "kubernetes.io/dockerconfigjson"
+
+  data = {
+    ".dockerconfigjson" = jsonencode({
+      auths = {
+        "${var.docker_registry_server}" = {
+          "username" = var.docker_username
+          "password" = var.docker_password
+          "email"    = var.docker_email
+          "auth"     = base64encode("${var.docker_username}:${var.docker_password}")
+        }
+      }
+    })
+  }
+}
+
 # ingress controller; provisions load balancer (skipped when infra/GitOps owns the controller)
+#
+# Upgrade order (per cluster, before paragon terraform apply):
+#   1. kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+#   2. terraform apply (paragon workspace)
+# CRD apply is safe while v2.x controller is still running; skip risks v3.4 crash-loop.
+#
+# Scheduling: prefer on-demand nodes but allow spot when the on-demand pool is small.
+# Pod anti-affinity (preferred) spreads replicas across hosts. PDB + safe-to-evict: false
+# protect against cluster-autoscaler disruption regardless of node pool.
 resource "helm_release" "ingress" {
   count = var.install_ingress_controller ? 1 : 0
 
@@ -186,7 +233,7 @@ resource "helm_release" "ingress" {
 
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
-  version    = "1.9.1"
+  version    = "3.4.0"
 
   namespace        = local.paragon_namespace
   atomic           = true
@@ -201,9 +248,61 @@ resource "helm_release" "ingress" {
   }
 
   set {
+    name  = "region"
+    value = var.aws_region
+  }
+
+  set {
     name  = "replicaCount"
     value = "3"
   }
+
+  set {
+    name  = "podDisruptionBudget.maxUnavailable"
+    value = "1"
+  }
+
+  set {
+    name  = "podAnnotations.cluster-autoscaler\\.kubernetes\\.io/safe-to-evict"
+    value = "false"
+  }
+
+  # Custom affinity replaces chart default (configureDefaultAffinity); include both
+  # preferred on-demand placement and preferred per-host spread.
+  values = [yamlencode({
+    configureDefaultAffinity = false
+    affinity = {
+      nodeAffinity = {
+        preferredDuringSchedulingIgnoredDuringExecution = [{
+          weight = 100
+          preference = {
+            matchExpressions = [{
+              key      = "useparagon.com/capacityType"
+              operator = "In"
+              values   = ["ondemand"]
+            }]
+          }
+        }]
+      }
+      podAntiAffinity = {
+        preferredDuringSchedulingIgnoredDuringExecution = [{
+          weight = 100
+          podAffinityTerm = {
+            labelSelector = {
+              matchExpressions = [{
+                key      = "app.kubernetes.io/name"
+                operator = "In"
+                values   = ["aws-load-balancer-controller"]
+              }]
+            }
+            topologyKey = "kubernetes.io/hostname"
+          }
+        }]
+      }
+    }
+  })]
+
+  depends_on = [module.karpenter]
 }
 
 # metrics server for hpa
@@ -222,17 +321,26 @@ resource "helm_release" "metricsserver" {
   verify           = false
 
   depends_on = [
+    module.karpenter,
     terraform_data.managed_ingress_controller_ready,
     terraform_data.external_ingress_controller_ready,
   ]
 }
 
-# graceful handling of spot evictions
+# graceful handling of spot evictions on legacy managed node groups
 module "aws_node_termination_handler" {
+  count = var.enable_legacy_mng_pools ? 1 : 0
+
   source  = "qvest-digital/aws-node-termination-handler/kubernetes"
   version = "4.0.0"
 
   json_logging = true
+
+  # Spot nodes are labeled in infra (cluster.tf); avoid legacy lifecycle=Ec2Spot default.
+  k8s_node_selector = {
+    "useparagon.com/capacityType" = "spot"
+  }
+  k8s_node_tolerations = []
 }
 
 # microservices deployment
@@ -262,12 +370,14 @@ resource "helm_release" "paragon_on_prem" {
   ]
 
   depends_on = [
+    module.karpenter,
     terraform_data.managed_ingress_controller_ready,
     terraform_data.external_ingress_controller_ready,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
+    kubernetes_secret.docker_login,
     kubernetes_storage_class_v1.gp3_encrypted,
-    kubernetes_config_map.feature_flag_content
+    kubernetes_config_map.feature_flag_content,
   ]
 }
 
@@ -309,11 +419,13 @@ resource "helm_release" "paragon_logging" {
   }
 
   depends_on = [
+    module.karpenter,
     terraform_data.managed_ingress_controller_ready,
     terraform_data.external_ingress_controller_ready,
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.openobserve_credentials,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_secret.docker_login,
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }
 
@@ -355,11 +467,13 @@ resource "helm_release" "paragon_monitoring" {
   }
 
   depends_on = [
+    module.karpenter,
     terraform_data.managed_ingress_controller_ready,
     terraform_data.external_ingress_controller_ready,
     helm_release.paragon_on_prem,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_secret.docker_login,
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }

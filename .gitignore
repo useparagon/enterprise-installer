@@ -48,6 +48,7 @@ build/
 # ignore IDE files
 .cursor/*
 !.cursor/skills/
+!.cursor/commands/
 .idea/
 .vscode/
 
@@ -60,3 +61,6 @@ node_modules/
 
 # atlas generated service-inputs.json files
 charts/*/**/files/service-inputs.json
+
+# release-changelog workflow scratch output
+.release-changelog/

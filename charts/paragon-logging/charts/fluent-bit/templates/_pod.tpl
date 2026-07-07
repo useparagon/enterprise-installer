@@ -1,8 +1,9 @@
 {{- define "fluent-bit.pod" -}}
 serviceAccountName: {{ include "fluent-bit.serviceAccountName" . }}
-{{- with .Values.imagePullSecrets }}
+{{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+{{- if $pullSecrets }}
 imagePullSecrets:
-  {{- toYaml . | nindent 2 }}
+  {{- $pullSecrets | nindent 2 }}
 {{- end }}
 {{- if .Values.priorityClass.name }}
 priorityClassName: {{ .Values.priorityClass.name }}
@@ -38,7 +39,7 @@ containers:
     securityContext:
       {{- toYaml . | nindent 6 }}
   {{- end }}
-    image: {{ include "fluent-bit.image" (merge .Values.image (dict "tag" (default .Chart.AppVersion .Values.image.tag))) | quote }}
+    image: {{ include "fluent-bit.image" (merge .Values.image (dict "tag" (default .Chart.AppVersion .Values.image.tag) "root" .)) | quote }}
     imagePullPolicy: {{ .Values.image.pullPolicy }}
   {{- if or .Values.env .Values.envWithTpl }}
     env:
@@ -103,7 +104,7 @@ containers:
     {{- end }}
 {{- if .Values.hotReload.enabled }}
   - name: reloader
-    image: {{ include "fluent-bit.image" .Values.hotReload.image }}
+    image: {{ include "fluent-bit.image" (merge .Values.hotReload.image (dict "root" .)) | quote }}
     args:
       - {{ printf "-webhook-url=http://localhost:%s/api/v2/reload" (toString .Values.metricsPort) }}
       - -volume-dir=/watch/config

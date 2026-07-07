@@ -29,8 +29,7 @@ autoscaling:
   # targetCPUUtilizationPercentage: 75
   # targetMemoryUtilizationPercentage: 75
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: 'grafana'
 

@@ -60,11 +60,13 @@ resource "helm_release" "managed_sync" {
   }
 
   depends_on = [
+    module.karpenter,
     terraform_data.managed_ingress_controller_ready,
     terraform_data.external_ingress_controller_ready,
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.managed_sync_secrets,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_secret.docker_login,
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }

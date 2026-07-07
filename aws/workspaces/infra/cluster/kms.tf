@@ -1,10 +1,12 @@
 locals {
   key_administrators = distinct(compact(concat(
-    coalesce(var.eks_admin_arns, []),
-    [var.kms_admin_role != null ? var.kms_admin_role : local.caller_arn],
+    var.eks_admin_arns,
+    var.kms_admin_role != null ? [var.kms_admin_role] : [],
     [local.autoscaling_role_arn]
   )))
 }
+
+data "aws_partition" "current" {}
 
 module "ebs_kms_key" {
   source  = "terraform-aws-modules/kms/aws"
@@ -27,6 +29,100 @@ module "ebs_kms_key" {
   computed_aliases = {
     ebs = { name = "eks/${var.workspace}/ebs" }
   }
+
+  key_statements = var.enable_karpenter ? [
+    {
+      sid = "AllowSQSServiceAccountScoped"
+      actions = [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey",
+      ]
+      principals = [{
+        type        = "Service"
+        identifiers = ["sqs.amazonaws.com"]
+      }]
+      resources = ["*"]
+      condition = [{
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [data.aws_caller_identity.current.account_id]
+      }]
+    },
+    {
+      sid = "AllowEventBridgeServiceAccountScoped"
+      actions = [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey",
+      ]
+      principals = [{
+        type        = "Service"
+        identifiers = ["events.amazonaws.com"]
+      }]
+      resources = ["*"]
+      condition = [{
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [data.aws_caller_identity.current.account_id]
+      }]
+    },
+    {
+      sid = "AllowEBSVolumeEncryptionViaEC2"
+      actions = [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey",
+      ]
+      principals = [{
+        type        = "AWS"
+        identifiers = ["*"]
+      }]
+      resources = ["*"]
+      condition = [
+        {
+          test     = "StringEquals"
+          variable = "kms:CallerAccount"
+          values   = [data.aws_caller_identity.current.account_id]
+        },
+        {
+          test     = "StringEquals"
+          variable = "kms:ViaService"
+          values   = ["ec2.${var.aws_region}.amazonaws.com"]
+        },
+      ]
+    },
+    {
+      sid     = "AllowAttachmentOfPersistentResourcesViaEC2"
+      actions = ["kms:CreateGrant"]
+      principals = [{
+        type        = "AWS"
+        identifiers = ["*"]
+      }]
+      resources = ["*"]
+      condition = [
+        {
+          test     = "StringEquals"
+          variable = "kms:CallerAccount"
+          values   = [data.aws_caller_identity.current.account_id]
+        },
+        {
+          test     = "StringEquals"
+          variable = "kms:ViaService"
+          values   = ["ec2.${var.aws_region}.amazonaws.com"]
+        },
+        {
+          test     = "Bool"
+          variable = "kms:GrantIsForAWSResource"
+          values   = ["true"]
+        },
+      ]
+    },
+  ] : []
 }
 
 module "cluster_kms_key" {

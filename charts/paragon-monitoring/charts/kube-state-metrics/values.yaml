@@ -6,8 +6,7 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: 'latest'
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 # - name: "image-pull-secret"
 fullnameOverride: 'kube-state-metrics'
 

@@ -46,9 +46,10 @@ spec:
         {{- include (printf "%s.selectorLabels" $name) $root | nindent 8 }}
     spec:
       terminationGracePeriodSeconds: 65
-      {{- with $root.Values.imagePullSecrets }}
+      {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" $root) -}}
+      {{- if $pullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        {{- $pullSecrets | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include (printf "%s.serviceAccountName" $name) $root }}
       securityContext:
@@ -57,11 +58,11 @@ spec:
         - name: {{ $name }}
           securityContext:
             {{- toYaml $root.Values.securityContext | nindent 12 }}
-          image: "{{ $root.Values.image.repository }}:{{ $root.Values.global.paragon_version | default $root.Values.global.env.VERSION }}"
+          image: {{ include "paragon.containerImage" (dict "root" $root) | quote }}
           {{- if $command }}
           command: [{{ $command | quote }}]
           {{- end }}
-          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          imagePullPolicy: {{ include "paragon.imagePullPolicy" (dict "root" $root) }}
           ports:
             - name: http
               containerPort: {{ $root.Values.service.port }}

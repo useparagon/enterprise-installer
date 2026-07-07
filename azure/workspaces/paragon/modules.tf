@@ -6,6 +6,8 @@ module "helm" {
   docker_email                   = var.docker_email
   docker_password                = var.docker_password
   docker_registry_server         = var.docker_registry_server
+  docker_pull_secret_name        = var.docker_pull_secret_name
+  create_docker_pull_secret      = var.create_docker_pull_secret
   docker_username                = var.docker_username
   env_secret_name                = azurerm_key_vault_secret.env.name
   external_secrets_client_id     = var.azure_client_id
@@ -67,8 +69,9 @@ module "hoop" {
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections
   infra_vars = {
-    postgres = try(local.infra_vars.postgres, null)
-    redis    = try(local.infra_vars.redis, null)
+    postgres      = try(local.infra_vars.postgres, null)
+    redis         = try(local.infra_vars.redis, null)
+    redis_managed = try(local.infra_vars.redis_managed, null)
   }
 }
 

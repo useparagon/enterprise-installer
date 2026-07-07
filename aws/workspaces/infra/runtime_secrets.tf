@@ -91,6 +91,8 @@ resource "aws_secretsmanager_secret_version" "runtime_kafka" {
 }
 
 resource "aws_secretsmanager_secret" "runtime_bastion" {
+  count = var.bastion_enabled ? 1 : 0
+
   name                    = "${local.runtime_secret_prefix}/bastion"
   description             = "Bastion SSH connection info for ${var.organization}"
   recovery_window_in_days = var.secrets_recovery_window_in_days
@@ -102,9 +104,11 @@ resource "aws_secretsmanager_secret" "runtime_bastion" {
 }
 
 resource "aws_secretsmanager_secret_version" "runtime_bastion" {
-  secret_id = aws_secretsmanager_secret.runtime_bastion.id
+  count = var.bastion_enabled ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.runtime_bastion[0].id
   secret_string = jsonencode({
-    public_dns  = module.bastion.connection.bastion_dns
-    private_key = module.bastion.connection.private_key
+    public_dns  = module.bastion[0].connection.bastion_dns
+    private_key = module.bastion[0].connection.private_key
   })
 }
