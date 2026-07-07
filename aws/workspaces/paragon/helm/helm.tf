@@ -268,15 +268,13 @@ resource "helm_release" "ingress" {
     value = "1"
   }
 
-  set {
-    name  = "podAnnotations.cluster-autoscaler\\.kubernetes\\.io/safe-to-evict"
-    value = "false"
-  }
-
   # Custom affinity replaces chart default (configureDefaultAffinity); include both
   # preferred on-demand placement and preferred per-host spread.
   values = [yamlencode({
     configureDefaultAffinity = false
+    podAnnotations = {
+      "cluster-autoscaler.kubernetes.io/safe-to-evict" = "false"
+    }
     affinity = {
       nodeAffinity = {
         preferredDuringSchedulingIgnoredDuringExecution = [{
