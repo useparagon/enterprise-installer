@@ -3,7 +3,7 @@
 
 | Name | Version |
 | ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
 | <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | >= 0.0.19 |
@@ -66,11 +66,13 @@
 | <a name="input_certificate"></a> [certificate](#input\_certificate) | Optional ACM certificate ARN of an existing certificate to use with the load balancer. | `string` | `null` | no |
 | <a name="input_cloudflare_dns_api_token"></a> [cloudflare\_dns\_api\_token](#input\_cloudflare\_dns\_api\_token) | Cloudflare DNS API token for SSL certificate creation and verification. | `string` | `null` | no |
 | <a name="input_cloudflare_zone_id"></a> [cloudflare\_zone\_id](#input\_cloudflare\_zone\_id) | Cloudflare zone id to set CNAMEs. | `string` | `null` | no |
+| <a name="input_create_docker_pull_secret"></a> [create\_docker\_pull\_secret](#input\_create\_docker\_pull\_secret) | Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm\_values. | `bool` | `true` | no |
 | <a name="input_customer_facing"></a> [customer\_facing](#input\_customer\_facing) | Whether the connections are customer-facing (true limits access to dev-team-oncall/dev-team-managers/admin, false adds dev-team-engineering). | `bool` | `true` | no |
 | <a name="input_dns_provider"></a> [dns\_provider](#input\_dns\_provider) | DNS provider to use. | `string` | `"none"` | no |
 | <a name="input_docker_email"></a> [docker\_email](#input\_docker\_email) | Docker email to pull images. | `string` | n/a | yes |
 | <a name="input_docker_password"></a> [docker\_password](#input\_docker\_password) | Docker password to pull images. | `string` | n/a | yes |
-| <a name="input_docker_registry_server"></a> [docker\_registry\_server](#input\_docker\_registry\_server) | Docker container registry server. | `string` | `"docker.io"` | no |
+| <a name="input_docker_pull_secret_name"></a> [docker\_pull\_secret\_name](#input\_docker\_pull\_secret\_name) | Kubernetes secret name for registry pull credentials. | `string` | `"docker-cfg"` | no |
+| <a name="input_docker_registry_server"></a> [docker\_registry\_server](#input\_docker\_registry\_server) | Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry. | `string` | `"docker.io"` | no |
 | <a name="input_docker_username"></a> [docker\_username](#input\_docker\_username) | Docker username to pull images. | `string` | n/a | yes |
 | <a name="input_domain"></a> [domain](#input\_domain) | The root domain used for the microservices. | `string` | n/a | yes |
 | <a name="input_excluded_microservices"></a> [excluded\_microservices](#input\_excluded\_microservices) | The microservices that should be excluded from the deployment. | `list(string)` | `[]` | no |
@@ -99,6 +101,10 @@
 | <a name="input_infra_json_path"></a> [infra\_json\_path](#input\_infra\_json\_path) | Deprecated legacy path to an `infra` workspace output JSON file. | `string` | `null` | no |
 | <a name="input_ingress_scheme"></a> [ingress\_scheme](#input\_ingress\_scheme) | Whether the load balancer is 'internet-facing' (public) or 'internal' (private) | `string` | `"internet-facing"` | no |
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.31"` | no |
+| <a name="input_karpenter_defaults"></a> [karpenter\_defaults](#input\_karpenter\_defaults) | Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults. | <pre>object({<br/>    ami_selector_alias              = optional(string)<br/>    disruption_consolidation_policy = optional(string)<br/>    disruption_consolidate_after    = optional(string)<br/>    disruption_budgets = optional(list(object({<br/>      nodes    = string<br/>      reasons  = optional(list(string))<br/>      schedule = optional(string)<br/>      duration = optional(string)<br/>    })))<br/>    expire_after             = optional(string)<br/>    termination_grace_period = optional(string)<br/>    ec2_kubelet_max_pods     = optional(number)<br/>  })</pre> | `{}` | no |
+| <a name="input_karpenter_node_os_volume_size_gib"></a> [karpenter\_node\_os\_volume\_size\_gib](#input\_karpenter\_node\_os\_volume\_size\_gib) | Bottlerocket OS (control) volume size in GiB for Karpenter worker nodes (/dev/xvda). | `number` | `15` | no |
+| <a name="input_karpenter_node_pools"></a> [karpenter\_node\_pools](#input\_karpenter\_node\_pools) | Karpenter NodePool definitions. Map key is the NodePool name. | <pre>map(object({<br/>    capacity_types = list(string)<br/>    instance_types = list(string)<br/>    cpu_limit      = string<br/>    memory_limit   = string<br/>    nodes_limit    = number<br/>    weight         = number<br/>    labels         = optional(map(string))<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = optional(string)<br/>      effect = string<br/>    })))<br/>  }))</pre> | <pre>{<br/>  "default-ondemand": {<br/>    "capacity_types": [<br/>      "on-demand"<br/>    ],<br/>    "cpu_limit": "52",<br/>    "instance_types": [<br/>      "m6a.xlarge"<br/>    ],<br/>    "memory_limit": "208Gi",<br/>    "nodes_limit": 13,<br/>    "weight": 25<br/>  },<br/>  "default-spot": {<br/>    "capacity_types": [<br/>      "spot"<br/>    ],<br/>    "cpu_limit": "152",<br/>    "instance_types": [<br/>      "t3a.xlarge",<br/>      "t3.xlarge",<br/>      "m5a.xlarge",<br/>      "m5.xlarge",<br/>      "m6a.xlarge",<br/>      "m6i.xlarge",<br/>      "m7a.xlarge",<br/>      "m7i.xlarge",<br/>      "r5a.xlarge",<br/>      "m4.xlarge"<br/>    ],<br/>    "memory_limit": "608Gi",<br/>    "nodes_limit": 38,<br/>    "weight": 75<br/>  }<br/>}</pre> | no |
+| <a name="input_karpenter_node_volume_size_gib"></a> [karpenter\_node\_volume\_size\_gib](#input\_karpenter\_node\_volume\_size\_gib) | Bottlerocket container data volume size in GiB for Karpenter worker nodes (/dev/xvdb). | `number` | `50` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
 | <a name="input_managed_sync_version"></a> [managed\_sync\_version](#input\_managed\_sync\_version) | The version of the Managed Sync helm chart to install. | `string` | `"latest"` | no |
 | <a name="input_monitor_version"></a> [monitor\_version](#input\_monitor\_version) | The version of the Paragon monitors to install. | `string` | `null` | no |

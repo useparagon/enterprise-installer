@@ -36,9 +36,21 @@ variable "certificate" {
 }
 
 variable "docker_registry_server" {
-  description = "Docker container registry server."
+  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
   default     = "docker.io"
+}
+
+variable "docker_pull_secret_name" {
+  description = "Kubernetes secret name for registry pull credentials."
+  type        = string
+  default     = "docker-cfg"
+}
+
+variable "create_docker_pull_secret" {
+  description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
+  type        = bool
+  default     = true
 }
 
 variable "docker_username" {
@@ -96,6 +108,85 @@ variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
   default     = "1.31"
+}
+
+variable "karpenter_node_os_volume_size_gib" {
+  description = "Bottlerocket OS (control) volume size in GiB for Karpenter worker nodes (/dev/xvda)."
+  type        = number
+  default     = 15
+}
+
+variable "karpenter_node_volume_size_gib" {
+  description = "Bottlerocket container data volume size in GiB for Karpenter worker nodes (/dev/xvdb)."
+  type        = number
+  default     = 50
+}
+
+variable "karpenter_node_pools" {
+  description = "Karpenter NodePool definitions. Map key is the NodePool name."
+  type = map(object({
+    capacity_types = list(string)
+    instance_types = list(string)
+    cpu_limit      = string
+    memory_limit   = string
+    nodes_limit    = number
+    weight         = number
+    labels         = optional(map(string))
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
+  }))
+
+  default = {
+    "default-spot" = {
+      capacity_types = ["spot"]
+      instance_types = [
+        "t3a.xlarge", "t3.xlarge",
+        "m5a.xlarge", "m5.xlarge",
+        "m6a.xlarge", "m6i.xlarge",
+        "m7a.xlarge", "m7i.xlarge",
+        "r5a.xlarge",
+      ]
+      cpu_limit    = "160"
+      memory_limit = "610Gi"
+      nodes_limit  = 40
+      weight       = 75
+    }
+    "default-ondemand" = {
+      capacity_types = ["on-demand"]
+      instance_types = ["m6a.xlarge"]
+      cpu_limit      = "60"
+      memory_limit   = "210Gi"
+      nodes_limit    = 20
+      weight         = 25
+    }
+  }
+
+  validation {
+    condition     = length(var.karpenter_node_pools) > 0
+    error_message = "At least one Karpenter NodePool must be defined in karpenter_node_pools."
+  }
+}
+
+variable "karpenter_defaults" {
+  description = "Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults."
+  type = object({
+    ami_selector_alias              = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+    expire_after             = optional(string)
+    termination_grace_period = optional(string)
+    ec2_kubelet_max_pods     = optional(number)
+  })
+  default = {}
 }
 
 variable "dns_provider" {
@@ -513,9 +604,10 @@ locals {
   waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
 
   # use default where standard value can be determined
-  cluster_name     = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
-  logs_bucket      = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
-  auditlogs_bucket = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
+  cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
+  cluster_k8s_version = try(local.infra_vars.k8s_version.value, var.k8s_version)
+  logs_bucket         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
+  auditlogs_bucket    = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)

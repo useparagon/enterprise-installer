@@ -19,10 +19,15 @@ spec:
         app.kubernetes.io/component: uds-apply
     spec:
       restartPolicy: Never
+      {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+      {{- if $pullSecrets }}
+      imagePullSecrets:
+        {{- $pullSecrets | nindent 8 }}
+      {{- end }}
       containers:
         - name: uds-apply
-          image: "{{ .Values.uds.image.repository }}:{{ .Values.uds.image.tag }}"
-          imagePullPolicy: {{ .Values.uds.image.pullPolicy }}
+          image: {{ include "paragon.image" (dict "root" . "repository" .Values.uds.image.repository "tag" .Values.uds.image.tag) | quote }}
+          imagePullPolicy: {{ .Values.uds.image.pullPolicy | default .Values.global.pullPolicy | default "IfNotPresent" }}
           command:
             - /bin/sh
             - -c

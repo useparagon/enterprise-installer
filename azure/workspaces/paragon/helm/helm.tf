@@ -106,6 +106,13 @@ locals {
     }
   })
 
+  docker_pull_secret_global_values = var.create_docker_pull_secret ? {
+    imagePullSecrets = concat(
+      try(nonsensitive(var.helm_values.global.imagePullSecrets), []),
+      [{ name = var.docker_pull_secret_name }]
+    )
+  } : {}
+
   global_values = yamlencode({
     global = merge(
       nonsensitive(var.helm_values.global),
@@ -124,7 +131,8 @@ locals {
           }
         ),
         paragon_version = local.version
-      }
+      },
+      local.docker_pull_secret_global_values
     )
   })
 
@@ -149,14 +157,19 @@ locals {
   global_values_minus_env = yamlencode(merge(
     nonsensitive(var.helm_values),
     {
-      global = merge(nonsensitive(var.helm_values).global, {
-        podAnnotations = {
-          "reloader.stakater.com/auto" = "true"
-        }
-        env = {
-          HOST_ENV = "AZURE_K8"
-        }
-      })
+      global = merge(
+        nonsensitive(var.helm_values).global,
+        {
+          podAnnotations = merge(
+            try(nonsensitive(var.helm_values).global.podAnnotations, {}),
+            { "reloader.stakater.com/auto" = "true" }
+          )
+          env = {
+            HOST_ENV = "AZURE_K8"
+          }
+        },
+        local.docker_pull_secret_global_values
+      )
     }
   ))
 
@@ -189,6 +202,7 @@ resource "kubernetes_config_map" "feature_flag_content" {
     "features.yml" = var.feature_flags_content
   }
 }
+
 
 # microservices deployment
 resource "helm_release" "paragon_on_prem" {

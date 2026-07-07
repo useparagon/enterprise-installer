@@ -28,6 +28,11 @@ spec:
       labels:
         {{- include "openobserve.selectorLabels" . | nindent 8 }}
     spec:
+      {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+      {{- if $pullSecrets }}
+      imagePullSecrets:
+        {{- $pullSecrets | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "openobserve.serviceAccountName" . }}
       securityContext:
         fsGroup: 2000
@@ -36,7 +41,8 @@ spec:
         runAsNonRoot: true
       containers:
         - name: {{ include "openobserve.fullname" . }}
-          image: {{ .Values.image.repository | default "public.ecr.aws/zinclabs/openobserve" }}:{{ .Values.image.tag | default "latest" }}
+          image: {{ include "paragon.image" (dict "root" . "repository" (.Values.image.repository | default "public.ecr.aws/zinclabs/openobserve") "tag" (.Values.image.tag | default "latest")) | quote }}
+          imagePullPolicy: {{ include "paragon.imagePullPolicy" (dict "root" .) }}
           env:
             {{- /* Handle environment variables */}}
             {{- if and .Values.envKeys (kindIs "slice" .Values.envKeys) }}
@@ -65,7 +71,6 @@ spec:
                   optional: true
             {{- end }}
             {{- end }}
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           resources:
             limits:
               cpu: {{ .Values.resources.limits.cpu | default "4096m" }}

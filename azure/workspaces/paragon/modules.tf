@@ -1,37 +1,39 @@
 module "helm" {
   source = "./helm"
 
-  cluster_name           = local.cluster_name
-  docker_cfg_secret_name = azurerm_key_vault_secret.docker_cfg.name
-  docker_email           = var.docker_email
-  docker_password        = var.docker_password
-  docker_registry_server = var.docker_registry_server
-  docker_username        = var.docker_username
-  env_secret_name        = azurerm_key_vault_secret.env.name
+  cluster_name                   = local.cluster_name
+  docker_cfg_secret_name         = azurerm_key_vault_secret.docker_cfg.name
+  docker_email                   = var.docker_email
+  docker_password                = var.docker_password
+  docker_registry_server         = var.docker_registry_server
+  docker_pull_secret_name        = var.docker_pull_secret_name
+  create_docker_pull_secret      = var.create_docker_pull_secret
+  docker_username                = var.docker_username
+  env_secret_name                = azurerm_key_vault_secret.env.name
   external_secrets_client_id     = var.azure_client_id
   external_secrets_client_secret = var.azure_client_secret
   external_secrets_tenant_id     = var.azure_tenant_id
-  feature_flags_content  = local.feature_flags_content
-  flipt_options          = local.flipt_options
-  helm_values            = local.helm_values_public
-  ingress_scheme         = var.ingress_scheme
-  key_vault_name         = data.azurerm_key_vault.paragon.name
-  k8s_version            = var.k8s_version
-  logs_bucket            = local.logs_bucket
-  managed_sync_enabled   = var.managed_sync_enabled
-  managed_sync_secret_name = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
-  managed_sync_version   = var.managed_sync_version
-  microservices          = local.microservices
-  monitor_version        = local.monitor_version
-  monitors               = local.monitors
-  monitors_enabled       = var.monitors_enabled
-  openobserve_email      = local.openobserve_email
-  openobserve_password   = local.openobserve_password
-  openobserve_secret_name = azurerm_key_vault_secret.openobserve[0].name
-  public_microservices   = local.public_microservices
-  public_monitors        = local.public_monitors
-  resource_group         = local.infra_vars.resource_group.value
-  workspace              = local.workspace
+  feature_flags_content          = local.feature_flags_content
+  flipt_options                  = local.flipt_options
+  helm_values                    = local.helm_values_public
+  ingress_scheme                 = var.ingress_scheme
+  key_vault_name                 = data.azurerm_key_vault.paragon.name
+  k8s_version                    = var.k8s_version
+  logs_bucket                    = local.logs_bucket
+  managed_sync_enabled           = var.managed_sync_enabled
+  managed_sync_secret_name       = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
+  managed_sync_version           = var.managed_sync_version
+  microservices                  = local.microservices
+  monitor_version                = local.monitor_version
+  monitors                       = local.monitors
+  monitors_enabled               = var.monitors_enabled
+  openobserve_email              = local.openobserve_email
+  openobserve_password           = local.openobserve_password
+  openobserve_secret_name        = azurerm_key_vault_secret.openobserve[0].name
+  public_microservices           = local.public_microservices
+  public_monitors                = local.public_monitors
+  resource_group                 = local.infra_vars.resource_group.value
+  workspace                      = local.workspace
 }
 
 module "managed_sync_config" {
@@ -67,8 +69,9 @@ module "hoop" {
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections
   infra_vars = {
-    postgres = try(local.infra_vars.postgres, null)
-    redis    = try(local.infra_vars.redis, null)
+    postgres      = try(local.infra_vars.postgres, null)
+    redis         = try(local.infra_vars.redis, null)
+    redis_managed = try(local.infra_vars.redis_managed, null)
   }
 }
 

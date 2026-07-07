@@ -62,12 +62,15 @@ module "redis" {
 module "storage" {
   source = "./storage"
 
-  workspace                = local.workspace
-  force_destroy            = var.disable_deletion_protection
-  app_bucket_expiration    = var.app_bucket_expiration
-  auditlogs_retention_days = var.auditlogs_retention_days
-  auditlogs_lock_enabled   = var.auditlogs_lock_enabled
-  managed_sync_enabled   = var.managed_sync_enabled
+  workspace                 = local.workspace
+  force_destroy             = var.disable_deletion_protection
+  app_bucket_expiration     = var.app_bucket_expiration
+  auditlogs_retention_days  = var.auditlogs_retention_days
+  auditlogs_lock_enabled    = var.auditlogs_lock_enabled
+  managed_sync_enabled      = var.managed_sync_enabled
+  s3_kms_encryption_enabled = var.s3_kms_encryption_enabled
+  s3_kms_key_arn            = var.s3_kms_key_arn
+  admin_arns                = local.admin_arns
 
   migrated             = var.migrated_workspace != null
   cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
@@ -89,6 +92,7 @@ module "kafka" {
 }
 
 module "bastion" {
+  count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
 
   workspace     = local.workspace
@@ -112,20 +116,28 @@ module "bastion" {
 module "cluster" {
   source = "./cluster"
 
-  workspace = local.workspace
+  workspace  = local.workspace
+  aws_region = var.aws_region
 
-  bastion_role_arn          = module.bastion.bastion_role_arn
-  bastion_security_group_id = module.bastion.security_group.host[0]
+  bastion_enabled           = var.bastion_enabled
+  bastion_role_arn          = var.bastion_enabled ? module.bastion[0].bastion_role_arn : null
+  bastion_security_group_id = var.bastion_enabled ? module.bastion[0].security_group.host[0] : null
 
   argocd_enabled                  = var.argocd_enabled
   create_autoscaling_linked_role  = var.create_autoscaling_linked_role
-  eks_admin_arns                  = var.eks_admin_arns
+  eks_admin_arns                  = local.admin_arns
   eks_max_node_count              = var.eks_max_node_count
   eks_min_node_count              = var.eks_min_node_count
   eks_ondemand_node_instance_type = local.eks_ondemand_node_instance_type
   eks_spot_instance_percent       = var.eks_spot_instance_percent
   eks_spot_node_instance_type     = local.eks_spot_node_instance_type
   k8s_version                     = var.k8s_version
+
+  enable_karpenter              = var.enable_karpenter
+  enable_legacy_mng_pools       = var.enable_legacy_mng_pools
+  karpenter_chart_version       = var.karpenter_chart_version
+  karpenter_iam_names           = var.karpenter_iam_names
+  eks_system_managed_node_group = var.eks_system_managed_node_group
 
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id

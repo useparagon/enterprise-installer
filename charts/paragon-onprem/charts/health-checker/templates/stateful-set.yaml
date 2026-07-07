@@ -23,9 +23,10 @@ spec:
         {{- include "health-checker.selectorLabels" . | nindent 8 }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
-      {{- with .Values.imagePullSecrets }}
+      {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+      {{- if $pullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        {{- $pullSecrets | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "health-checker.serviceAccountName" . }}
       securityContext:
@@ -34,8 +35,8 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ include "paragon.image" (dict "root" . "repository" .Values.image.repository "tag" (.Values.image.tag | default .Chart.AppVersion)) | quote }}
+          imagePullPolicy: {{ include "paragon.imagePullPolicy" (dict "root" .) }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

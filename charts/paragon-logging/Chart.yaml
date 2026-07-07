@@ -6,6 +6,9 @@ version: __PARAGON_VERSION__
 appVersion: 'v1'
 
 dependencies:
+  - name: paragon-templates
+    version: 1
+    repository: file://../paragon-templates
   - name: fluent-bit
     version: __PARAGON_VERSION__
     repository: file://charts/fluent-bit

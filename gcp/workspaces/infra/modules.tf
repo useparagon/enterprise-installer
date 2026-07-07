@@ -90,6 +90,7 @@ module "cluster" {
 }
 
 module "bastion" {
+  count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
 
   cloudflare_api_token           = var.cloudflare_api_token
