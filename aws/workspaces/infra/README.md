@@ -5,7 +5,11 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
+| <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
 
 ## Providers
 
@@ -105,6 +109,7 @@ No requirements.
 | <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | The name of the EKS cluster. |
 | <a name="output_enable_karpenter"></a> [enable\_karpenter](#output\_enable\_karpenter) | Whether Karpenter autoscaling is enabled. Consumed by paragon workspace for EC2NodeClass and NodePool manifests. |
 | <a name="output_enable_legacy_mng_pools"></a> [enable\_legacy\_mng\_pools](#output\_enable\_legacy\_mng\_pools) | Whether legacy on-demand and spot managed node groups are active. Consumed by paragon workspace for conditional AWS Node Termination Handler (NTH) deployment on legacy managed node groups. |
+| <a name="output_k8s_version"></a> [k8s\_version](#output\_k8s\_version) | EKS control plane version. Consumed by paragon workspace for Karpenter drift tagging. |
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka. |
 | <a name="output_karpenter"></a> [karpenter](#output\_karpenter) | AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace. |
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | The bucket used to store system logs. |
