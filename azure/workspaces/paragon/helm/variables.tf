@@ -143,6 +143,12 @@ variable "managed_sync_version" {
   type        = string
 }
 
+variable "key_vault_purge_protection_enabled" {
+  description = "Enable purge protection on the cert-manager Key Vault. Required by some Azure org policies (e.g. Enforce-GR-KeyVault). Cannot be disabled after creation."
+  type        = bool
+  default     = false
+}
+
 locals {
   chart_names     = var.monitors_enabled ? ["paragon-logging", "paragon-monitoring", "paragon-onprem"] : ["paragon-logging", "paragon-onprem"]
   chart_directory = "../charts"

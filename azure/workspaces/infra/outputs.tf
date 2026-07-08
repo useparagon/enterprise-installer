@@ -62,6 +62,7 @@ output "redis_managed_export_storage" {
 output "cluster_name" {
   description = "The name of the AKS cluster."
   value       = module.cluster.kubernetes.name
+  sensitive   = true
 }
 
 output "resource_group" {

@@ -64,6 +64,7 @@ output "bastion" {
 output "cluster_name" {
   description = "The name of the EKS cluster."
   value       = module.cluster.eks_cluster.name
+  sensitive   = true
 }
 
 output "enable_karpenter" {
