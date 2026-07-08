@@ -17,3 +17,23 @@ output "availability_zones" {
 output "gateway_ip" {
   value = aws_eip.gw.*.public_ip
 }
+
+output "firewall_subnet" {
+  value = aws_subnet.firewall
+}
+
+output "private_route_table_ids" {
+  value = aws_route_table.private[*].id
+}
+
+output "main_route_table_id" {
+  value = aws_vpc.app.main_route_table_id
+}
+
+output "nat_gateway_ids" {
+  value = aws_nat_gateway.gw[*].id
+}
+
+output "private_subnet_cidrs" {
+  value = aws_subnet.private[*].cidr_block
+}

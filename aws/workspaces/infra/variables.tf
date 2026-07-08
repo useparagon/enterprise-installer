@@ -306,6 +306,28 @@ variable "s3_kms_key_arn" {
   default     = null
 }
 
+# network firewall
+variable "network_firewall" {
+  description = "Optional AWS Network Firewall for egress inspection with RAM-shared rule group ARNs (stateful or stateless). Greenfield only; logs go to <workspace>-logs."
+  type = object({
+    enabled = optional(bool, false)
+
+    rule_group_arns = optional(list(string), [])
+
+    stateless_default_actions          = optional(list(string), ["aws:forward_to_sfe"])
+    stateless_fragment_default_actions = optional(list(string), ["aws:forward_to_sfe"])
+  })
+  default = { enabled = false }
+
+  validation {
+    condition = (
+      !var.network_firewall.enabled ||
+      length(var.network_firewall.rule_group_arns) > 0
+    )
+    error_message = "When network_firewall.enabled is true, provide at least one rule_group_arn (RAM-shared)."
+  }
+}
+
 # bastion
 variable "bastion_enabled" {
   description = "Whether to create the bastion host and its associated Cloudflare tunnel."

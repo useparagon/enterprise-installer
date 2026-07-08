@@ -22,3 +22,8 @@ variable "vpc_cidr_newbits" {
   description = "Newbits used for calculating subnets."
   type        = number
 }
+
+variable "network_firewall_enabled" {
+  description = "Whether to create firewall subnets for AWS Network Firewall."
+  type        = bool
+}

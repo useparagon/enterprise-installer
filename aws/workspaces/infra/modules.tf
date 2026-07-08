@@ -1,11 +1,37 @@
 module "network" {
   source = "./network"
 
-  workspace        = local.workspace
-  aws_region       = var.aws_region
-  az_count         = var.az_count
-  vpc_cidr         = var.vpc_cidr
-  vpc_cidr_newbits = var.vpc_cidr_newbits
+  workspace                 = local.workspace
+  aws_region                = var.aws_region
+  az_count                  = var.az_count
+  vpc_cidr                  = var.vpc_cidr
+  vpc_cidr_newbits          = var.vpc_cidr_newbits
+  network_firewall_enabled  = var.network_firewall.enabled
+}
+
+module "network_firewall" {
+  count  = var.network_firewall.enabled ? 1 : 0
+  source = "./network_firewall"
+
+  workspace = local.workspace
+  vpc_id    = module.network.vpc.id
+  vpc_cidr  = var.vpc_cidr
+  az_count  = var.az_count
+
+  availability_zones      = module.network.availability_zones.names
+  firewall_subnet_ids     = module.network.firewall_subnet[*].id
+  private_route_table_ids = module.network.private_route_table_ids
+  main_route_table_id     = module.network.main_route_table_id
+  nat_gateway_ids         = module.network.nat_gateway_ids
+  private_subnet_cidrs    = module.network.private_subnet_cidrs
+  logs_bucket_name        = module.storage.s3.logs_bucket
+
+  network_firewall = {
+    enabled                            = var.network_firewall.enabled
+    rule_group_arns                    = var.network_firewall.rule_group_arns
+    stateless_default_actions          = var.network_firewall.stateless_default_actions
+    stateless_fragment_default_actions = var.network_firewall.stateless_fragment_default_actions
+  }
 }
 
 module "cloudtrail" {
@@ -63,6 +89,8 @@ module "storage" {
   source = "./storage"
 
   workspace                 = local.workspace
+  aws_region                = var.aws_region
+  network_firewall_enabled  = var.network_firewall.enabled
   force_destroy             = var.disable_deletion_protection
   app_bucket_expiration     = var.app_bucket_expiration
   auditlogs_retention_days  = var.auditlogs_retention_days
