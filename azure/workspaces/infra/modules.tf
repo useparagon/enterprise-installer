@@ -132,3 +132,62 @@ module "kafka" {
   virtual_network                   = module.network.virtual_network
   workspace                         = local.workspace
 }
+
+module "argocd" {
+  count  = var.argocd_enabled ? 1 : 0
+  source = "./argocd"
+
+  argocd_enabled = true
+
+  # Identity / cluster
+  workspace                 = local.workspace
+  azure_location            = var.location
+  azure_subscription_id     = var.azure_subscription_id
+  azure_tenant_id           = coalesce(var.azure_tenant_id, data.azurerm_client_config.current.tenant_id)
+  azure_resource_group_name = module.network.resource_group.name
+  azure_node_resource_group = module.cluster.kubernetes.node_resource_group
+  cluster_name              = module.cluster.kubernetes.name
+  oidc_issuer_url           = module.cluster.oidc_issuer_url
+  key_vault_name            = local.key_vault_name
+  key_vault_id              = azurerm_key_vault.paragon.id
+  key_vault_uri             = azurerm_key_vault.paragon.vault_uri
+
+  # Secret content — computed by argocd_env.tf and root variables
+  env_config             = local.argocd_env_secret
+  docker_username        = var.argocd_docker_username
+  docker_password        = var.argocd_docker_password
+  docker_registry_server = var.argocd_docker_registry_server
+  docker_email           = var.argocd_docker_email
+  managed_sync_config    = var.paragon_managed_sync_config
+
+  # DNS / Cloudflare
+  cloudflare_api_token = var.cloudflare_api_token
+  cloudflare_zone_id   = var.cloudflare_tunnel_zone_id
+
+  # ArgoCD tooling
+  argocd_version            = var.argocd_version
+  argocd_helm_chart_version = var.argocd_helm_chart_version
+  eso_chart_version         = var.eso_chart_version
+  argocd_addon_overrides    = var.argocd_addon_overrides
+
+  # Bootstrap repo
+  bootstrap_repo_url      = var.argocd_bootstrap_repo_url
+  bootstrap_repo_path     = var.argocd_bootstrap_repo_path
+  bootstrap_repo_revision = var.argocd_bootstrap_repo_revision
+  bootstrap_repo_token    = var.argocd_bootstrap_repo_token
+  auto_sync               = var.argocd_auto_sync
+  self_heal               = var.argocd_self_heal
+
+  # Paragon application
+  paragon_domain               = local.paragon_domain_trimmed
+  app_chart_repository         = var.argocd_app_chart_repository
+  paragon_managed_sync_version = var.paragon_managed_sync_version
+  paragon_monitors_enabled     = var.paragon_monitors_enabled
+  managed_sync_enabled         = var.managed_sync_enabled
+  ingress_scheme               = var.argocd_ingress_scheme
+
+  depends_on = [
+    azurerm_key_vault_access_policy.terraform,
+    module.cluster,
+  ]
+}

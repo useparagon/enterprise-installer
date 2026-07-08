@@ -42,6 +42,8 @@ resource "google_secret_manager_secret_version" "runtime_storage" {
     public_bucket       = module.storage.storage.public_bucket
     private_bucket      = module.storage.storage.private_bucket
     managed_sync_bucket = module.storage.storage.managed_sync_bucket
+    logs_bucket         = module.storage.storage.logs_bucket
+    auditlogs_bucket    = module.storage.storage.auditlogs_bucket
     microservice_user   = module.storage.storage.minio_microservice_user
     microservice_pass   = module.storage.storage.minio_microservice_pass
     root_user           = module.storage.storage.project_id
@@ -89,5 +91,21 @@ resource "google_secret_manager_secret_version" "runtime_redis_ca_cert" {
       try(module.redis.redis.queue.ca_certificate, null),
       try(module.redis.redis.system.ca_certificate, null),
     ]))
+  })
+}
+
+resource "google_secret_manager_secret" "runtime_bastion" {
+  secret_id = "${local.runtime_secret_prefix}-bastion"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "runtime_bastion" {
+  secret = google_secret_manager_secret.runtime_bastion.id
+  secret_data = jsonencode({
+    public_dns  = module.bastion.connection.bastion_dns
+    private_key = module.bastion.connection.private_key
   })
 }

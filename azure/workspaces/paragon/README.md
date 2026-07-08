@@ -30,8 +30,8 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.58.0 |
-| <a name="provider_random"></a> [random](#provider\_random) | 3.8.1 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.76.0 |
+| <a name="provider_random"></a> [random](#provider\_random) | 3.9.0 |
 
 ## Modules
 

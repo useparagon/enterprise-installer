@@ -111,3 +111,57 @@ module "bastion" {
   tfc_agent_token = var.tfc_agent_token
   workspace       = local.workspace
 }
+
+module "argocd" {
+  count  = var.argocd_enabled ? 1 : 0
+  source = "./argocd"
+
+  argocd_enabled = true
+
+  # Identity / cluster
+  workspace      = local.workspace
+  gcp_project_id = local.gcp_project_id
+  gcp_region     = var.region
+  cluster_name   = module.cluster.kubernetes.name
+  labels         = local.default_labels
+
+  # Secret content — computed by argocd_env.tf and root variables
+  env_config             = local.argocd_env_secret
+  docker_username        = var.argocd_docker_username
+  docker_password        = var.argocd_docker_password
+  docker_registry_server = var.argocd_docker_registry_server
+  docker_email           = var.argocd_docker_email
+  managed_sync_config    = var.paragon_managed_sync_config
+
+  # DNS / Cloudflare
+  cloudflare_api_token = var.cloudflare_api_token
+  cloudflare_zone_id   = var.cloudflare_tunnel_zone_id
+
+  # ArgoCD tooling
+  argocd_release_name       = "argo-cd"
+  argocd_version            = var.argocd_version
+  argocd_helm_chart_version = var.argocd_helm_chart_version
+  eso_chart_version         = var.eso_chart_version
+  argocd_addon_overrides    = var.argocd_addon_overrides
+
+  destination_namespace     = "paragon"
+  cluster_secret_store_name = "gcp-secret-manager"
+
+  # Bootstrap repo
+  bootstrap_repo_url      = var.argocd_bootstrap_repo_url
+  bootstrap_repo_path     = var.argocd_bootstrap_repo_path
+  bootstrap_repo_revision = var.argocd_bootstrap_repo_revision
+  bootstrap_repo_token    = var.argocd_bootstrap_repo_token
+  auto_sync               = var.argocd_auto_sync
+  self_heal               = var.argocd_self_heal
+
+  # Paragon application
+  paragon_domain               = local.paragon_domain_trimmed
+  app_chart_repository         = var.argocd_app_chart_repository
+  paragon_managed_sync_version = var.paragon_managed_sync_version
+  paragon_monitors_enabled     = var.paragon_monitors_enabled
+  managed_sync_enabled         = var.managed_sync_enabled
+  ingress_scheme               = var.argocd_ingress_scheme
+
+  depends_on = [module.cluster]
+}

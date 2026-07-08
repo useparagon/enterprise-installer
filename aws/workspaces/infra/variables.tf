@@ -28,6 +28,12 @@ variable "aws_session_token" {
   default     = null
 }
 
+variable "aws_assume_role_arn" {
+  description = "Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift backend account)."
+  type        = string
+  default     = null
+}
+
 # ---------------------------------------------------------------------------
 # Account
 # ---------------------------------------------------------------------------
@@ -180,7 +186,7 @@ variable "elasticache_multi_az" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.34"
+  default     = "1.35"
   nullable    = false
 }
 
@@ -468,6 +474,13 @@ variable "argocd_enabled" {
   nullable    = false
 }
 
+variable "k8s_providers_enabled" {
+  description = "Configure kubernetes/helm/kubectl providers against the EKS API. Defaults to false; set true when destroying a stack that still has GitOps resources in state while argocd_enabled is false."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 # ---------------------------------------------------------------------------
 # Migration
 # ---------------------------------------------------------------------------
@@ -504,7 +517,7 @@ variable "argocd_helm_chart_version" {
 }
 
 variable "argocd_addon_overrides" {
-  description = "Optional overrides merged into the EKS Blueprints Argo CD addon map."
+  description = "Optional Helm set overrides for the Argo CD release."
   type        = map(any)
   default     = {}
   nullable    = false
@@ -518,7 +531,7 @@ variable "eso_chart_version" {
 }
 
 variable "eso_addon_overrides" {
-  description = "Optional overrides for the Blueprints external-secrets addon (merged into the default external_secrets map)."
+  description = "Optional values merged into the external-secrets Helm release values map."
   type        = map(any)
   default     = {}
   nullable    = false
@@ -598,23 +611,11 @@ variable "argocd_bootstrap_repo_private" {
   nullable    = false
 }
 
-variable "paragon_chart_version" {
-  description = "Target chart version or constraint for Paragon charts deployed via ArgoCD (e.g. '2026.04.*'). Required when argocd_enabled is true."
-  type        = string
-  default     = null
-}
-
 variable "paragon_monitors_enabled" {
   description = "Whether monitoring charts should be deployed via ArgoCD."
   type        = bool
   default     = false
   nullable    = false
-}
-
-variable "paragon_monitor_version" {
-  description = "Chart version for the monitoring stack when deployed via ArgoCD. Defaults to paragon_chart_version when paragon_monitors_enabled is true."
-  type        = string
-  default     = null
 }
 
 variable "paragon_managed_sync_config" {
@@ -679,8 +680,33 @@ variable "argocd_docker_email" {
   default     = null
 }
 
+variable "docker_registry_server" {
+  description = "Docker registry server for application image pulls (PARA-21726). Falls back to argocd_docker_registry_server when unset."
+  type        = string
+  default     = null
+}
+
+variable "docker_username" {
+  description = "Docker username for application image pulls (PARA-21726). Falls back to argocd_docker_username when unset."
+  type        = string
+  default     = null
+}
+
+variable "docker_password" {
+  description = "Docker password for application image pulls (PARA-21726). Falls back to argocd_docker_password when unset."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "docker_email" {
+  description = "Docker email for application image pulls (PARA-21726). Falls back to argocd_docker_email when unset."
+  type        = string
+  default     = null
+}
+
 variable "secrets_recovery_window_in_days" {
-  description = "Secrets Manager deletion recovery window for ArgoCD application secrets (env, docker-cfg, managed-sync, openobserve). Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection."
+  description = "Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve) and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection."
   type        = number
   default     = 0
 
@@ -720,6 +746,13 @@ variable "paragon_certificate_arn" {
   }
 }
 
+variable "gitops_alb_ingressclass_exists" {
+  description = "Brownfield flag: set true when a cluster-scoped IngressClass named \"alb\" already exists (e.g. installed by the legacy paragon Helm \"ingress\" release). When true, the AWS Load Balancer Controller is configured with createIngressClassResource=false to avoid an \"already exists\" conflict. Set explicitly per stack instead of probed at plan time — a live cluster read during plan blocks the entire plan (and any destroy) for minutes whenever the EKS API is unreachable."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 # ---------------------------------------------------------------------------
 # Locals
 # ---------------------------------------------------------------------------
@@ -730,12 +763,6 @@ locals {
   workspace   = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
 
   paragon_domain_trimmed = var.paragon_domain != null ? trimspace(var.paragon_domain) : ""
-
-  # GitOps ingress: ALB controller + external-dns (Route 53 records from Ingress hosts).
-  gitops_ingress_enabled = (
-    var.argocd_enabled &&
-    local.paragon_domain_trimmed != ""
-  )
 
   default_tags = merge(
     {
@@ -753,17 +780,18 @@ locals {
   eks_ondemand_node_instance_type = distinct([for value in split(",", var.eks_ondemand_node_instance_type) : trimspace(value)])
   eks_spot_node_instance_type     = distinct([for value in split(",", var.eks_spot_node_instance_type) : trimspace(value)])
 
-  # ArgoCD: guard for secrets module — domain, Docker creds, and argocd enabled.
-  argocd_secrets_ready = (
+  # Application secrets guard — domain and Docker creds required for a complete
+  # GitOps bundle (paragon-secrets + docker-cfg ExternalSecrets).
+  app_secrets_ready = (
     local.argocd_domain != "" &&
-    var.argocd_docker_username != null &&
-    var.argocd_docker_password != null
+    local.secrets_docker_username != null &&
+    local.secrets_docker_password != null
   )
 
-  argocd_openobserve_credentials = var.argocd_enabled ? {
-    email    = "${random_string.openobserve_email[0].result}@useparagon.com"
-    password = random_password.openobserve_password[0].result
-  } : null
+  secrets_docker_registry_server = coalesce(var.docker_registry_server, var.argocd_docker_registry_server)
+  secrets_docker_username        = coalesce(var.docker_username, var.argocd_docker_username)
+  secrets_docker_password        = coalesce(var.docker_password, var.argocd_docker_password)
+  secrets_docker_email           = coalesce(var.docker_email, var.argocd_docker_email)
 
   # When using an assumed role the role itself must be referenced instead of the
   # current session identity arn, otherwise KMS key policies are rejected with
@@ -794,17 +822,6 @@ resource "terraform_data" "validate_argocd_versions" {
 
   lifecycle {
     precondition {
-      condition     = var.paragon_chart_version == null || trimspace(var.paragon_chart_version) != ""
-      error_message = "paragon_chart_version cannot be empty when set."
-    }
-    precondition {
-      condition = (
-        !var.argocd_enabled ||
-        (var.paragon_chart_version != null && trimspace(var.paragon_chart_version) != "")
-      )
-      error_message = "paragon_chart_version is required when argocd_enabled is true."
-    }
-    precondition {
       condition     = trimspace(var.argocd_app_chart_repository) != ""
       error_message = "argocd_app_chart_repository cannot be empty."
     }
@@ -829,17 +846,13 @@ resource "terraform_data" "validate_argocd_versions" {
       error_message = "paragon_managed_sync_config is required when argocd_enabled and managed_sync_enabled are both true."
     }
     precondition {
-      condition     = !var.paragon_monitors_enabled || (var.paragon_monitor_version != null && trimspace(var.paragon_monitor_version) != "")
-      error_message = "paragon_monitor_version must be set when paragon_monitors_enabled is true."
-    }
-    precondition {
       condition     = contains(["internet-facing", "internal"], var.argocd_ingress_scheme)
       error_message = "argocd_ingress_scheme must be either 'internet-facing' or 'internal'."
     }
-    # Without these, the secrets module is skipped (argocd_secrets_ready=false) while Argo CD
-    # and ESO still bootstrap, leaving workloads to sync with no paragon-secrets or pull creds.
+    # Without docker creds + domain, ExternalSecrets for paragon-secrets/docker-cfg
+    # cannot be wired while Argo CD and ESO still bootstrap.
     precondition {
-      condition     = local.argocd_secrets_ready
+      condition     = local.app_secrets_ready
       error_message = "argocd_enabled requires paragon_domain, argocd_docker_username, and argocd_docker_password so the paragon-secrets and docker-cfg secrets can be created for GitOps/ESO."
     }
     precondition {
@@ -889,28 +902,4 @@ resource "terraform_data" "validate_argocd_versions" {
       error_message = "paragon_domain must be set when argocd_enabled is true."
     }
   }
-}
-
-# ---------------------------------------------------------------------------
-# Generated resources (conditional on argocd_enabled)
-# ---------------------------------------------------------------------------
-
-resource "random_string" "openobserve_email" {
-  count = var.argocd_enabled ? 1 : 0
-
-  length  = 12
-  lower   = true
-  numeric = true
-  special = false
-  upper   = false
-}
-
-resource "random_password" "openobserve_password" {
-  count = var.argocd_enabled ? 1 : 0
-
-  length  = 32
-  lower   = true
-  numeric = true
-  special = false
-  upper   = true
 }

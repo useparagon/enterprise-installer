@@ -7,3 +7,13 @@ output "kubernetes" {
   }
   sensitive = true
 }
+
+output "workload_pool" {
+  value       = "${var.gcp_project_id}.svc.id.goog"
+  description = "GKE Workload Identity pool."
+}
+
+output "cluster_id" {
+  value       = module.gke.cluster_id
+  description = "Full GKE cluster resource id (projects/.../locations/.../clusters/...), used for Fleet membership / Connect Gateway."
+}

@@ -55,8 +55,8 @@ resource "azurerm_key_vault_secret" "runtime_storage" {
     public_storage_account_name = module.storage.blob.public_storage_account_name
     private_bucket              = module.storage.blob.private_container
     managed_sync_bucket         = module.storage.blob.managed_sync_container
-    microservice_user           = module.storage.blob.minio_microservice_user
-    microservice_pass           = module.storage.blob.minio_microservice_pass
+    logs_container              = module.storage.blob.logs_container
+    auditlogs_container         = module.storage.blob.auditlogs_container
     root_user                   = module.storage.blob.name
     root_password               = module.storage.blob.access_key
   })
@@ -77,6 +77,17 @@ resource "azurerm_key_vault_secret" "runtime_kafka" {
     cluster_password          = module.kafka[0].kafka_credentials.password
     cluster_mechanism         = module.kafka[0].kafka_credentials.mechanism
     cluster_tls_enabled       = module.kafka[0].tls_enabled
+  })
+
+  depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
+resource "azurerm_key_vault_secret" "runtime_bastion" {
+  name         = "bastion"
+  key_vault_id = azurerm_key_vault.paragon.id
+  value = jsonencode({
+    public_dns  = module.bastion.connection.bastion_dns
+    private_key = module.bastion.connection.private_key
   })
 
   depends_on = [azurerm_key_vault_access_policy.terraform]

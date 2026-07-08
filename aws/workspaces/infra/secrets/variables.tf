@@ -20,9 +20,10 @@ variable "env_config" {
 }
 
 variable "docker_config" {
-  description = "Docker registry credentials as a JSON-encoded dockerconfigjson."
+  description = "Docker registry credentials as a JSON-encoded dockerconfigjson wrapper."
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "managed_sync_config" {
@@ -32,12 +33,8 @@ variable "managed_sync_config" {
   default     = null
 }
 
-variable "openobserve_credentials" {
-  description = "OpenObserve admin credentials."
-  type = object({
-    email    = string
-    password = string
-  })
-  sensitive = true
-  default   = null
+variable "create_openobserve" {
+  description = "When true, create the OpenObserve admin credentials secret."
+  type        = bool
+  default     = true
 }

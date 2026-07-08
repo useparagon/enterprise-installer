@@ -2,6 +2,26 @@ locals {
   secret_prefix = "paragon/${var.workspace}"
 }
 
+resource "random_string" "openobserve_email" {
+  count = var.create_openobserve ? 1 : 0
+
+  length  = 12
+  lower   = true
+  numeric = true
+  special = false
+  upper   = false
+}
+
+resource "random_password" "openobserve_password" {
+  count = var.create_openobserve ? 1 : 0
+
+  length  = 32
+  lower   = true
+  numeric = true
+  special = false
+  upper   = true
+}
+
 resource "aws_secretsmanager_secret" "env" {
   name                    = "${local.secret_prefix}/env"
   description             = "Paragon application environment variables for ${var.organization}"
@@ -30,8 +50,10 @@ resource "aws_secretsmanager_secret" "docker_cfg" {
 }
 
 resource "aws_secretsmanager_secret_version" "docker_cfg" {
-  secret_id     = aws_secretsmanager_secret.docker_cfg.id
-  secret_string = var.docker_config
+  secret_id = aws_secretsmanager_secret.docker_cfg.id
+  secret_string = var.docker_config != null ? var.docker_config : jsonencode({
+    dockerconfigjson = jsonencode({ auths = {} })
+  })
 }
 
 resource "aws_secretsmanager_secret" "managed_sync" {
@@ -55,7 +77,7 @@ resource "aws_secretsmanager_secret_version" "managed_sync" {
 }
 
 resource "aws_secretsmanager_secret" "openobserve" {
-  count = var.openobserve_credentials != null ? 1 : 0
+  count = var.create_openobserve ? 1 : 0
 
   name                    = "${local.secret_prefix}/openobserve"
   description             = "OpenObserve credentials for ${var.organization}"
@@ -68,11 +90,11 @@ resource "aws_secretsmanager_secret" "openobserve" {
 }
 
 resource "aws_secretsmanager_secret_version" "openobserve" {
-  count = var.openobserve_credentials != null ? 1 : 0
+  count = var.create_openobserve ? 1 : 0
 
   secret_id = aws_secretsmanager_secret.openobserve[0].id
   secret_string = jsonencode({
-    ZO_ROOT_USER_EMAIL    = var.openobserve_credentials.email
-    ZO_ROOT_USER_PASSWORD = var.openobserve_credentials.password
+    ZO_ROOT_USER_EMAIL    = "${random_string.openobserve_email[0].result}@useparagon.com"
+    ZO_ROOT_USER_PASSWORD = random_password.openobserve_password[0].result
   })
 }

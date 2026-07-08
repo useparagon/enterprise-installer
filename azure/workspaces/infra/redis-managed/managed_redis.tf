@@ -27,4 +27,13 @@ resource "azurerm_managed_redis" "redis" {
     persistence_redis_database_backup_frequency   = each.value.rdb_backup_frequency
     persistence_append_only_file_backup_frequency = each.value.aof_backup_frequency
   }
+
+  # Azure Managed Redis (Redis Enterprise) provisioning can be slow and occasionally
+  # completes server-side after the client gives up, leaving an orphaned cluster
+  # and broken state. Allow ample time so the apply waits for completion.
+  timeouts {
+    create = "90m"
+    update = "90m"
+    delete = "60m"
+  }
 }

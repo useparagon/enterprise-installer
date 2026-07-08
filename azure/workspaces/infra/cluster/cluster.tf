@@ -87,6 +87,9 @@ resource "azurerm_kubernetes_cluster" "cluster" {
     network_policy      = var.k8s_network_policy
   }
 
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
+
   identity {
     type = "SystemAssigned"
   }

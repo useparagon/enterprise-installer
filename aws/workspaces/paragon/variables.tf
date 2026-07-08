@@ -402,7 +402,7 @@ variable "migrated_workspace" {
 }
 
 variable "argocd_enabled" {
-  description = "When true, the infra workspace manages runtime secrets and External Secrets; this workspace references them instead of creating duplicates."
+  description = "When true, infra also bootstraps Argo CD/GitOps (ESO, ALB controller, app-of-apps). Application secrets in Secrets Manager are always owned by the infra workspace (PARA-21726); this workspace overlays chart-specific keys and reads the rest."
   type        = bool
   default     = false
 }

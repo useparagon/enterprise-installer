@@ -4,6 +4,8 @@ locals {
 }
 
 data "aws_iam_policy_document" "cas_assume" {
+  count = var.cluster_autoscaler_enabled ? 1 : 0
+
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -28,8 +30,10 @@ data "aws_iam_policy_document" "cas_assume" {
 }
 
 resource "aws_iam_role" "cluster_autoscaler" {
+  count = var.cluster_autoscaler_enabled ? 1 : 0
+
   name               = "${var.workspace}-cluster-autoscaler"
-  assume_role_policy = data.aws_iam_policy_document.cas_assume.json
+  assume_role_policy = data.aws_iam_policy_document.cas_assume[0].json
 
   tags = {
     Name = "${var.workspace}-cluster-autoscaler"
@@ -37,6 +41,8 @@ resource "aws_iam_role" "cluster_autoscaler" {
 }
 
 data "aws_iam_policy_document" "cas_permissions" {
+  count = var.cluster_autoscaler_enabled ? 1 : 0
+
   statement {
     effect = "Allow"
     actions = [
@@ -71,12 +77,16 @@ data "aws_iam_policy_document" "cas_permissions" {
 }
 
 resource "aws_iam_role_policy" "cluster_autoscaler" {
+  count = var.cluster_autoscaler_enabled ? 1 : 0
+
   name   = "cluster-autoscaler"
-  role   = aws_iam_role.cluster_autoscaler.id
-  policy = data.aws_iam_policy_document.cas_permissions.json
+  role   = aws_iam_role.cluster_autoscaler[0].id
+  policy = data.aws_iam_policy_document.cas_permissions[0].json
 }
 
 resource "kubectl_manifest" "cluster_autoscaler_application" {
+  count = var.cluster_autoscaler_enabled ? 1 : 0
+
   yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
@@ -103,7 +113,7 @@ resource "kubectl_manifest" "cluster_autoscaler_application" {
               serviceAccount = {
                 name = local.cas_sa_name
                 annotations = {
-                  "eks.amazonaws.com/role-arn" = aws_iam_role.cluster_autoscaler.arn
+                  "eks.amazonaws.com/role-arn" = aws_iam_role.cluster_autoscaler[0].arn
                 }
               }
             }
@@ -122,5 +132,5 @@ resource "kubectl_manifest" "cluster_autoscaler_application" {
     }
   })
 
-  depends_on = [terraform_data.eso_crds_ready]
+  depends_on = [time_sleep.eso_crds, helm_release.argocd]
 }

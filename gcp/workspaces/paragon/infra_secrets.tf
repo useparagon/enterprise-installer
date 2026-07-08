@@ -45,7 +45,7 @@ locals {
       auditlogs_bucket = { value = local.auditlogs_bucket }
       postgres         = { value = jsondecode(data.google_secret_manager_secret_version.infra_postgres[0].secret_data) }
       redis            = { value = jsondecode(data.google_secret_manager_secret_version.infra_redis[0].secret_data) }
-      minio            = { value = jsondecode(data.google_secret_manager_secret_version.infra_storage[0].secret_data) }
+      storage          = { value = jsondecode(data.google_secret_manager_secret_version.infra_storage[0].secret_data) }
     },
     var.managed_sync_enabled ? {
       kafka = { value = jsondecode(data.google_secret_manager_secret_version.infra_kafka[0].secret_data) }

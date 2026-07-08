@@ -23,4 +23,13 @@ terraform {
       version = ">= 0.0.19"
     }
   }
+
+  # backend "remote" {
+  #   hostname     = "app.terraform.io"
+  #   organization = "paragon-cloud"
+  #
+  #   workspaces {
+  #     name = "paragon-gcp-paragon"
+  #   }
+  # }
 }

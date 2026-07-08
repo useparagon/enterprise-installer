@@ -626,3 +626,314 @@ locals {
     cache = merge(local.redis_managed_instances_config["cache"], { cluster_enabled = false })
   }
 }
+# ArgoCD / GitOps variables for Azure infra workspace.
+# paragon_domain is defined in variables.tf — not repeated here.
+
+variable "argocd_enabled" {
+  description = "Enable ArgoCD-based GitOps deployment. When true, bootstraps ArgoCD and ESO on the cluster, writes config to Key Vault, and applies ArgoCD Application manifests."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "k8s_providers_enabled" {
+  description = "Configure kubernetes/helm/kubectl providers against the AKS API. Defaults to false; set true when destroying a stack that still has GitOps resources in state while argocd_enabled is false."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+# ---------------------------------------------------------------------------
+# ArgoCD / GitOps — tooling
+# ---------------------------------------------------------------------------
+
+variable "argocd_version" {
+  description = "Argo CD container image tag (e.g. v3.4.2). Applied via the official argo-cd Helm chart."
+  type        = string
+  default     = "v3.4.2"
+  nullable    = false
+}
+
+variable "argocd_helm_chart_version" {
+  description = "Version of the argo-cd Helm chart from https://argoproj.github.io/argo-helm."
+  type        = string
+  default     = "9.5.15"
+  nullable    = false
+}
+
+variable "argocd_addon_overrides" {
+  description = "Optional overrides merged into the ArgoCD Helm values."
+  type        = map(any)
+  default     = {}
+  nullable    = false
+}
+
+variable "eso_chart_version" {
+  description = "Helm chart version for external-secrets operator."
+  type        = string
+  default     = "0.14.4"
+  nullable    = false
+}
+
+variable "argocd_auto_sync" {
+  description = "Whether ArgoCD Applications should auto-sync on git/chart changes."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
+variable "argocd_self_heal" {
+  description = "Whether ArgoCD should auto-correct drift from desired state."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
+variable "argocd_slack_token" {
+  description = "Optional Slack bot token for ArgoCD sync notifications."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "argocd_slack_channel" {
+  description = "Slack channel name for ArgoCD notifications."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
+# ---------------------------------------------------------------------------
+# ArgoCD / GitOps — Paragon application charts
+# ---------------------------------------------------------------------------
+
+variable "argocd_app_chart_repository" {
+  description = "Helm chart repository URL for Paragon application charts."
+  type        = string
+  default     = "https://paragon-helm-production.s3.amazonaws.com"
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_url" {
+  description = "HTTPS Git repository URL for Argo CD App-of-Apps bootstrap. Leave empty to skip creating the root Application."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_path" {
+  description = "Path inside argocd_bootstrap_repo_url containing child Application manifests."
+  type        = string
+  default     = ""
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_revision" {
+  description = "Git revision (branch, tag, or commit) for App-of-Apps bootstrap."
+  type        = string
+  default     = "HEAD"
+  nullable    = false
+}
+
+variable "argocd_bootstrap_repo_token" {
+  description = "GitHub PAT for argocd_bootstrap_repo_url (HTTPS). Set via Spacelift context / TF_VAR_* (never commit). Required when bootstrap repo URL and path are set."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "argocd_bootstrap_repo_private" {
+  description = "When true, argocd_bootstrap_repo_token is required to clone the bootstrap repository."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "paragon_monitors_enabled" {
+  description = "Whether monitoring charts should be deployed via ArgoCD."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "paragon_managed_sync_config" {
+  description = "Optional managed-sync secret data to write to Key Vault. Null when managed sync is disabled."
+  type        = map(string)
+  sensitive   = true
+  default     = null
+}
+
+variable "paragon_managed_sync_version" {
+  description = "Chart version for managed-sync when deployed via ArgoCD. Required when argocd_enabled and managed_sync_enabled are both true."
+  type        = string
+  default     = null
+}
+
+# ---------------------------------------------------------------------------
+# ArgoCD / GitOps — application secrets
+# ---------------------------------------------------------------------------
+
+variable "paragon_domain" {
+  description = "Customer-facing Paragon domain (e.g. customer.example.com). Used for ingress, DNS zone, and written to Key Vault as PARAGON_DOMAIN and derived *_PUBLIC_URL values when argocd_enabled."
+  type        = string
+  default     = null
+}
+
+variable "argocd_env_overrides" {
+  description = "Optional overrides for any infra-derived env key written to Key Vault. Merged on top of computed defaults; argocd_app_secrets wins if the same key is set in both."
+  type        = map(string)
+  default     = null
+}
+
+variable "argocd_app_secrets" {
+  description = "Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat env Key Vault secret last."
+  type        = map(string)
+  sensitive   = true
+  default     = null
+}
+
+variable "argocd_docker_registry_server" {
+  description = "Docker registry server for ArgoCD image pulls."
+  type        = string
+  default     = "docker.io"
+  nullable    = false
+}
+
+variable "argocd_docker_username" {
+  description = "Docker username for ArgoCD image pulls."
+  type        = string
+  default     = null
+}
+
+variable "argocd_docker_password" {
+  description = "Docker password for ArgoCD image pulls."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "argocd_docker_email" {
+  description = "Docker email for ArgoCD image pulls."
+  type        = string
+  default     = null
+}
+
+# ---------------------------------------------------------------------------
+# ArgoCD / GitOps — ingress
+# ---------------------------------------------------------------------------
+
+variable "argocd_ingress_scheme" {
+  description = "Ingress scheme for ArgoCD-managed ingress: internet-facing or internal."
+  type        = string
+  default     = "internet-facing"
+  nullable    = false
+
+  validation {
+    condition     = contains(["internet-facing", "internal"], var.argocd_ingress_scheme)
+    error_message = "argocd_ingress_scheme must be either 'internet-facing' or 'internal'."
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Locals
+# ---------------------------------------------------------------------------
+
+locals {
+  paragon_domain_trimmed = var.paragon_domain != null ? trimspace(var.paragon_domain) : ""
+
+  argocd_domain = local.paragon_domain_trimmed
+
+  # argocd_secrets_ready is used in validate_argocd_versions precondition only.
+  argocd_secrets_ready = (
+    local.argocd_domain != "" &&
+    var.argocd_docker_username != null &&
+    var.argocd_docker_password != null
+  )
+}
+
+resource "terraform_data" "validate_argocd_versions" {
+  count = var.argocd_enabled ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = trimspace(var.argocd_app_chart_repository) != ""
+      error_message = "argocd_app_chart_repository cannot be empty."
+    }
+
+    precondition {
+      condition     = var.paragon_managed_sync_version == null || trimspace(var.paragon_managed_sync_version) != ""
+      error_message = "paragon_managed_sync_version cannot be empty when set."
+    }
+
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        !var.managed_sync_enabled ||
+        (var.paragon_managed_sync_version != null && trimspace(var.paragon_managed_sync_version) != "")
+      )
+      error_message = "paragon_managed_sync_version is required when argocd_enabled and managed_sync_enabled are both true."
+    }
+
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        !var.managed_sync_enabled ||
+        (var.paragon_managed_sync_config != null && length(var.paragon_managed_sync_config) > 0)
+      )
+      error_message = "paragon_managed_sync_config is required when argocd_enabled and managed_sync_enabled are both true."
+    }
+
+    precondition {
+      condition     = local.argocd_secrets_ready
+      error_message = "argocd_enabled requires paragon_domain, argocd_docker_username, and argocd_docker_password so the paragon-secrets and docker-cfg secrets can be created for GitOps/ESO."
+    }
+
+    precondition {
+      condition     = var.argocd_slack_token == null || trimspace(var.argocd_slack_channel) != ""
+      error_message = "argocd_slack_channel must be set when argocd_slack_token is provided."
+    }
+
+    precondition {
+      condition     = trimspace(var.argocd_slack_channel) == "" || var.argocd_slack_token != null
+      error_message = "argocd_slack_token must be set when argocd_slack_channel is provided."
+    }
+
+    precondition {
+      condition = (
+        (trimspace(var.argocd_bootstrap_repo_url) == "" && trimspace(var.argocd_bootstrap_repo_path) == "") ||
+        (trimspace(var.argocd_bootstrap_repo_url) != "" && trimspace(var.argocd_bootstrap_repo_path) != "")
+      )
+      error_message = "argocd_bootstrap_repo_url and argocd_bootstrap_repo_path must either both be empty or both be set."
+    }
+
+    precondition {
+      condition = (
+        trimspace(var.argocd_bootstrap_repo_url) == "" ||
+        trimspace(var.argocd_bootstrap_repo_path) == "" ||
+        startswith(trimspace(var.argocd_bootstrap_repo_url), "https://")
+      )
+      error_message = "argocd_bootstrap_repo_url must use HTTPS (https://github.com/...). SSH git@ URLs are not supported."
+    }
+
+    precondition {
+      condition = (
+        trimspace(var.argocd_bootstrap_repo_url) == "" ||
+        trimspace(var.argocd_bootstrap_repo_path) == "" ||
+        !var.argocd_bootstrap_repo_private ||
+        (
+          var.argocd_bootstrap_repo_token != null &&
+          trimspace(var.argocd_bootstrap_repo_token) != ""
+        )
+      )
+      error_message = "argocd_bootstrap_repo_token is required when argocd_bootstrap_repo_private is true and bootstrap repo URL/path are set."
+    }
+
+    precondition {
+      condition = (
+        !var.argocd_enabled ||
+        (var.paragon_domain != null && trimspace(var.paragon_domain) != "")
+      )
+      error_message = "paragon_domain must be set when argocd_enabled is true."
+    }
+  }
+}

@@ -24,6 +24,8 @@ module "gke" {
   region                     = var.region
   remove_default_node_pool   = true
   subnetwork                 = var.private_subnet.name
+  identity_namespace         = "enabled"
+  gateway_api_channel        = "CHANNEL_STANDARD"
   zones                      = [var.region_zone, var.region_zone_backup]
 
   # Private cluster configuration

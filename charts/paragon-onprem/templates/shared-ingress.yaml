@@ -1,0 +1,72 @@
+{{- /*
+Single shared GCE Ingress for all public Paragon hosts.
+
+GCE Ingress has no ALB-style load-balancer grouping (unlike AWS, where per-service
+ingresses merge into one ALB via group.name), so a per-service ingress would create
+one Cloud Load Balancer + IP per service. This template consolidates every public
+host behind ONE static IP + ONE cert, mirroring the legacy `paragon` workspace
+(gcp/workspaces/paragon/helm/ingress.tf).
+
+Rendered only when global.ingress.shared is true (GCP); AWS/Azure keep their
+per-service ingresses (charts/paragon-templates/templates/_ingress.yaml).
+
+Infra stays service-agnostic and passes references via global.ingress.* (the same
+ergonomics as the AWS global.ingress block):
+  - className        : ingress class (default "gce"; "gce-internal" when scheme=internal)
+  - loadBalancerName : reserved global static IP name (google_compute_global_address)
+  - certificate      : GCP Certificate Manager cert-map name (networking.gke.io/certmap)
+  - services         : [{name, port}] public hosts; host = <name>.<PARAGON_DOMAIN>
+
+The FrontendConfig CR (HTTP->HTTPS redirect) is service-agnostic and rendered here
+so it is GitOps-managed, then referenced by the Ingress annotation.
+*/ -}}
+{{- $g := (.Values.global).ingress | default dict -}}
+{{- if $g.shared -}}
+{{- $ns := .Values.global.namespace | default "paragon" -}}
+{{- $domain := .Values.global.env.PARAGON_DOMAIN -}}
+{{- $internal := eq ($g.scheme | default "external") "internal" -}}
+{{- $className := ternary "gce-internal" ($g.className | default "gce") $internal -}}
+{{- $fcName := printf "%s-frontend-config" .Release.Name -}}
+{{- if not $domain }}{{ fail "global.ingress.shared is true but global.env.PARAGON_DOMAIN is empty" }}{{ end -}}
+{{- if not $g.services }}{{ fail "global.ingress.shared is true but global.ingress.services is empty" }}{{ end -}}
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: {{ $fcName }}
+  namespace: {{ $ns }}
+spec:
+  redirectToHttps:
+    enabled: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shared-ingress
+  namespace: {{ $ns }}
+  annotations:
+    kubernetes.io/ingress.allow-http: "true"
+    kubernetes.io/ingress.class: {{ $className }}
+    ingress.kubernetes.io/healthcheck-path: /healthz
+    networking.gke.io/v1beta1.FrontendConfig: {{ $fcName }}
+    {{- if $g.loadBalancerName }}
+    kubernetes.io/ingress.global-static-ip-name: {{ $g.loadBalancerName }}
+    {{- end }}
+    {{- if $g.certificate }}
+    networking.gke.io/certmap: {{ $g.certificate }}
+    {{- end }}
+spec:
+  ingressClassName: {{ $className }}
+  rules:
+    {{- range $g.services }}
+    - host: {{ printf "%s.%s" .name $domain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .name }}
+                port:
+                  number: {{ .port }}
+    {{- end }}
+{{- end -}}

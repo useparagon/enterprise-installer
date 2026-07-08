@@ -1,7 +1,7 @@
 locals {
   eso_sync_triggers = var.install_external_secrets ? join(",", compact([
     try(kubectl_manifest.external_secret_paragon[0].uid, null),
-    try(kubectl_manifest.external_secret_docker[0].uid, null),
+    var.docker_cfg_secret_name != null ? try(kubectl_manifest.external_secret_docker[0].uid, null) : null,
     var.openobserve_secret_name != null ? try(kubectl_manifest.external_secret_openobserve[0].uid, null) : null,
     var.managed_sync_secret_name != null ? try(kubectl_manifest.external_secret_managed_sync[0].uid, null) : null,
   ])) : var.runtime_secrets_ready
@@ -14,7 +14,7 @@ resource "time_sleep" "wait_for_eso_core_secrets" {
 
   depends_on = [
     kubectl_manifest.external_secret_paragon[0],
-    kubectl_manifest.external_secret_docker[0],
+    kubectl_manifest.external_secret_docker,
   ]
 
   triggers = {

@@ -1,6 +1,20 @@
+variable "argocd_enabled" {
+  description = "When false, no ArgoCD/GitOps resources are created in this module."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
 variable "cluster_name" {
   description = "Name of the EKS cluster."
   type        = string
+}
+
+variable "cluster_autoscaler_enabled" {
+  description = "Deploy cluster-autoscaler via Argo CD when legacy managed node groups are active."
+  type        = bool
+  default     = false
+  nullable    = false
 }
 
 variable "oidc_provider_arn" {
@@ -19,54 +33,18 @@ variable "workspace" {
 }
 
 variable "aws_region" {
-  description = "AWS region for the Secrets Manager resources."
+  description = "AWS region for Secrets Manager and Route 53 resources."
   type        = string
 }
 
-variable "argocd_namespace" {
-  description = "Namespace to install ArgoCD into."
-  type        = string
-  default     = "argocd"
-}
-
-variable "create_gp3_storage_class" {
-  description = "Create a default gp3 StorageClass. Leave false when upgrading from SSM bootstrap (gp3 already exists)."
-  type        = bool
-  default     = false
-}
-
-variable "argocd_release_name" {
-  description = "Argo CD Helm release name used for in-cluster secret discovery."
-  type        = string
-  default     = "argo-cd"
-}
-
-variable "eso_role_arn" {
-  description = "IAM role ARN for the External Secrets Operator service account (installed via Blueprints)."
-  type        = string
-}
-
-variable "eso_crds_ready" {
-  description = "Set when Blueprints ESO Helm + CRD wait have completed (time_sleep id from parent module)."
-  type        = string
-}
+# ---------------------------------------------------------------------------
+# Application secrets — created by the root secrets module
+# ---------------------------------------------------------------------------
 
 variable "secrets_manager_secret_arns" {
-  description = "List of Secrets Manager secret ARNs that ESO should be allowed to read."
+  description = "ARNs of application Secrets Manager secrets the ESO role may read."
   type        = list(string)
   default     = []
-}
-
-variable "destination_namespace" {
-  description = "Target namespace for Paragon workloads."
-  type        = string
-  default     = "paragon"
-}
-
-variable "cluster_secret_store_name" {
-  description = "Name of the ClusterSecretStore for ExternalSecrets."
-  type        = string
-  default     = "aws-secrets-manager"
 }
 
 variable "env_secret_name" {
@@ -93,6 +71,102 @@ variable "openobserve_secret_name" {
   default     = null
 }
 
+# ---------------------------------------------------------------------------
+# DNS / Cloudflare / TLS
+# ---------------------------------------------------------------------------
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token for NS record delegation. Leave empty or use the dummy value to skip Cloudflare records."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "cloudflare_zone_id" {
+  description = "Cloudflare zone ID for paragon_domain NS delegation."
+  type        = string
+  default     = ""
+}
+
+variable "paragon_certificate_arn" {
+  description = "Existing ACM certificate ARN for Paragon ALB ingress. When empty, Terraform requests a new ACM cert in the paragon_domain Route 53 zone."
+  type        = string
+  default     = ""
+}
+
+variable "gitops_alb_ingressclass_exists" {
+  description = "Brownfield flag: set true when a cluster-scoped IngressClass named alb already exists."
+  type        = bool
+  default     = false
+}
+
+# ---------------------------------------------------------------------------
+# ArgoCD tooling
+# ---------------------------------------------------------------------------
+
+variable "argocd_namespace" {
+  description = "Namespace to install ArgoCD into."
+  type        = string
+  default     = "argocd"
+}
+
+variable "argocd_release_name" {
+  description = "Argo CD Helm release name."
+  type        = string
+  default     = "argo-cd"
+}
+
+variable "argocd_version" {
+  description = "Argo CD container image tag."
+  type        = string
+}
+
+variable "argocd_helm_chart_version" {
+  description = "Argo CD Helm chart version."
+  type        = string
+}
+
+variable "argocd_addon_overrides" {
+  description = "Optional Helm set overrides for the Argo CD release (name = set path, value = set value)."
+  type        = map(any)
+  default     = {}
+  nullable    = false
+}
+
+variable "eso_chart_version" {
+  description = "External Secrets Operator Helm chart version."
+  type        = string
+}
+
+variable "eso_addon_overrides" {
+  description = "Optional values merged into the external-secrets Helm release values map."
+  type        = map(any)
+  default     = {}
+  nullable    = false
+}
+
+variable "create_gp3_storage_class" {
+  description = "Create a default gp3 StorageClass. Leave false when upgrading from SSM bootstrap (gp3 already exists)."
+  type        = bool
+  default     = false
+}
+
+variable "destination_namespace" {
+  description = "Target namespace for Paragon workloads."
+  type        = string
+  default     = "paragon"
+}
+
+variable "cluster_secret_store_name" {
+  description = "Name of the ClusterSecretStore for ExternalSecrets."
+  type        = string
+  default     = "aws-secrets-manager"
+}
+
+# ---------------------------------------------------------------------------
+# Bootstrap repo
+# ---------------------------------------------------------------------------
+
 variable "bootstrap_repo_url" {
   description = "Git repository URL for App-of-Apps bootstrap."
   type        = string
@@ -112,7 +186,7 @@ variable "bootstrap_repo_revision" {
 }
 
 variable "bootstrap_repo_token" {
-  description = "GitHub personal access token for cloning bootstrap_repo_url (HTTPS). Set via Spacelift context / TF_VAR_* (never commit). Needs repo read on the bootstrap repository."
+  description = "GitHub PAT for bootstrap_repo_url (HTTPS)."
   type        = string
   sensitive   = true
   default     = null
@@ -130,56 +204,42 @@ variable "self_heal" {
   default     = true
 }
 
-variable "paragon_certificate_arn" {
-  description = "ACM certificate ARN for Paragon ALB ingress (wildcard for paragon_domain). Exposed on the in-cluster GitOps bridge secret for ApplicationSet helm values."
-  type        = string
-  default     = ""
-}
+# ---------------------------------------------------------------------------
+# Paragon application
+# ---------------------------------------------------------------------------
 
 variable "paragon_domain" {
-  description = "Customer-facing Paragon domain (GitOps bridge annotation paragon_domain)."
+  description = "Customer-facing Paragon domain."
   type        = string
   default     = ""
 }
 
 variable "app_chart_repository" {
-  description = "Helm chart repository URL for Paragon application charts (GitOps bridge annotation)."
+  description = "Helm chart repository URL for Paragon application charts."
   type        = string
   default     = ""
 }
 
-variable "paragon_chart_version" {
-  description = "Target chart version or constraint for Paragon charts (GitOps bridge annotation)."
-  type        = string
-  default     = null
-}
-
-variable "paragon_monitor_version" {
-  description = "Chart version for the monitoring stack when deployed via Argo CD (GitOps bridge annotation)."
-  type        = string
-  default     = null
-}
-
 variable "paragon_managed_sync_version" {
-  description = "Chart version for managed-sync when deployed via Argo CD (GitOps bridge annotation)."
+  description = "Chart version for managed-sync when deployed via Argo CD."
   type        = string
   default     = null
 }
 
 variable "paragon_monitors_enabled" {
-  description = "Whether monitoring charts are deployed via Argo CD (GitOps bridge annotation)."
+  description = "Whether monitoring charts are deployed via Argo CD."
   type        = bool
   default     = false
 }
 
 variable "managed_sync_enabled" {
-  description = "Whether managed sync is enabled (GitOps bridge annotation)."
+  description = "Whether managed sync is enabled."
   type        = bool
   default     = false
 }
 
 variable "ingress_scheme" {
-  description = "ALB scheme for Argo CD-managed ingress (GitOps bridge annotation)."
+  description = "ALB scheme for Argo CD-managed ingress."
   type        = string
   default     = "internet-facing"
 }

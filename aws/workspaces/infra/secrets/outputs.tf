@@ -1,5 +1,5 @@
 output "secret_arns" {
-  description = "ARNs of all Secrets Manager secrets created."
+  description = "ARNs of all application Secrets Manager secrets created by this module."
   value = compact([
     aws_secretsmanager_secret.env.arn,
     aws_secretsmanager_secret.docker_cfg.arn,

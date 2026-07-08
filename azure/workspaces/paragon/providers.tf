@@ -1,3 +1,30 @@
+terraform {
+  required_version = ">= 1.9.0"
+
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
+    hoop = {
+      source  = "hoophq/hoop"
+      version = ">= 0.0.19"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
+  }
+}
+
 provider "azurerm" {
   subscription_id = var.azure_subscription_id
   tenant_id       = var.azure_tenant_id
@@ -30,4 +57,3 @@ provider "hoop" {
   api_url = var.hoop_api_url
   api_key = coalesce(var.hoop_api_key, "dummy-token")
 }
-
