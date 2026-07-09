@@ -27,3 +27,18 @@ variable "network_firewall_enabled" {
   description = "Whether to create firewall subnets for AWS Network Firewall."
   type        = bool
 }
+
+variable "logs_bucket_name" {
+  description = "Central S3 logs bucket for Network Firewall logging when enabled."
+  type        = string
+}
+
+variable "network_firewall" {
+  description = "Network Firewall configuration. Defaults are defined in the root variables.tf."
+  type = object({
+    enabled                            = bool
+    rule_group_arns                    = list(string)
+    stateless_default_actions          = list(string)
+    stateless_fragment_default_actions = list(string)
+  })
+}

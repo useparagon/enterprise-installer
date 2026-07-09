@@ -124,11 +124,9 @@ variable "eks_system_managed_node_group" {
   })
 }
 
-variable "network_firewall_arn" {
-  description = "When set, serializes cluster creation after Network Firewall routing is ready."
+variable "egress_ready" {
+  description = "Set when private egress routing is ready. Implicit apply-order dependency for internet-bootstrapping workloads."
   type        = string
-  default     = null
-  nullable    = true
 }
 
 data "aws_caller_identity" "current" {}

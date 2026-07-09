@@ -37,3 +37,8 @@ output "nat_gateway_ids" {
 output "private_subnet_cidrs" {
   value = aws_subnet.private[*].cidr_block
 }
+
+output "egress_ready" {
+  description = "Signals private egress routing is configured (firewall ARN when NFW is enabled, otherwise VPC ID)."
+  value       = var.network_firewall.enabled ? module.network_firewall[0].firewall_arn : aws_vpc.app.id
+}

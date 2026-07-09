@@ -73,6 +73,11 @@ variable "k8s_version" {
   type        = string
 }
 
+variable "egress_ready" {
+  description = "Set when private egress routing is ready. Implicit apply-order dependency for internet-bootstrapping workloads."
+  type        = string
+}
+
 locals {
   # TODO: update to random port
   ssh_port = 22

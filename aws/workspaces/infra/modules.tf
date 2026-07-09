@@ -1,15 +1,4 @@
-module "network" {
-  source = "./network"
-
-  workspace                = local.workspace
-  aws_region               = var.aws_region
-  az_count                 = var.az_count
-  vpc_cidr                 = var.vpc_cidr
-  vpc_cidr_newbits         = var.vpc_cidr_newbits
-  network_firewall_enabled = var.network_firewall.enabled
-}
-
-# Logs bucket and policy must exist before Network Firewall logging and firewall apply.
+# Logs bucket policy must exist before Network Firewall logging configuration.
 module "storage" {
   source = "./storage"
 
@@ -29,29 +18,17 @@ module "storage" {
   cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
 }
 
-module "network_firewall" {
-  count  = var.network_firewall.enabled ? 1 : 0
-  source = "./network_firewall"
+module "network" {
+  source = "./network"
 
-  workspace = local.workspace
-  vpc_id    = module.network.vpc.id
-  vpc_cidr  = var.vpc_cidr
-  az_count  = var.az_count
-
-  availability_zones      = module.network.availability_zones.names
-  firewall_subnet_ids     = module.network.firewall_subnet[*].id
-  private_route_table_ids = module.network.private_route_table_ids
-  main_route_table_id     = module.network.main_route_table_id
-  nat_gateway_ids         = module.network.nat_gateway_ids
-  private_subnet_cidrs    = module.network.private_subnet_cidrs
-  logs_bucket_name        = module.storage.logs_bucket_name
-
-  network_firewall = {
-    enabled                            = var.network_firewall.enabled
-    rule_group_arns                    = var.network_firewall.rule_group_arns
-    stateless_default_actions          = var.network_firewall.stateless_default_actions
-    stateless_fragment_default_actions = var.network_firewall.stateless_fragment_default_actions
-  }
+  workspace                = local.workspace
+  aws_region               = var.aws_region
+  az_count                 = var.az_count
+  vpc_cidr                 = var.vpc_cidr
+  vpc_cidr_newbits         = var.vpc_cidr_newbits
+  network_firewall_enabled = var.network_firewall.enabled
+  logs_bucket_name         = module.storage.logs_bucket_name
+  network_firewall         = var.network_firewall
 }
 
 module "cloudtrail" {
@@ -67,8 +44,6 @@ module "cloudtrail" {
 
 module "postgres" {
   source = "./postgres"
-
-  depends_on = [module.network_firewall]
 
   workspace                   = local.workspace
   aws_region                  = var.aws_region
@@ -95,8 +70,6 @@ module "postgres" {
 module "redis" {
   source = "./redis"
 
-  depends_on = [module.network_firewall]
-
   workspace                      = local.workspace
   aws_region                     = var.aws_region
   elasticache_node_type          = var.elasticache_node_type
@@ -113,8 +86,6 @@ module "kafka" {
   source = "./kafka"
   count  = var.managed_sync_enabled ? 1 : 0
 
-  depends_on = [module.network_firewall]
-
   workspace                  = local.workspace
   force_destroy              = var.disable_deletion_protection
   msk_autoscaling_enabled    = var.msk_autoscaling_enabled
@@ -129,8 +100,6 @@ module "kafka" {
 module "bastion" {
   count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
-
-  depends_on = [module.network_firewall]
 
   workspace     = local.workspace
   aws_region    = var.aws_region
@@ -148,6 +117,9 @@ module "bastion" {
   private_subnet = module.network.private_subnet
   public_subnet  = module.network.public_subnet
   vpc_id         = module.network.vpc.id
+
+  # Workloads that bootstrap over the internet must wait for egress routing (NFW or NAT).
+  egress_ready = module.network.egress_ready
 }
 
 module "cluster" {
@@ -156,7 +128,7 @@ module "cluster" {
   workspace  = local.workspace
   aws_region = var.aws_region
 
-  network_firewall_arn = var.network_firewall.enabled ? module.network_firewall[0].firewall_arn : null
+  egress_ready = module.network.egress_ready
 
   bastion_enabled           = var.bastion_enabled
   bastion_role_arn          = var.bastion_enabled ? module.bastion[0].bastion_role_arn : null
