@@ -316,6 +316,12 @@ variable "network_firewall" {
 
     stateless_default_actions          = optional(list(string), ["aws:forward_to_sfe"])
     stateless_fragment_default_actions = optional(list(string), ["aws:forward_to_sfe"])
+
+    # STRICT_ORDER (AWS-recommended) evaluates stateful rule groups by priority. It is
+    # required when any referenced rule group was created with STRICT_ORDER. DEFAULT_ACTION_ORDER
+    # lets the Suricata engine decide order and forbids priority/stateful_default_actions.
+    stateful_rule_order      = optional(string, "STRICT_ORDER")
+    stateful_default_actions = optional(list(string), ["aws:drop_strict", "aws:alert_strict"])
   })
   default = { enabled = false }
 
@@ -325,6 +331,11 @@ variable "network_firewall" {
       length(var.network_firewall.rule_group_arns) > 0
     )
     error_message = "When network_firewall.enabled is true, provide at least one rule_group_arn (RAM-shared)."
+  }
+
+  validation {
+    condition     = contains(["STRICT_ORDER", "DEFAULT_ACTION_ORDER"], var.network_firewall.stateful_rule_order)
+    error_message = "network_firewall.stateful_rule_order must be STRICT_ORDER or DEFAULT_ACTION_ORDER."
   }
 }
 

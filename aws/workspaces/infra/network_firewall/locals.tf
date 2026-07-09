@@ -1,6 +1,10 @@
 locals {
   nfw_log_prefix = "network-firewall"
 
+  # STRICT_ORDER requires priority + stateful_default_actions and an engine options block;
+  # DEFAULT_ACTION_ORDER forbids all three. Referenced rule groups must match this order.
+  strict_order = var.network_firewall.stateful_rule_order == "STRICT_ORDER"
+
   stateful_rule_group_arns = [
     for arn in var.network_firewall.rule_group_arns : arn
     if can(regex(":stateful-rulegroup/", arn))

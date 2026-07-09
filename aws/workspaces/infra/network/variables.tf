@@ -40,5 +40,7 @@ variable "network_firewall" {
     rule_group_arns                    = list(string)
     stateless_default_actions          = list(string)
     stateless_fragment_default_actions = list(string)
+    stateful_rule_order                = string
+    stateful_default_actions           = list(string)
   })
 }
