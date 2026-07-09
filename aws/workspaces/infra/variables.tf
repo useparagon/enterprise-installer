@@ -308,7 +308,7 @@ variable "s3_kms_key_arn" {
 
 # network firewall
 variable "network_firewall" {
-  description = "Optional AWS Network Firewall for egress inspection with RAM-shared rule group ARNs (stateful or stateless). Greenfield only; logs go to <workspace>-logs."
+  description = "Optional AWS Network Firewall for egress inspection with RAM-shared rule group ARNs (stateful or stateless). Enable on initial deployment only; not supported when adding to an existing workspace. Logs go to <workspace>-logs."
   type = object({
     enabled = optional(bool, false)
 
