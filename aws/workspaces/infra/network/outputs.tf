@@ -39,6 +39,6 @@ output "private_subnet_cidrs" {
 }
 
 output "egress_ready" {
-  description = "Signals private egress routing is configured (firewall ARN when NFW is enabled, otherwise VPC ID)."
-  value       = var.network_firewall.enabled ? module.network_firewall[0].firewall_arn : aws_vpc.app.id
+  description = "Signals private egress routing is configured (routing token when NFW is enabled, otherwise VPC ID)."
+  value       = var.network_firewall.enabled ? module.network_firewall[0].routing_ready : aws_vpc.app.id
 }

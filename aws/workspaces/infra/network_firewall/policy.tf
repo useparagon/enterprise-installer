@@ -9,7 +9,6 @@ resource "aws_networkfirewall_firewall_policy" "this" {
       for_each = local.stateful_rule_group_arns
       content {
         resource_arn = stateful_rule_group_reference.value
-        priority     = stateful_rule_group_reference.key + 1
       }
     }
 
