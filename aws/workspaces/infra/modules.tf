@@ -1,17 +1,39 @@
 module "network" {
   source = "./network"
 
+  workspace                = local.workspace
+  aws_region               = var.aws_region
+  az_count                 = var.az_count
+  vpc_cidr                 = var.vpc_cidr
+  vpc_cidr_newbits         = var.vpc_cidr_newbits
+  network_firewall_enabled = var.network_firewall.enabled
+}
+
+# Logs bucket and policy must exist before Network Firewall logging and firewall apply.
+module "storage" {
+  source = "./storage"
+
   workspace                 = local.workspace
   aws_region                = var.aws_region
-  az_count                  = var.az_count
-  vpc_cidr                  = var.vpc_cidr
-  vpc_cidr_newbits          = var.vpc_cidr_newbits
   network_firewall_enabled  = var.network_firewall.enabled
+  force_destroy             = var.disable_deletion_protection
+  app_bucket_expiration     = var.app_bucket_expiration
+  auditlogs_retention_days  = var.auditlogs_retention_days
+  auditlogs_lock_enabled    = var.auditlogs_lock_enabled
+  managed_sync_enabled      = var.managed_sync_enabled
+  s3_kms_encryption_enabled = var.s3_kms_encryption_enabled
+  s3_kms_key_arn            = var.s3_kms_key_arn
+  admin_arns                = local.admin_arns
+
+  migrated             = var.migrated_workspace != null
+  cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
 }
 
 module "network_firewall" {
   count  = var.network_firewall.enabled ? 1 : 0
   source = "./network_firewall"
+
+  depends_on = [module.storage]
 
   workspace = local.workspace
   vpc_id    = module.network.vpc.id
@@ -24,7 +46,7 @@ module "network_firewall" {
   main_route_table_id     = module.network.main_route_table_id
   nat_gateway_ids         = module.network.nat_gateway_ids
   private_subnet_cidrs    = module.network.private_subnet_cidrs
-  logs_bucket_name        = module.storage.s3.logs_bucket
+  logs_bucket_name        = "${local.workspace}-logs"
 
   network_firewall = {
     enabled                            = var.network_firewall.enabled
@@ -47,6 +69,8 @@ module "cloudtrail" {
 
 module "postgres" {
   source = "./postgres"
+
+  depends_on = [module.network_firewall]
 
   workspace                   = local.workspace
   aws_region                  = var.aws_region
@@ -73,6 +97,8 @@ module "postgres" {
 module "redis" {
   source = "./redis"
 
+  depends_on = [module.network_firewall]
+
   workspace                      = local.workspace
   aws_region                     = var.aws_region
   elasticache_node_type          = var.elasticache_node_type
@@ -85,28 +111,11 @@ module "redis" {
   private_subnet = module.network.private_subnet
 }
 
-module "storage" {
-  source = "./storage"
-
-  workspace                 = local.workspace
-  aws_region                = var.aws_region
-  network_firewall_enabled  = var.network_firewall.enabled
-  force_destroy             = var.disable_deletion_protection
-  app_bucket_expiration     = var.app_bucket_expiration
-  auditlogs_retention_days  = var.auditlogs_retention_days
-  auditlogs_lock_enabled    = var.auditlogs_lock_enabled
-  managed_sync_enabled      = var.managed_sync_enabled
-  s3_kms_encryption_enabled = var.s3_kms_encryption_enabled
-  s3_kms_key_arn            = var.s3_kms_key_arn
-  admin_arns                = local.admin_arns
-
-  migrated             = var.migrated_workspace != null
-  cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
-}
-
 module "kafka" {
   source = "./kafka"
   count  = var.managed_sync_enabled ? 1 : 0
+
+  depends_on = [module.network_firewall]
 
   workspace                  = local.workspace
   force_destroy              = var.disable_deletion_protection
@@ -122,6 +131,8 @@ module "kafka" {
 module "bastion" {
   count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
+
+  depends_on = [module.network_firewall]
 
   workspace     = local.workspace
   aws_region    = var.aws_region
@@ -144,6 +155,8 @@ module "bastion" {
 module "cluster" {
   source = "./cluster"
 
+  depends_on = [module.network_firewall]
+
   workspace  = local.workspace
   aws_region = var.aws_region
 
@@ -160,11 +173,11 @@ module "cluster" {
   eks_spot_node_instance_type     = local.eks_spot_node_instance_type
   k8s_version                     = var.k8s_version
 
-  enable_karpenter                = var.enable_karpenter
-  enable_legacy_mng_pools         = var.enable_legacy_mng_pools
-  karpenter_chart_version         = var.karpenter_chart_version
-  karpenter_iam_names             = var.karpenter_iam_names
-  eks_system_managed_node_group   = var.eks_system_managed_node_group
+  enable_karpenter              = var.enable_karpenter
+  enable_legacy_mng_pools       = var.enable_legacy_mng_pools
+  karpenter_chart_version       = var.karpenter_chart_version
+  karpenter_iam_names           = var.karpenter_iam_names
+  eks_system_managed_node_group = var.eks_system_managed_node_group
 
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
