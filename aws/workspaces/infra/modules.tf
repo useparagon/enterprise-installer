@@ -33,8 +33,6 @@ module "network_firewall" {
   count  = var.network_firewall.enabled ? 1 : 0
   source = "./network_firewall"
 
-  depends_on = [module.storage]
-
   workspace = local.workspace
   vpc_id    = module.network.vpc.id
   vpc_cidr  = var.vpc_cidr
@@ -46,7 +44,7 @@ module "network_firewall" {
   main_route_table_id     = module.network.main_route_table_id
   nat_gateway_ids         = module.network.nat_gateway_ids
   private_subnet_cidrs    = module.network.private_subnet_cidrs
-  logs_bucket_name        = "${local.workspace}-logs"
+  logs_bucket_name        = module.storage.logs_bucket_name
 
   network_firewall = {
     enabled                            = var.network_firewall.enabled
@@ -155,10 +153,10 @@ module "bastion" {
 module "cluster" {
   source = "./cluster"
 
-  depends_on = [module.network_firewall]
-
   workspace  = local.workspace
   aws_region = var.aws_region
+
+  network_firewall_arn = var.network_firewall.enabled ? module.network_firewall[0].firewall_arn : null
 
   bastion_enabled           = var.bastion_enabled
   bastion_role_arn          = var.bastion_enabled ? module.bastion[0].bastion_role_arn : null

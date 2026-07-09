@@ -124,4 +124,11 @@ variable "eks_system_managed_node_group" {
   })
 }
 
+variable "network_firewall_arn" {
+  description = "When set, serializes cluster creation after Network Firewall routing is ready."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 data "aws_caller_identity" "current" {}
