@@ -66,10 +66,9 @@ locals {
       managed_sync = coalesce(try(var.base_helm_values.global.env["CLOUD_STORAGE_MANAGED_SYNC_BUCKET"], null), local.storage_output.managed_sync_bucket)
     }
     type = try(var.base_helm_values.global.env["CLOUD_STORAGE_TYPE"], "S3")
-    # TODO(PARA-21728 follow-up): Managed Sync Pod Identity — do not inject static S3 keys on AWS.
-    # Optional override only if explicitly provided in customer helm values.
-    user = try(var.base_helm_values.global.env["CLOUD_STORAGE_USER"], null)
-    pass = try(var.base_helm_values.global.env["CLOUD_STORAGE_PASS"], null)
+    # root_user/root_password removed once S3 Pod Identity lands; try() keeps this safe until Managed Sync PR.
+    user = try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_USER"], try(local.storage_output.root_user, null))
+    pass = try(var.base_helm_values.global.env["CLOUD_STORAGE_MICROSERVICE_PASS"], try(local.storage_output.root_password, null))
     public_url = coalesce(
       try(var.base_helm_values.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
       local.storage_type == "S3" ? "https://s3.${var.aws_region}.amazonaws.com" : null,
@@ -90,12 +89,11 @@ locals {
 
     CLOUD_STORAGE_TYPE                = local.storage_type
     CLOUD_STORAGE_PUBLIC_BUCKET       = local.storage_config.buckets.public
+    CLOUD_STORAGE_USER                = local.storage_config.user
+    CLOUD_STORAGE_PASS                = local.storage_config.pass
     CLOUD_STORAGE_MANAGED_SYNC_BUCKET = local.storage_config.buckets.managed_sync
     CLOUD_STORAGE_PUBLIC_URL          = local.storage_config.public_url
     CLOUD_STORAGE_PRIVATE_URL         = local.storage_config.public_url
-    # Static keys omitted on AWS (Pod Identity). Optional customer overrides only:
-    CLOUD_STORAGE_USER = local.storage_config.user
-    CLOUD_STORAGE_PASS = local.storage_config.pass
 
     // TODO: make `MANAGED_SYNC_URL` communicate via private DNS instead of open internet
     MANAGED_SYNC_URL       = try(var.base_helm_values.global.env["MANAGED_SYNC_URL"], "https://sync.${var.domain}")
