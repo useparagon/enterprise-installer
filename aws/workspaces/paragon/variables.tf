@@ -814,6 +814,9 @@ locals {
     "POSTGRES_DATABASE",
     "REDIS_HOST",
     "REDIS_PORT",
+    # AWS uses EKS Pod Identity for Grafana CloudWatch — strip static keys if present in customer values.
+    "MONITOR_GRAFANA_AWS_ACCESS_ID",
+    "MONITOR_GRAFANA_AWS_SECRET_KEY",
   ]
 
   default_redis_cluster = try(
@@ -1006,11 +1009,9 @@ locals {
             local.cloud_storage_type == "S3" ? "https://s3.${var.aws_region}.amazonaws.com" : null,
           )
 
-          # Monitor configurations
+          # Monitor configurations (Grafana CloudWatch via EKS Pod Identity; no static AWS keys)
           MONITOR_BULL_EXPORTER_HOST               = "http://bull-exporter"
           MONITOR_BULL_EXPORTER_PORT               = try(local.monitors["bull-exporter"].port, null)
-          MONITOR_GRAFANA_AWS_ACCESS_ID            = var.monitors_enabled ? module.monitors[0].grafana_aws_access_key_id : null
-          MONITOR_GRAFANA_AWS_SECRET_KEY           = var.monitors_enabled ? module.monitors[0].grafana_aws_secret_access_key : null
           MONITOR_GRAFANA_HOST                     = "http://grafana"
           MONITOR_GRAFANA_PORT                     = try(local.monitors["grafana"].port, null)
           MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD  = var.monitors_enabled ? module.monitors[0].grafana_admin_password : null
