@@ -293,8 +293,9 @@ secrets:
   ZEUS_POSTGRES_USERNAME: "your-zeus-db-username"
   
   # Cloud Storage
-  CLOUD_STORAGE_MICROSERVICE_PASS: "your-s3-secret-key"
-  CLOUD_STORAGE_MICROSERVICE_USER: "your-s3-access-key"
+  # On AWS, S3 auth uses EKS Pod Identity — do not set CLOUD_STORAGE_MICROSERVICE_USER/PASS.
+  # CLOUD_STORAGE_MICROSERVICE_PASS: "your-s3-secret-key"   # legacy / MinIO only
+  # CLOUD_STORAGE_MICROSERVICE_USER: "your-s3-access-key"   # legacy / MinIO only
   
   # Monitoring
   MONITOR_GRAFANA_AWS_ACCESS_ID: "your-grafana-aws-access-key"

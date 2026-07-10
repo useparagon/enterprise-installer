@@ -133,8 +133,7 @@ This will produce an `infra-output.json` file that will generally follow the sch
     "value": {
       "private_bucket": "<private-bucket-name>",
       "public_bucket": "<public-bucket-name>",
-      "root_password": "<iam-password>",
-      "root_user": "<iam-username>"
+      "role_arn": "<iam-role-arn-for-eks-pod-identity>"
     }
   },
   "postgres": {

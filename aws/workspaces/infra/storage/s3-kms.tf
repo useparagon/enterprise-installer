@@ -22,9 +22,8 @@ module "s3_kms_key" {
 
   key_administrators = var.admin_arns
 
-  # the application reads/writes objects via this IAM user, so it must be able to
-  # use the key to encrypt/decrypt objects
-  key_users = [aws_iam_user.app.arn]
+  # Pod Identity role used by Paragon workloads to read/write encrypted objects
+  key_users = [aws_iam_role.app.arn]
 
   computed_aliases = {
     s3 = { name = "s3/${var.workspace}" }
