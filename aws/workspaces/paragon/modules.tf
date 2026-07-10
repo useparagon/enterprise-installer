@@ -80,34 +80,16 @@ module "managed_sync_config" {
   microservices    = local.microservices
 }
 
-# EKS Pod Identity: associate Paragon ServiceAccounts with the infra S3 IAM role.
+# EKS Pod Identity: associate every Paragon onprem ServiceAccount with the S3 role.
+# CLOUD_STORAGE_* is injected globally, so associations match that (no curated subset).
 module "pod_identity" {
   source = "./pod-identity"
   count  = try(local.storage_output.role_arn, null) != null ? 1 : 0
 
-  cluster_name = local.cluster_name
-  namespace    = module.helm.namespace_paragon.id
-  s3_role_arn  = local.storage_output.role_arn
-  service_accounts = toset([
-    "api-triggerkit",
-    "cache-replay",
-    "hades",
-    "health-checker",
-    "hermes",
-    "release",
-    "zeus",
-    "worker-actionkit",
-    "worker-actions",
-    "worker-auditlogs",
-    "worker-credentials",
-    "worker-crons",
-    "worker-deployments",
-    "worker-eventlogs",
-    "worker-proxy",
-    "worker-triggerkit",
-    "worker-triggers",
-    "worker-workflows",
-  ])
+  cluster_name     = local.cluster_name
+  namespace        = module.helm.namespace_paragon.id
+  s3_role_arn      = local.storage_output.role_arn
+  service_accounts = toset(keys(local.monorepo_microservices))
 }
 
 module "monitors" {
