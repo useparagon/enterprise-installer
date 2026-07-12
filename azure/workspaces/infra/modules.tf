@@ -1,10 +1,11 @@
 module "network" {
   source = "./network"
 
-  location  = var.location
-  tags      = local.default_tags
-  vpc_cidr  = var.vpc_cidr
-  workspace = local.workspace
+  location          = var.location
+  nsg_malicious_ips = var.nsg_malicious_ips
+  tags              = local.default_tags
+  vpc_cidr          = var.vpc_cidr
+  workspace         = local.workspace
 }
 
 module "bastion" {
