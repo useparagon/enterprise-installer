@@ -54,3 +54,13 @@ variable "cdn_bucket_acl_reset" {
   type        = bool
   default     = false
 }
+
+variable "aws_region" {
+  description = "The AWS region resources are created in."
+  type        = string
+}
+
+variable "network_firewall_enabled" {
+  description = "Whether AWS Network Firewall is enabled (grants log delivery to the central logs bucket)."
+  type        = bool
+}
