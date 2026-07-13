@@ -15,7 +15,7 @@ ROLES=(
   # Contributor role - provides full access to manage all resources except grant access to others
   # This is the minimum role needed for Terraform to create and manage Azure resources
   "Contributor"
-  # Needed to switch Key Vaults to RBAC and create role assignments
+  # Needed to create role assignments (Key Vault RBAC + AKS Network Contributor on the private subnet)
   "User Access Administrator"
 )
 
@@ -61,7 +61,11 @@ echo "  - Create and manage Key Vault role assignments (via User Access Administ
 echo "  - Create and manage Public IPs"
 echo ""
 echo "For Key Vault RBAC (permission model change + role assignments),"
+echo "and for AKS Network Contributor on the private subnet (ingress LB),"
 echo "Terraform also needs User Access Administrator at subscription or resource group scope."
 echo ""
 echo "If you want the Terraform principal to manage Key Vault secrets/certs/keys,"
 echo "assign Key Vault Administrator at the vault scope."
+echo ""
+echo "On apply, infra grants the AKS cluster identity Network Contributor on the"
+echo "private subnet so LoadBalancer / VMSS subnet join succeeds."

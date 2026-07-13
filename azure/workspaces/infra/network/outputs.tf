@@ -38,6 +38,6 @@ output "aks_nsg_id" {
 }
 
 output "default_closed_nsg_id" {
-  description = "NSG attached to the redis (data) subnet."
+  description = "NSG attached to the redis subnet (baseline + Premium Redis VNet ports)."
   value       = azurerm_network_security_group.default_closed.id
 }
