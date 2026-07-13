@@ -262,11 +262,17 @@ resource "azurerm_network_security_group" "default_closed" {
 resource "azurerm_subnet_network_security_group_association" "public" {
   subnet_id                 = azurerm_subnet.public.id
   network_security_group_id = azurerm_network_security_group.aks.id
+
+  # Wait for installer allow rules so association does not attach an NSG that only
+  # has platform DenyAllInbound (HTTP/HTTPS would be blocked until rules exist).
+  depends_on = [azurerm_network_security_rule.aks]
 }
 
 resource "azurerm_subnet_network_security_group_association" "private" {
   subnet_id                 = azurerm_subnet.private.id
   network_security_group_id = azurerm_network_security_group.aks.id
+
+  depends_on = [azurerm_network_security_rule.aks]
 }
 
 resource "azurerm_subnet_network_security_group_association" "redis" {
