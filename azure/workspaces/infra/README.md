@@ -177,7 +177,11 @@ Baseline rules on `aks-nsg` and `default-closed-nsg`: deny SSH (22) inbound, all
 
 For Premium Azure Cache for Redis (default SKU, VNet-injected on the redis subnet), `default-closed-nsg` also allows the [required Redis VNet ports](https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/cache-how-to-premium-vnet): client `6379`/`6380`, management/cluster ranges (`8443`, `10221-10231`, `13000-13999`, `15000-15999`, `20226`), and Azure Load Balancer ports (`8500`, `16001`).
 
-AKS LoadBalancer provisioning needs the cluster identity to have **Network Contributor** on the private subnet (created by infra Terraform). That role assignment requires the Terraform principal to also have **User Access Administrator** (included in `azure/scripts/setup-roles.sh`).
+AKS LoadBalancer provisioning needs the cluster identity to have **Network Contributor** on:
+- the private subnet (VMSS / subnet join)
+- the `aks-nsg` NSG (cloud-provider-azure reconciles LB security rules on the associated NSG)
+
+Those role assignments are created by infra Terraform and require the Terraform principal to also have **User Access Administrator** (included in `azure/scripts/setup-roles.sh`).
 
 Optional malicious-IP denylist (inbound and outbound) via `nsg_malicious_ips`. Empty by default (rules omitted). Azure allows at most 4000 prefixes per rule:
 

@@ -68,4 +68,5 @@ echo "If you want the Terraform principal to manage Key Vault secrets/certs/keys
 echo "assign Key Vault Administrator at the vault scope."
 echo ""
 echo "On apply, infra grants the AKS cluster identity Network Contributor on the"
-echo "private subnet so LoadBalancer / VMSS subnet join succeeds."
+echo "private subnet and aks-nsg so LoadBalancer / VMSS subnet join and NSG"
+echo "rule reconciliation succeed."
