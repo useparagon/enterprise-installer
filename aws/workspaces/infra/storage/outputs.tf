@@ -1,3 +1,8 @@
+output "logs_bucket_name" {
+  description = "Central logs bucket name (non-sensitive wiring for Network Firewall)."
+  value       = aws_s3_bucket.logs.bucket
+}
+
 output "s3" {
   value = {
     access_key_id       = aws_iam_access_key.app.id
