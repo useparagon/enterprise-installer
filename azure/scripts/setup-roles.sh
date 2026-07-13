@@ -15,7 +15,7 @@ ROLES=(
   # Contributor role - provides full access to manage all resources except grant access to others
   # This is the minimum role needed for Terraform to create and manage Azure resources
   "Contributor"
-  # Needed to create role assignments (Key Vault RBAC + AKS Network Contributor on the private subnet)
+  # Needed to create role assignments (Key Vault RBAC + AKS Network Contributor on subnet/NSG)
   "User Access Administrator"
 )
 

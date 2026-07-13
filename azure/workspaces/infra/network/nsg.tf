@@ -2,7 +2,9 @@
 # Postgres already has its own NSG in the postgres module.
 #
 #   aks-nsg        -> baseline + allow 80/443 inbound (ingress + AKS node subnets)
-#   default-closed -> baseline + Premium Redis VNet ports (redis subnet)
+#                    Rules are separate azurerm_network_security_rule resources; the
+#                    NSG ignores security_rule drift so AKS can manage LB rules.
+#   default-closed -> baseline + Premium Redis VNet ports (redis subnet; TF-owned)
 #
 # Baseline = optional deny for nsg_malicious_ips in/out, deny SSH(22) inbound,
 # allow all other outbound. Platform default rules still allow intra-VNet + Azure LB.
@@ -205,23 +207,31 @@ resource "azurerm_network_security_group" "aks" {
   resource_group_name = azurerm_resource_group.main.name
   tags                = var.tags
 
-  dynamic "security_rule" {
-    for_each = { for rule in local.nsg_aks_rules : rule.name => rule }
-    content {
-      name                         = security_rule.value.name
-      priority                     = security_rule.value.priority
-      direction                    = security_rule.value.direction
-      access                       = security_rule.value.access
-      protocol                     = security_rule.value.protocol
-      source_port_range            = security_rule.value.source_port_range
-      destination_port_range       = security_rule.value.destination_port_range
-      destination_port_ranges      = security_rule.value.destination_port_ranges
-      source_address_prefix        = security_rule.value.source_address_prefix
-      source_address_prefixes      = security_rule.value.source_address_prefixes
-      destination_address_prefix   = security_rule.value.destination_address_prefix
-      destination_address_prefixes = security_rule.value.destination_address_prefixes
-    }
+  # cloud-provider-azure adds/updates LoadBalancer security rules on this NSG when
+  # Services reconcile. Manage installer rules as separate resources below, and
+  # ignore the NSG's aggregated security_rule set so Terraform does not wipe AKS rules.
+  lifecycle {
+    ignore_changes = [security_rule]
   }
+}
+
+resource "azurerm_network_security_rule" "aks" {
+  for_each = { for rule in local.nsg_aks_rules : rule.name => rule }
+
+  name                         = each.value.name
+  priority                     = each.value.priority
+  direction                    = each.value.direction
+  access                       = each.value.access
+  protocol                     = each.value.protocol
+  source_port_range            = each.value.source_port_range
+  destination_port_range       = each.value.destination_port_range
+  destination_port_ranges      = each.value.destination_port_ranges
+  source_address_prefix        = each.value.source_address_prefix
+  source_address_prefixes      = each.value.source_address_prefixes
+  destination_address_prefix   = each.value.destination_address_prefix
+  destination_address_prefixes = each.value.destination_address_prefixes
+  resource_group_name          = azurerm_resource_group.main.name
+  network_security_group_name  = azurerm_network_security_group.aks.name
 }
 
 resource "azurerm_network_security_group" "default_closed" {
