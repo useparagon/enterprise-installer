@@ -100,6 +100,13 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   }
 }
 
+# required for subnet join when provisioning LoadBalancers / updating VMSS.
+resource "azurerm_role_assignment" "aks_network_contributor" {
+  scope                = var.private_subnet.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_kubernetes_cluster.cluster.identity[0].principal_id
+}
+
 # created as a separate resource so config can be updated
 # if `default_node_pool` is updated in the `azurerm_kubernetes_cluster`,
 # all terraform updates fail
@@ -136,6 +143,8 @@ resource "azurerm_kubernetes_cluster_node_pool" "pool" {
   upgrade_settings {
     max_surge = "1"
   }
+
+  depends_on = [azurerm_role_assignment.aks_network_contributor]
 
   # Ensure new nodes are created before old ones are destroyed
   lifecycle {
