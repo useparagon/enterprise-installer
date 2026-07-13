@@ -306,6 +306,39 @@ variable "s3_kms_key_arn" {
   default     = null
 }
 
+# network firewall
+variable "network_firewall" {
+  description = "Optional AWS Network Firewall for egress inspection with RAM-shared rule group ARNs (stateful or stateless). Enable on initial deployment only; not supported when adding to an existing workspace. Logs go to <workspace>-logs."
+  type = object({
+    enabled = optional(bool, false)
+
+    rule_group_arns = optional(list(string), [])
+
+    stateless_default_actions          = optional(list(string), ["aws:forward_to_sfe"])
+    stateless_fragment_default_actions = optional(list(string), ["aws:forward_to_sfe"])
+
+    # STRICT_ORDER (AWS-recommended) evaluates stateful rule groups by priority. It is
+    # required when any referenced rule group was created with STRICT_ORDER. DEFAULT_ACTION_ORDER
+    # lets the Suricata engine decide order and forbids priority/stateful_default_actions.
+    stateful_rule_order      = optional(string, "STRICT_ORDER")
+    stateful_default_actions = optional(list(string), ["aws:drop_strict", "aws:alert_strict"])
+  })
+  default = { enabled = false }
+
+  validation {
+    condition = (
+      !var.network_firewall.enabled ||
+      length(var.network_firewall.rule_group_arns) > 0
+    )
+    error_message = "When network_firewall.enabled is true, provide at least one rule_group_arn (RAM-shared)."
+  }
+
+  validation {
+    condition     = contains(["STRICT_ORDER", "DEFAULT_ACTION_ORDER"], var.network_firewall.stateful_rule_order)
+    error_message = "network_firewall.stateful_rule_order must be STRICT_ORDER or DEFAULT_ACTION_ORDER."
+  }
+}
+
 # bastion
 variable "bastion_enabled" {
   description = "Whether to create the bastion host and its associated Cloudflare tunnel."
