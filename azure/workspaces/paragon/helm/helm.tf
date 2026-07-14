@@ -117,6 +117,12 @@ locals {
     global = merge(
       nonsensitive(var.helm_values.global),
       {
+        podAnnotations = merge(
+          try(nonsensitive(var.helm_values.global).podAnnotations, {}),
+          {
+            "reloader.stakater.com/auto" = "true"
+          }
+        )
         env = merge(
           nonsensitive(var.helm_values.global.env),
           {
@@ -130,14 +136,38 @@ locals {
     )
   })
 
+  runtime_secret_values = yamlencode({
+    fluent-bit = {
+      envFrom = [
+        {
+          secretRef = {
+            name = "openobserve-credentials"
+          }
+        }
+      ]
+      podAnnotations = {
+        "reloader.stakater.com/auto" = "true"
+      }
+    }
+    openobserve = {
+      secretName = "openobserve-credentials"
+    }
+  })
+
   global_values_minus_env = yamlencode(merge(
     nonsensitive(var.helm_values),
     {
       global = merge(
         nonsensitive(var.helm_values).global,
-        { env = {
-          HOST_ENV = "AZURE_K8"
-        } },
+        {
+          podAnnotations = merge(
+            try(nonsensitive(var.helm_values).global.podAnnotations, {}),
+            { "reloader.stakater.com/auto" = "true" }
+          )
+          env = {
+            HOST_ENV = "AZURE_K8"
+          }
+        },
         local.docker_pull_secret_global_values
       )
     }
@@ -173,55 +203,6 @@ resource "kubernetes_config_map" "feature_flag_content" {
   }
 }
 
-# kubernetes secret to pull container images from a registry (Docker Hub, Artifactory, etc.)
-resource "kubernetes_secret" "docker_login" {
-  count = var.create_docker_pull_secret ? 1 : 0
-
-  metadata {
-    name      = var.docker_pull_secret_name
-    namespace = kubernetes_namespace.paragon.id
-  }
-
-  type = "kubernetes.io/dockerconfigjson"
-
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "${var.docker_registry_server}" = {
-          "username" = var.docker_username
-          "password" = var.docker_password
-          "email"    = var.docker_email
-          "auth"     = base64encode("${var.docker_username}:${var.docker_password}")
-        }
-      }
-    })
-  }
-}
-
-# shared secrets
-resource "kubernetes_secret" "paragon_secrets" {
-  for_each = toset(
-    var.managed_sync_enabled ? [
-      "paragon-secrets",
-      "paragon-managed-sync-secrets"
-      ] : [
-      "paragon-secrets"
-    ]
-  )
-  metadata {
-    name      = each.value
-    namespace = kubernetes_namespace.paragon.id
-  }
-
-  type = "Opaque"
-
-  data = {
-    # Map global.env from helm_values into secret data
-    for key, value in nonsensitive(var.helm_values.global.env) :
-    key => value
-  }
-}
-
 # microservices deployment
 resource "helm_release" "paragon_on_prem" {
   name              = "paragon-on-prem"
@@ -249,8 +230,8 @@ resource "helm_release" "paragon_on_prem" {
 
   depends_on = [
     helm_release.ingress,
-    kubernetes_secret.docker_login,
-    kubernetes_secret.paragon_secrets,
+    kubectl_manifest.external_secret_docker,
+    kubectl_manifest.external_secret_paragon,
     kubernetes_config_map.feature_flag_content
   ]
 }
@@ -273,10 +254,12 @@ resource "helm_release" "paragon_logging" {
   values = fileexists("${path.root}/../.secure/values.yaml") ? [
     local.helm_values_yaml,
     local.global_values,
+    local.runtime_secret_values,
     file("${path.root}/../.secure/values.yaml")
     ] : [
     local.helm_values_yaml,
-    local.global_values
+    local.global_values,
+    local.runtime_secret_values
   ]
 
   set {
@@ -289,30 +272,10 @@ resource "helm_release" "paragon_logging" {
     value = var.logs_bucket
   }
 
-  set_sensitive {
-    name  = "fluent-bit.secrets.ZO_ROOT_USER_EMAIL"
-    value = local.openobserve_email
-  }
-
-  set_sensitive {
-    name  = "fluent-bit.secrets.ZO_ROOT_USER_PASSWORD"
-    value = local.openobserve_password
-  }
-
-  set_sensitive {
-    name  = "openobserve.secrets.ZO_ROOT_USER_EMAIL"
-    value = local.openobserve_email
-  }
-
-  set_sensitive {
-    name  = "openobserve.secrets.ZO_ROOT_USER_PASSWORD"
-    value = local.openobserve_password
-  }
-
-
   depends_on = [
     helm_release.ingress,
-    kubernetes_secret.docker_login
+    kubectl_manifest.external_secret_docker,
+    kubectl_manifest.external_secret_openobserve
   ]
 }
 
@@ -345,6 +308,7 @@ resource "helm_release" "paragon_monitoring" {
   depends_on = [
     helm_release.ingress,
     helm_release.paragon_on_prem,
-    kubernetes_secret.docker_login
+    kubectl_manifest.external_secret_docker,
+    kubectl_manifest.external_secret_paragon
   ]
 }

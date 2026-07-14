@@ -435,6 +435,68 @@ variable "msk_instance_type" {
   default     = "kafka.t3.small"
 }
 
+variable "paragon_domain" {
+  description = "Customer-facing Paragon domain (e.g. customer.example.com). Written to Secrets Manager as PARAGON_DOMAIN and derived *_PUBLIC_URL values."
+  type        = string
+  default     = null
+}
+
+variable "env_overrides" {
+  description = "Optional overrides for any infra-derived env key written to Secrets Manager (e.g. ACCOUNT_PUBLIC_URL, CERBERUS_POSTGRES_PORT, CLOUD_STORAGE_PUBLIC_BUCKET). Merged on top of computed defaults; app_secrets wins if the same key is set in both."
+  type        = map(string)
+  default     = null
+}
+
+variable "app_secrets" {
+  description = "Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides env_overrides when the same key is set in both."
+  type        = map(string)
+  sensitive   = true
+  default     = null
+}
+
+variable "docker_registry_server" {
+  description = "Docker registry server for application image pulls."
+  type        = string
+  default     = null
+}
+
+variable "docker_username" {
+  description = "Docker username for application image pulls."
+  type        = string
+  default     = null
+}
+
+variable "docker_password" {
+  description = "Docker password for application image pulls."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "docker_email" {
+  description = "Docker email for application image pulls."
+  type        = string
+  default     = null
+}
+
+variable "paragon_managed_sync_config" {
+  description = "Optional managed-sync secret data to write to Secrets Manager. Null when managed sync is disabled."
+  type        = map(string)
+  sensitive   = true
+  default     = null
+}
+
+variable "secrets_recovery_window_in_days" {
+  description = "Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve) and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.secrets_recovery_window_in_days == 0 || (var.secrets_recovery_window_in_days >= 7 && var.secrets_recovery_window_in_days <= 30)
+    error_message = "secrets_recovery_window_in_days must be 0 (immediate) or between 7 and 30."
+  }
+}
+
 locals {
   # hash of account ID to help ensure uniqueness of resources like S3 bucket names
   hash        = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)

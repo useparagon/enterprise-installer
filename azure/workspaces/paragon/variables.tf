@@ -294,13 +294,13 @@ variable "customer_facing" {
 }
 
 variable "infra_json_path" {
-  description = "Path to `infra` workspace output JSON file."
+  description = "Deprecated legacy path to an `infra` workspace output JSON file. Prefer Key Vault handoff secrets (PARA-21726)."
   type        = string
-  default     = ".secure/infra-output.json"
+  default     = null
 }
 
 variable "infra_json" {
-  description = "JSON string of `infra` workspace variables to use instead of `infra_json_path`"
+  description = "Deprecated legacy JSON string of `infra` workspace variables."
   type        = string
   default     = null
 }
@@ -329,29 +329,26 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
-variable "key_vault_purge_protection_enabled" {
-  description = "Enable purge protection on the cert-manager Key Vault. Required by some Azure org policies (e.g. Enforce-GR-KeyVault). Cannot be disabled after creation."
-  type        = bool
-  default     = false
-}
-
 locals {
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
-  hash      = substr(sha256(var.azure_subscription_id), 0, 8)
-  workspace = nonsensitive("paragon-${var.organization}-${local.hash}")
+  hash                  = substr(sha256(var.azure_subscription_id), 0, 8)
+  infra_json_path       = var.infra_json_path != null ? abspath(var.infra_json_path) : null
+  use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
+  legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
+  workspace             = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}") : "paragon-${var.organization}-${local.hash}")
 
   dns_enabled = var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
 
-  infra_json_path = abspath(var.infra_json_path)
-  infra_vars      = jsondecode(fileexists(local.infra_json_path) && var.infra_json == null ? file(local.infra_json_path) : var.infra_json)
-  # Backward compatible with infra workspaces that still emit the legacy "minio" output
-  # instead of the renamed "storage" output.
-  storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value)
+  resource_group_name = local.use_legacy_infra_json ? try(local.legacy_infra_vars.resource_group.value.name, "${local.workspace}-resources") : "${local.workspace}-resources"
+  cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, "${local.workspace}-cluster") : "${local.workspace}-cluster"
+  logs_bucket         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
+  auditlogs_bucket    = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
-  # use default where standard value can be determined
-  cluster_name     = try(local.infra_vars.cluster_name.value, local.workspace)
-  logs_bucket      = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
-  auditlogs_bucket = try(local.infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs")
+  # `local.infra_vars` is resolved in infra_secrets.tf (legacy infra.json when provided,
+  # otherwise infra secrets sourced from Key Vault). Backward compatible with infra
+  # workspaces that still emit the legacy "minio" output instead of the renamed "storage"
+  # output; null-safe when neither is present.
+  storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
@@ -818,6 +815,24 @@ locals {
         },
         var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
       )
+    })
+  })
+
+  # Write chart env to Key Vault for ESO → paragon-secrets. Keep only keys
+  # Helm templates read at render time; everything else is secretKeyRef'd by charts.
+  helm_public_env_keys = toset(["VERSION", "HOST_ENV", "PARAGON_DOMAIN"])
+  helm_secret_values = {
+    for key, value in local.helm_values.global.env :
+    key => tostring(value)
+    if value != null && tostring(value) != ""
+  }
+  helm_values_public = merge(local.helm_values, {
+    global = merge(local.helm_values.global, {
+      env = {
+        for key, value in local.helm_values.global.env :
+        key => value
+        if value != null && contains(local.helm_public_env_keys, key)
+      }
     })
   })
 

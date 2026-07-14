@@ -152,3 +152,31 @@ module "cluster" {
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
 }
+
+module "secrets" {
+  source = "./secrets"
+
+  workspace    = local.workspace
+  organization = var.organization
+  env_config   = local.env_config
+
+  docker_config = (
+    var.docker_username != null &&
+    var.docker_password != null
+    ) ? jsonencode({
+      dockerconfigjson = jsonencode({
+        auths = {
+          (coalesce(var.docker_registry_server, "docker.io")) = {
+            username = var.docker_username
+            password = var.docker_password
+            email    = var.docker_email
+            auth     = base64encode("${var.docker_username}:${var.docker_password}")
+          }
+        }
+      })
+  }) : null
+
+  managed_sync_config     = var.managed_sync_enabled ? coalesce(var.paragon_managed_sync_config, {}) : null
+  create_openobserve      = true
+  recovery_window_in_days = var.secrets_recovery_window_in_days
+}

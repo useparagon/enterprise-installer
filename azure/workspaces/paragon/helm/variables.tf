@@ -17,6 +17,11 @@ variable "docker_registry_server" {
   type        = string
 }
 
+variable "docker_cfg_secret_name" {
+  description = "Key Vault secret name for docker credentials."
+  type        = string
+}
+
 variable "docker_pull_secret_name" {
   description = "Kubernetes secret name for registry pull credentials."
   type        = string
@@ -42,6 +47,29 @@ variable "docker_password" {
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+}
+
+variable "env_secret_name" {
+  description = "Key Vault secret name for shared Paragon application secrets."
+  type        = string
+}
+
+variable "external_secrets_client_id" {
+  description = "Azure client ID used by External Secrets Operator."
+  type        = string
+  sensitive   = true
+}
+
+variable "external_secrets_client_secret" {
+  description = "Azure client secret used by External Secrets Operator."
+  type        = string
+  sensitive   = true
+}
+
+variable "external_secrets_tenant_id" {
+  description = "Azure tenant ID used by External Secrets Operator."
+  type        = string
+  sensitive   = true
 }
 
 variable "openobserve_email" {
@@ -143,10 +171,21 @@ variable "managed_sync_version" {
   type        = string
 }
 
-variable "key_vault_purge_protection_enabled" {
-  description = "Enable purge protection on the cert-manager Key Vault. Required by some Azure org policies (e.g. Enforce-GR-KeyVault). Cannot be disabled after creation."
-  type        = bool
-  default     = false
+variable "key_vault_name" {
+  description = "Key Vault name that stores Paragon runtime secrets."
+  type        = string
+}
+
+variable "managed_sync_secret_name" {
+  description = "Key Vault secret name for managed-sync secrets."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_secret_name" {
+  description = "Key Vault secret name for OpenObserve credentials."
+  type        = string
+  default     = null
 }
 
 locals {

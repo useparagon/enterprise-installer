@@ -114,6 +114,12 @@ locals {
     global = merge(
       nonsensitive(var.helm_values.global),
       {
+        podAnnotations = merge(
+          try(nonsensitive(var.helm_values.global).podAnnotations, {}),
+          {
+            "reloader.stakater.com/auto" = "true"
+          }
+        )
         env = merge(
           nonsensitive(var.helm_values.global.env),
           {
@@ -127,14 +133,39 @@ locals {
     )
   })
 
+  runtime_secret_values = yamlencode({
+    fluent-bit = {
+      envFrom = [
+        {
+          secretRef = {
+            name = "openobserve-credentials"
+          }
+        }
+      ]
+      podAnnotations = {
+        "reloader.stakater.com/auto" = "true"
+      }
+    }
+    openobserve = {
+      credsSecretName = ""
+      secretName      = "openobserve-credentials"
+    }
+  })
+
   global_values_minus_env = yamlencode(merge(
     nonsensitive(var.helm_values),
     {
       global = merge(
         nonsensitive(var.helm_values).global,
-        { env = {
-          HOST_ENV = "AWS_K8"
-        } },
+        {
+          podAnnotations = merge(
+            try(nonsensitive(var.helm_values).global.podAnnotations, {}),
+            { "reloader.stakater.com/auto" = "true" }
+          )
+          env = {
+            HOST_ENV = "AWS_K8"
+          }
+        },
         local.docker_pull_secret_global_values
       )
     }
@@ -161,12 +192,16 @@ resource "kubernetes_namespace" "paragon" {
   }
 }
 
+locals {
+  paragon_namespace = kubernetes_namespace.paragon.metadata[0].name
+}
+
 resource "kubernetes_config_map" "feature_flag_content" {
   count = var.feature_flags_content != null ? 1 : 0
 
   metadata {
     name      = "feature-flags-content"
-    namespace = kubernetes_namespace.paragon.id
+    namespace = local.paragon_namespace
   }
 
   data = {
@@ -176,11 +211,11 @@ resource "kubernetes_config_map" "feature_flag_content" {
 
 # kubernetes secret to pull container images from a registry (Docker Hub, Artifactory, etc.)
 resource "kubernetes_secret" "docker_login" {
-  count = var.create_docker_pull_secret ? 1 : 0
+  count = var.create_docker_pull_secret && !var.install_external_secrets ? 1 : 0
 
   metadata {
     name      = var.docker_pull_secret_name
-    namespace = kubernetes_namespace.paragon.id
+    namespace = local.paragon_namespace
   }
 
   type = "kubernetes.io/dockerconfigjson"
@@ -196,30 +231,6 @@ resource "kubernetes_secret" "docker_login" {
         }
       }
     })
-  }
-}
-
-# shared secrets
-resource "kubernetes_secret" "paragon_secrets" {
-  for_each = toset(
-    var.managed_sync_enabled ? [
-      "paragon-secrets",
-      "paragon-managed-sync-secrets"
-      ] : [
-      "paragon-secrets"
-    ]
-  )
-  metadata {
-    name      = each.value
-    namespace = kubernetes_namespace.paragon.id
-  }
-
-  type = "Opaque"
-
-  data = {
-    # Map global.env from helm_values into secret data
-    for key, value in nonsensitive(var.helm_values.global.env) :
-    key => value
   }
 }
 
@@ -241,7 +252,7 @@ resource "helm_release" "ingress" {
   chart      = "aws-load-balancer-controller"
   version    = "3.4.0"
 
-  namespace        = kubernetes_namespace.paragon.id
+  namespace        = local.paragon_namespace
   atomic           = true
   cleanup_on_fail  = true
   create_namespace = false
@@ -305,7 +316,7 @@ resource "helm_release" "ingress" {
       }
     }
   })]
-  
+
   depends_on = [module.karpenter]
 }
 
@@ -317,7 +328,7 @@ resource "helm_release" "metricsserver" {
   repository = "https://kubernetes-sigs.github.io/metrics-server/"
   chart      = "metrics-server"
 
-  namespace        = kubernetes_namespace.paragon.id
+  namespace        = local.paragon_namespace
   atomic           = true
   cleanup_on_fail  = true
   create_namespace = false
@@ -353,7 +364,7 @@ resource "helm_release" "paragon_on_prem" {
   chart       = "./charts/paragon-onprem"
   version     = "${local.version}-${local.chart_hashes["paragon-onprem"]}"
 
-  namespace         = kubernetes_namespace.paragon.id
+  namespace         = local.paragon_namespace
   atomic            = true
   cleanup_on_fail   = true
   create_namespace  = false
@@ -375,8 +386,9 @@ resource "helm_release" "paragon_on_prem" {
   depends_on = [
     module.karpenter,
     helm_release.ingress,
+    data.kubernetes_secret.paragon_secrets,
+    data.kubernetes_secret.docker_cfg,
     kubernetes_secret.docker_login,
-    kubernetes_secret.paragon_secrets,
     kubernetes_storage_class_v1.gp3_encrypted,
     kubernetes_config_map.feature_flag_content,
   ]
@@ -389,7 +401,7 @@ resource "helm_release" "paragon_logging" {
   chart       = "./charts/paragon-logging"
   version     = "${local.version}-${local.chart_hashes["paragon-logging"]}"
 
-  namespace         = kubernetes_namespace.paragon.id
+  namespace         = local.paragon_namespace
   atomic            = true
   cleanup_on_fail   = true
   create_namespace  = false
@@ -400,7 +412,8 @@ resource "helm_release" "paragon_logging" {
 
   values = [
     local.helm_values_yaml,
-    local.global_values
+    local.global_values,
+    local.runtime_secret_values
   ]
 
   set {
@@ -418,29 +431,11 @@ resource "helm_release" "paragon_logging" {
     value = var.aws_region
   }
 
-  set_sensitive {
-    name  = "fluent-bit.secrets.ZO_ROOT_USER_EMAIL"
-    value = local.openobserve_email
-  }
-
-  set_sensitive {
-    name  = "fluent-bit.secrets.ZO_ROOT_USER_PASSWORD"
-    value = local.openobserve_password
-  }
-
-  set_sensitive {
-    name  = "openobserve.secrets.ZO_ROOT_USER_EMAIL"
-    value = local.openobserve_email
-  }
-
-  set_sensitive {
-    name  = "openobserve.secrets.ZO_ROOT_USER_PASSWORD"
-    value = local.openobserve_password
-  }
-
   depends_on = [
     module.karpenter,
     helm_release.ingress,
+    data.kubernetes_secret.docker_cfg,
+    data.kubernetes_secret.openobserve_credentials,
     kubernetes_secret.docker_login,
     kubernetes_storage_class_v1.gp3_encrypted,
   ]
@@ -455,7 +450,7 @@ resource "helm_release" "paragon_monitoring" {
   chart       = "./charts/paragon-monitoring"
   version     = "${var.monitor_version}-${local.chart_hashes["paragon-monitoring"]}"
 
-  namespace         = kubernetes_namespace.paragon.id
+  namespace         = local.paragon_namespace
   atomic            = true
   cleanup_on_fail   = true
   create_namespace  = false
@@ -487,6 +482,8 @@ resource "helm_release" "paragon_monitoring" {
     module.karpenter,
     helm_release.ingress,
     helm_release.paragon_on_prem,
+    data.kubernetes_secret.paragon_secrets,
+    data.kubernetes_secret.docker_cfg,
     kubernetes_secret.docker_login,
     kubernetes_storage_class_v1.gp3_encrypted,
   ]

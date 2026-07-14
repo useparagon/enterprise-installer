@@ -30,6 +30,11 @@ variable "docker_registry_server" {
   type        = string
 }
 
+variable "docker_cfg_secret_name" {
+  description = "Secret Manager secret name for docker credentials."
+  type        = string
+}
+
 variable "docker_pull_secret_name" {
   description = "Kubernetes secret name for registry pull credentials."
   type        = string
@@ -59,6 +64,16 @@ variable "docker_email" {
 
 variable "domain" {
   description = "The domain used for the application. Used to generate an SSL certificate and associates CNAMEs."
+  type        = string
+}
+
+variable "env_secret_name" {
+  description = "Secret Manager secret name for shared Paragon application secrets."
+  type        = string
+}
+
+variable "external_secrets_service_account_email" {
+  description = "Google service account email used by External Secrets Operator."
   type        = string
 }
 
@@ -166,6 +181,30 @@ variable "k8s_version" {
 
 variable "storage_service_account" {
   description = "The GCP service account email for cloud storage access."
+  type        = string
+  default     = null
+}
+
+variable "managed_sync_secret_name" {
+  description = "Secret Manager secret name for managed-sync secrets."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_secret_name" {
+  description = "Secret Manager secret name for OpenObserve credentials."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_gcs_secret_name" {
+  description = "Secret Manager secret name for the OpenObserve GCS credentials file."
+  type        = string
+  default     = null
+}
+
+variable "redis_ca_cert_secret_name" {
+  description = "Secret Manager secret name for the Redis CA certificate bundle."
   type        = string
   default     = null
 }
