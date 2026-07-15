@@ -77,7 +77,10 @@ module "eks" {
     Name = var.workspace
   }
 
-  depends_on = [aws_iam_role.eks_cluster_admin]
+  depends_on = [
+    aws_iam_role.eks_cluster_admin,
+    terraform_data.egress_ready,
+  ]
 }
 
 # Managed outside the EKS module so creation is ordered after the cluster (and the

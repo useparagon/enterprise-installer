@@ -76,6 +76,17 @@ variable "vpc_cidr" {
   nullable    = false
 }
 
+variable "nsg_malicious_ips" {
+  description = "Optional CIDR prefixes denied by subnet NSG inbound/outbound rules (public, private, redis). Empty skips those rules. Azure allows at most 4000 prefixes per rule."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.nsg_malicious_ips) <= 4000
+    error_message = "nsg_malicious_ips cannot exceed Azure's 4000 address-prefix limit per NSG rule."
+  }
+}
+
 variable "auditlogs_retention_days" {
   description = "The number of days to retain audit logs before deletion."
   type        = number
@@ -95,6 +106,13 @@ variable "bastion_enabled" {
   description = "Whether to create the bastion host and its associated Cloudflare tunnel."
   type        = bool
   default     = true
+}
+
+# key vault (runtime secrets + cert-manager handoff)
+variable "key_vault_purge_protection_enabled" {
+  description = "Enable purge protection on the Paragon Key Vault. Required by some Azure org policies (e.g. Enforce-GR-KeyVault). Cannot be disabled after creation."
+  type        = bool
+  default     = false
 }
 
 # cloudflare

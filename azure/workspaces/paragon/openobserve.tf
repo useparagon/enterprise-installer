@@ -11,11 +11,16 @@ resource "random_string" "openobserve_email" {
 resource "random_password" "openobserve_password" {
   count = var.openobserve_password == null ? 1 : 0
 
-  length  = 32
-  lower   = true
-  upper   = true
-  numeric = true
-  special = false
+  length           = 32
+  lower            = true
+  numeric          = true
+  special          = true
+  upper            = true
+  min_lower        = 2
+  min_upper        = 2
+  min_numeric      = 2
+  min_special      = 2
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 locals {

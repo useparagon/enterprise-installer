@@ -44,10 +44,9 @@ resource "helm_release" "reloader" {
 locals {
   secret_store_yaml = yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
-    kind       = "SecretStore"
+    kind       = "ClusterSecretStore"
     metadata = {
-      name      = "gcp-secret-manager"
-      namespace = kubernetes_namespace_v1.paragon.id
+      name = "gcp-secret-manager"
     }
     spec = {
       provider = {
@@ -78,7 +77,7 @@ locals {
       refreshInterval = "5m"
       secretStoreRef = {
         name = "gcp-secret-manager"
-        kind = "SecretStore"
+        kind = "ClusterSecretStore"
       }
       target = {
         name           = "paragon-secrets"
@@ -92,21 +91,21 @@ locals {
     }
   })
 
-  external_secret_docker_yaml = yamlencode({
+  external_secret_docker_yaml = var.create_docker_pull_secret && var.docker_cfg_secret_name != null ? yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ExternalSecret"
     metadata = {
-      name      = "docker-cfg"
+      name      = var.docker_pull_secret_name
       namespace = kubernetes_namespace_v1.paragon.id
     }
     spec = {
       refreshInterval = "1h"
       secretStoreRef = {
         name = "gcp-secret-manager"
-        kind = "SecretStore"
+        kind = "ClusterSecretStore"
       }
       target = {
-        name           = "docker-cfg"
+        name           = var.docker_pull_secret_name
         creationPolicy = "Owner"
         template = {
           type = "kubernetes.io/dockerconfigjson"
@@ -123,7 +122,7 @@ locals {
         }
       }]
     }
-  })
+  }) : null
 
   external_secret_managed_sync_yaml = var.managed_sync_secret_name != null ? yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
@@ -136,7 +135,7 @@ locals {
       refreshInterval = "5m"
       secretStoreRef = {
         name = "gcp-secret-manager"
-        kind = "SecretStore"
+        kind = "ClusterSecretStore"
       }
       target = {
         name           = "paragon-managed-sync-secrets"
@@ -161,7 +160,7 @@ locals {
       refreshInterval = "5m"
       secretStoreRef = {
         name = "gcp-secret-manager"
-        kind = "SecretStore"
+        kind = "ClusterSecretStore"
       }
       target = {
         name           = "openobserve-credentials"
@@ -186,7 +185,7 @@ locals {
       refreshInterval = "5m"
       secretStoreRef = {
         name = "gcp-secret-manager"
-        kind = "SecretStore"
+        kind = "ClusterSecretStore"
       }
       target = {
         name           = "openobserve-creds"
@@ -213,7 +212,7 @@ locals {
       refreshInterval = "5m"
       secretStoreRef = {
         name = "gcp-secret-manager"
-        kind = "SecretStore"
+        kind = "ClusterSecretStore"
       }
       target = {
         name           = "redis-ca-cert"
@@ -241,6 +240,8 @@ resource "kubectl_manifest" "external_secret_paragon" {
 }
 
 resource "kubectl_manifest" "external_secret_docker" {
+  count = local.external_secret_docker_yaml != null ? 1 : 0
+
   yaml_body  = local.external_secret_docker_yaml
   depends_on = [kubectl_manifest.secret_store]
 }

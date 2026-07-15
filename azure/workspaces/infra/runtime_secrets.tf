@@ -13,7 +13,8 @@ resource "azurerm_key_vault" "paragon" {
   resource_group_name        = module.network.resource_group.name
   tenant_id                  = coalesce(var.azure_tenant_id, data.azurerm_client_config.current.tenant_id)
   sku_name                   = "premium"
-  soft_delete_retention_days = 7
+  purge_protection_enabled   = var.key_vault_purge_protection_enabled
+  soft_delete_retention_days = 90
 }
 
 resource "azurerm_key_vault_access_policy" "terraform" {
@@ -83,11 +84,13 @@ resource "azurerm_key_vault_secret" "runtime_kafka" {
 }
 
 resource "azurerm_key_vault_secret" "runtime_bastion" {
+  count = var.bastion_enabled ? 1 : 0
+
   name         = "bastion"
   key_vault_id = azurerm_key_vault.paragon.id
   value = jsonencode({
-    public_dns  = module.bastion.connection.bastion_dns
-    private_key = module.bastion.connection.private_key
+    public_dns  = module.bastion[0].connection.bastion_dns
+    private_key = module.bastion[0].connection.private_key
   })
 
   depends_on = [azurerm_key_vault_access_policy.terraform]

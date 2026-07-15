@@ -1,11 +1,34 @@
+# Logs bucket policy must exist before Network Firewall logging configuration.
+module "storage" {
+  source = "./storage"
+
+  workspace                 = local.workspace
+  aws_region                = var.aws_region
+  network_firewall_enabled  = var.network_firewall.enabled
+  force_destroy             = var.disable_deletion_protection
+  app_bucket_expiration     = var.app_bucket_expiration
+  auditlogs_retention_days  = var.auditlogs_retention_days
+  auditlogs_lock_enabled    = var.auditlogs_lock_enabled
+  managed_sync_enabled      = var.managed_sync_enabled
+  s3_kms_encryption_enabled = var.s3_kms_encryption_enabled
+  s3_kms_key_arn            = var.s3_kms_key_arn
+  admin_arns                = local.admin_arns
+
+  migrated             = var.migrated_workspace != null
+  cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
+}
+
 module "network" {
   source = "./network"
 
-  workspace        = local.workspace
-  aws_region       = var.aws_region
-  az_count         = var.az_count
-  vpc_cidr         = var.vpc_cidr
-  vpc_cidr_newbits = var.vpc_cidr_newbits
+  workspace                = local.workspace
+  aws_region               = var.aws_region
+  az_count                 = var.az_count
+  vpc_cidr                 = var.vpc_cidr
+  vpc_cidr_newbits         = var.vpc_cidr_newbits
+  network_firewall_enabled = var.network_firewall.enabled
+  logs_bucket_name         = module.storage.logs_bucket_name
+  network_firewall         = var.network_firewall
 }
 
 module "cloudtrail" {
@@ -59,23 +82,6 @@ module "redis" {
   private_subnet = module.network.private_subnet
 }
 
-module "storage" {
-  source = "./storage"
-
-  workspace                 = local.workspace
-  force_destroy             = var.disable_deletion_protection
-  app_bucket_expiration     = var.app_bucket_expiration
-  auditlogs_retention_days  = var.auditlogs_retention_days
-  auditlogs_lock_enabled    = var.auditlogs_lock_enabled
-  managed_sync_enabled      = var.managed_sync_enabled
-  s3_kms_encryption_enabled = var.s3_kms_encryption_enabled
-  s3_kms_key_arn            = var.s3_kms_key_arn
-  admin_arns                = local.admin_arns
-
-  migrated             = var.migrated_workspace != null
-  cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
-}
-
 module "kafka" {
   source = "./kafka"
   count  = var.managed_sync_enabled ? 1 : 0
@@ -111,6 +117,9 @@ module "bastion" {
   private_subnet = module.network.private_subnet
   public_subnet  = module.network.public_subnet
   vpc_id         = module.network.vpc.id
+
+  # Workloads that bootstrap over the internet must wait for egress routing (NFW or NAT).
+  egress_ready = module.network.egress_ready
 }
 
 module "cluster" {
@@ -118,6 +127,8 @@ module "cluster" {
 
   workspace  = local.workspace
   aws_region = var.aws_region
+
+  egress_ready = module.network.egress_ready
 
   bastion_enabled           = var.bastion_enabled
   bastion_role_arn          = var.bastion_enabled ? module.bastion[0].bastion_role_arn : null
@@ -171,7 +182,7 @@ module "secrets" {
       })
   }) : null
 
-  managed_sync_config     = var.paragon_managed_sync_config
+  managed_sync_config     = var.managed_sync_enabled ? coalesce(var.paragon_managed_sync_config, {}) : null
   recovery_window_in_days = var.secrets_recovery_window_in_days
 }
 

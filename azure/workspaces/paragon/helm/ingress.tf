@@ -1,15 +1,12 @@
-resource "azurerm_key_vault" "paragon" {
-  # Key Vault names are 3-24 chars and must not end with a hyphen; strip any
-  # trailing hyphen left by truncating the workspace name to 24 chars.
+# Key Vault is owned by the infra workspace (runtime handoff + app secrets).
+# Must match the sanitized name from infra/runtime_secrets.tf.
+data "azurerm_key_vault" "paragon" {
   name                = replace(substr(var.workspace, 0, 24), "/-+$/", "")
-  location            = var.resource_group.location
   resource_group_name = var.resource_group.name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-  sku_name            = "premium"
 }
 
 resource "azurerm_key_vault_access_policy" "aks_access_to_kv" {
-  key_vault_id = azurerm_key_vault.paragon.id
+  key_vault_id = data.azurerm_key_vault.paragon.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = data.azurerm_kubernetes_cluster.cluster.kubelet_identity.0.object_id
 

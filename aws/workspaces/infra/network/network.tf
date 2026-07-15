@@ -43,6 +43,19 @@ resource "aws_subnet" "private" {
   }
 }
 
+# Dedicated /28 subnets for AWS Network Firewall endpoints (block index 0 of the VPC CIDR plan).
+resource "aws_subnet" "firewall" {
+  count      = var.network_firewall_enabled ? var.az_count : 0
+  cidr_block = cidrsubnet(local.firewall_parent_cidr, local.firewall_subnet_bits, count.index)
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  vpc_id                  = aws_vpc.app.id
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "${var.workspace}-firewall-${substr(data.aws_availability_zones.available.names[count.index], length(data.aws_availability_zones.available.names[count.index]) - 2, 2)}"
+  }
+}
+
 resource "aws_eip" "gw" {
   count      = var.az_count
   domain     = "vpc"
@@ -80,18 +93,34 @@ resource "aws_nat_gateway" "gw" {
   }
 }
 
-# Create a new route table for the private subnets, make it route non-local traffic through the NAT gateway to the internet
+# Private route tables. When NFW is disabled, keep the NAT default route inline on the
+# route table (pre-NFW model) so brownfield upgrades do not hit RouteAlreadyExists from a
+# new standalone aws_route. When NFW is enabled, omit the inline route; the network_firewall
+# module owns private → firewall-endpoint routes as aws_route resources.
 resource "aws_route_table" "private" {
   count  = var.az_count
   vpc_id = aws_vpc.app.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = element(aws_nat_gateway.gw.*.id, count.index)
+  dynamic "route" {
+    for_each = var.network_firewall_enabled ? [] : [1]
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.gw[count.index].id
+    }
   }
 
   tags = {
     Name = "${var.workspace}-private-route-table"
+  }
+}
+
+# Drop standalone NAT aws_route from state without destroying the AWS route. Inline
+# route blocks above take over management for the NFW-disabled path.
+removed {
+  from = aws_route.private_egress
+
+  lifecycle {
+    destroy = false
   }
 }
 

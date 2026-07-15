@@ -64,6 +64,7 @@ output "bastion" {
 output "cluster_name" {
   description = "The name of the EKS cluster."
   value       = module.cluster.eks_cluster.name
+  sensitive   = true
 }
 
 # ---------------------------------------------------------------------------
@@ -129,4 +130,15 @@ output "enable_legacy_mng_pools" {
 output "karpenter" {
   description = "AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace."
   value       = module.cluster.karpenter
+}
+
+output "secrets_manager_env_secret" {
+  description = "Name of the Secrets Manager secret containing Paragon env config."
+  value       = module.secrets.env_secret_name
+  sensitive   = true
+}
+
+output "secrets_manager_secret_arns" {
+  description = "ARNs of application Secrets Manager secrets."
+  value       = module.secrets.secret_arns
 }

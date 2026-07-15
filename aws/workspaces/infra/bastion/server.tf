@@ -81,6 +81,8 @@ module "bastion" {
     tunnel_name     = local.tunnel_domain,
     tunnel_secret   = local.tunnel_secret,
   })
+
+  depends_on = [terraform_data.egress_ready]
 }
 
 # allow SSM Connect access

@@ -72,6 +72,7 @@ output "kafka" {
 output "cluster_name" {
   description = "The name of the GKE cluster."
   value       = module.cluster.kubernetes.name
+  sensitive   = true
 }
 
 output "argocd_namespace" {

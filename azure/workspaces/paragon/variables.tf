@@ -53,18 +53,22 @@ variable "create_docker_pull_secret" {
 }
 
 variable "docker_username" {
-  description = "Docker username to pull images."
+  description = "Docker username to pull images. Null when using a pre-provisioned pull secret (create_docker_pull_secret=false)."
   type        = string
+  default     = null
 }
 
 variable "docker_password" {
-  description = "Docker password to pull images."
+  description = "Docker password to pull images. Null when using a pre-provisioned pull secret (create_docker_pull_secret=false)."
   type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+  default     = null
 }
 
 variable "monitors_enabled" {
@@ -294,7 +298,7 @@ variable "customer_facing" {
 }
 
 variable "infra_json_path" {
-  description = "Deprecated legacy path to an `infra` workspace output JSON file."
+  description = "Deprecated legacy path to an `infra` workspace output JSON file. Prefer Key Vault handoff secrets (PARA-21726)."
   type        = string
   default     = null
 }
@@ -345,7 +349,7 @@ locals {
   auditlogs_bucket    = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
   # `local.infra_vars` is resolved in infra_secrets.tf (legacy infra.json when provided,
-  # otherwise infra secrets sourced from external secrets). Backward compatible with infra
+  # otherwise infra secrets sourced from Key Vault). Backward compatible with infra
   # workspaces that still emit the legacy "minio" output instead of the renamed "storage"
   # output; null-safe when neither is present.
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
@@ -701,8 +705,8 @@ locals {
         WORKER_WORKFLOWS_MINIMUM_TEST_WORKFLOW_QUEUE_COUNT    = 1
 
         # Authentication
-        ADMIN_BASIC_AUTH_USERNAME = local.helm_vars.global.env["LICENSE"]
-        ADMIN_BASIC_AUTH_PASSWORD = local.helm_vars.global.env["LICENSE"]
+        ADMIN_BASIC_AUTH_USERNAME = try(local.helm_vars.global.env["LICENSE"], null)
+        ADMIN_BASIC_AUTH_PASSWORD = try(local.helm_vars.global.env["LICENSE"], null)
 
         # Feature flags
         FEATURE_FLAG_PLATFORM_ENABLED  = "true"
@@ -819,19 +823,37 @@ locals {
     })
   })
 
-  bootstrap_values    = yamldecode(file("${path.module}/../../../charts/bootstrap/values.yaml"))
-  runtime_secret_keys = toset(try(local.bootstrap_values.secretKeys, []))
+  # Split env by prepared chart service-inputs.json (./prepare.sh):
+  # - envKeys → Helm global.env (plain `value:` on pods)
+  # - secretKeys (and not also envKeys) → Key Vault for secretKeyRef
+  # Azure has no infra flat-env secret (unlike AWS); secretKeys are taken from
+  # helm_values that already embed postgres/redis/storage from nested infra JSON.
+  chart_service_input_files = fileset("${path.root}/charts", "**/files/service-inputs.json")
+  chart_service_inputs = [
+    for f in local.chart_service_input_files :
+    jsondecode(file("${path.root}/charts/${f}"))
+  ]
+  chart_env_keys = toset(flatten([
+    for s in local.chart_service_inputs : try(s.envKeys, [])
+  ]))
+  chart_secret_keys = toset(flatten([
+    for s in local.chart_service_inputs : try(s.secretKeys, [])
+  ]))
+  helm_is_secret_env_key = {
+    for key, _ in local.helm_values.global.env :
+    key => contains(local.chart_secret_keys, key) && !contains(local.chart_env_keys, key)
+  }
   helm_secret_values = {
     for key, value in local.helm_values.global.env :
     key => tostring(value)
-    if value != null && contains(local.runtime_secret_keys, key)
+    if value != null && tostring(value) != "" && local.helm_is_secret_env_key[key]
   }
   helm_values_public = merge(local.helm_values, {
     global = merge(local.helm_values.global, {
       env = {
         for key, value in local.helm_values.global.env :
         key => value
-        if value != null && !contains(local.runtime_secret_keys, key)
+        if value != null && !local.helm_is_secret_env_key[key]
       }
     })
   })

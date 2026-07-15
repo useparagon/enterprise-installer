@@ -15,11 +15,16 @@ resource "random_string" "openobserve_email" {
 resource "random_password" "openobserve_password" {
   count = var.create_openobserve ? 1 : 0
 
-  length  = 32
-  lower   = true
-  numeric = true
-  special = false
-  upper   = true
+  length           = 32
+  lower            = true
+  numeric          = true
+  special          = true
+  upper            = true
+  min_lower        = 2
+  min_upper        = 2
+  min_numeric      = 2
+  min_special      = 2
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 resource "aws_secretsmanager_secret" "env" {

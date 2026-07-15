@@ -21,7 +21,7 @@ PRINCIPAL_ID="your-service-principal-object-id-or-user-object-id"
 ROLES=(
   # Full resource management except IAM grants (Terraform apply/destroy)
   "Contributor"
-  # Key Vault permission model (RBAC) and Azure resource role assignments
+  # Needed to create role assignments (Key Vault RBAC + AKS Network Contributor on subnet/NSG)
   "User Access Administrator"
   # kubectl / Kubernetes API via Azure RBAC (cluster inspection, certs, events, logs)
   "Azure Kubernetes Service Cluster User Role"
@@ -58,5 +58,13 @@ echo "  Redis, storage, AKS node pools, VMSS (bastion), public IPs, etc."
 echo "User Access Administrator: Key Vault RBAC transitions and Azure RBAC assignments."
 echo "AKS Cluster User: Kubernetes API access for diagnostics (e.g. cert-manager, ingress)."
 echo ""
-echo "For Key Vault secret/certificate *contents*, assign a Key Vault data-plane role at"
-echo "the vault scope (e.g. Key Vault Administrator)."
+echo "For Key Vault RBAC (permission model change + role assignments),"
+echo "and for AKS Network Contributor on the private subnet (ingress LB),"
+echo "Terraform also needs User Access Administrator at subscription or resource group scope."
+echo ""
+echo "If you want the Terraform principal to manage Key Vault secrets/certs/keys,"
+echo "assign Key Vault Administrator at the vault scope."
+echo ""
+echo "On apply, infra grants the AKS cluster identity Network Contributor on the"
+echo "private subnet and aks-nsg so LoadBalancer / VMSS subnet join and NSG"
+echo "rule reconciliation succeed."

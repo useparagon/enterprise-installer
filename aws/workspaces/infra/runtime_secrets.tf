@@ -1,7 +1,7 @@
 # Nested JSON handoff secrets for the paragon Terraform workspace (postgres, redis,
-# storage, kafka, bastion). Always created so paragon can read infra_vars via Secrets
-# Manager and operators can retrieve sensitive infra outputs (e.g. the bastion private
-# key) without pulling Terraform state.
+# storage, kafka, bastion, cluster). Always created so paragon can read infra_vars via
+# Secrets Manager and operators can retrieve sensitive infra outputs (e.g. the bastion
+# private key) without pulling Terraform state.
 # When argocd_enabled, infra additionally syncs these via ESO ExternalSecrets.
 
 locals {
@@ -110,5 +110,26 @@ resource "aws_secretsmanager_secret_version" "runtime_bastion" {
   secret_string = jsonencode({
     public_dns  = module.bastion[0].connection.bastion_dns
     private_key = module.bastion[0].connection.private_key
+  })
+}
+
+resource "aws_secretsmanager_secret" "runtime_cluster" {
+  name                    = "${local.runtime_secret_prefix}/cluster"
+  description             = "Cluster metadata for ${var.organization} (karpenter, k8s version)"
+  recovery_window_in_days = var.secrets_recovery_window_in_days
+  tags = {
+    Name         = "${local.runtime_secret_prefix}/cluster"
+    Organization = var.organization
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "runtime_cluster" {
+  secret_id = aws_secretsmanager_secret.runtime_cluster.id
+  secret_string = jsonencode({
+    enable_karpenter        = module.cluster.enable_karpenter
+    enable_legacy_mng_pools = module.cluster.enable_legacy_mng_pools
+    k8s_version             = module.cluster.k8s_version
+    karpenter               = module.cluster.karpenter
+    cluster_name            = module.cluster.eks_cluster.name
   })
 }

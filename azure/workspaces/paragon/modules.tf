@@ -2,7 +2,7 @@ module "helm" {
   source = "./helm"
 
   cluster_name                   = local.cluster_name
-  docker_cfg_secret_name         = azurerm_key_vault_secret.docker_cfg.name
+  docker_cfg_secret_name         = var.create_docker_pull_secret && length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].name : null
   docker_email                   = var.docker_email
   docker_password                = var.docker_password
   docker_registry_server         = var.docker_registry_server

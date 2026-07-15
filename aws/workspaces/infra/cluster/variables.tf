@@ -130,4 +130,9 @@ variable "eks_system_managed_node_group" {
   })
 }
 
+variable "egress_ready" {
+  description = "Set when private egress routing is ready. Implicit apply-order dependency for internet-bootstrapping workloads."
+  type        = string
+}
+
 data "aws_caller_identity" "current" {}
