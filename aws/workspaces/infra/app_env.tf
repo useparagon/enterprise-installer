@@ -5,8 +5,6 @@
 # (LICENSE, OAuth, SMTP, …) merges last. Written by module.secrets on every apply.
 
 locals {
-  argocd_domain = var.paragon_domain != null ? trimspace(var.paragon_domain) : ""
-
   argocd_postgres = module.postgres.rds
   argocd_redis    = module.redis.elasticache
   argocd_storage  = module.storage.s3
@@ -48,41 +46,9 @@ locals {
     role => local.argocd_redis_endpoint[role] != null ? "${local.argocd_redis_endpoint[role].host}:${local.argocd_redis_endpoint[role].port}" : local.argocd_default_redis_url
   }
 
-  # Default https://<subdomain>.<domain> for each public service. Omitted when
-  # paragon_domain is unset (lint/plan without domain). Override any computed
-  # key via var.env_overrides (e.g. ACCOUNT_PUBLIC_URL, CERBERUS_POSTGRES_PORT).
-  argocd_public_url_subdomains = {
-    ACCOUNT_PUBLIC_URL            = "account"
-    API_TRIGGERKIT_PUBLIC_URL     = "api-triggerkit"
-    CACHE_REPLAY_PUBLIC_URL       = "cache-replay"
-    CERBERUS_PUBLIC_URL           = "cerberus"
-    CONNECT_PUBLIC_URL            = "connect"
-    DASHBOARD_PUBLIC_URL          = "dashboard"
-    HADES_PUBLIC_URL              = "hades"
-    HEALTH_CHECKER_PUBLIC_URL     = "health-checker"
-    HERMES_PUBLIC_URL             = "hermes"
-    PASSPORT_PUBLIC_URL           = "passport"
-    PHEME_PUBLIC_URL              = "pheme"
-    RELEASE_PUBLIC_URL            = "release"
-    ZEUS_PUBLIC_URL               = "zeus"
-    WORKER_ACTIONKIT_PUBLIC_URL   = "worker-actionkit"
-    WORKER_ACTIONS_PUBLIC_URL     = "worker-actions"
-    WORKER_AUDIT_LOGS_PUBLIC_URL  = "worker-auditlogs"
-    WORKER_CREDENTIALS_PUBLIC_URL = "worker-credentials"
-    WORKER_CRONS_PUBLIC_URL       = "worker-crons"
-    WORKER_DEPLOYMENTS_PUBLIC_URL = "worker-deployments"
-    WORKER_EVENT_LOGS_PUBLIC_URL  = "worker-eventlogs"
-    WORKER_PROXY_PUBLIC_URL       = "worker-proxy"
-    WORKER_TRIGGERKIT_PUBLIC_URL  = "worker-triggerkit"
-    WORKER_TRIGGERS_PUBLIC_URL    = "worker-triggers"
-    WORKER_WORKFLOWS_PUBLIC_URL   = "worker-workflows"
-  }
-
-  argocd_public_url_defaults = local.argocd_domain != "" ? {
-    for env_key, subdomain in local.argocd_public_url_subdomains :
-    env_key => "https://${subdomain}.${local.argocd_domain}"
-  } : {}
-
+  # *_PUBLIC_URL / PARAGON_DOMAIN are chart envKeys owned by the paragon workspace
+  # (`var.domain`). Do not derive them here from a second domain input — that can
+  # desync Secrets Manager from Helm. Seed via env_overrides for GitOps-only flows.
   argocd_env_overrides = var.env_overrides != null ? var.env_overrides : {}
 
   argocd_postgres_env_prefixes = {
@@ -106,12 +72,7 @@ locals {
 
   argocd_s3_endpoint = "https://s3.${var.aws_region}.amazonaws.com"
 
-  argocd_domain_env = local.argocd_domain != "" ? {
-    PARAGON_DOMAIN               = local.argocd_domain
-    PUBLIC_UPLOAD_PROXY_BASE_URL = "https://zeus.${local.argocd_domain}/public-upload-proxy"
-  } : {}
-
-  argocd_infra_env = merge(local.argocd_domain_env, {
+  argocd_infra_env = {
     REDIS_URL = local.argocd_default_redis_url
 
     CACHE_REDIS_CLUSTER_ENABLED    = local.argocd_redis_cluster_enabled.cache
@@ -136,7 +97,7 @@ locals {
     CLOUD_STORAGE_REGION            = var.aws_region
     CLOUD_STORAGE_PUBLIC_URL        = local.argocd_s3_endpoint
     CLOUD_STORAGE_PRIVATE_URL       = local.argocd_s3_endpoint
-  })
+  }
 
   argocd_app_secret_overrides = var.app_secrets != null ? var.app_secrets : {}
 
@@ -149,7 +110,6 @@ locals {
     for key, value in merge(
       local.argocd_infra_env,
       local.argocd_postgres_env,
-      local.argocd_public_url_defaults,
       local.argocd_env_overrides,
       local.argocd_license_admin_auth,
       local.argocd_app_secret_overrides,
