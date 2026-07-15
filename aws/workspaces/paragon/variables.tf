@@ -814,6 +814,9 @@ locals {
     "POSTGRES_DATABASE",
     "REDIS_HOST",
     "REDIS_PORT",
+    # AWS uses EKS Pod Identity for S3 — strip static access keys even if present in customer values.
+    "CLOUD_STORAGE_MICROSERVICE_USER",
+    "CLOUD_STORAGE_MICROSERVICE_PASS",
   ]
 
   default_redis_cluster = try(
@@ -989,13 +992,11 @@ locals {
           WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
           WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}", local.default_redis_url)
 
-          # Cloud Storage configurations
-          CLOUD_STORAGE_MICROSERVICE_PASS = local.storage_output.root_password
-          CLOUD_STORAGE_MICROSERVICE_USER = local.storage_output.root_user
-          CLOUD_STORAGE_PUBLIC_BUCKET     = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
-          CLOUD_STORAGE_SYSTEM_BUCKET     = try(local.storage_output.private_bucket, "${local.workspace}-app")
-          CLOUD_STORAGE_TYPE              = local.cloud_storage_type
-          CLOUD_STORAGE_REGION            = var.aws_region
+          # Cloud Storage configurations (S3 auth via EKS Pod Identity; no static access keys)
+          CLOUD_STORAGE_PUBLIC_BUCKET = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
+          CLOUD_STORAGE_SYSTEM_BUCKET = try(local.storage_output.private_bucket, "${local.workspace}-app")
+          CLOUD_STORAGE_TYPE          = local.cloud_storage_type
+          CLOUD_STORAGE_REGION        = var.aws_region
 
           CLOUD_STORAGE_PUBLIC_URL = coalesce(
             try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
