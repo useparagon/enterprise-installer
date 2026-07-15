@@ -19,8 +19,9 @@ variable "docker_registry_server" {
 }
 
 variable "docker_cfg_secret_name" {
-  description = "Secrets Manager secret name for docker credentials."
+  description = "Secrets Manager secret name for docker credentials. Null when unused."
   type        = string
+  default     = null
 }
 
 variable "docker_pull_secret_name" {
@@ -283,40 +284,6 @@ variable "karpenter_defaults" {
     ec2_kubelet_max_pods     = optional(number)
   })
   default = {}
-}
-
-variable "install_external_secrets" {
-  description = "Install External Secrets Operator and sync Secrets Manager values into Kubernetes."
-  type        = bool
-  default     = true
-}
-
-variable "env_secret_name" {
-  description = "Secrets Manager secret name for Paragon env config synced by ESO."
-  type        = string
-}
-
-variable "eso_role_arn" {
-  description = "IAM role ARN assumed by the External Secrets Operator service account."
-  type        = string
-}
-
-variable "docker_cfg_secret_name" {
-  description = "Secrets Manager secret name for Docker registry credentials. Null when unused."
-  type        = string
-  default     = null
-}
-
-variable "managed_sync_secret_name" {
-  description = "Secrets Manager secret name for managed-sync credentials. Null when managed sync is disabled."
-  type        = string
-  default     = null
-}
-
-variable "openobserve_secret_name" {
-  description = "Secrets Manager secret name for OpenObserve credentials. Null when unused."
-  type        = string
-  default     = null
 }
 
 locals {

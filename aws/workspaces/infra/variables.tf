@@ -680,21 +680,8 @@ variable "argocd_env_overrides" {
   default     = null
 }
 
-variable "env_overrides" {
-  description = "Optional overrides for any infra-derived env key written to Secrets Manager (e.g. PARAGON_DOMAIN, ACCOUNT_PUBLIC_URL, CERBERUS_POSTGRES_PORT). Merged on top of computed defaults; app_secrets wins if the same key is set in both. Domain and *_PUBLIC_URL chart envKeys are owned by the paragon workspace `domain` variable — seed them here only for GitOps-only flows that read Secrets Manager without that workspace."
-  type        = map(string)
-  default     = null
-}
-
 variable "argocd_app_secrets" {
   description = "Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides argocd_env_overrides when the same key is set in both."
-  type        = map(string)
-  sensitive   = true
-  default     = null
-}
-
-variable "app_secrets" {
-  description = "Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides env_overrides when the same key is set in both."
   type        = map(string)
   sensitive   = true
   default     = null
