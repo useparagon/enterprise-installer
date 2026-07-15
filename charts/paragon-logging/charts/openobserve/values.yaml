@@ -35,8 +35,10 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ''
 
-# used to store GCP JSON creds as ConfigMap
+# GCP service-account JSON for ZO_S3 (base64). Used only when credsSecretName is empty.
 credsJson: ""
+
+# Existing Secret (e.g. ESO-synced) mounted at /creds. Takes precedence over credsJson.
 credsSecretName: ""
 
 ingress:

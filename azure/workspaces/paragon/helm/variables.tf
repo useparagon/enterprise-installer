@@ -100,6 +100,12 @@ variable "helm_values" {
   sensitive   = true
 }
 
+variable "secrets_revision" {
+  description = "Opaque revision of cloud-store secrets synced via ESO. Included in secret_hash so secret-only changes still force Helm upgrades (Reloader remains the runtime path)."
+  type        = string
+  default     = ""
+}
+
 variable "feature_flags_content" {
   description = "Optional YAML content for feature flags when not using a git repository."
   type        = string

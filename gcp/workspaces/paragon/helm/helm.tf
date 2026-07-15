@@ -235,9 +235,13 @@ locals {
     if var.storage_service_account != null && var.managed_sync_enabled
   }
 
-  # changes to secrets should trigger redeploy
+  # Force Helm upgrades when public values or ESO-backed cloud secrets change.
+  # helm_values is public-only; secrets_revision tracks Secret Manager versions.
   secret_hash = yamlencode({
-    secret_hash = sha256(jsonencode(nonsensitive(var.helm_values)))
+    secret_hash = sha256(jsonencode({
+      values  = nonsensitive(var.helm_values)
+      secrets = var.secrets_revision
+    }))
   })
 }
 

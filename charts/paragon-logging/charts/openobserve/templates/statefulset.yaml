@@ -81,23 +81,23 @@ spec:
           ports:
             - containerPort: {{ .Values.service.port }}
               name: http
-          {{- if or .Values.credsJson .Values.credsSecretName }}
           volumeMounts:
           - name: openobserve-data
             mountPath: /data
+          {{- if or .Values.credsSecretName .Values.credsJson }}
           - name: openobserve-creds
             mountPath: /creds
-          {{- else }}
-          volumeMounts:
-          - name: openobserve-data
-            mountPath: /data
           {{- end }}
-      {{- if or .Values.credsJson .Values.credsSecretName }}
       volumes:
+        {{- if .Values.credsSecretName }}
         - name: openobserve-creds
           secret:
-            secretName: {{ .Values.credsSecretName | default (printf "%s-creds" (include "openobserve.fullname" .)) }}
-      {{- end }}
+            secretName: {{ .Values.credsSecretName | quote }}
+        {{- else if .Values.credsJson }}
+        - name: openobserve-creds
+          secret:
+            secretName: {{ include "openobserve.fullname" . }}-creds
+        {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: openobserve-data

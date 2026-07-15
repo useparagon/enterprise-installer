@@ -174,8 +174,13 @@ locals {
   ))
 
   # changes to secrets should trigger redeploy
+  # Force Helm upgrades when public values or ESO-backed cloud secrets change.
+  # helm_values is public-only; secrets_revision tracks Key Vault secret versions.
   secret_hash = yamlencode({
-    secret_hash = sha256(jsonencode(nonsensitive(var.helm_values)))
+    secret_hash = sha256(jsonencode({
+      values  = nonsensitive(var.helm_values)
+      secrets = var.secrets_revision
+    }))
   })
 }
 

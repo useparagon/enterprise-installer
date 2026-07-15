@@ -38,6 +38,13 @@ module "helm" {
   flipt_options                          = local.flipt_options
   gcp_creds                              = local.gcp_creds
   helm_values                            = local.helm_values_public
+  secrets_revision = sha256(jsonencode({
+    env             = google_secret_manager_secret_version.env.name
+    docker_cfg      = length(google_secret_manager_secret_version.docker_cfg) > 0 ? google_secret_manager_secret_version.docker_cfg[0].name : null
+    managed_sync    = var.managed_sync_enabled ? google_secret_manager_secret_version.managed_sync[0].name : null
+    openobserve     = google_secret_manager_secret_version.openobserve[0].name
+    openobserve_gcs = local.gcp_creds != null ? google_secret_manager_secret_version.openobserve_gcs[0].name : null
+  }))
   ingress_scheme                         = var.ingress_scheme
   k8s_version                            = var.k8s_version
   logs_bucket                            = local.logs_bucket

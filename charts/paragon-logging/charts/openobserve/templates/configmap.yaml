@@ -1,4 +1,4 @@
-{{- if .Values.credsJson }}
+{{- if and .Values.credsJson (eq (default "" .Values.credsSecretName) "") }}
 apiVersion: v1
 kind: Secret
 metadata:

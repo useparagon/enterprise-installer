@@ -85,6 +85,8 @@ module "helm" {
   workspace                         = local.workspace
 
   runtime_secrets_ready = terraform_data.runtime_secrets_populated.id
+  # Hash SM version IDs (not terraform_data.id, which is stable across input updates).
+  secrets_revision = sha256(jsonencode(terraform_data.runtime_secrets_populated.output))
 }
 
 module "managed_sync_config" {
