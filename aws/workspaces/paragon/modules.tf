@@ -99,13 +99,13 @@ module "monitors" {
   source = "./monitors"
   count  = var.monitors_enabled ? 1 : 0
 
-  grafana_admin_email           = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_USER"], null)
-  grafana_admin_password        = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
-  grafana_aws_access_key_id     = try(local.helm_vars.global.env["MONITOR_GRAFANA_AWS_ACCESS_ID"], null)
-  grafana_aws_secret_access_key = try(local.helm_vars.global.env["MONITOR_GRAFANA_AWS_SECRET_KEY"], null)
-  pgadmin_admin_email           = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
-  pgadmin_admin_password        = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
-  workspace                     = local.workspace
+  grafana_admin_email    = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_USER"], null)
+  grafana_admin_password = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
+  pgadmin_admin_email    = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
+  pgadmin_admin_password = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
+  workspace              = local.workspace
+  cluster_name           = local.cluster_name
+  namespace              = module.helm.namespace_paragon.id
 }
 
 module "uptime" {

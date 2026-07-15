@@ -298,8 +298,6 @@ secrets:
   # CLOUD_STORAGE_MICROSERVICE_USER: "your-s3-access-key"   # legacy / MinIO only
   
   # Monitoring
-  MONITOR_GRAFANA_AWS_ACCESS_ID: "your-grafana-aws-access-key"
-  MONITOR_GRAFANA_AWS_SECRET_KEY: "your-grafana-aws-secret-key"
   MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD: "your-grafana-admin-password"
   MONITOR_GRAFANA_SECURITY_ADMIN_USER: "your-grafana-admin-email@example.com"
   MONITOR_PGADMIN_EMAIL: "your-pgadmin-email@example.com"
