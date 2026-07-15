@@ -77,12 +77,20 @@ spec:
           volumeMounts:
           - name: openobserve-data
             mountPath: /data
+          {{- if or .Values.credsSecretName .Values.credsJson }}
           - name: openobserve-creds
             mountPath: /creds
+          {{- end }}
       volumes:
+        {{- if .Values.credsSecretName }}
+        - name: openobserve-creds
+          secret:
+            secretName: {{ .Values.credsSecretName | quote }}
+        {{- else if .Values.credsJson }}
         - name: openobserve-creds
           configMap:
-            name: openobserve-creds
+            name: {{ include "openobserve.fullname" . }}-creds
+        {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: openobserve-data
