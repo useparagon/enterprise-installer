@@ -14,9 +14,10 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 
 | Name | Version |
 | ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
-| <a name="requirement_google"></a> [google](#requirement\_google) | ~> 7.0 |
-| <a name="requirement_tls"></a> [tls](#requirement\_tls) | ~> 4.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
+| <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
+| <a name="requirement_google"></a> [google](#requirement\_google) | >= 7.19.0, < 8.0.0 |
+| <a name="requirement_google-beta"></a> [google-beta](#requirement\_google-beta) | ~> 7.0 |
 
 ## Providers
 

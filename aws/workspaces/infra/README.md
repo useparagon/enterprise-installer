@@ -7,13 +7,9 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 
 | Name | Version |
 | ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.17.0 |
-| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 2.1.0, < 3.0.0 |
-| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.12.0 |
-| <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.6.0 |
 
 ## Providers
 
