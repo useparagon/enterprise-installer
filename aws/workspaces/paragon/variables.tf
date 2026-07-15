@@ -1016,19 +1016,19 @@ locals {
           # Redis configurations
           REDIS_URL = local.default_redis_url
 
-          CACHE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
-          CACHE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
-          CACHE_REDIS_URL                = try("${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
-          QUEUE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.queue.cluster, local.default_redis_cluster)
-          QUEUE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.queue.ssl, local.default_redis_ssl)
-          QUEUE_REDIS_URL                = try("${local.infra_vars.redis.value.queue.host}:${local.infra_vars.redis.value.queue.port}", local.default_redis_url)
-          SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
-          SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
-          SYSTEM_REDIS_URL               = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
-          # Prefer managed_sync (workflow cluster) when present — matches infra/app_env.tf.
+          CACHE_REDIS_CLUSTER_ENABLED  = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
+          CACHE_REDIS_TLS_ENABLED      = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
+          CACHE_REDIS_URL              = try("${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
+          QUEUE_REDIS_CLUSTER_ENABLED  = try(local.infra_vars.redis.value.queue.cluster, local.default_redis_cluster)
+          QUEUE_REDIS_TLS_ENABLED      = try(local.infra_vars.redis.value.queue.ssl, local.default_redis_ssl)
+          QUEUE_REDIS_URL              = try("${local.infra_vars.redis.value.queue.host}:${local.infra_vars.redis.value.queue.port}", local.default_redis_url)
+          SYSTEM_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
+          SYSTEM_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
+          SYSTEM_REDIS_URL             = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
+          # Prefer managed_sync (workflow cluster) when present — matches infra/argocd_env.tf.
           WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.managed_sync.cluster, local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
           WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.managed_sync.ssl, local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-          WORKFLOW_REDIS_URL             = try(
+          WORKFLOW_REDIS_URL = try(
             "${local.infra_vars.redis.value.managed_sync.host}:${local.infra_vars.redis.value.managed_sync.port}",
             "${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}",
             local.default_redis_url
