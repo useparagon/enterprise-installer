@@ -40,13 +40,13 @@ output "private_subnet_cidrs" {
 
 # Token that only resolves once private egress routing exists:
 # - NFW enabled  -> firewall + private/return/firewall routes (module.network_firewall.routing_ready)
-# - NFW disabled -> the NAT default routes on the private route tables
+# - NFW disabled -> private route tables (inline NAT default routes) + NAT gateways
 # Consumers gate internet-bootstrapping workloads (EKS nodes, bastion) on this value.
 output "egress_ready" {
   description = "Signals private egress routing is configured for both NFW-enabled and NFW-disabled paths."
   value = var.network_firewall.enabled ? (
     module.network_firewall[0].routing_ready
     ) : (
-    join(",", aws_route.private_egress[*].id)
+    join(",", concat(aws_route_table.private[*].id, aws_nat_gateway.gw[*].id))
   )
 }

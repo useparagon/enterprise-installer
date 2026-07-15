@@ -93,22 +93,35 @@ resource "aws_nat_gateway" "gw" {
   }
 }
 
-# Create a new route table for the private subnets. Egress route is managed separately.
+# Private route tables. When NFW is disabled, keep the NAT default route inline on the
+# route table (pre-NFW model) so brownfield upgrades do not hit RouteAlreadyExists from a
+# new standalone aws_route. When NFW is enabled, omit the inline route; the network_firewall
+# module owns private → firewall-endpoint routes as aws_route resources.
 resource "aws_route_table" "private" {
   count  = var.az_count
   vpc_id = aws_vpc.app.id
+
+  dynamic "route" {
+    for_each = var.network_firewall_enabled ? [] : [1]
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.gw[count.index].id
+    }
+  }
 
   tags = {
     Name = "${var.workspace}-private-route-table"
   }
 }
 
-# Default path when Network Firewall is disabled: private subnets egress via NAT.
-resource "aws_route" "private_egress" {
-  count                  = var.network_firewall_enabled ? 0 : var.az_count
-  route_table_id         = aws_route_table.private[count.index].id
-  destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.gw[count.index].id
+# Drop standalone NAT aws_route from state without destroying the AWS route. Inline
+# route blocks above take over management for the NFW-disabled path.
+removed {
+  from = aws_route.private_egress
+
+  lifecycle {
+    destroy = false
+  }
 }
 
 # Explicitly associate the newly created route tables to the private subnets (so they don't default to the main route table)

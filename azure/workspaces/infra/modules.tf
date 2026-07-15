@@ -1,10 +1,11 @@
 module "network" {
   source = "./network"
 
-  location  = var.location
-  tags      = local.default_tags
-  vpc_cidr  = var.vpc_cidr
-  workspace = local.workspace
+  location          = var.location
+  nsg_malicious_ips = var.nsg_malicious_ips
+  tags              = local.default_tags
+  vpc_cidr          = var.vpc_cidr
+  workspace         = local.workspace
 }
 
 module "bastion" {
@@ -113,6 +114,7 @@ module "cluster" {
   k8s_spot_instance_percent       = var.k8s_spot_instance_percent
   k8s_spot_node_instance_type     = var.k8s_spot_node_instance_type
   k8s_version                     = var.k8s_version
+  aks_nsg_id                      = module.network.aks_nsg_id
   private_subnet                  = module.network.private_subnet
   private_subnet_nat_gateway_id   = module.network.private_subnet_nat_gateway_id
   resource_group                  = module.network.resource_group

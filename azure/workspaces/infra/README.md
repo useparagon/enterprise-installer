@@ -162,6 +162,36 @@ Optional staged migrations for legacy clusters (each step is one-way where noted
 2. **Azure CNI Overlay** (irreversible): drop the `k8s_network_plugin_mode` and `k8s_pod_cidr` overrides above and apply with the new defaults (or set them explicitly). Pods stop consuming VNet subnet IPs.
 3. **Service CIDR / DNS IP**: cannot be changed in-place; requires a new cluster.
 
+## Network Security Groups (NSGs)
+
+Every installer-managed subnet gets an NSG. Postgres already had one; public, private, and redis now do too:
+
+| Subnet | NSG | Extra inbound rules |
+|--------|-----|---------------------|
+| public | `{workspace}-aks-nsg` | TCP 80, TCP 443 |
+| private | `{workspace}-aks-nsg` | TCP 80, TCP 443 |
+| redis | `{workspace}-default-closed-nsg` | Premium Redis VNet ports (see below) |
+| postgres | `{workspace}-postgres` (postgres module) | Postgres port from VNet |
+
+Baseline rules on `aks-nsg` and `default-closed-nsg`: deny SSH (22) inbound, allow all outbound. Azure platform defaults still allow intra-VNet and Azure Load Balancer traffic.
+
+For Premium Azure Cache for Redis (default SKU, VNet-injected on the redis subnet), `default-closed-nsg` also allows the [required Redis VNet ports](https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/cache-how-to-premium-vnet): client `6379`/`6380`, management/cluster ranges (`8443`, `10221-10231`, `13000-13999`, `15000-15999`, `20226`), and Azure Load Balancer ports (`8500`, `16001`).
+
+AKS LoadBalancer provisioning needs the cluster identity to have **Network Contributor** on:
+- the private subnet (VMSS / subnet join)
+- the `aks-nsg` NSG (cloud-provider-azure reconciles LB security rules on the associated NSG)
+
+Those role assignments are created by infra Terraform and require the Terraform principal to also have **User Access Administrator** (included in `azure/scripts/setup-roles.sh`).
+
+Optional malicious-IP denylist (inbound and outbound) via `nsg_malicious_ips`. Empty by default (rules omitted). Azure allows at most 4000 prefixes per rule:
+
+```hcl
+nsg_malicious_ips = [
+  "203.0.113.0/24",
+  "198.51.100.10/32",
+]
+```
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -234,6 +264,7 @@ No resources.
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.34"` | no |
 | <a name="input_location"></a> [location](#input\_location) | Azure geographic region to deploy resources in. | `string` | n/a | yes |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
+| <a name="input_nsg_malicious_ips"></a> [nsg\_malicious\_ips](#input\_nsg\_malicious\_ips) | Optional CIDR prefixes denied by subnet NSG inbound/outbound rules (public, private, redis). Empty skips those rules. Azure allows at most 4000 prefixes per rule. | `list(string)` | `[]` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
 | <a name="input_postgres_base_sku_name"></a> [postgres\_base\_sku\_name](#input\_postgres\_base\_sku\_name) | PostgreSQL SKU for secondary instances. Use GP\_Standard\_D2ads\_v5 for HA support. SKU availability may vary by Azure region. | `string` | `"B_Standard_B2s"` | no |
 | <a name="input_postgres_instances"></a> [postgres\_instances](#input\_postgres\_instances) | Per-instance PostgreSQL overrides. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed\_sync, paragon).<br/>Both sku and redundant must be set on each entry you include. Omitted keys use built-in defaults (no HA). Null uses defaults for all instances. | <pre>map(object({<br/>    sku       = string<br/>    redundant = bool<br/>  }))</pre> | `null` | no |
