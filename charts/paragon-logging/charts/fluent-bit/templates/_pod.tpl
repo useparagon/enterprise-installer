@@ -39,7 +39,7 @@ containers:
     securityContext:
       {{- toYaml . | nindent 6 }}
   {{- end }}
-    image: {{ include "fluent-bit.image" (merge .Values.image (dict "tag" (default .Chart.AppVersion .Values.image.tag) "root" .)) | quote }}
+    image: {{ include "fluent-bit.image" (merge (deepCopy .Values.image) (dict "tag" (default .Chart.AppVersion .Values.image.tag) "root" .)) | quote }}
     imagePullPolicy: {{ .Values.image.pullPolicy }}
   {{- if or .Values.env .Values.envWithTpl }}
     env:
@@ -104,7 +104,7 @@ containers:
     {{- end }}
 {{- if .Values.hotReload.enabled }}
   - name: reloader
-    image: {{ include "fluent-bit.image" (merge .Values.hotReload.image (dict "root" .)) | quote }}
+    image: {{ include "fluent-bit.image" (merge (deepCopy .Values.hotReload.image) (dict "root" .)) | quote }}
     args:
       - {{ printf "-webhook-url=http://localhost:%s/api/v2/reload" (toString .Values.metricsPort) }}
       - -volume-dir=/watch/config

@@ -6,6 +6,11 @@ variable "private_subnet" {
   description = "Private subnet accessible only within the virtual network to deploy to."
 }
 
+variable "aks_nsg_id" {
+  description = "NSG associated with the AKS private subnet. Required so the cluster identity can reconcile LoadBalancer security rules."
+  type        = string
+}
+
 variable "private_subnet_nat_gateway_id" {
   description = "Private subnet NAT gateway association ID. Required before AKS can use userAssignedNATGateway outbound."
   type        = string
