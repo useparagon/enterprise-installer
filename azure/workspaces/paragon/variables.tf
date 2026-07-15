@@ -822,12 +822,15 @@ locals {
     })
   })
 
-  # Split env by chart service-inputs.json:
+  # Split env by prepared chart service-inputs.json (./prepare.sh):
   # - envKeys → Helm global.env (plain `value:` on pods)
   # - secretKeys (and not also envKeys) → Key Vault for secretKeyRef
+  # Azure has no infra flat-env secret (unlike AWS); secretKeys are taken from
+  # helm_values that already embed postgres/redis/storage from nested infra JSON.
+  chart_service_input_files = fileset("${path.root}/charts", "**/files/service-inputs.json")
   chart_service_inputs = [
-    for f in fileset("${path.root}/../../../charts", "**/files/service-inputs.json") :
-    jsondecode(file("${path.root}/../../../charts/${f}"))
+    for f in local.chart_service_input_files :
+    jsondecode(file("${path.root}/charts/${f}"))
   ]
   chart_env_keys = toset(flatten([
     for s in local.chart_service_inputs : try(s.envKeys, [])

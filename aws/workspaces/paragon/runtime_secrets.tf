@@ -39,6 +39,13 @@ resource "aws_secretsmanager_secret_version" "env_paragon_overlay" {
     local.helm_secret_values,
     jsondecode(data.aws_secretsmanager_secret_version.env.secret_string)
   ))
+
+  lifecycle {
+    precondition {
+      condition     = length(local.chart_service_inputs) > 0
+      error_message = "No charts/**/files/service-inputs.json under ${path.root}/charts. Run ./prepare.sh -p aws before apply so secretKeys/envKeys can be classified."
+    }
+  }
 }
 
 data "aws_secretsmanager_secret" "docker_cfg" {

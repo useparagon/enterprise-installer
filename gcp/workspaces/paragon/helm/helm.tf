@@ -293,8 +293,8 @@ resource "helm_release" "paragon_on_prem" {
   depends_on = [
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
+    data.kubernetes_secret.redis_ca,
     kubernetes_config_map_v1.feature_flag_content,
-    kubectl_manifest.external_secret_redis_ca
   ]
 }
 
@@ -351,8 +351,8 @@ resource "helm_release" "paragon_logging" {
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.openobserve_credentials,
-    kubectl_manifest.external_secret_openobserve_gcs,
-    kubectl_manifest.external_secret_redis_ca
+    data.kubernetes_secret.openobserve_gcs,
+    data.kubernetes_secret.redis_ca,
   ]
 }
 

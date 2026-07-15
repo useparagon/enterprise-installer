@@ -903,9 +903,12 @@ locals {
   # Split env by chart service-inputs.json:
   # - envKeys → Helm global.env (plain `value:` on pods)
   # - secretKeys (and not also envKeys) → Secret Manager for secretKeyRef
+  # Prefer prepared workspace charts (./prepare.sh). GCP has no infra flat-env
+  # secret (unlike AWS); secretKeys come from helm_values built from nested infra JSON.
+  chart_service_input_files = fileset("${path.root}/charts", "**/files/service-inputs.json")
   chart_service_inputs = [
-    for f in fileset("${path.root}/../../../charts", "**/files/service-inputs.json") :
-    jsondecode(file("${path.root}/../../../charts/${f}"))
+    for f in local.chart_service_input_files :
+    jsondecode(file("${path.root}/charts/${f}"))
   ]
   chart_env_keys = toset(flatten([
     for s in local.chart_service_inputs : try(s.envKeys, [])

@@ -3,6 +3,8 @@ locals {
     try(kubectl_manifest.external_secret_paragon.uid, null),
     var.docker_cfg_secret_name != null ? try(kubectl_manifest.external_secret_docker[0].uid, null) : null,
     var.openobserve_secret_name != null ? try(kubectl_manifest.external_secret_openobserve.uid, null) : null,
+    var.openobserve_gcs_secret_name != null ? try(kubectl_manifest.external_secret_openobserve_gcs[0].uid, null) : null,
+    var.redis_ca_cert_secret_name != null ? try(kubectl_manifest.external_secret_redis_ca[0].uid, null) : null,
     var.managed_sync_secret_name != null ? try(kubectl_manifest.external_secret_managed_sync[0].uid, null) : null,
   ]))
 }
@@ -32,6 +34,30 @@ resource "time_sleep" "wait_for_eso_openobserve" {
   }
 }
 
+resource "time_sleep" "wait_for_eso_openobserve_gcs" {
+  count = var.openobserve_gcs_secret_name != null ? 1 : 0
+
+  create_duration = "30s"
+
+  depends_on = [kubectl_manifest.external_secret_openobserve_gcs[0]]
+
+  triggers = {
+    external_secret = try(kubectl_manifest.external_secret_openobserve_gcs[0].uid, null)
+  }
+}
+
+resource "time_sleep" "wait_for_eso_redis_ca" {
+  count = var.redis_ca_cert_secret_name != null ? 1 : 0
+
+  create_duration = "30s"
+
+  depends_on = [kubectl_manifest.external_secret_redis_ca[0]]
+
+  triggers = {
+    external_secret = try(kubectl_manifest.external_secret_redis_ca[0].uid, null)
+  }
+}
+
 resource "time_sleep" "wait_for_eso_managed_sync" {
   count = var.managed_sync_secret_name != null ? 1 : 0
 
@@ -50,6 +76,8 @@ resource "terraform_data" "eso_secrets_gate" {
   depends_on = [
     time_sleep.wait_for_eso_core_secrets,
     time_sleep.wait_for_eso_openobserve,
+    time_sleep.wait_for_eso_openobserve_gcs,
+    time_sleep.wait_for_eso_redis_ca,
     time_sleep.wait_for_eso_managed_sync,
   ]
 }
@@ -90,6 +118,28 @@ data "kubernetes_secret" "managed_sync_secrets" {
 
   metadata {
     name      = "paragon-managed-sync-secrets"
+    namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret" "openobserve_gcs" {
+  count = var.openobserve_gcs_secret_name != null ? 1 : 0
+
+  metadata {
+    name      = "openobserve-creds"
+    namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret" "redis_ca" {
+  count = var.redis_ca_cert_secret_name != null ? 1 : 0
+
+  metadata {
+    name      = "redis-ca-cert"
     namespace = kubernetes_namespace_v1.paragon.id
   }
 
