@@ -16,6 +16,12 @@ module "helm" {
   feature_flags_content          = local.feature_flags_content
   flipt_options                  = local.flipt_options
   helm_values                    = local.helm_values_public
+  secrets_revision = sha256(jsonencode({
+    env          = azurerm_key_vault_secret.env.version
+    docker_cfg   = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
+    managed_sync = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
+    openobserve  = azurerm_key_vault_secret.openobserve[0].version
+  }))
   ingress_scheme                 = var.ingress_scheme
   key_vault_name                 = data.azurerm_key_vault.paragon.name
   k8s_version                    = var.k8s_version
