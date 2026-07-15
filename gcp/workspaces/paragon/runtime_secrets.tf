@@ -22,6 +22,9 @@ resource "google_secret_manager_secret_version" "env" {
 }
 
 resource "google_secret_manager_secret" "docker_cfg" {
+  # Skip when create_docker_pull_secret=false (Artifactory/proxy: pre-provisioned k8s secret).
+  count = var.create_docker_pull_secret && var.docker_username != null && var.docker_password != null ? 1 : 0
+
   secret_id = local.runtime_secret_names.docker_cfg
 
   replication {
@@ -30,7 +33,9 @@ resource "google_secret_manager_secret" "docker_cfg" {
 }
 
 resource "google_secret_manager_secret_version" "docker_cfg" {
-  secret = google_secret_manager_secret.docker_cfg.id
+  count = var.create_docker_pull_secret && var.docker_username != null && var.docker_password != null ? 1 : 0
+
+  secret = google_secret_manager_secret.docker_cfg[0].id
   secret_data = jsonencode({
     dockerconfigjson = jsonencode({
       auths = {

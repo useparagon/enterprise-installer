@@ -52,9 +52,17 @@ locals {
     keys(jsondecode(jsondecode(data.aws_secretsmanager_secret_version.docker_cfg.secret_string).dockerconfigjson).auths),
     []
   )
+  runtime_docker_cfg_has_infra_auths = length(local.runtime_docker_cfg_from_infra) > 0
   runtime_docker_cfg_needs_paragon_overlay = (
     local.runtime_docker_cfg_enabled &&
-    length(local.runtime_docker_cfg_from_infra) == 0
+    !local.runtime_docker_cfg_has_infra_auths
+  )
+  # Sync into the cluster only when Terraform should create the pull secret.
+  # create_docker_pull_secret=false is the Artifactory/proxy path where a
+  # customer-pre-provisioned secret is referenced via helm imagePullSecrets.
+  # Sync when paragon tfvars have credentials OR infra already wrote auths.
+  runtime_docker_cfg_sync_enabled = var.create_docker_pull_secret && (
+    local.runtime_docker_cfg_enabled || local.runtime_docker_cfg_has_infra_auths
   )
 }
 
@@ -95,7 +103,7 @@ data "aws_secretsmanager_secret_version" "openobserve" {
 
 locals {
   runtime_env_secret_name          = data.aws_secretsmanager_secret.env.name
-  runtime_docker_cfg_secret_name   = local.runtime_docker_cfg_enabled ? data.aws_secretsmanager_secret.docker_cfg.name : null
+  runtime_docker_cfg_secret_name   = local.runtime_docker_cfg_sync_enabled ? data.aws_secretsmanager_secret.docker_cfg.name : null
   runtime_openobserve_secret_name  = data.aws_secretsmanager_secret.openobserve.name
   runtime_managed_sync_secret_name = var.managed_sync_enabled ? data.aws_secretsmanager_secret.managed_sync[0].name : null
   runtime_docker_cfg_version_id = local.runtime_docker_cfg_needs_paragon_overlay ? (
@@ -107,7 +115,7 @@ locals {
 resource "terraform_data" "runtime_secrets_populated" {
   input = {
     env         = aws_secretsmanager_secret_version.env_paragon_overlay.version_id
-    docker_cfg  = local.runtime_docker_cfg_enabled ? local.runtime_docker_cfg_version_id : null
+    docker_cfg  = local.runtime_docker_cfg_sync_enabled ? local.runtime_docker_cfg_version_id : null
     openobserve = data.aws_secretsmanager_secret_version.openobserve.version_id
     managed_sync = var.managed_sync_enabled ? (
       aws_secretsmanager_secret_version.managed_sync_paragon_overlay[0].version_id

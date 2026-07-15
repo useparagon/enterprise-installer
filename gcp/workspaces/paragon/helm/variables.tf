@@ -31,8 +31,9 @@ variable "docker_registry_server" {
 }
 
 variable "docker_cfg_secret_name" {
-  description = "Secret Manager secret name for docker credentials."
+  description = "Secret Manager secret name for docker credentials. Null when unused (e.g. pre-provisioned Artifactory pull secret)."
   type        = string
+  default     = null
 }
 
 variable "docker_pull_secret_name" {
@@ -50,16 +51,20 @@ variable "create_docker_pull_secret" {
 variable "docker_username" {
   description = "Docker username to pull images."
   type        = string
+  default     = null
 }
 
 variable "docker_password" {
   description = "Docker password to pull images."
   type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+  default     = null
 }
 
 variable "domain" {

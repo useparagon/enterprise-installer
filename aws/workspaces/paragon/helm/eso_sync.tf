@@ -77,8 +77,10 @@ data "kubernetes_secret" "paragon_secrets" {
 }
 
 data "kubernetes_secret" "docker_cfg" {
+  count = var.install_external_secrets && var.docker_cfg_secret_name != null ? 1 : 0
+
   metadata {
-    name      = "docker-cfg"
+    name      = var.docker_pull_secret_name
     namespace = local.paragon_namespace
   }
 

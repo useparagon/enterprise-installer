@@ -14,6 +14,9 @@ resource "azurerm_key_vault_secret" "env" {
 }
 
 resource "azurerm_key_vault_secret" "docker_cfg" {
+  # Skip when create_docker_pull_secret=false (Artifactory/proxy: pre-provisioned k8s secret).
+  count = var.create_docker_pull_secret && var.docker_username != null && var.docker_password != null ? 1 : 0
+
   name         = local.runtime_secret_names.docker_cfg
   key_vault_id = data.azurerm_key_vault.paragon.id
   value = jsonencode({

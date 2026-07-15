@@ -99,18 +99,22 @@ variable "create_docker_pull_secret" {
 }
 
 variable "docker_username" {
-  description = "Docker username to pull images."
+  description = "Docker username to pull images. Null when using a pre-provisioned pull secret (create_docker_pull_secret=false)."
   type        = string
+  default     = null
 }
 
 variable "docker_password" {
-  description = "Docker password to pull images."
+  description = "Docker password to pull images. Null when using a pre-provisioned pull secret (create_docker_pull_secret=false)."
   type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+  default     = null
 }
 
 variable "region" {

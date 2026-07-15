@@ -210,8 +210,15 @@ resource "kubernetes_config_map" "feature_flag_content" {
 }
 
 # kubernetes secret to pull container images from a registry (Docker Hub, Artifactory, etc.)
+# When install_external_secrets is true, ESO syncs this secret instead (see external_secrets.tf).
+# When create_docker_pull_secret is false, callers pre-provision the secret (Artifactory/proxy).
 resource "kubernetes_secret" "docker_login" {
-  count = var.create_docker_pull_secret && !var.install_external_secrets ? 1 : 0
+  count = (
+    var.create_docker_pull_secret &&
+    !var.install_external_secrets &&
+    var.docker_username != null &&
+    var.docker_password != null
+  ) ? 1 : 0
 
   metadata {
     name      = var.docker_pull_secret_name
