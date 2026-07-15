@@ -329,6 +329,12 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "key_vault_purge_protection_enabled" {
+  description = "Enable purge protection on the cert-manager Key Vault. Required by some Azure org policies (e.g. Enforce-GR-KeyVault). Cannot be disabled after creation."
+  type        = bool
+  default     = false
+}
+
 locals {
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
   hash      = substr(sha256(var.azure_subscription_id), 0, 8)

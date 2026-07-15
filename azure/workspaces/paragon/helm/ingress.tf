@@ -1,9 +1,11 @@
 resource "azurerm_key_vault" "paragon" {
-  name                = substr(var.workspace, 0, 24)
-  location            = var.resource_group.location
-  resource_group_name = var.resource_group.name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-  sku_name            = "premium"
+  name                       = substr(var.workspace, 0, 24)
+  location                   = var.resource_group.location
+  resource_group_name        = var.resource_group.name
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  sku_name                   = "premium"
+  purge_protection_enabled   = var.key_vault_purge_protection_enabled
+  soft_delete_retention_days = 90
 }
 
 resource "azurerm_key_vault_access_policy" "aks_access_to_kv" {

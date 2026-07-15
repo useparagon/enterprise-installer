@@ -106,31 +106,34 @@ resource "aws_s3_bucket_policy" "app" {
   policy = data.aws_iam_policy_document.app.json
 }
 
-resource "aws_iam_user" "app" {
-  name = "${var.workspace}-s3-user"
-
-  tags = {
-    Name = "${var.workspace}-s3-user"
+# EKS Pod Identity role for Paragon microservices that access app/cdn/auditlogs S3 buckets.
+# Associations (SA → role) are created in the paragon workspace.
+data "aws_iam_policy_document" "app_assume" {
+  statement {
+    sid = "PodIdentity"
+    actions = [
+      "sts:AssumeRole",
+      "sts:TagSession",
+    ]
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
   }
 }
 
-resource "aws_iam_access_key" "app" {
-  user = aws_iam_user.app.name
+resource "aws_iam_role" "app" {
+  name               = "${var.workspace}-s3"
+  assume_role_policy = data.aws_iam_policy_document.app_assume.json
+
+  tags = {
+    Name = "${var.workspace}-s3"
+  }
 }
 
-resource "aws_iam_group" "app_group" {
-  name = "${var.workspace}-s3-user-group"
-}
-
-resource "aws_iam_group_membership" "app_group_membership" {
-  name  = "${var.workspace}-s3-user-group-membership"
-  group = aws_iam_group.app_group.name
-  users = [aws_iam_user.app.name]
-}
-
-resource "aws_iam_group_policy" "app" {
-  name  = "${var.workspace}-s3-user-group-policy"
-  group = aws_iam_group.app_group.name
+resource "aws_iam_role_policy" "app" {
+  name = "${var.workspace}-s3-policy"
+  role = aws_iam_role.app.id
 
   policy = jsonencode(
     {

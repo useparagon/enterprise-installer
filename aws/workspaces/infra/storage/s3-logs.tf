@@ -61,6 +61,73 @@ data "aws_iam_policy_document" "logs_bucket_policy" {
       values   = [data.aws_caller_identity.current.account_id]
     }
   }
+
+  dynamic "statement" {
+    for_each = var.network_firewall_enabled ? [1] : []
+    content {
+      sid    = "AWSLogDeliveryWriteNetworkFirewall"
+      effect = "Allow"
+
+      principals {
+        type        = "Service"
+        identifiers = ["delivery.logs.amazonaws.com"]
+      }
+
+      actions = ["s3:PutObject"]
+      resources = [
+        "${aws_s3_bucket.logs.arn}/network-firewall/AWSLogs/${data.aws_caller_identity.current.account_id}/*",
+      ]
+
+      condition {
+        test     = "StringEquals"
+        variable = "s3:x-amz-acl"
+        values   = ["bucket-owner-full-control"]
+      }
+
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [data.aws_caller_identity.current.account_id]
+      }
+
+      condition {
+        test     = "ArnLike"
+        variable = "aws:SourceArn"
+        values   = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = var.network_firewall_enabled ? [1] : []
+    content {
+      sid    = "AWSLogDeliveryAclCheckNetworkFirewall"
+      effect = "Allow"
+
+      principals {
+        type        = "Service"
+        identifiers = ["delivery.logs.amazonaws.com"]
+      }
+
+      actions = [
+        "s3:GetBucketAcl",
+        "s3:ListBucket",
+      ]
+      resources = [aws_s3_bucket.logs.arn]
+
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [data.aws_caller_identity.current.account_id]
+      }
+
+      condition {
+        test     = "ArnLike"
+        variable = "aws:SourceArn"
+        values   = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"]
+      }
+    }
+  }
 }
 
 resource "aws_s3_bucket_policy" "logs_bucket" {
@@ -118,6 +185,22 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
 
     expiration {
       days = 365
+    }
+  }
+
+  dynamic "rule" {
+    for_each = var.network_firewall_enabled ? [1] : []
+    content {
+      id     = "expire-network-firewall-logs"
+      status = "Enabled"
+
+      filter {
+        prefix = "network-firewall/"
+      }
+
+      expiration {
+        days = 365
+      }
     }
   }
 }

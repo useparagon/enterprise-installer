@@ -40,13 +40,12 @@ output "auditlogs_bucket" {
 }
 
 output "storage" {
-  description = "Object storage connection info."
+  description = "Object storage connection info. S3 access uses EKS Pod Identity (role_arn); static access keys are no longer provisioned."
   value = {
     public_bucket       = module.storage.s3.public_bucket
     private_bucket      = module.storage.s3.private_bucket
     managed_sync_bucket = module.storage.s3.managed_sync_bucket
-    root_user           = module.storage.s3.access_key_id
-    root_password       = module.storage.s3.access_key_secret
+    role_arn            = module.storage.s3.role_arn
     kms_key_arn         = module.storage.s3.kms_key_arn
   }
   sensitive = true
@@ -64,6 +63,7 @@ output "bastion" {
 output "cluster_name" {
   description = "The name of the EKS cluster."
   value       = module.cluster.eks_cluster.name
+  sensitive   = true
 }
 
 output "enable_karpenter" {

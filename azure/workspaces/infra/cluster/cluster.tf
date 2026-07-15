@@ -100,6 +100,24 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   }
 }
 
+# required for subnet join when provisioning LoadBalancers / updating VMSS.
+# skip_service_principal_aad_check is intentionally omitted: changing it on an
+# existing assignment is ForceNew and azurerm errors with "doesn't support update".
+# For greenfield AAD lag, re-run apply (or wait briefly) rather than toggling that flag.
+resource "azurerm_role_assignment" "aks_network_contributor" {
+  scope                = var.private_subnet.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_kubernetes_cluster.cluster.identity[0].principal_id
+}
+
+# cloud-provider-azure updates security rules on the subnet's NSG when syncing
+# LoadBalancers; Network Contributor on the subnet alone does not cover the NSG.
+resource "azurerm_role_assignment" "aks_nsg_network_contributor" {
+  scope                = var.aks_nsg_id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_kubernetes_cluster.cluster.identity[0].principal_id
+}
+
 # created as a separate resource so config can be updated
 # if `default_node_pool` is updated in the `azurerm_kubernetes_cluster`,
 # all terraform updates fail
@@ -136,6 +154,11 @@ resource "azurerm_kubernetes_cluster_node_pool" "pool" {
   upgrade_settings {
     max_surge = "1"
   }
+
+  depends_on = [
+    azurerm_role_assignment.aks_network_contributor,
+    azurerm_role_assignment.aks_nsg_network_contributor,
+  ]
 
   # Ensure new nodes are created before old ones are destroyed
   lifecycle {

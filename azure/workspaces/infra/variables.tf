@@ -58,6 +58,17 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
+variable "nsg_malicious_ips" {
+  description = "Optional CIDR prefixes denied by subnet NSG inbound/outbound rules (public, private, redis). Empty skips those rules. Azure allows at most 4000 prefixes per rule."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.nsg_malicious_ips) <= 4000
+    error_message = "nsg_malicious_ips cannot exceed Azure's 4000 address-prefix limit per NSG rule."
+  }
+}
+
 variable "auditlogs_retention_days" {
   description = "The number of days to retain audit logs before deletion."
   type        = number
