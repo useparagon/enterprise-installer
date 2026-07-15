@@ -1068,74 +1068,24 @@ locals {
     })
   })
 
-  # Non-secret config stays in Helm global.env (chart envKeys → plain `value:`).
-  # Only secret-classified keys are written to Secrets Manager for secretKeyRef.
-  helm_secret_env_suffixes = [
-    "_PASSWORD",
-    "_SECRET",
-    "_SECRET_ID",
-    "_SECRET_KEY",
-    "_SECRET_ACCESS_KEY",
-    "_ACCESS_KEY",
-    "_ACCESS_KEY_ID",
-    "_TOKEN",
-    "_ENCRYPTION_KEY",
-    "_API_KEY",
-    "_JWT_SECRET",
-    "_WRITE_KEY",
-    "_REDIS_URL",
-    "_POSTGRES_HOST",
-    "_POSTGRES_PORT",
-    "_POSTGRES_USERNAME",
-    "_POSTGRES_PASSWORD",
-    "_POSTGRES_DATABASE",
-    "_CLIENT_ID",
-    "_CLIENT_SECRET",
-    "_PUBLIC_KEY",
-    "_SIGNING_SECRET",
-    "_APPLICATION_KEY",
+  # Split env by chart service-inputs.json:
+  # - envKeys → Helm global.env (plain `value:` on pods)
+  # - secretKeys (and not also envKeys) → Secrets Manager for secretKeyRef
+  # Chart metadata is the source of truth (e.g. CERBERUS_POSTGRES_PORT is an envKey).
+  chart_service_inputs = [
+    for f in fileset("${path.root}/../../../charts", "**/files/service-inputs.json") :
+    jsondecode(file("${path.root}/../../../charts/${f}"))
   ]
-  helm_secret_env_prefixes = [
-    "SMTP_",
-    "SSO_WORKOS_",
-    "STRIPE_",
-    "BASIC_AUTH_",
-    "ADMIN_BASIC_AUTH_",
-    "ARMORCLAD_",
-    "MONITOR_PGADMIN_",
-    "MONITOR_GRAFANA_AWS_",
-    "MONITOR_GRAFANA_AUTH_",
-    "MONITOR_GRAFANA_SECURITY_",
-    "MONITOR_GRAFANA_SLACK_",
-    "MONITOR_PROMETHEUS_ECS_",
-    "CLOUD_STORAGE_MICROSERVICE_",
-    "ZO_ROOT_",
-    "ZO_S3_ACCESS_",
-    "ZO_S3_SECRET_",
-  ]
-  helm_secret_env_exact = toset([
-    "LICENSE",
-    "LICENSE_CONFIG",
-    "REDIS_URL",
-    "COOKIE_CONSENT_SDK_ID",
-    "GOOGLE_ANALYTICS_TRACKING_ID",
-    "GOOGLE_TAG_MANAGER_ID",
-    "HEADWAY_ACCOUNT_ID",
-    "INTERCOM_APP_ID",
-    "MICROSOFT_TEAMS_BOT_ID",
-    "MONITOR_GRAFANA_ALB_ARN",
-    "MONITOR_GRAFANA_UPTIME_WEBHOOK_URL",
-    "SAGE_INTACCT_SENDER_ID",
-    "TRELLO_APP_NAME",
-    "ZEUS_POSTGRES_REDIS_CACHE_TTL_SECS",
-  ])
+  chart_env_keys = toset(flatten([
+    for s in local.chart_service_inputs : try(s.envKeys, [])
+  ]))
+  chart_secret_keys = toset(flatten([
+    for s in local.chart_service_inputs : try(s.secretKeys, [])
+  ]))
+  # Prefer envKeys when a key appears in both lists.
   helm_is_secret_env_key = {
     for key, _ in local.helm_values.global.env :
-    key => (
-      contains(local.helm_secret_env_exact, key) ||
-      anytrue([for s in local.helm_secret_env_suffixes : endswith(key, s)]) ||
-      anytrue([for p in local.helm_secret_env_prefixes : startswith(key, p)])
-    )
+    key => contains(local.chart_secret_keys, key) && !contains(local.chart_env_keys, key)
   }
   helm_secret_values = {
     for key, value in local.helm_values.global.env :
