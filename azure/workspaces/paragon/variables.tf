@@ -822,20 +822,86 @@ locals {
     })
   })
 
-  # Write chart env to Key Vault for ESO → paragon-secrets. Keep only keys
-  # Helm templates read at render time; everything else is secretKeyRef'd by charts.
-  helm_public_env_keys = toset(["VERSION", "HOST_ENV", "PARAGON_DOMAIN"])
+  # Non-secret config stays in Helm global.env (chart envKeys → plain `value:`).
+  # Only secret-classified keys are written to Key Vault for secretKeyRef.
+  helm_secret_env_suffixes = [
+    "_PASSWORD",
+    "_SECRET",
+    "_SECRET_ID",
+    "_SECRET_KEY",
+    "_SECRET_ACCESS_KEY",
+    "_ACCESS_KEY",
+    "_ACCESS_KEY_ID",
+    "_TOKEN",
+    "_ENCRYPTION_KEY",
+    "_API_KEY",
+    "_JWT_SECRET",
+    "_WRITE_KEY",
+    "_REDIS_URL",
+    "_POSTGRES_HOST",
+    "_POSTGRES_PORT",
+    "_POSTGRES_USERNAME",
+    "_POSTGRES_PASSWORD",
+    "_POSTGRES_DATABASE",
+    "_CLIENT_ID",
+    "_CLIENT_SECRET",
+    "_PUBLIC_KEY",
+    "_SIGNING_SECRET",
+    "_APPLICATION_KEY",
+  ]
+  helm_secret_env_prefixes = [
+    "SMTP_",
+    "SSO_WORKOS_",
+    "STRIPE_",
+    "BASIC_AUTH_",
+    "ADMIN_BASIC_AUTH_",
+    "ARMORCLAD_",
+    "MONITOR_PGADMIN_",
+    "MONITOR_GRAFANA_AWS_",
+    "MONITOR_GRAFANA_AUTH_",
+    "MONITOR_GRAFANA_SECURITY_",
+    "MONITOR_GRAFANA_SLACK_",
+    "MONITOR_PROMETHEUS_ECS_",
+    "CLOUD_STORAGE_MICROSERVICE_",
+    "ZO_ROOT_",
+    "ZO_S3_ACCESS_",
+    "ZO_S3_SECRET_",
+  ]
+  helm_secret_env_exact = toset([
+    "LICENSE",
+    "LICENSE_CONFIG",
+    "REDIS_URL",
+    "COOKIE_CONSENT_SDK_ID",
+    "GOOGLE_ANALYTICS_TRACKING_ID",
+    "GOOGLE_TAG_MANAGER_ID",
+    "HEADWAY_ACCOUNT_ID",
+    "INTERCOM_APP_ID",
+    "MICROSOFT_TEAMS_BOT_ID",
+    "MONITOR_GRAFANA_ALB_ARN",
+    "MONITOR_GRAFANA_UPTIME_WEBHOOK_URL",
+    "SAGE_INTACCT_SENDER_ID",
+    "TRELLO_APP_NAME",
+    "ZEUS_POSTGRES_REDIS_CACHE_TTL_SECS",
+  ])
+  helm_is_secret_env_key = {
+    for key, _ in local.helm_values.global.env :
+    key => (
+      contains(local.helm_secret_env_exact, key) ||
+      anytrue([for s in local.helm_secret_env_suffixes : endswith(key, s)]) ||
+      anytrue([for p in local.helm_secret_env_prefixes : startswith(key, p)])
+    )
+  }
   helm_secret_values = {
     for key, value in local.helm_values.global.env :
     key => tostring(value)
-    if value != null && tostring(value) != ""
+    if value != null && tostring(value) != "" && local.helm_is_secret_env_key[key]
   }
   helm_values_public = merge(local.helm_values, {
     global = merge(local.helm_values.global, {
       env = {
         for key, value in local.helm_values.global.env :
         key => value
-        if value != null && contains(local.helm_public_env_keys, key)
+        if value != null && !local.helm_is_secret_env_key[key]
       }
     })
   })

@@ -14,12 +14,6 @@ Environment variables helper
 {{- else if and $.Values.global.env (kindIs "map" $.Values.global.env) (hasKey $.Values.global.env $key) }}
 - name: {{ $key }}
   value: {{ index $.Values.global.env $key | quote }}
-{{- else }}
-- name: {{ $key }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ $.Values.secretName }}
-      key: {{ $key }}
 {{- end }}
 {{- end }}
 {{- $secretKeys := $serviceData.secretKeys | default (list) }}
