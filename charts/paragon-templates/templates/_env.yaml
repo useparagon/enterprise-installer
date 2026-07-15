@@ -20,7 +20,6 @@ Environment variables helper
     secretKeyRef:
       name: {{ $.Values.secretName }}
       key: {{ $key }}
-      optional: true
 {{- end }}
 {{- end }}
 {{- $secretKeys := $serviceData.secretKeys | default (list) }}

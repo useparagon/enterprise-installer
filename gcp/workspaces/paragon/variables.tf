@@ -783,8 +783,8 @@ locals {
         WORKER_WORKFLOWS_MINIMUM_TEST_WORKFLOW_QUEUE_COUNT    = 1
 
         # Authentication
-        ADMIN_BASIC_AUTH_USERNAME = local.helm_vars.global.env["LICENSE"]
-        ADMIN_BASIC_AUTH_PASSWORD = local.helm_vars.global.env["LICENSE"]
+        ADMIN_BASIC_AUTH_USERNAME = try(local.helm_vars.global.env["LICENSE"], null)
+        ADMIN_BASIC_AUTH_PASSWORD = try(local.helm_vars.global.env["LICENSE"], null)
 
         # Feature flags
         FEATURE_FLAG_PLATFORM_ENABLED  = "true"

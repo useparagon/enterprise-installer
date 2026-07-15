@@ -33,9 +33,11 @@ data "aws_secretsmanager_secret_version" "env" {
 
 resource "aws_secretsmanager_secret_version" "env_paragon_overlay" {
   secret_id = data.aws_secretsmanager_secret.env.id
+  # Infra wins on conflicts so chart-derived redis/postgres wiring (e.g. WORKFLOW_REDIS_*
+  # falling back to cache) cannot clobber infra's managed_sync mapping.
   secret_string = jsonencode(merge(
-    jsondecode(data.aws_secretsmanager_secret_version.env.secret_string),
-    local.helm_secret_values
+    local.helm_secret_values,
+    jsondecode(data.aws_secretsmanager_secret_version.env.secret_string)
   ))
 }
 

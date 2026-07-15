@@ -947,9 +947,9 @@ locals {
           WORKER_WORKFLOWS_MINIMUM_HERMES_PROCESSOR_QUEUE_COUNT = 0
           WORKER_WORKFLOWS_MINIMUM_TEST_WORKFLOW_QUEUE_COUNT    = 1
 
-          # Authentication
-          ADMIN_BASIC_AUTH_USERNAME = local.helm_vars.global.env["LICENSE"]
-          ADMIN_BASIC_AUTH_PASSWORD = local.helm_vars.global.env["LICENSE"]
+          # Authentication (LICENSE may live only in infra app_secrets)
+          ADMIN_BASIC_AUTH_USERNAME = try(local.helm_vars.global.env["LICENSE"], null)
+          ADMIN_BASIC_AUTH_PASSWORD = try(local.helm_vars.global.env["LICENSE"], null)
 
           # Feature flags
           FEATURE_FLAG_PLATFORM_ENABLED  = "true"
@@ -1001,9 +1001,14 @@ locals {
           SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
           SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
           SYSTEM_REDIS_URL               = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
-          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
-          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}", local.default_redis_url)
+          # Prefer managed_sync (workflow cluster) when present — matches infra/app_env.tf.
+          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.managed_sync.cluster, local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
+          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.managed_sync.ssl, local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
+          WORKFLOW_REDIS_URL             = try(
+            "${local.infra_vars.redis.value.managed_sync.host}:${local.infra_vars.redis.value.managed_sync.port}",
+            "${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}",
+            local.default_redis_url
+          )
 
           # Cloud Storage configurations
           CLOUD_STORAGE_MICROSERVICE_PASS = local.storage_output.root_password
