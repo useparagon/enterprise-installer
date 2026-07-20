@@ -127,9 +127,8 @@ locals {
     WORKFLOW_REDIS_TLS_ENABLED     = local.argocd_redis_tls_enabled.workflow
     WORKFLOW_REDIS_URL             = local.argocd_redis_url.workflow
 
+    # AWS S3 auth uses EKS Pod Identity (role_arn) — do not set MICROSERVICE_USER/PASS.
     CLOUD_STORAGE_COMPLIANCE_BUCKET = local.argocd_storage.auditlogs_bucket
-    CLOUD_STORAGE_MICROSERVICE_PASS = local.argocd_storage.access_key_secret
-    CLOUD_STORAGE_MICROSERVICE_USER = local.argocd_storage.access_key_id
     CLOUD_STORAGE_PUBLIC_BUCKET     = local.argocd_storage.public_bucket
     CLOUD_STORAGE_SYSTEM_BUCKET     = local.argocd_storage.private_bucket
     CLOUD_STORAGE_TYPE              = local.argocd_cloud_storage_type
