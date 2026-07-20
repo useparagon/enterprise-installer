@@ -1,4 +1,6 @@
 # Flat chart-native env secret for GitOps (ESO -> paragon-secrets).
+# Infra-derived values include Grafana / pgAdmin admin creds from
+# argocd_monitors.tf; var.argocd_env_overrides and var.argocd_app_secrets merge last.
 
 locals {
   argocd_domain = var.paragon_domain != null ? trimspace(var.paragon_domain) : ""
@@ -143,6 +145,7 @@ locals {
       local.argocd_infra_env,
       local.argocd_postgres_env,
       local.argocd_public_url_defaults,
+      local.argocd_monitor_creds,
       local.argocd_env_overrides,
       local.argocd_license_admin_auth,
       local.argocd_app_secret_overrides,

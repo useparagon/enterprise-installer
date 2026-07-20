@@ -1,8 +1,8 @@
 # Flat chart-native env secret for GitOps (ESO -> paragon-secrets).
 # Replaces the nested postgres/redis/storage JSON handoff used by the legacy
-# paragon workspace. Infra-derived values are computed below; optional
-# var.argocd_env_overrides can replace any of them; var.argocd_app_secrets
-# merges last.
+# paragon workspace. Infra-derived values are computed below (including Grafana /
+# pgAdmin admin creds from argocd_monitors.tf); optional var.argocd_env_overrides
+# can replace any of them; var.argocd_app_secrets merges last.
 
 locals {
   argocd_postgres = module.postgres.postgres
@@ -139,6 +139,7 @@ locals {
       local.argocd_infra_env,
       local.argocd_postgres_env,
       local.argocd_public_url_defaults,
+      local.argocd_monitor_creds,
       local.argocd_env_overrides,
       local.argocd_license_admin_auth,
       local.argocd_app_secret_overrides,
