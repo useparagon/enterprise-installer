@@ -6,7 +6,7 @@ resource "helm_release" "managed_sync" {
   repository       = "https://paragon-helm-production.s3.amazonaws.com"
   chart            = "managed-sync"
   version          = var.managed_sync_version
-  namespace        = kubernetes_namespace.paragon.id
+  namespace        = local.paragon_namespace
   create_namespace = false
   cleanup_on_fail  = true
   atomic           = true
@@ -17,6 +17,11 @@ resource "helm_release" "managed_sync" {
     local.global_values_minus_env,
     local.secret_hash
   ]
+
+  set {
+    name  = "secretName"
+    value = "paragon-managed-sync-secrets"
+  }
 
   set {
     name  = "ingress.certificate"
@@ -57,8 +62,10 @@ resource "helm_release" "managed_sync" {
   depends_on = [
     module.karpenter,
     helm_release.ingress,
+    data.kubernetes_secret.docker_cfg,
+    data.kubernetes_secret.paragon_secrets,
+    data.kubernetes_secret.managed_sync_secrets,
     kubernetes_secret.docker_login,
-    kubernetes_secret.paragon_secrets,
     kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }

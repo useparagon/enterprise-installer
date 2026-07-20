@@ -17,6 +17,12 @@ variable "docker_registry_server" {
   type        = string
 }
 
+variable "docker_cfg_secret_name" {
+  description = "Key Vault secret name for docker credentials. Null when unused (e.g. pre-provisioned Artifactory pull secret)."
+  type        = string
+  default     = null
+}
+
 variable "docker_pull_secret_name" {
   description = "Kubernetes secret name for registry pull credentials."
   type        = string
@@ -32,16 +38,43 @@ variable "create_docker_pull_secret" {
 variable "docker_username" {
   description = "Docker username to pull images."
   type        = string
+  default     = null
 }
 
 variable "docker_password" {
   description = "Docker password to pull images."
   type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+  default     = null
+}
+
+variable "env_secret_name" {
+  description = "Key Vault secret name for shared Paragon application secrets."
+  type        = string
+}
+
+variable "external_secrets_client_id" {
+  description = "Azure client ID used by External Secrets Operator."
+  type        = string
+  sensitive   = true
+}
+
+variable "external_secrets_client_secret" {
+  description = "Azure client secret used by External Secrets Operator."
+  type        = string
+  sensitive   = true
+}
+
+variable "external_secrets_tenant_id" {
+  description = "Azure tenant ID used by External Secrets Operator."
+  type        = string
+  sensitive   = true
 }
 
 variable "openobserve_email" {
@@ -65,6 +98,12 @@ variable "helm_values" {
   description = "Object containing values to pass to the helm chart."
   type        = any
   sensitive   = true
+}
+
+variable "secrets_revision" {
+  description = "Opaque revision of cloud-store secrets synced via ESO. Included in secret_hash so secret-only changes still force Helm upgrades (Reloader remains the runtime path)."
+  type        = string
+  default     = ""
 }
 
 variable "feature_flags_content" {
@@ -143,10 +182,21 @@ variable "managed_sync_version" {
   type        = string
 }
 
-variable "key_vault_purge_protection_enabled" {
-  description = "Enable purge protection on the cert-manager Key Vault. Required by some Azure org policies (e.g. Enforce-GR-KeyVault). Cannot be disabled after creation."
-  type        = bool
-  default     = false
+variable "key_vault_name" {
+  description = "Key Vault name that stores Paragon runtime secrets."
+  type        = string
+}
+
+variable "managed_sync_secret_name" {
+  description = "Key Vault secret name for managed-sync secrets."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_secret_name" {
+  description = "Key Vault secret name for OpenObserve credentials."
+  type        = string
+  default     = null
 }
 
 locals {

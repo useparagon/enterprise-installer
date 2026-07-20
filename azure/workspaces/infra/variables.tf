@@ -88,6 +88,13 @@ variable "bastion_enabled" {
   default     = true
 }
 
+# key vault (runtime secrets + cert-manager handoff)
+variable "key_vault_purge_protection_enabled" {
+  description = "Enable purge protection on the Paragon Key Vault. Required by some Azure org policies (e.g. Enforce-GR-KeyVault). Cannot be disabled after creation."
+  type        = bool
+  default     = false
+}
+
 # cloudflare
 variable "cloudflare_api_token" {
   description = "Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS`"

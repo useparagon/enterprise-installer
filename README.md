@@ -93,9 +93,12 @@ Per-subchart `image.repository` overrides remain available for third-party image
 **Terraform pull credentials** (in `vars.auto.tfvars`):
 
 ```hcl
-docker_registry_server   = "artifactory.example.com"  # must match imageRegistry host
-docker_pull_secret_name  = "docker-cfg"               # or customer secret name
-create_docker_pull_secret = true                      # false if secret is pre-provisioned
+docker_registry_server    = "artifactory.example.com"  # must match imageRegistry host
+docker_pull_secret_name   = "docker-cfg"               # or customer secret name
+create_docker_pull_secret = true                       # false if secret is pre-provisioned
+# When create_docker_pull_secret = false, omit docker_username / docker_password /
+# docker_email; Terraform will not create or sync a registry pull secret. Point
+# global.imagePullSecrets at the pre-provisioned secret name instead.
 ```
 
 Verify rendered images with `helm template` and grep for unexpected upstream hosts (`docker.io`, `ghcr.io`, `public.ecr.aws`, etc.).
