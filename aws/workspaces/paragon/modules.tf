@@ -100,17 +100,32 @@ module "managed_sync_config" {
   microservices    = local.microservices
 }
 
+# EKS Pod Identity: associate every Paragon onprem ServiceAccount with the S3 role.
+# CLOUD_STORAGE_* is injected globally, so associations match that (no curated subset).
+module "pod_identity" {
+  source = "./pod-identity"
+  count  = try(local.storage_output.role_arn, null) != null ? 1 : 0
+
+  cluster_name = local.cluster_name
+  namespace    = module.helm.namespace_paragon.id
+  s3_role_arn  = local.storage_output.role_arn
+  service_accounts = setunion(
+    toset(keys(local.monorepo_microservices)),
+    var.managed_sync_enabled ? toset(["managed-sync-service-account"]) : toset([]),
+  )
+}
+
 module "monitors" {
   source = "./monitors"
   count  = var.monitors_enabled ? 1 : 0
 
-  grafana_admin_email           = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_USER"], null)
-  grafana_admin_password        = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
-  grafana_aws_access_key_id     = try(local.helm_vars.global.env["MONITOR_GRAFANA_AWS_ACCESS_ID"], null)
-  grafana_aws_secret_access_key = try(local.helm_vars.global.env["MONITOR_GRAFANA_AWS_SECRET_KEY"], null)
-  pgadmin_admin_email           = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
-  pgadmin_admin_password        = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
-  workspace                     = local.workspace
+  grafana_admin_email    = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_USER"], null)
+  grafana_admin_password = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
+  pgadmin_admin_email    = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
+  pgadmin_admin_password = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
+  workspace              = local.workspace
+  cluster_name           = local.cluster_name
+  namespace              = module.helm.namespace_paragon.id
 }
 
 module "uptime" {

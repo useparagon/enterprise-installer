@@ -68,8 +68,6 @@ resource "aws_eks_addon" "aws_ebs_csi_driver" {
 }
 
 resource "aws_eks_addon" "eks_pod_identity_agent" {
-  count = var.enable_karpenter ? 1 : 0
-
   cluster_name                = module.eks.cluster_name
   addon_name                  = "eks-pod-identity-agent"
   addon_version               = local.eks_addon_versions["eks-pod-identity-agent"]

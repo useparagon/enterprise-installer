@@ -5,8 +5,7 @@ output "logs_bucket_name" {
 
 output "s3" {
   value = {
-    access_key_id       = aws_iam_access_key.app.id
-    access_key_secret   = aws_iam_access_key.app.secret
+    role_arn            = aws_iam_role.app.arn
     private_bucket      = aws_s3_bucket.app.bucket
     public_bucket       = aws_s3_bucket.cdn.bucket
     auditlogs_bucket    = aws_s3_bucket.auditlogs.bucket

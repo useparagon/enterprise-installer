@@ -848,6 +848,12 @@ locals {
     "POSTGRES_DATABASE",
     "REDIS_HOST",
     "REDIS_PORT",
+    # AWS uses EKS Pod Identity for Grafana CloudWatch — strip static keys if present in customer values.
+    "MONITOR_GRAFANA_AWS_ACCESS_ID",
+    "MONITOR_GRAFANA_AWS_SECRET_KEY",
+    # AWS uses EKS Pod Identity for S3 — strip static access keys even if present in customer values.
+    "CLOUD_STORAGE_MICROSERVICE_USER",
+    "CLOUD_STORAGE_MICROSERVICE_PASS",
   ]
 
   default_redis_cluster = try(
@@ -1034,13 +1040,11 @@ locals {
             local.default_redis_url
           )
 
-          # Cloud Storage configurations
-          CLOUD_STORAGE_MICROSERVICE_PASS = try(local.storage_output.root_password, null)
-          CLOUD_STORAGE_MICROSERVICE_USER = try(local.storage_output.root_user, null)
-          CLOUD_STORAGE_PUBLIC_BUCKET     = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
-          CLOUD_STORAGE_SYSTEM_BUCKET     = try(local.storage_output.private_bucket, "${local.workspace}-app")
-          CLOUD_STORAGE_TYPE              = local.cloud_storage_type
-          CLOUD_STORAGE_REGION            = var.aws_region
+          # Cloud Storage configurations (S3 auth via EKS Pod Identity; no static access keys)
+          CLOUD_STORAGE_PUBLIC_BUCKET = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
+          CLOUD_STORAGE_SYSTEM_BUCKET = try(local.storage_output.private_bucket, "${local.workspace}-app")
+          CLOUD_STORAGE_TYPE          = local.cloud_storage_type
+          CLOUD_STORAGE_REGION        = var.aws_region
 
           CLOUD_STORAGE_PUBLIC_URL = coalesce(
             try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
@@ -1051,11 +1055,9 @@ locals {
             local.cloud_storage_type == "S3" ? "https://s3.${var.aws_region}.amazonaws.com" : null,
           )
 
-          # Monitor configurations
+          # Monitor configurations (Grafana CloudWatch via EKS Pod Identity; no static AWS keys)
           MONITOR_BULL_EXPORTER_HOST               = "http://bull-exporter"
           MONITOR_BULL_EXPORTER_PORT               = try(local.monitors["bull-exporter"].port, null)
-          MONITOR_GRAFANA_AWS_ACCESS_ID            = var.monitors_enabled ? module.monitors[0].grafana_aws_access_key_id : null
-          MONITOR_GRAFANA_AWS_SECRET_KEY           = var.monitors_enabled ? module.monitors[0].grafana_aws_secret_access_key : null
           MONITOR_GRAFANA_HOST                     = "http://grafana"
           MONITOR_GRAFANA_PORT                     = try(local.monitors["grafana"].port, null)
           MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD  = var.monitors_enabled ? module.monitors[0].grafana_admin_password : null
