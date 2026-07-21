@@ -14,11 +14,13 @@ resource "aws_route53_zone" "paragon" {
 resource "aws_route53_record" "paragon_caa" {
   count = local.create_dns_zone ? 1 : 0
 
-  name    = trimspace(var.paragon_domain)
-  records = ["0 issue \"amazon.com\""]
-  ttl     = 300
-  type    = "CAA"
-  zone_id = aws_route53_zone.paragon[0].zone_id
+  # Brownfield cutovers often already have this CAA from the legacy paragon ALB module.
+  allow_overwrite = true
+  name            = trimspace(var.paragon_domain)
+  records         = ["0 issue \"amazon.com\""]
+  ttl             = 300
+  type            = "CAA"
+  zone_id         = aws_route53_zone.paragon[0].zone_id
 }
 
 module "paragon_acm" {
