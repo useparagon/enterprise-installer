@@ -780,7 +780,7 @@ variable "paragon_certificate_arn" {
 }
 
 variable "gitops_alb_ingressclass_exists" {
-  description = "Brownfield flag: set true when a cluster-scoped IngressClass named \"alb\" already exists (e.g. installed by the legacy paragon Helm \"ingress\" release). When true, the AWS Load Balancer Controller is configured with createIngressClassResource=false to avoid an \"already exists\" conflict. Set explicitly per stack instead of probed at plan time — a live cluster read during plan blocks the entire plan (and any destroy) for minutes whenever the EKS API is unreachable."
+  description = "Brownfield flag: set true only when a cluster-scoped IngressClass named \"alb\" will still exist at apply time. Cutover uninstalls the legacy paragon Helm \"ingress\" release before infra LBC apply (which removes that IngressClass), so leave false (default) so the chart creates IngressClass \"alb\". Set true only for unusual cases where IngressClass is preserved independently. Set explicitly per stack instead of probed at plan time — a live cluster read during plan blocks the entire plan (and any destroy) for minutes whenever the EKS API is unreachable."
   type        = bool
   default     = false
   nullable    = false

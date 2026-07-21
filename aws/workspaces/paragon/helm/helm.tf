@@ -336,20 +336,37 @@ resource "helm_release" "metricsserver" {
   ]
 }
 
-# graceful handling of spot evictions on legacy managed node groups
-module "aws_node_termination_handler" {
+# Graceful spot eviction handling on legacy managed node groups.
+# Official chart (ECR Public image); replaces qvest-digital TF module which
+# hardcoded docker.io/amazon/... tags that no longer exist for recent versions.
+resource "helm_release" "aws_node_termination_handler" {
   count = var.enable_legacy_mng_pools ? 1 : 0
 
-  source  = "qvest-digital/aws-node-termination-handler/kubernetes"
-  version = "4.0.0"
+  name        = "aws-node-termination-handler"
+  description = "AWS Node Termination Handler"
 
-  json_logging = true
+  repository = "oci://public.ecr.aws/aws-ec2/helm"
+  chart      = "aws-node-termination-handler"
+  version    = "0.27.6"
 
-  # Spot nodes are labeled in infra (cluster.tf); avoid legacy lifecycle=Ec2Spot default.
-  k8s_node_selector = {
-    "useparagon.com/capacityType" = "spot"
-  }
-  k8s_node_tolerations = []
+  namespace        = "kube-system"
+  atomic           = true
+  cleanup_on_fail  = true
+  create_namespace = false
+  force_update     = true
+  verify           = false
+
+  values = [yamlencode({
+    jsonLogging                    = true
+    enableSpotInterruptionDraining = true
+    # Match prior module default (chart default is true).
+    enableScheduledEventDraining = false
+    # Spot nodes are labeled in infra (cluster.tf); avoid cluster-wide schedule.
+    nodeSelector = {
+      "useparagon.com/capacityType" = "spot"
+    }
+    tolerations = []
+  })]
 }
 
 # microservices deployment
