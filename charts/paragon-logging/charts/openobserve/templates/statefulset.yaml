@@ -1,3 +1,10 @@
+{{- $podAnnotations := dict -}}
+{{- if and .Values.global (kindIs "map" .Values.global) (hasKey .Values.global "podAnnotations") (kindIs "map" .Values.global.podAnnotations) -}}
+{{- $podAnnotations = merge $podAnnotations .Values.global.podAnnotations -}}
+{{- end -}}
+{{- if .Values.podAnnotations -}}
+{{- $podAnnotations = merge $podAnnotations .Values.podAnnotations -}}
+{{- end -}}
 ---
 # create statefulset
 apiVersion: apps/v1
@@ -6,13 +13,6 @@ metadata:
   name: {{ include "openobserve.fullname" . }}
   labels:
     {{- include "openobserve.labels" . | nindent 4 }}
-{{- $podAnnotations := dict -}}
-{{- if and .Values.global (kindIs "map" .Values.global) (hasKey .Values.global "podAnnotations") (kindIs "map" .Values.global.podAnnotations) -}}
-{{- $podAnnotations = merge $podAnnotations .Values.global.podAnnotations -}}
-{{- end -}}
-{{- if .Values.podAnnotations -}}
-{{- $podAnnotations = merge $podAnnotations .Values.podAnnotations -}}
-{{- end -}}
 spec:
   serviceName: {{ include "openobserve.fullname" . }}
   replicas: {{ .Values.replicaCount | default 1 }}
@@ -84,6 +84,7 @@ spec:
           - name: openobserve-creds
             mountPath: /creds
           {{- end }}
+      {{- if or .Values.credsSecretName .Values.credsJson }}
       volumes:
         {{- if .Values.credsSecretName }}
         - name: openobserve-creds
@@ -94,6 +95,7 @@ spec:
           secret:
             secretName: {{ include "openobserve.fullname" . }}-creds
         {{- end }}
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: openobserve-data
