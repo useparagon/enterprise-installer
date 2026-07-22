@@ -62,11 +62,7 @@ spec:
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
-                  name: {{- if and $.Values.secrets (kindIs "map" $.Values.secrets) (hasKey $.Values.secrets $key) }}
-                         {{ $.Values.secretName }}-{{ $.Chart.Name }}
-                       {{- else }}
-                         {{ $.Values.secretName }}
-                       {{- end }}
+                  name: {{ if and $.Values.secrets (kindIs "map" $.Values.secrets) (hasKey $.Values.secrets $key) }}{{ $.Values.secretName }}-{{ $.Chart.Name }}{{ else }}{{ $.Values.secretName }}{{ end }}
                   key: {{ $key }}
                   optional: true
             {{- end }}
