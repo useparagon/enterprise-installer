@@ -24,7 +24,9 @@ permissions:
 jobs:
   release-charts:
     name: Package & Publish Production Helm Charts
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - self-hosted-lite
     env:
       HELM_REPO_URL: https://paragon-helm-production.s3.amazonaws.com
       S3_BUCKET: paragon-helm-production
