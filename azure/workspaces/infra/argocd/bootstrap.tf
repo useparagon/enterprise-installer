@@ -492,3 +492,23 @@ resource "kubectl_manifest" "external_secrets" {
     kubectl_manifest.destination_namespace,
   ]
 }
+
+# Helm pre-upgrade migration Jobs often omit pod-spec imagePullSecrets even when
+# global.imagePullSecrets is set. Attach docker-cfg to the namespace default SA so
+# every pod (including hooks) can pull private useparagon/* images.
+resource "kubernetes_default_service_account_v1" "destination" {
+  count = local.enabled && local.docker_cfg_secret_name != null ? 1 : 0
+
+  metadata {
+    namespace = var.destination_namespace
+  }
+
+  image_pull_secret {
+    name = "docker-cfg"
+  }
+
+  depends_on = [
+    kubectl_manifest.destination_namespace,
+    kubectl_manifest.external_secrets,
+  ]
+}
