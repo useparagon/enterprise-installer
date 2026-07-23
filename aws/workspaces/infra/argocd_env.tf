@@ -136,6 +136,13 @@ locals {
     CLOUD_STORAGE_REGION            = var.aws_region
     CLOUD_STORAGE_PUBLIC_URL        = local.argocd_s3_endpoint
     CLOUD_STORAGE_PRIVATE_URL       = local.argocd_s3_endpoint
+
+    # OpenObserve (paragon-logging) — same keys the legacy helm_release set via
+    # global.env.ZO_S3_*. Auth uses the node/pod AWS credential chain (no static keys).
+    ZO_S3_PROVIDER    = "s3"
+    ZO_S3_BUCKET_NAME = local.argocd_storage.logs_bucket
+    ZO_S3_REGION_NAME = var.aws_region
+    ZO_S3_SERVER_URL  = local.argocd_s3_endpoint
   })
 
   argocd_app_secret_overrides = var.argocd_app_secrets != null ? var.argocd_app_secrets : {}
