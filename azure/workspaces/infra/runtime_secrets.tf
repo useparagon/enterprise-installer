@@ -40,10 +40,22 @@ resource "azurerm_key_vault_secret" "runtime_postgres" {
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
 
+# Same contract as output.redis / output.redis_managed (and legacy infra-output.json):
+# - coexistence: redis = legacy, redis-managed = AMR
+# - cutover (legacy off): redis = AMR
 resource "azurerm_key_vault_secret" "runtime_redis" {
   name         = "redis"
   key_vault_id = azurerm_key_vault.paragon.id
-  value        = jsonencode(module.redis.redis)
+  value        = jsonencode(var.redis_enabled ? module.redis.redis : module.redis_managed[0].redis)
+
+  depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
+resource "azurerm_key_vault_secret" "runtime_redis_managed" {
+  name         = "redis-managed"
+  key_vault_id = azurerm_key_vault.paragon.id
+  # Always present so paragon KV handoff can resolve redis_managed (null when AMR disabled).
+  value        = jsonencode(var.redis_managed_enabled ? module.redis_managed[0].redis : null)
 
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
