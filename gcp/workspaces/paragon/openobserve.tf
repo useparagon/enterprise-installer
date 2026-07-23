@@ -1,10 +1,10 @@
 resource "random_string" "openobserve_email" {
   count = var.openobserve_email == null ? 1 : 0
 
-  length  = 10
+  length  = 12
   lower   = true
   upper   = false
-  numeric = false
+  numeric = true
   special = false
 }
 
