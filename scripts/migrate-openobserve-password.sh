@@ -3,7 +3,7 @@
 #
 # One-time manual step AFTER terraform apply on existing OpenObserve clusters.
 #
-# Terraform writes the new password to paragon-secrets-openobserve. OpenObserve
+# Terraform writes the new password to openobserve-credentials (ESO). OpenObserve
 # still has the old password in its PVC until this script runs.
 #
 # Two access modes (pick one):
@@ -25,7 +25,7 @@ LOG_PREFIX="[o2-password-migrate]"
 
 NAMESPACE="${NAMESPACE:-paragon}"
 ORG="${ORG:-default}"
-SECRET_NAME="${SECRET_NAME:-paragon-secrets-openobserve}"
+SECRET_NAME="${SECRET_NAME:-openobserve-credentials}"
 O2_PORT="${O2_PORT:-5080}"
 
 HOOP_CONN=""
@@ -41,7 +41,7 @@ usage() {
   cat <<'EOF'
 migrate-openobserve-password.sh
 
-Syncs OpenObserve (PVC) with the new password already in paragon-secrets-openobserve
+Syncs OpenObserve (PVC) with the new password already in openobserve-credentials
 after terraform apply.
 
   1. terraform apply
@@ -68,7 +68,7 @@ Options:
   --old-password PASS    Current OpenObserve password (from 1Password). Required.
   --namespace NAME       Kubernetes namespace (default: paragon)
   --org NAME             OpenObserve organization (default: default)
-  --secret NAME          Secret with Terraform password (default: paragon-secrets-openobserve)
+  --secret NAME          Secret with Terraform password (default: openobserve-credentials)
   --port PORT            Local port for hoop connect proxy only (default: 5080)
   --dry-run              Print actions without calling the API
   -h, --help             Show this help
@@ -151,14 +151,21 @@ secret_field_kubectl() {
 
 secret_field_hoop() {
   local key="$1"
-  local b64 raw
-  log "reading ${key} via hoop connect ${HOOP_K8S_CONN}"
+  local b64 raw err
+  log "reading ${key} via hoop connect ${HOOP_K8S_CONN} (secret ${SECRET_NAME})"
+  err="$(mktemp)"
   raw="$(hoop connect "$HOOP_K8S_CONN" -s -- \
     kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" \
-    -o "jsonpath={.data.${key}}" 2>/dev/null || true)"
+    -o "jsonpath={.data.${key}}" 2>"$err" || true)"
   # kubectl jsonpath is a single base64 line; ignore any hoop banner noise on stdout
   b64="$(printf '%s\n' "$raw" | grep -E '^[A-Za-z0-9+/=]+$' | tail -1 | tr -d '[:space:]')"
-  [ -n "$b64" ] || die "failed to read ${key} from secret (hoop connect ${HOOP_K8S_CONN})"
+  if [ -z "$b64" ]; then
+    log "hoop/kubectl stderr: $(tr '\n' ' ' <"$err" | tr -d '\r')"
+    log "hoop stdout (truncated): $(printf '%s' "$raw" | head -c 200)"
+    rm -f "$err"
+    die "failed to read ${key} from secret ${SECRET_NAME} (hoop connect ${HOOP_K8S_CONN})"
+  fi
+  rm -f "$err"
   printf '%s' "$b64" | base64 -d
 }
 

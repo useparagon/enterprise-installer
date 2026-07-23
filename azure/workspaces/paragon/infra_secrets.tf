@@ -22,6 +22,12 @@ data "azurerm_key_vault_secret" "infra_redis" {
   key_vault_id = data.azurerm_key_vault.paragon.id
 }
 
+data "azurerm_key_vault_secret" "infra_redis_managed" {
+  count        = local.use_legacy_infra_json ? 0 : 1
+  name         = "redis-managed"
+  key_vault_id = data.azurerm_key_vault.paragon.id
+}
+
 data "azurerm_key_vault_secret" "infra_storage" {
   count        = local.use_legacy_infra_json ? 0 : 1
   name         = "storage"
@@ -47,9 +53,11 @@ locals {
           location = data.azurerm_resource_group.infra[0].location
         }
       }
-      postgres = { value = jsondecode(data.azurerm_key_vault_secret.infra_postgres[0].value) }
-      redis    = { value = jsondecode(data.azurerm_key_vault_secret.infra_redis[0].value) }
-      storage  = { value = jsondecode(data.azurerm_key_vault_secret.infra_storage[0].value) }
+      postgres      = { value = jsondecode(data.azurerm_key_vault_secret.infra_postgres[0].value) }
+      redis         = { value = jsondecode(data.azurerm_key_vault_secret.infra_redis[0].value) }
+      # Mirrors infra output redis_managed (null when AMR disabled / secret encodes null).
+      redis_managed = { value = jsondecode(data.azurerm_key_vault_secret.infra_redis_managed[0].value) }
+      storage       = { value = jsondecode(data.azurerm_key_vault_secret.infra_storage[0].value) }
     },
     var.managed_sync_enabled ? {
       kafka = { value = jsondecode(data.azurerm_key_vault_secret.infra_kafka[0].value) }
