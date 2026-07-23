@@ -32,6 +32,10 @@ resource "helm_release" "external_secrets" {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
     value = var.eso_role_arn
   }
+
+  # ALB controller registers a cluster-scoped Service mutating webhook; wait
+  # until its pods have endpoints or Service creates fail with no endpoints.
+  depends_on = [helm_release.ingress]
 }
 
 resource "helm_release" "reloader" {
@@ -43,6 +47,8 @@ resource "helm_release" "reloader" {
   create_namespace = false
   atomic           = true
   cleanup_on_fail  = true
+
+  depends_on = [helm_release.ingress]
 }
 
 locals {
