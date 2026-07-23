@@ -58,7 +58,9 @@ resource "azurerm_key_vault_secret" "openobserve" {
   name         = local.runtime_secret_names.openobserve
   key_vault_id = data.azurerm_key_vault.paragon.id
   value = jsonencode({
-    ZO_ROOT_USER_EMAIL    = local.openobserve_email
-    ZO_ROOT_USER_PASSWORD = local.openobserve_password
+    ZO_ROOT_USER_EMAIL         = local.openobserve_email
+    ZO_ROOT_USER_PASSWORD      = local.openobserve_password
+    AZURE_STORAGE_ACCOUNT_NAME = local.storage_output.root_user
+    AZURE_STORAGE_ACCOUNT_KEY  = local.storage_output.root_password
   })
 }
