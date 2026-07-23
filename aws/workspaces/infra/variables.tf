@@ -802,6 +802,7 @@ locals {
       Name        = "paragon-${var.organization}"
       Environment = local.environment
       Creator     = "Terraform"
+      aws-apn-id  = "pc:3elab41fw971izucbsjrfn81o"
     },
     trimspace(var.organization) == "" ? {} : { Organization = var.organization }
   )
