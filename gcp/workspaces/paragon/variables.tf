@@ -402,13 +402,13 @@ variable "waf_enabled" {
 }
 
 variable "waf_ip_whitelist" {
-  description = "CIDRs that bypass every other Cloud Armor rule (office IPs). Bare addresses are normalized to /32 or /128. Empty list = no allowlist rule."
+  description = "CIDRs that bypass every other Cloud Armor rule (office IPs). Bare addresses are normalized to /32 or /128. Empty list = no allowlist rule. Example: `[\"203.0.113.10\", \"198.51.100.0/24\"]`"
   type        = list(string)
   default     = []
 }
 
 variable "waf_ip_blacklist" {
-  description = "CIDRs that are always denied. Bare addresses are normalized to /32 or /128. Empty list = no denylist rule."
+  description = "CIDRs that are always denied. Bare addresses are normalized to /32 or /128. Empty list = no denylist rule. Example: `[\"203.0.113.66\", \"192.0.2.0/24\"]`"
   type        = list(string)
   default     = []
 }
@@ -453,7 +453,7 @@ variable "waf_rate_limit_global_window_sec" {
 }
 
 variable "waf_rate_limit_paths" {
-  description = "Map of URL path prefix to requests per key per window, evaluated before the global limit. Paths without a leading / are normalized and match by prefix, so /actuator also covers /actuator/heapdump. Empty = no path rate limit rules."
+  description = "Map of URL path prefix to requests per key per window, evaluated before the global limit. Paths without a leading / are normalized and match by prefix, so /actuator also covers /actuator/heapdump. Empty = no path rate limit rules. Example: `{ \"/actuator\" = 20, \"/api/v1/webhooks\" = 600 }`"
   type        = map(number)
   default     = {}
 
@@ -493,6 +493,8 @@ variable "waf_rate_limit_options" {
     - ban_duration_sec: how long a banned key stays banned. rate_based_ban only.
     - ban_threshold_count / ban_threshold_interval_sec: optional second threshold that must also be breached before a ban. rate_based_ban only.
     - preview: evaluate and log without enforcing
+
+    Example: `{ action = "rate_based_ban", enforce_on_key = "XFF_IP", ban_duration_sec = 1800 }`
   EOT
   type = object({
     action                     = optional(string, "throttle")
@@ -556,6 +558,12 @@ variable "waf_preconfigured_rules" {
     - opt_in_rule_ids: signature IDs to enable even though sensitivity excludes them
     - opt_out_rule_ids: signature IDs to disable, for known false positives. Must match the CRS version of rule_set.
     - exclusions: request fields skipped during evaluation. Each entry optionally narrows to target_rule_ids and lists request_headers / request_cookies / request_uris / request_query_params as { operator, value }, where operator is EQUALS, STARTS_WITH, ENDS_WITH, CONTAINS or EQUALS_ANY and value is required for all but EQUALS_ANY.
+
+    Example, rolling out SQLi in preview while XSS enforces with one signature disabled:
+
+    `sqli = { rule_set = "sqli-v422-stable", preview = true }`
+
+    `xss = { rule_set = "xss-v422-stable", sensitivity = 2, opt_out_rule_ids = ["owasp-crs-v042200-id941150-xss"] }`
 
     Reference: https://cloud.google.com/armor/docs/waf-rules
   EOT
@@ -688,6 +696,12 @@ variable "waf_custom_rules" {
     - description: free text, truncated to 63 characters. Defaults to the map key.
     - rate_limit: threshold_count plus optional interval_sec (60), exceed_status (429), enforce_on_key (IP), enforce_on_key_name, ban_duration_sec, ban_threshold_count, ban_threshold_interval_sec. Ban fields apply to rate_based_ban only.
 
+    Example, a geo block and a throttle on the login route:
+
+    `block-cn = { expression = "origin.region_code == 'CN'" }`
+
+    `throttle-login = { expression = "request.path.startsWith('/auth/login')", action = "throttle", rate_limit = { threshold_count = 100, interval_sec = 60 } }`
+
     Reference: https://cloud.google.com/armor/docs/rules-language-reference
   EOT
   type = map(object({
@@ -811,6 +825,8 @@ variable "waf_advanced_options" {
     - user_ip_request_headers: headers to resolve the real client IP from, for enforce_on_key = "USER_IP"
     - adaptive_protection_enabled: machine-learned Layer 7 DDoS detection. Requires Cloud Armor Enterprise.
     - adaptive_protection_rule_visibility: "STANDARD" (default) or "PREMIUM"
+
+    Example: `{ json_parsing = "STANDARD", log_level = "VERBOSE" }`
   EOT
   type = object({
     json_parsing                        = optional(string, "DISABLED")
