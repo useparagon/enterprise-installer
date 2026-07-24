@@ -396,7 +396,7 @@ variable "helm_yaml" {
 }
 
 variable "waf_enabled" {
-  description = "Enable Google Cloud Armor on the shared public Application Load Balancer. false by default — set true and configure waf_preconfigured_rules, rate limits, or IP lists in tfvars. Ignored when ingress_scheme is 'internal'."
+  description = "Enable Google Cloud Armor on the shared public Application Load Balancer. false by default — set true and configure waf_preconfigured_rules, rate limits, or IP lists in tfvars. Ignored when ingress_scheme is 'internal'. Disabling detaches the policy before destroying it, but the GKE controller detaches asynchronously, so a destroy that fails with resourceInUseByAnotherResource just needs apply to be re-run."
   type        = bool
   default     = false
 }
@@ -460,9 +460,9 @@ variable "waf_rate_limit_paths" {
   validation {
     condition = alltrue([
       for path in keys(var.waf_rate_limit_paths) :
-      can(regex("^/?[A-Za-z0-9._~/-]*$", path))
+      can(regex("^/?[A-Za-z0-9._~-][A-Za-z0-9._~/-]*$", path))
     ])
-    error_message = "waf_rate_limit_paths keys must be plain URL path prefixes built from letters, digits and the characters . _ ~ - / (no quotes, wildcards or regular expressions)."
+    error_message = "waf_rate_limit_paths keys must be non-empty URL path prefixes built from letters, digits and the characters . _ ~ - / (no quotes, wildcards or regular expressions). \"\" and \"/\" are rejected because they would match every request; use waf_rate_limit_global instead."
   }
 
   validation {
