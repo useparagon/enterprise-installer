@@ -453,7 +453,7 @@ variable "waf_rate_limit_global_window_sec" {
 }
 
 variable "waf_rate_limit_paths" {
-  description = "Map of URL path prefix to requests per key per window, evaluated before the global limit. Paths without a leading / are normalized and match by prefix, so /actuator also covers /actuator/heapdump. Longer prefixes are evaluated first, so a stricter /api/foo limit takes precedence over a broader /api one. Empty = no path rate limit rules. Example: `{ \"/actuator\" = 20, \"/api/v1/webhooks\" = 600 }`"
+  description = "Map of URL path prefix to requests per key per window, evaluated before the global limit. Paths without a leading / are normalized and match by prefix, so /actuator also covers /actuator/heapdump. Keys must be unique after that normalization — \"actuator\" and \"/actuator\" are the same prefix. Longer prefixes are evaluated first, so a stricter /api/foo limit takes precedence over a broader /api one. Empty = no path rate limit rules. Example: `{ \"/actuator\" = 20, \"/api/v1/webhooks\" = 600 }`"
   type        = map(number)
   default     = {}
 
@@ -463,6 +463,14 @@ variable "waf_rate_limit_paths" {
       can(regex("^/?[A-Za-z0-9._~-][A-Za-z0-9._~/-]*$", path))
     ])
     error_message = "waf_rate_limit_paths keys must be non-empty URL path prefixes built from letters, digits and the characters . _ ~ - / (no quotes, wildcards or regular expressions). \"\" and \"/\" are rejected because they would match every request; use waf_rate_limit_global instead."
+  }
+
+  validation {
+    condition = length(keys(var.waf_rate_limit_paths)) == length(distinct([
+      for path in keys(var.waf_rate_limit_paths) :
+      startswith(path, "/") ? path : "/${path}"
+    ]))
+    error_message = "waf_rate_limit_paths keys must be unique after normalizing a missing leading /. For example \"actuator\" and \"/actuator\" both become \"/actuator\" and would create duplicate Cloud Armor rules where only the first match is enforced."
   }
 
   validation {
