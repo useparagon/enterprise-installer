@@ -453,7 +453,7 @@ variable "waf_rate_limit_global_window_sec" {
 }
 
 variable "waf_rate_limit_paths" {
-  description = "Map of URL path prefix to requests per key per window, evaluated before the global limit. Paths without a leading / are normalized and match by prefix, so /actuator also covers /actuator/heapdump. Empty = no path rate limit rules. Example: `{ \"/actuator\" = 20, \"/api/v1/webhooks\" = 600 }`"
+  description = "Map of URL path prefix to requests per key per window, evaluated before the global limit. Paths without a leading / are normalized and match by prefix, so /actuator also covers /actuator/heapdump. Longer prefixes are evaluated first, so a stricter /api/foo limit takes precedence over a broader /api one. Empty = no path rate limit rules. Example: `{ \"/actuator\" = 20, \"/api/v1/webhooks\" = 600 }`"
   type        = map(number)
   default     = {}
 

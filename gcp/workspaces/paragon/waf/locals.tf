@@ -60,9 +60,17 @@ locals {
 
   has_global_rate_limit = var.waf_rate_limit_global != null && coalesce(var.waf_rate_limit_global, 0) > 0
 
-  # Path prefixes are sorted so rule priorities stay stable as entries are added.
+  # Longest prefix first: Cloud Armor stops at the first match, so /api/foo must be
+  # evaluated before /api. The length-encoded sort key keeps priorities stable.
+  sorted_rate_limit_paths = [
+    for entry in sort([
+      for path in keys(var.waf_rate_limit_paths) :
+      format("%06d|%s", 999999 - length(startswith(path, "/") ? path : "/${path}"), path)
+    ]) : split("|", entry)[1]
+  ]
+
   path_rate_rules = [
-    for idx, path in sort(keys(var.waf_rate_limit_paths)) : {
+    for idx, path in local.sorted_rate_limit_paths : {
       priority   = local.priority_rate_path + idx
       slug       = "path-${idx}"
       path       = startswith(path, "/") ? path : "/${path}"
