@@ -133,6 +133,29 @@ locals {
     PRIVATE_URL = local.argocd_gcs_private_url
   })
 
+  # In-cluster monitoring component hosts (paragon-monitoring). Same defaults as
+  # gitops/base/values-common.yaml — required by Grafana dashboard generation.
+  argocd_monitor_host_defaults = {
+    MONITOR_BULL_EXPORTER_HOST         = "http://bull-exporter"
+    MONITOR_BULL_EXPORTER_PORT         = "9538"
+    MONITOR_GRAFANA_HOST               = "http://grafana"
+    MONITOR_GRAFANA_PORT               = "4500"
+    MONITOR_KUBE_STATE_METRICS_HOST    = "http://kube-state-metrics"
+    MONITOR_KUBE_STATE_METRICS_PORT    = "2550"
+    MONITOR_PGADMIN_HOST               = "http://pgadmin"
+    MONITOR_PGADMIN_PORT               = "5050"
+    MONITOR_PGADMIN_SSL_MODE           = "disable"
+    MONITOR_POSTGRES_EXPORTER_HOST     = "http://postgres-exporter"
+    MONITOR_POSTGRES_EXPORTER_PORT     = "9187"
+    MONITOR_POSTGRES_EXPORTER_SSL_MODE = "require"
+    MONITOR_PROMETHEUS_HOST            = "http://prometheus"
+    MONITOR_PROMETHEUS_PORT            = "9090"
+    MONITOR_REDIS_EXPORTER_HOST        = "http://redis-exporter"
+    MONITOR_REDIS_EXPORTER_PORT        = "9121"
+    MONITOR_REDIS_INSIGHT_HOST         = "http://redis-insight"
+    MONITOR_REDIS_INSIGHT_PORT         = "8500"
+  }
+
   argocd_app_secret_overrides = var.argocd_app_secrets != null ? var.argocd_app_secrets : {}
 
   argocd_license_admin_auth = try(local.argocd_app_secret_overrides.LICENSE, null) != null ? {
@@ -145,6 +168,7 @@ locals {
       local.argocd_infra_env,
       local.argocd_postgres_env,
       local.argocd_public_url_defaults,
+      local.argocd_monitor_host_defaults,
       local.argocd_monitor_creds,
       local.argocd_env_overrides,
       local.argocd_license_admin_auth,
