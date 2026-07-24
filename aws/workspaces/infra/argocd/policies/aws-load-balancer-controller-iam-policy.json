@@ -235,11 +235,12 @@
         {
             "Effect": "Allow",
             "Action": [
-                "elasticloadbalancing:SetWebAcl",
-                "elasticloadbalancing:ModifyListener",
                 "elasticloadbalancing:AddListenerCertificates",
+                "elasticloadbalancing:ModifyListener",
+                "elasticloadbalancing:ModifyRule",
                 "elasticloadbalancing:RemoveListenerCertificates",
-                "elasticloadbalancing:ModifyRule"
+                "elasticloadbalancing:SetRulePriorities",
+                "elasticloadbalancing:SetWebAcl"
             ],
             "Resource": "*"
         }

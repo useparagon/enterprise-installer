@@ -136,7 +136,38 @@ locals {
     CLOUD_STORAGE_REGION            = var.aws_region
     CLOUD_STORAGE_PUBLIC_URL        = local.argocd_s3_endpoint
     CLOUD_STORAGE_PRIVATE_URL       = local.argocd_s3_endpoint
+
+    # OpenObserve (paragon-logging) — same keys the legacy helm_release set via
+    # global.env.ZO_S3_*. Auth uses the node/pod AWS credential chain (no static keys).
+    ZO_S3_PROVIDER    = "s3"
+    ZO_S3_BUCKET_NAME = local.argocd_storage.logs_bucket
+    ZO_S3_REGION_NAME = var.aws_region
+    ZO_S3_SERVER_URL  = local.argocd_s3_endpoint
   })
+
+  # In-cluster monitoring component hosts (paragon-monitoring). Same defaults as
+  # gitops/base/values-common.yaml — required by Grafana dashboard generation.
+  # Harmless when monitors are disabled; override via argocd_env_overrides.
+  argocd_monitor_host_defaults = {
+    MONITOR_BULL_EXPORTER_HOST         = "http://bull-exporter"
+    MONITOR_BULL_EXPORTER_PORT         = "9538"
+    MONITOR_GRAFANA_HOST               = "http://grafana"
+    MONITOR_GRAFANA_PORT               = "4500"
+    MONITOR_KUBE_STATE_METRICS_HOST    = "http://kube-state-metrics"
+    MONITOR_KUBE_STATE_METRICS_PORT    = "2550"
+    MONITOR_PGADMIN_HOST               = "http://pgadmin"
+    MONITOR_PGADMIN_PORT               = "5050"
+    MONITOR_PGADMIN_SSL_MODE           = "disable"
+    MONITOR_POSTGRES_EXPORTER_HOST     = "http://postgres-exporter"
+    MONITOR_POSTGRES_EXPORTER_PORT     = "9187"
+    MONITOR_POSTGRES_EXPORTER_SSL_MODE = "require"
+    MONITOR_PROMETHEUS_HOST            = "http://prometheus"
+    MONITOR_PROMETHEUS_PORT            = "9090"
+    MONITOR_REDIS_EXPORTER_HOST        = "http://redis-exporter"
+    MONITOR_REDIS_EXPORTER_PORT        = "9121"
+    MONITOR_REDIS_INSIGHT_HOST         = "http://redis-insight"
+    MONITOR_REDIS_INSIGHT_PORT         = "8500"
+  }
 
   argocd_app_secret_overrides = var.argocd_app_secrets != null ? var.argocd_app_secrets : {}
 
@@ -150,6 +181,7 @@ locals {
       local.argocd_infra_env,
       local.argocd_postgres_env,
       local.argocd_public_url_defaults,
+      local.argocd_monitor_host_defaults,
       local.argocd_monitor_creds,
       local.argocd_env_overrides,
       local.argocd_license_admin_auth,
