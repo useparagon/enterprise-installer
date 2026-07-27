@@ -112,6 +112,38 @@ resource "kubectl_manifest" "ingress" {
   ]
 }
 
+locals {
+  waf_active = var.waf_security_policy_name != ""
+
+  # Always created: an empty securityPolicy name is what tells the controller to detach
+  # a policy, so dropping the manifest would leave it attached and block its destroy.
+  waf_backend_config_spec = merge(
+    {
+      securityPolicy = {
+        name = var.waf_security_policy_name
+      }
+    },
+    local.waf_active ? {
+      logging = {
+        enable     = true
+        sampleRate = var.waf_logs_sample_rate
+      }
+    } : {}
+  )
+}
+
+resource "kubectl_manifest" "waf_backendconfig" {
+  yaml_body = yamlencode({
+    apiVersion = "cloud.google.com/v1"
+    kind       = "BackendConfig"
+    metadata = {
+      name      = "paragon-waf-backendconfig"
+      namespace = kubernetes_namespace_v1.paragon.id
+    }
+    spec = local.waf_backend_config_spec
+  })
+}
+
 # Grafana backend config for health checks
 resource "kubectl_manifest" "grafana_backendconfig" {
   yaml_body = yamlencode({
@@ -121,15 +153,18 @@ resource "kubectl_manifest" "grafana_backendconfig" {
       name      = "grafana-backendconfig"
       namespace = kubernetes_namespace_v1.paragon.id
     }
-    spec = {
-      healthCheck = {
-        requestPath        = "/api/health"
-        port               = 4500
-        checkIntervalSec   = 10
-        timeoutSec         = 5
-        healthyThreshold   = 2
-        unhealthyThreshold = 2
-      }
-    }
+    spec = merge(
+      {
+        healthCheck = {
+          requestPath        = "/api/health"
+          port               = 4500
+          checkIntervalSec   = 10
+          timeoutSec         = 5
+          healthyThreshold   = 2
+          unhealthyThreshold = 2
+        }
+      },
+      local.waf_backend_config_spec
+    )
   })
 }

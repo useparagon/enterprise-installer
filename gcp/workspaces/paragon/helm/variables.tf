@@ -227,6 +227,18 @@ variable "infra_vars" {
   sensitive   = true
 }
 
+variable "waf_security_policy_name" {
+  description = "Cloud Armor security policy to attach to the public backend services. Empty disables the attachment."
+  type        = string
+  default     = ""
+}
+
+variable "waf_logs_sample_rate" {
+  description = "Fraction of requests logged on the protected backend services, between 0 and 1."
+  type        = number
+  default     = 1
+}
+
 locals {
   chart_names     = var.monitors_enabled ? ["paragon-logging", "paragon-monitoring", "paragon-onprem"] : ["paragon-logging", "paragon-onprem"]
   chart_directory = "../charts"

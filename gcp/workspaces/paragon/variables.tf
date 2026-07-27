@@ -395,6 +395,489 @@ variable "helm_yaml" {
   default     = null
 }
 
+variable "waf_enabled" {
+  description = "Enable Google Cloud Armor on the shared public Application Load Balancer. false by default — set true and configure waf_preconfigured_rules, rate limits, or IP lists in tfvars. Ignored when ingress_scheme is 'internal'. Disabling detaches the policy before destroying it, but the GKE controller detaches asynchronously, so a destroy that fails with resourceInUseByAnotherResource just needs apply to be re-run."
+  type        = bool
+  default     = false
+}
+
+variable "waf_ip_whitelist" {
+  description = "CIDRs that bypass every other Cloud Armor rule (office IPs). Bare addresses are normalized to /32 or /128. Empty list = no allowlist rule. Example: `[\"203.0.113.10\", \"198.51.100.0/24\"]`"
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_ip_blacklist" {
+  description = "CIDRs that are always denied. Bare addresses are normalized to /32 or /128. Empty list = no denylist rule. Example: `[\"203.0.113.66\", \"192.0.2.0/24\"]`"
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_ip_blacklist_deny_status" {
+  description = "HTTP status returned by the denylist rule. Cloud Armor only allows 403, 404, or 502 for deny actions."
+  type        = number
+  default     = 403
+
+  validation {
+    condition     = contains([403, 404, 502], var.waf_ip_blacklist_deny_status)
+    error_message = "waf_ip_blacklist_deny_status must be 403, 404, or 502."
+  }
+}
+
+variable "waf_rate_limit_global" {
+  description = "Requests per key allowed across all paths within the window. null or 0 = no global rate limit rule. Enforced per backend service and per region, so the aggregate limit scales with the number of protected backends."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.waf_rate_limit_global == null || contains([0], coalesce(var.waf_rate_limit_global, 0)) || coalesce(var.waf_rate_limit_global, 1) >= 1
+    error_message = "waf_rate_limit_global must be null, 0 (disabled), or a positive number of requests."
+  }
+
+  validation {
+    condition     = coalesce(var.waf_rate_limit_global, 0) <= 10000
+    error_message = "waf_rate_limit_global must be 10000 or less, the Cloud Armor ceiling for rate_based_ban. Throttle allows more, but the lower bound is enforced so switching waf_rate_limit_options.action never breaks an apply."
+  }
+}
+
+variable "waf_rate_limit_global_window_sec" {
+  description = "Evaluation window in seconds for the global rate limit."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([10, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 2700, 3600], var.waf_rate_limit_global_window_sec)
+    error_message = "waf_rate_limit_global_window_sec must be one of 10, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 2700, 3600."
+  }
+}
+
+variable "waf_rate_limit_paths" {
+  description = "Map of URL path prefix to requests per key per window, evaluated before the global limit. Paths without a leading / are normalized and match by prefix, so /actuator also covers /actuator/heapdump. Keys must be unique after that normalization — \"actuator\" and \"/actuator\" are the same prefix. Longer prefixes are evaluated first, so a stricter /api/foo limit takes precedence over a broader /api one. Empty = no path rate limit rules. Example: `{ \"/actuator\" = 20, \"/api/v1/webhooks\" = 600 }`"
+  type        = map(number)
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for path in keys(var.waf_rate_limit_paths) :
+      can(regex("^/?[A-Za-z0-9._~-][A-Za-z0-9._~/-]*$", path))
+    ])
+    error_message = "waf_rate_limit_paths keys must be non-empty URL path prefixes built from letters, digits and the characters . _ ~ - / (no quotes, wildcards or regular expressions). \"\" and \"/\" are rejected because they would match every request; use waf_rate_limit_global instead."
+  }
+
+  validation {
+    condition = length(keys(var.waf_rate_limit_paths)) == length(distinct([
+      for path in keys(var.waf_rate_limit_paths) :
+      startswith(path, "/") ? path : "/${path}"
+    ]))
+    error_message = "waf_rate_limit_paths keys must be unique after normalizing a missing leading /. For example \"actuator\" and \"/actuator\" both become \"/actuator\" and would create duplicate Cloud Armor rules where only the first match is enforced."
+  }
+
+  validation {
+    condition     = alltrue([for limit in values(var.waf_rate_limit_paths) : limit >= 1 && limit <= 10000])
+    error_message = "waf_rate_limit_paths values must be between 1 and 10000 requests."
+  }
+}
+
+variable "waf_rate_limit_path_window_sec" {
+  description = "Evaluation window in seconds for the path rate limits."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([10, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 2700, 3600], var.waf_rate_limit_path_window_sec)
+    error_message = "waf_rate_limit_path_window_sec must be one of 10, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 2700, 3600."
+  }
+}
+
+variable "waf_rate_limit_options" {
+  description = <<-EOT
+    Shared behaviour for the rules generated from waf_rate_limit_global and waf_rate_limit_paths. Per-rule rate limiting is available through waf_custom_rules.
+
+    - action: "throttle" caps traffic at the threshold; "rate_based_ban" blocks the key for ban_duration_sec. Cloud Armor rejects switching a rate_based_ban rule back to throttle in place.
+    - exceed_status: status returned above the threshold (403, 404, 429 or 502)
+    - enforce_on_key: what counts as one client. Use XFF_IP when a CDN or proxy such as Cloudflare fronts the load balancer.
+    - enforce_on_key_name: header or cookie name, required for HTTP_HEADER/HTTP_COOKIE
+    - ban_duration_sec: how long a banned key stays banned. rate_based_ban only.
+    - ban_threshold_count / ban_threshold_interval_sec: optional second threshold that must also be breached before a ban. rate_based_ban only.
+    - preview: evaluate and log without enforcing
+
+    Example: `{ action = "rate_based_ban", enforce_on_key = "XFF_IP", ban_duration_sec = 1800 }`
+  EOT
+  type = object({
+    action                     = optional(string, "throttle")
+    exceed_status              = optional(number, 429)
+    enforce_on_key             = optional(string, "IP")
+    enforce_on_key_name        = optional(string)
+    ban_duration_sec           = optional(number, 600)
+    ban_threshold_count        = optional(number)
+    ban_threshold_interval_sec = optional(number, 600)
+    preview                    = optional(bool, false)
+  })
+  default = {}
+
+  validation {
+    condition     = contains(["throttle", "rate_based_ban"], coalesce(var.waf_rate_limit_options.action, "throttle"))
+    error_message = "waf_rate_limit_options.action must be \"throttle\" or \"rate_based_ban\"."
+  }
+
+  validation {
+    condition     = contains([403, 404, 429, 502], coalesce(var.waf_rate_limit_options.exceed_status, 429))
+    error_message = "waf_rate_limit_options.exceed_status must be 403, 404, 429, or 502."
+  }
+
+  validation {
+    condition = contains(
+      ["ALL", "IP", "XFF_IP", "USER_IP", "HTTP_HEADER", "HTTP_COOKIE", "HTTP_PATH", "SNI", "REGION_CODE", "TLS_JA3_FINGERPRINT", "TLS_JA4_FINGERPRINT"],
+      coalesce(var.waf_rate_limit_options.enforce_on_key, "IP")
+    )
+    error_message = "waf_rate_limit_options.enforce_on_key must be one of ALL, IP, XFF_IP, USER_IP, HTTP_HEADER, HTTP_COOKIE, HTTP_PATH, SNI, REGION_CODE, TLS_JA3_FINGERPRINT, TLS_JA4_FINGERPRINT."
+  }
+
+  validation {
+    condition = !contains(["HTTP_HEADER", "HTTP_COOKIE"], coalesce(var.waf_rate_limit_options.enforce_on_key, "IP")) || (
+      var.waf_rate_limit_options.enforce_on_key_name != null && trimspace(coalesce(var.waf_rate_limit_options.enforce_on_key_name, "")) != ""
+    )
+    error_message = "waf_rate_limit_options.enforce_on_key_name is required when enforce_on_key is HTTP_HEADER or HTTP_COOKIE."
+  }
+
+  validation {
+    condition     = coalesce(var.waf_rate_limit_options.ban_duration_sec, 600) >= 1
+    error_message = "waf_rate_limit_options.ban_duration_sec must be a positive number of seconds."
+  }
+
+  validation {
+    condition     = contains([10, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 2700, 3600], coalesce(var.waf_rate_limit_options.ban_threshold_interval_sec, 600))
+    error_message = "waf_rate_limit_options.ban_threshold_interval_sec must be one of 10, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 2700, 3600."
+  }
+}
+
+variable "waf_preconfigured_rules" {
+  description = <<-EOT
+    Map of Google-managed (preconfigured) WAF rule sets to evaluate. Empty by default — you choose which sets to enable. Cloud Armor's equivalent of an AWS WAF managed rule group.
+
+    Each key is the rule name inside the policy (unique). Each value configures one set:
+
+    - rule_set (required): e.g. sqli-v422-stable, xss-v422-stable, lfi-v422-stable, rfi-v422-stable, rce-v422-stable, protocolattack-v422-stable, scannerdetection-v422-stable, methodenforcement-v422-stable, php-v422-stable, sessionfixation-v422-stable, java-v422-stable, generic-v422-stable, cve-canary, json-sqli-canary. CRS 4.22 (-v422-) is current; -v33- and unsuffixed names are older.
+    - sensitivity: OWASP paranoia level 0-4, default 1. Higher adds signatures and false positives. 0 evaluates nothing unless opt_in_rule_ids is set.
+    - deny_status: status returned on a match (403, 404 or 502)
+    - priority: evaluation order. Auto-assigned in the 5000 band when omitted.
+    - preview: evaluate and log without blocking, the equivalent of AWS WAF "count"
+    - opt_in_rule_ids: signature IDs to enable even though sensitivity excludes them
+    - opt_out_rule_ids: signature IDs to disable, for known false positives. Must match the CRS version of rule_set.
+    - exclusions: request fields skipped during evaluation. Each entry optionally narrows to target_rule_ids and lists request_headers / request_cookies / request_uris / request_query_params as { operator, value }, where operator is EQUALS, STARTS_WITH, ENDS_WITH, CONTAINS or EQUALS_ANY and value is required for all but EQUALS_ANY.
+
+    Example, rolling out SQLi in preview while XSS enforces with one signature disabled:
+
+    `sqli = { rule_set = "sqli-v422-stable", preview = true }`
+
+    `xss = { rule_set = "xss-v422-stable", sensitivity = 2, opt_out_rule_ids = ["owasp-crs-v042200-id941150-xss"] }`
+
+    Reference: https://cloud.google.com/armor/docs/waf-rules
+  EOT
+  type = map(object({
+    rule_set         = string
+    sensitivity      = optional(number, 1)
+    deny_status      = optional(number, 403)
+    priority         = optional(number)
+    preview          = optional(bool, false)
+    opt_in_rule_ids  = optional(list(string), [])
+    opt_out_rule_ids = optional(list(string), [])
+    exclusions = optional(list(object({
+      target_rule_ids = optional(list(string), [])
+      request_headers = optional(list(object({
+        operator = string
+        value    = optional(string)
+      })), [])
+      request_cookies = optional(list(object({
+        operator = string
+        value    = optional(string)
+      })), [])
+      request_uris = optional(list(object({
+        operator = string
+        value    = optional(string)
+      })), [])
+      request_query_params = optional(list(object({
+        operator = string
+        value    = optional(string)
+      })), [])
+    })), [])
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_preconfigured_rules :
+      can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", rule.rule_set))
+    ])
+    error_message = "waf_preconfigured_rules.rule_set must be a Cloud Armor rule set name such as \"sqli-v422-stable\" (lowercase letters, digits and hyphens only)."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_preconfigured_rules :
+      coalesce(rule.sensitivity, 1) >= 0 && coalesce(rule.sensitivity, 1) <= 4
+    ])
+    error_message = "waf_preconfigured_rules.sensitivity must be between 0 and 4."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_preconfigured_rules :
+      coalesce(rule.sensitivity, 1) > 0 || length(coalesce(rule.opt_in_rule_ids, [])) > 0
+    ])
+    error_message = "waf_preconfigured_rules entries with sensitivity 0 evaluate no signatures unless opt_in_rule_ids is set."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_preconfigured_rules :
+      contains([403, 404, 502], coalesce(rule.deny_status, 403))
+    ])
+    error_message = "waf_preconfigured_rules.deny_status must be 403, 404, or 502."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_preconfigured_rules :
+      rule.priority == null || (coalesce(rule.priority, 1) >= 1 && coalesce(rule.priority, 1) <= 2147483646)
+    ])
+    error_message = "waf_preconfigured_rules.priority must be between 1 and 2147483646. 2147483647 is reserved for the default rule."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, rule in var.waf_preconfigured_rules : [
+        for id in concat(coalesce(rule.opt_in_rule_ids, []), coalesce(rule.opt_out_rule_ids, [])) :
+        can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", id))
+      ]
+    ]))
+    error_message = "waf_preconfigured_rules opt_in_rule_ids and opt_out_rule_ids must be signature IDs such as \"owasp-crs-v042200-id942350-sqli\" (lowercase letters, digits and hyphens only)."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, rule in var.waf_preconfigured_rules : [
+        for exclusion in coalesce(rule.exclusions, []) : [
+          for field in concat(
+            coalesce(exclusion.request_headers, []),
+            coalesce(exclusion.request_cookies, []),
+            coalesce(exclusion.request_uris, []),
+            coalesce(exclusion.request_query_params, []),
+          ) :
+          contains(["EQUALS", "STARTS_WITH", "ENDS_WITH", "CONTAINS", "EQUALS_ANY"], field.operator)
+        ]
+      ]
+    ]))
+    error_message = "waf_preconfigured_rules exclusion operators must be EQUALS, STARTS_WITH, ENDS_WITH, CONTAINS, or EQUALS_ANY."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, rule in var.waf_preconfigured_rules : [
+        for exclusion in coalesce(rule.exclusions, []) : [
+          for field in concat(
+            coalesce(exclusion.request_headers, []),
+            coalesce(exclusion.request_cookies, []),
+            coalesce(exclusion.request_uris, []),
+            coalesce(exclusion.request_query_params, []),
+          ) :
+          field.operator == "EQUALS_ANY" ? field.value == null : (field.value != null && trimspace(coalesce(field.value, "")) != "")
+        ]
+      ]
+    ]))
+    error_message = "waf_preconfigured_rules exclusions require a value for every operator except EQUALS_ANY, which must omit it."
+  }
+}
+
+variable "waf_custom_rules" {
+  description = <<-EOT
+    Map of rules written in the Cloud Armor rules language (CEL), for anything the IP lists, path rate limits and preconfigured rule sets do not cover: geo blocking, header matching, per-rule rate limits.
+
+    Each key is the rule name inside the policy (unique). Each value configures one rule:
+
+    - expression (required): CEL, e.g. "origin.region_code == 'CN'", "request.headers['user-agent'].contains('curl')", "request.path.startsWith('/admin') && !inIpRange(origin.ip, '203.0.113.0/24')"
+    - action: "deny" (default), "allow", "throttle" or "rate_based_ban". The rate limiting actions require rate_limit; allow and deny must omit it.
+    - deny_status: status returned by a deny action (403, 404 or 502)
+    - priority: evaluation order. Auto-assigned in the 6000 band when omitted; set below 1000 to run ahead of every generated rule.
+    - preview: evaluate and log without enforcing
+    - description: free text, truncated to 63 characters. Defaults to the map key.
+    - rate_limit: threshold_count plus optional interval_sec (60), exceed_status (429), enforce_on_key (IP), enforce_on_key_name, ban_duration_sec, ban_threshold_count, ban_threshold_interval_sec. Ban fields apply to rate_based_ban only.
+
+    Example, a geo block and a throttle on the login route:
+
+    `block-cn = { expression = "origin.region_code == 'CN'" }`
+
+    `throttle-login = { expression = "request.path.startsWith('/auth/login')", action = "throttle", rate_limit = { threshold_count = 100, interval_sec = 60 } }`
+
+    Reference: https://cloud.google.com/armor/docs/rules-language-reference
+  EOT
+  type = map(object({
+    expression  = string
+    action      = optional(string, "deny")
+    deny_status = optional(number, 403)
+    priority    = optional(number)
+    preview     = optional(bool, false)
+    description = optional(string)
+    rate_limit = optional(object({
+      threshold_count            = number
+      interval_sec               = optional(number, 60)
+      exceed_status              = optional(number, 429)
+      enforce_on_key             = optional(string, "IP")
+      enforce_on_key_name        = optional(string)
+      ban_duration_sec           = optional(number, 600)
+      ban_threshold_count        = optional(number)
+      ban_threshold_interval_sec = optional(number, 600)
+    }))
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      trimspace(rule.expression) != ""
+    ])
+    error_message = "waf_custom_rules.expression must be a non-empty CEL expression."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      contains(["allow", "deny", "throttle", "rate_based_ban"], coalesce(rule.action, "deny"))
+    ])
+    error_message = "waf_custom_rules.action must be \"allow\", \"deny\", \"throttle\", or \"rate_based_ban\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      contains(["throttle", "rate_based_ban"], coalesce(rule.action, "deny")) == (rule.rate_limit != null)
+    ])
+    error_message = "waf_custom_rules entries must set rate_limit when action is \"throttle\" or \"rate_based_ban\", and must omit it for \"allow\" and \"deny\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      contains([403, 404, 502], coalesce(rule.deny_status, 403))
+    ])
+    error_message = "waf_custom_rules.deny_status must be 403, 404, or 502."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      rule.priority == null || (coalesce(rule.priority, 1) >= 1 && coalesce(rule.priority, 1) <= 2147483646)
+    ])
+    error_message = "waf_custom_rules.priority must be between 1 and 2147483646. 2147483647 is reserved for the default rule."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      rule.rate_limit == null || (
+        rule.rate_limit.threshold_count >= 1 && rule.rate_limit.threshold_count <= 10000
+      )
+    ])
+    error_message = "waf_custom_rules.rate_limit.threshold_count must be between 1 and 10000."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      rule.rate_limit == null || contains(
+        [10, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 2700, 3600],
+        coalesce(rule.rate_limit.interval_sec, 60)
+      )
+    ])
+    error_message = "waf_custom_rules.rate_limit.interval_sec must be one of 10, 30, 60, 120, 180, 240, 300, 600, 900, 1200, 1800, 2700, 3600."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      rule.rate_limit == null || contains([403, 404, 429, 502], coalesce(rule.rate_limit.exceed_status, 429))
+    ])
+    error_message = "waf_custom_rules.rate_limit.exceed_status must be 403, 404, 429, or 502."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      rule.rate_limit == null || contains(
+        ["ALL", "IP", "XFF_IP", "USER_IP", "HTTP_HEADER", "HTTP_COOKIE", "HTTP_PATH", "SNI", "REGION_CODE", "TLS_JA3_FINGERPRINT", "TLS_JA4_FINGERPRINT"],
+        coalesce(rule.rate_limit.enforce_on_key, "IP")
+      )
+    ])
+    error_message = "waf_custom_rules.rate_limit.enforce_on_key must be one of ALL, IP, XFF_IP, USER_IP, HTTP_HEADER, HTTP_COOKIE, HTTP_PATH, SNI, REGION_CODE, TLS_JA3_FINGERPRINT, TLS_JA4_FINGERPRINT."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_custom_rules :
+      rule.rate_limit == null || !contains(["HTTP_HEADER", "HTTP_COOKIE"], coalesce(rule.rate_limit.enforce_on_key, "IP")) || (
+        rule.rate_limit.enforce_on_key_name != null && trimspace(coalesce(rule.rate_limit.enforce_on_key_name, "")) != ""
+      )
+    ])
+    error_message = "waf_custom_rules.rate_limit.enforce_on_key_name is required when enforce_on_key is HTTP_HEADER or HTTP_COOKIE."
+  }
+}
+
+variable "waf_advanced_options" {
+  description = <<-EOT
+    Policy-wide Cloud Armor options.
+
+    - json_parsing: "DISABLED" (default), "STANDARD" or "STANDARD_WITH_GRAPHQL". STANDARD lets preconfigured rule sets inspect JSON bodies field by field, which matters for the SQLi and XSS sets against Paragon's JSON APIs.
+    - json_content_types: extra Content-Type values to parse as JSON. Requires json_parsing = "STANDARD".
+    - log_level: "NORMAL" (default) or "VERBOSE". VERBOSE records the matched signature and request field, at higher log volume and cost.
+    - user_ip_request_headers: headers to resolve the real client IP from, for enforce_on_key = "USER_IP"
+    - adaptive_protection_enabled: machine-learned Layer 7 DDoS detection. Requires Cloud Armor Enterprise.
+    - adaptive_protection_rule_visibility: "STANDARD" (default) or "PREMIUM"
+
+    Example: `{ json_parsing = "STANDARD", log_level = "VERBOSE" }`
+  EOT
+  type = object({
+    json_parsing                        = optional(string, "DISABLED")
+    json_content_types                  = optional(list(string), [])
+    log_level                           = optional(string, "NORMAL")
+    user_ip_request_headers             = optional(list(string), [])
+    adaptive_protection_enabled         = optional(bool, false)
+    adaptive_protection_rule_visibility = optional(string, "STANDARD")
+  })
+  default = {}
+
+  validation {
+    condition     = contains(["DISABLED", "STANDARD", "STANDARD_WITH_GRAPHQL"], coalesce(var.waf_advanced_options.json_parsing, "DISABLED"))
+    error_message = "waf_advanced_options.json_parsing must be \"DISABLED\", \"STANDARD\", or \"STANDARD_WITH_GRAPHQL\"."
+  }
+
+  validation {
+    condition     = contains(["NORMAL", "VERBOSE"], coalesce(var.waf_advanced_options.log_level, "NORMAL"))
+    error_message = "waf_advanced_options.log_level must be \"NORMAL\" or \"VERBOSE\"."
+  }
+
+  validation {
+    condition     = contains(["STANDARD", "PREMIUM"], coalesce(var.waf_advanced_options.adaptive_protection_rule_visibility, "STANDARD"))
+    error_message = "waf_advanced_options.adaptive_protection_rule_visibility must be \"STANDARD\" or \"PREMIUM\"."
+  }
+
+  validation {
+    condition     = coalesce(var.waf_advanced_options.json_parsing, "DISABLED") == "STANDARD" || length(coalesce(var.waf_advanced_options.json_content_types, [])) == 0
+    error_message = "waf_advanced_options.json_content_types is only honoured when json_parsing is \"STANDARD\"."
+  }
+}
+
+variable "waf_logs_sample_rate" {
+  description = "Fraction of requests logged to Cloud Logging on the protected backend services, between 0 and 1. Cloud Armor records the matched rule and action in those logs, so 1 keeps every enforcement decision visible. Only applies when WAF is active."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.waf_logs_sample_rate >= 0 && var.waf_logs_sample_rate <= 1
+    error_message = "waf_logs_sample_rate must be between 0 and 1."
+  }
+}
+
 locals {
   creds_json     = try(jsondecode(file(var.gcp_credential_json_file)), var.gcp_credential_json)
   gcp_project_id = try(local.creds_json.project_id, var.gcp_project_id)
@@ -411,6 +894,9 @@ locals {
   }
 
   dns_enabled = var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
+
+  # Cloud Armor backend policies only apply to the external Application Load Balancer.
+  waf_active = var.waf_enabled && var.ingress_scheme != "internal"
 
   infra_json_path       = var.infra_json_path != null ? abspath(var.infra_json_path) : null
   use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null

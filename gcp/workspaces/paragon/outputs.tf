@@ -32,3 +32,13 @@ output "load_balancer" {
   description = "Location of the load balancer"
   value       = module.helm.load_balancer
 }
+
+output "waf_security_policy_name" {
+  description = "Name of the Cloud Armor security policy when WAF is enabled, otherwise null."
+  value       = local.waf_active ? module.waf[0].security_policy_name : null
+}
+
+output "waf_rule_count" {
+  description = "Number of rules in the Cloud Armor policy when WAF is enabled, otherwise null. The default quota is 200 rules per policy."
+  value       = local.waf_active ? module.waf[0].rule_count : null
+}
