@@ -178,5 +178,6 @@ module "secrets" {
 
   managed_sync_config     = var.managed_sync_enabled ? coalesce(var.paragon_managed_sync_config, {}) : null
   create_openobserve      = true
+  openobserve_email       = var.openobserve_email
   recovery_window_in_days = var.secrets_recovery_window_in_days
 }

@@ -99,7 +99,11 @@ resource "aws_secretsmanager_secret_version" "openobserve" {
 
   secret_id = aws_secretsmanager_secret.openobserve[0].id
   secret_string = jsonencode({
-    ZO_ROOT_USER_EMAIL    = "${random_string.openobserve_email[0].result}@useparagon.com"
+    ZO_ROOT_USER_EMAIL = (
+      var.openobserve_email != null
+      ? var.openobserve_email
+      : "${random_string.openobserve_email[0].result}@useparagon.com"
+    )
     ZO_ROOT_USER_PASSWORD = random_password.openobserve_password[0].result
   })
 }
