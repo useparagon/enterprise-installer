@@ -80,20 +80,26 @@ locals {
   }
 
   managed_sync_secrets = {
-    HOST_ENV  = "AWS_K8"
-    LOG_LEVEL = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
+    HOST_ENV       = "AWS_K8"
+    LOG_LEVEL      = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
     TRIAL_DISABLED = try(var.base_helm_values.global.env["TRIAL_DISABLED"], "true")
+
+    PLATFORM_ENV = try(var.base_helm_values.global.env["PLATFORM_ENV"], "enterprise")
+    NODE_ENV     = try(var.base_helm_values.global.env["NODE_ENV"], "production")
+    LICENSE      = try(var.base_helm_values.global.env["LICENSE"], null)
 
     CLOUD_STORAGE_TYPE                = local.storage_type
     CLOUD_STORAGE_PUBLIC_BUCKET       = local.storage_config.buckets.public
     CLOUD_STORAGE_MANAGED_SYNC_BUCKET = local.storage_config.buckets.managed_sync
     CLOUD_STORAGE_PUBLIC_URL          = local.storage_config.public_url
     CLOUD_STORAGE_PRIVATE_URL         = local.storage_config.public_url
+    CLOUD_STORAGE_REGION              = try(var.base_helm_values.global.env["CLOUD_STORAGE_REGION"], var.aws_region)
 
     // TODO: make `MANAGED_SYNC_URL` communicate via private DNS instead of open internet
-    MANAGED_SYNC_URL       = try(var.base_helm_values.global.env["MANAGED_SYNC_URL"], "https://sync.${var.domain}")
-    PARAGON_PROXY_BASE_URL = try("http://worker-proxy:${var.microservices["worker-proxy"].port}", null)
-    PARAGON_ZEUS_BASE_URL  = try("http://zeus:${var.microservices.zeus.port}", null)
+    MANAGED_SYNC_URL              = try(var.base_helm_values.global.env["MANAGED_SYNC_URL"], "https://sync.${var.domain}")
+    PARAGON_PROXY_BASE_URL        = try("http://worker-proxy:${var.microservices["worker-proxy"].port}", null)
+    PARAGON_ZEUS_BASE_URL         = try("http://zeus:${var.microservices.zeus.port}", null)
+    WORKER_EVENT_LOGS_PRIVATE_URL = try("http://worker-eventlogs:${var.microservices["worker-eventlogs"].port}", null)
 
     MANAGED_SYNC_PRIVATE_KEY     = replace(tls_private_key.managed_sync_signing_key.private_key_pem, "\n", "\\n")
     MANAGED_SYNC_AUTH_PUBLIC_KEY = replace(tls_private_key.managed_sync_signing_key.public_key_pem, "\n", "\\n")

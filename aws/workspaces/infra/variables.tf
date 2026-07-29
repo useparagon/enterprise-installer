@@ -480,6 +480,12 @@ variable "paragon_managed_sync_config" {
   default     = null
 }
 
+variable "openobserve_email" {
+  description = "Optional OpenObserve root user email. When set, used instead of the generated random email."
+  type        = string
+  default     = null
+}
+
 variable "secrets_recovery_window_in_days" {
   description = "Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve) and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection."
   type        = number
