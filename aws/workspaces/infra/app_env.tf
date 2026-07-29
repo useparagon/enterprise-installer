@@ -15,15 +15,13 @@ locals {
 
   argocd_default_redis_url = local.argocd_redis_cache != null ? "${local.argocd_redis_cache.host}:${local.argocd_redis_cache.port}" : null
 
-  # Infra ElastiCache exposes cache/queue/system and, when managed_sync_enabled,
-  # managed_sync (the dedicated caching & workflows cluster). Map the workflow role
-  # to managed_sync so WORKFLOW_REDIS_* targets that cluster instead of falling back
-  # to cache. cache/queue/system map to themselves.
+  # Map chart Redis roles to ElastiCache instances. workflow shares cache —
+  # there is no dedicated workflow cluster (see charts/example.yaml).
   argocd_redis_role_source = {
     cache    = "cache"
     queue    = "queue"
     system   = "system"
-    workflow = "managed_sync"
+    workflow = "cache"
   }
 
   argocd_redis_endpoint = {

@@ -88,6 +88,9 @@ locals {
     NODE_ENV     = try(var.base_helm_values.global.env["NODE_ENV"], "production")
     LICENSE      = try(var.base_helm_values.global.env["LICENSE"], null)
 
+    FEATURE_FLAG_PLATFORM_ENABLED  = try(var.base_helm_values.global.env["FEATURE_FLAG_PLATFORM_ENABLED"], "true")
+    FEATURE_FLAG_PLATFORM_ENDPOINT = try(var.base_helm_values.global.env["FEATURE_FLAG_PLATFORM_ENDPOINT"], "http://flipt:${var.microservices.flipt.port}")
+
     CLOUD_STORAGE_TYPE                = local.storage_type
     CLOUD_STORAGE_PUBLIC_BUCKET       = local.storage_config.buckets.public
     CLOUD_STORAGE_MANAGED_SYNC_BUCKET = local.storage_config.buckets.managed_sync
