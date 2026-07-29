@@ -352,20 +352,58 @@ resource "helm_release" "metricsserver" {
   ]
 }
 
-# graceful handling of spot evictions on legacy managed node groups
-module "aws_node_termination_handler" {
+# graceful handling of spot evictions on legacy managed node groups.
+#
+# Chart comes from ECR Public: AWS stopped publishing the image to Docker Hub after v1.13.3,
+# and the eks-charts HTTP repo is stale for this chart, so the OCI registry is the only source
+# tracking current releases.
+#
+# Release is named "nth" so chart resources are prefixed and cannot collide with the
+# aws-node-termination-handler objects left behind by the Terraform module this replaces.
+#
+# Values below only cover where chart defaults differ from the DaemonSet being replaced;
+# host network, system-node-critical, tolerate-all and IMDS mode already match.
+resource "helm_release" "node_termination_handler" {
   count = var.enable_legacy_mng_pools ? 1 : 0
 
-  source  = "qvest-digital/aws-node-termination-handler/kubernetes"
-  version = "4.0.0"
+  name        = "nth"
+  description = "AWS Node Termination Handler"
 
-  json_logging = true
+  repository = "oci://public.ecr.aws/aws-ec2/helm"
+  chart      = "aws-node-termination-handler"
+  version    = "0.27.6"
 
-  # Spot nodes are labeled in infra (cluster.tf); avoid legacy lifecycle=Ec2Spot default.
-  k8s_node_selector = {
-    "useparagon.com/capacityType" = "spot"
-  }
-  k8s_node_tolerations = []
+  namespace        = "kube-system"
+  atomic           = true
+  cleanup_on_fail  = true
+  create_namespace = false
+  force_update     = true
+  verify           = false
+
+  values = [yamlencode({
+    jsonLogging = true
+
+    # Chart default is true; keep it off to match the DaemonSet being replaced. Draining on
+    # scheduled maintenance events is a separate behavior change, not part of this fix.
+    enableScheduledEventDraining = false
+
+    # Chart ships resources empty, which would leave the pod BestEffort.
+    resources = {
+      requests = {
+        cpu    = "50m"
+        memory = "64Mi"
+      }
+      limits = {
+        cpu    = "100m"
+        memory = "128Mi"
+      }
+    }
+
+    # Spot nodes are labeled in infra (cluster.tf); avoid legacy lifecycle=Ec2Spot default.
+    daemonsetNodeSelector = {
+      "useparagon.com/capacityType" = "spot"
+    }
+  })]
 }
 
 # microservices deployment
