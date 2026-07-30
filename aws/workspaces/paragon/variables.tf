@@ -1007,14 +1007,9 @@ locals {
           SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
           SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
           SYSTEM_REDIS_URL               = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
-          # Prefer managed_sync (workflow cluster) when present — matches infra/app_env.tf.
-          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.managed_sync.cluster, local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
-          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.managed_sync.ssl, local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-          WORKFLOW_REDIS_URL             = try(
-            "${local.infra_vars.redis.value.managed_sync.host}:${local.infra_vars.redis.value.managed_sync.port}",
-            "${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}",
-            local.default_redis_url
-          )
+          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
+          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
+          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
 
           # Cloud Storage configurations (S3 auth via EKS Pod Identity; no static access keys)
           CLOUD_STORAGE_PUBLIC_BUCKET = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
