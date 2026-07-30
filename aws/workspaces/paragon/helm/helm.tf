@@ -352,17 +352,7 @@ resource "helm_release" "metricsserver" {
   ]
 }
 
-# graceful handling of spot evictions on legacy managed node groups.
-#
-# Chart comes from ECR Public: AWS stopped publishing the image to Docker Hub after v1.13.3,
-# and the eks-charts HTTP repo is stale for this chart, so the OCI registry is the only source
-# tracking current releases.
-#
-# Release is named "nth" so chart resources are prefixed and cannot collide with the
-# aws-node-termination-handler objects left behind by the Terraform module this replaces.
-#
-# Values below only cover where chart defaults differ from the DaemonSet being replaced;
-# host network, system-node-critical, tolerate-all and IMDS mode already match.
+# graceful handling of spot evictions on legacy managed node groups
 resource "helm_release" "node_termination_handler" {
   count = var.enable_legacy_mng_pools ? 1 : 0
 
