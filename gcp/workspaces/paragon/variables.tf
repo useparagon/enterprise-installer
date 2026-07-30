@@ -356,7 +356,7 @@ variable "hoop_agent_name" {
 variable "hoop_reviewers_access_groups" {
   description = "Reviewer groups required for customer-facing app connections."
   type        = list(string)
-  default     = ["dev-team-managers", "admin"]
+  default     = ["dev-team-managers"]
 }
 
 variable "customer_facing" {

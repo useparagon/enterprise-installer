@@ -84,7 +84,7 @@ variable "restricted_access_groups" {
 variable "reviewers_access_groups" {
   description = "Reviewer groups required for customer-facing app connections."
   type        = list(string)
-  default     = ["dev-team-managers", "admin"]
+  default     = ["dev-team-managers"]
 }
 
 variable "hoop_slack_bot_token" {
