@@ -57,7 +57,7 @@ The paragon workspace reads this file through `local.infra_vars = jsondecode(fil
 All modules are **local path modules** (e.g., `source = "./network"`). No shared module directory exists across providers. Each provider maintains its own modules.
 
 External registry modules used:
-- **AWS**: `terraform-aws-modules/eks/aws`, `terraform-aws-modules/kms/aws`, `terraform-aws-modules/iam/aws`, `cloudposse/acm-request-certificate/aws`, `trussworks/cloudtrail/aws`, `lablabs/eks-cluster-autoscaler/aws`, `qvest-digital/aws-node-termination-handler/kubernetes`
+- **AWS**: `terraform-aws-modules/eks/aws`, `terraform-aws-modules/kms/aws`, `terraform-aws-modules/iam/aws`, `cloudposse/acm-request-certificate/aws`, `trussworks/cloudtrail/aws`, `lablabs/eks-cluster-autoscaler/aws`
 - **GCP**: `terraform-google-modules/kubernetes-engine/google//modules/private-cluster`
 - **Azure**: No external registry modules (uses native `azurerm` resources directly)
 

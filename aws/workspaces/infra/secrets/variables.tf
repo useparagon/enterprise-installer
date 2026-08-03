@@ -38,3 +38,9 @@ variable "create_openobserve" {
   type        = bool
   default     = true
 }
+
+variable "openobserve_email" {
+  description = "Optional OpenObserve root user email. When set, used instead of the generated random email."
+  type        = string
+  default     = null
+}

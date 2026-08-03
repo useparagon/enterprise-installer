@@ -29,6 +29,15 @@ locals {
     }
   })
 
+  # Cloud Armor attaches to the backend service behind each public Service.
+  waf_service_annotations = {
+    annotations = {
+      "cloud.google.com/backend-config" = jsonencode({
+        default = "paragon-waf-backendconfig"
+      })
+    }
+  }
+
   public_microservice_values = yamlencode({
     for microservice_name, microservice_config in var.public_microservices : microservice_name => {
       ingress = {
@@ -42,9 +51,12 @@ locals {
         # loadBalancerName = google_compute_global_address.loadbalancer.name
         # scheme           = var.ingress_scheme
       }
-      service = {
-        type = "NodePort"
-      }
+      service = merge(
+        {
+          type = "NodePort"
+        },
+        local.waf_service_annotations
+      )
     }
   })
 
@@ -69,6 +81,7 @@ locals {
         # loadBalancerName = google_compute_global_address.loadbalancer.name
         # scheme           = var.ingress_scheme
       }
+      # Grafana keeps its own BackendConfig for its custom health check.
       service = merge(
         {
           type = "NodePort"
@@ -79,7 +92,7 @@ locals {
               default = "grafana-backendconfig"
             })
           }
-        } : {}
+        } : local.waf_service_annotations
       )
     }
   })
@@ -299,6 +312,7 @@ resource "helm_release" "paragon_on_prem" {
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.redis_ca,
     kubernetes_config_map_v1.feature_flag_content,
+    kubectl_manifest.waf_backendconfig,
   ]
 }
 
@@ -390,6 +404,7 @@ resource "helm_release" "paragon_monitoring" {
     helm_release.paragon_on_prem,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
-    kubectl_manifest.grafana_backendconfig
+    kubectl_manifest.grafana_backendconfig,
+    kubectl_manifest.waf_backendconfig
   ]
 }

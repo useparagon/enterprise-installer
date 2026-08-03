@@ -77,6 +77,13 @@ locals {
   # URL scheme but still requires MANAGED_SYNC_REDIS_TLS_ENABLED to enable TLS in the client.
   managed_sync_redis_url = "${local.redis_config.redis_tls_enabled ? "rediss" : "redis"}://${local.redis_config.password != null ? ":${urlencode(local.redis_config.password)}@" : ""}${local.redis_config.host}:${local.redis_config.port}"
 
+  # Workflow Redis shares cache when there is no dedicated workflow instance (matches monorepo chart).
+  workflow_redis_from_infra = try(var.infra_values.redis.value.workflow, var.infra_values.redis.value.cache, null)
+  workflow_redis_url = try(
+    local.workflow_redis_from_infra.connection_string,
+    local.workflow_redis_from_infra != null ? "${local.workflow_redis_from_infra.host}:${local.workflow_redis_from_infra.port}" : null
+  )
+
   # Backward compatible with infra workspaces that still emit the legacy "minio" output
   # instead of the renamed "storage" output. Null-safe when infra secrets come from
   # external secrets instead of an infra.json (no infra_values are provided).
@@ -111,6 +118,16 @@ locals {
     LOG_LEVEL      = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
     TRIAL_DISABLED = try(var.base_helm_values.global.env["TRIAL_DISABLED"], "true")
 
+    PLATFORM_ENV = try(var.base_helm_values.global.env["PLATFORM_ENV"], "enterprise")
+    NODE_ENV     = try(var.base_helm_values.global.env["NODE_ENV"], "production")
+    LICENSE      = try(var.base_helm_values.global.env["LICENSE"], null)
+
+    FEATURE_FLAG_PLATFORM_ENABLED  = try(var.base_helm_values.global.env["FEATURE_FLAG_PLATFORM_ENABLED"], "true")
+    FEATURE_FLAG_PLATFORM_ENDPOINT = try(var.base_helm_values.global.env["FEATURE_FLAG_PLATFORM_ENDPOINT"], "http://flipt:${var.microservices.flipt.port}")
+
+    WORKFLOW_REDIS_URL             = try(var.base_helm_values.global.env["WORKFLOW_REDIS_URL"], local.workflow_redis_url)
+    WORKFLOW_REDIS_CLUSTER_ENABLED = try(var.base_helm_values.global.env["WORKFLOW_REDIS_CLUSTER_ENABLED"], local.workflow_redis_from_infra.cluster, false)
+
     CLOUD_STORAGE_TYPE                = local.storage_type
     CLOUD_STORAGE_PUBLIC_BUCKET       = local.storage_config.buckets.public
     CLOUD_STORAGE_USER                = local.storage_config.user
@@ -120,9 +137,11 @@ locals {
     CLOUD_STORAGE_PRIVATE_URL         = local.storage_config.public_url
 
     // TODO: make `MANAGED_SYNC_URL` communicate via private DNS instead of open internet
-    MANAGED_SYNC_URL       = try(var.base_helm_values.global.env["MANAGED_SYNC_URL"], "https://sync.${var.domain}")
-    PARAGON_PROXY_BASE_URL = try("http://worker-proxy:${var.microservices["worker-proxy"].port}", null)
-    PARAGON_ZEUS_BASE_URL  = try("http://zeus:${var.microservices.zeus.port}", null)
+    MANAGED_SYNC_URL              = try(var.base_helm_values.global.env["MANAGED_SYNC_URL"], "https://sync.${var.domain}")
+    PARAGON_PROXY_BASE_URL        = try("http://worker-proxy:${var.microservices["worker-proxy"].port}", null)
+    PARAGON_ZEUS_BASE_URL         = try("http://zeus:${var.microservices.zeus.port}", null)
+    WORKER_ACTIONKIT_PRIVATE_URL  = try(var.base_helm_values.global.env["WORKER_ACTIONKIT_PRIVATE_URL"], "http://worker-actionkit:${var.microservices["worker-actionkit"].port}")
+    WORKER_EVENT_LOGS_PRIVATE_URL = try(var.base_helm_values.global.env["WORKER_EVENT_LOGS_PRIVATE_URL"], "http://worker-eventlogs:${var.microservices["worker-eventlogs"].port}")
 
     MANAGED_SYNC_PRIVATE_KEY     = replace(tls_private_key.managed_sync_signing_key.private_key_pem, "\n", "\\n")
     MANAGED_SYNC_AUTH_PUBLIC_KEY = replace(tls_private_key.managed_sync_signing_key.public_key_pem, "\n", "\\n")

@@ -336,13 +336,11 @@ resource "helm_release" "metricsserver" {
   ]
 }
 
-# Graceful spot eviction handling on legacy managed node groups.
-# Official chart (ECR Public image); replaces qvest-digital TF module which
-# hardcoded docker.io/amazon/... tags that no longer exist for recent versions.
-resource "helm_release" "aws_node_termination_handler" {
+# graceful handling of spot evictions on legacy managed node groups
+resource "helm_release" "node_termination_handler" {
   count = var.enable_legacy_mng_pools ? 1 : 0
 
-  name        = "aws-node-termination-handler"
+  name        = "nth"
   description = "AWS Node Termination Handler"
 
   repository = "oci://public.ecr.aws/aws-ec2/helm"
@@ -357,15 +355,28 @@ resource "helm_release" "aws_node_termination_handler" {
   verify           = false
 
   values = [yamlencode({
-    jsonLogging                    = true
-    enableSpotInterruptionDraining = true
-    # Match prior module default (chart default is true).
+    jsonLogging = true
+
+    # Chart default is true; keep it off to match the DaemonSet being replaced. Draining on
+    # scheduled maintenance events is a separate behavior change, not part of this fix.
     enableScheduledEventDraining = false
-    # Spot nodes are labeled in infra (cluster.tf); avoid cluster-wide schedule.
-    nodeSelector = {
+
+    # Chart ships resources empty, which would leave the pod BestEffort.
+    resources = {
+      requests = {
+        cpu    = "50m"
+        memory = "64Mi"
+      }
+      limits = {
+        cpu    = "100m"
+        memory = "128Mi"
+      }
+    }
+
+    # Spot nodes are labeled in infra (cluster.tf); avoid legacy lifecycle=Ec2Spot default.
+    daemonsetNodeSelector = {
       "useparagon.com/capacityType" = "spot"
     }
-    tolerations = []
   })]
 }
 
