@@ -82,6 +82,52 @@ locals {
     env_key => "https://${subdomain}.${local.argocd_domain}"
   } : {}
 
+  # BetterStack monitors only public Paragon services. Keep this in infra so
+  # monitors follow the ArgoCD/GitOps public domain rather than legacy Helm values.
+  uptime_service_subdomains = {
+    account            = "account"
+    api-triggerkit     = "api-triggerkit"
+    cache-replay       = "cache-replay"
+    cerberus           = "cerberus"
+    connect            = "connect"
+    dashboard          = "dashboard"
+    hades              = "hades"
+    health-checker     = "health-checker"
+    hermes             = "hermes"
+    passport           = "passport"
+    pheme              = "pheme"
+    release            = "release"
+    zeus               = "zeus"
+    worker-actionkit   = "worker-actionkit"
+    worker-actions     = "worker-actions"
+    worker-auditlogs   = "worker-auditlogs"
+    worker-credentials = "worker-credentials"
+    worker-crons       = "worker-crons"
+    worker-deployments = "worker-deployments"
+    worker-eventlogs   = "worker-eventlogs"
+    worker-proxy       = "worker-proxy"
+    worker-triggerkit  = "worker-triggerkit"
+    worker-triggers    = "worker-triggers"
+    worker-workflows   = "worker-workflows"
+  }
+
+  public_microservices = local.argocd_domain != "" ? {
+    for service, subdomain in local.uptime_service_subdomains :
+    service => {
+      healthcheck_path = "/healthz"
+      monitor_path     = service == "health-checker" ? "/status" : null
+      public_url       = "https://${subdomain}.${local.argocd_domain}"
+    }
+  } : {}
+
+  # Legacy behavior: when health-checker is enabled, it is the sole external
+  # health endpoint; otherwise BetterStack monitors every public service.
+  uptime_services = var.argocd_ingress_scheme != "internal" ? {
+    for service, config in local.public_microservices :
+    service => config
+    if service == "health-checker" || !var.health_checker_enabled
+  } : {}
+
   argocd_env_overrides = var.argocd_env_overrides != null ? var.argocd_env_overrides : {}
 
   argocd_postgres_env_prefixes = {

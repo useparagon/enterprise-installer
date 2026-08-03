@@ -144,11 +144,15 @@ module "cluster" {
   eks_spot_node_instance_type     = local.eks_spot_node_instance_type
   k8s_version                     = var.k8s_version
 
-  enable_karpenter              = var.enable_karpenter
-  enable_legacy_mng_pools       = var.enable_legacy_mng_pools
-  karpenter_chart_version       = var.karpenter_chart_version
-  karpenter_iam_names           = var.karpenter_iam_names
-  eks_system_managed_node_group = var.eks_system_managed_node_group
+  enable_karpenter                  = var.enable_karpenter
+  enable_legacy_mng_pools           = var.enable_legacy_mng_pools
+  karpenter_chart_version           = var.karpenter_chart_version
+  karpenter_iam_names               = var.karpenter_iam_names
+  karpenter_node_os_volume_size_gib = var.karpenter_node_os_volume_size_gib
+  karpenter_node_volume_size_gib    = var.karpenter_node_volume_size_gib
+  karpenter_node_pools              = var.karpenter_node_pools
+  karpenter_defaults                = var.karpenter_defaults
+  eks_system_managed_node_group     = var.eks_system_managed_node_group
 
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
@@ -246,4 +250,128 @@ module "argocd" {
   ingress_scheme               = var.argocd_ingress_scheme
 
   depends_on = [module.cluster, module.secrets]
+}
+
+# ---------------------------------------------------------------------------
+# WAF (public ALB) — annotation wired via gitops values (wafv2_acl_arn)
+# ---------------------------------------------------------------------------
+
+locals {
+  waf_active = var.waf_enabled && var.argocd_ingress_scheme == "internet-facing"
+
+  # ServiceAccount names must match chart SA names (paragon-onprem / managed-sync).
+  paragon_service_accounts = toset(concat(
+    [
+      "account",
+      "api-triggerkit",
+      "cache-replay",
+      "cerberus",
+      "connect",
+      "dashboard",
+      "flipt",
+      "hades",
+      "health-checker",
+      "hermes",
+      "passport",
+      "pheme",
+      "release",
+      "zeus",
+      "worker-actionkit",
+      "worker-actions",
+      "worker-auditlogs",
+      "worker-credentials",
+      "worker-crons",
+      "worker-deployments",
+      "worker-eventlogs",
+      "worker-proxy",
+      "worker-triggerkit",
+      "worker-triggers",
+      "worker-workflows",
+    ],
+    var.managed_sync_enabled ? ["managed-sync-service-account"] : [],
+  ))
+}
+
+module "waf" {
+  source = "./waf"
+  count  = local.waf_active ? 1 : 0
+
+  aws_region                       = var.aws_region
+  workspace                        = local.workspace
+  waf_logs_retention_days          = var.waf_logs_retention_days
+  waf_ip_whitelist                 = var.waf_ip_whitelist
+  waf_ip_blacklist                 = var.waf_ip_blacklist
+  waf_rate_limit_global            = var.waf_rate_limit_global
+  waf_rate_limit_global_window_sec = var.waf_rate_limit_global_window_sec
+  waf_rate_limit_paths             = var.waf_rate_limit_paths
+  waf_rate_limit_path_window_sec   = var.waf_rate_limit_path_window_sec
+  waf_managed_rule_groups          = var.waf_managed_rule_groups
+}
+
+module "pod_identity" {
+  source = "./pod-identity"
+  count  = try(module.storage.s3.role_arn, null) != null ? 1 : 0
+
+  cluster_name     = module.cluster.eks_cluster.name
+  namespace        = "paragon"
+  s3_role_arn      = module.storage.s3.role_arn
+  service_accounts = local.paragon_service_accounts
+
+  depends_on = [module.cluster]
+}
+
+module "monitors" {
+  source = "./monitors"
+  count  = var.paragon_monitors_enabled ? 1 : 0
+
+  workspace    = local.workspace
+  cluster_name = module.cluster.eks_cluster.name
+  namespace    = "paragon"
+
+  depends_on = [module.cluster]
+}
+
+# Hoop remains Terraform-managed while the Paragon application moves to ArgoCD.
+# The fixed namespace is owned by the application bootstrap/chart path.
+module "hoop" {
+  count  = var.hoop_enabled ? 1 : 0
+  source = "./hoop"
+
+  workspace                     = local.workspace
+  organization                  = var.organization
+  namespace                     = "paragon"
+  hoop_agent_name               = var.hoop_agent_name
+  hoop_agent_id                 = var.hoop_agent_id
+  hoop_key                      = var.hoop_key
+  hoop_slack_bot_token          = var.hoop_slack_bot_token
+  hoop_slack_app_token          = var.hoop_slack_app_token
+  hoop_slack_channel_ids        = var.hoop_slack_channel_ids
+  all_access_groups             = var.hoop_all_access_groups
+  restricted_access_groups      = var.hoop_restricted_access_groups
+  reviewers_access_groups       = var.hoop_reviewers_access_groups
+  hoop_postgres_guardrail_rules = var.hoop_postgres_guardrail_rules
+  hoop_redis_guardrail_rules    = var.hoop_redis_guardrail_rules
+  hoop_grafana_connection       = var.hoop_grafana_connection
+  customer_facing               = var.customer_facing
+  custom_connections            = var.hoop_custom_connections
+  k8s_connections               = var.hoop_k8s_connections
+
+  eks_oidc_provider_arn = module.cluster.eks_cluster.oidc_provider_arn
+  eks_oidc_issuer_url   = module.cluster.eks_cluster.cluster_oidc_issuer_url
+  infra_vars = {
+    postgres = { value = module.postgres.rds }
+    redis    = { value = module.redis.elasticache }
+  }
+
+  depends_on = [module.cluster, module.argocd]
+}
+
+module "uptime" {
+  source = "./uptime"
+
+  uptime_api_token = var.uptime_api_token
+  uptime_company   = coalesce(var.uptime_company, var.organization)
+  uptime_policy    = var.uptime_policy
+  uptime_regions   = var.uptime_regions
+  microservices    = local.uptime_services
 }

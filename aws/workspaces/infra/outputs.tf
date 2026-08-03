@@ -126,6 +126,38 @@ output "enable_legacy_mng_pools" {
   value       = module.cluster.enable_legacy_mng_pools
 }
 
+output "hoop_cluster_admin_token" {
+  description = "Service account token used by the Hoop Kubernetes connection."
+  value       = var.hoop_enabled ? module.hoop[0].cluster_admin_token : null
+  sensitive   = true
+}
+
+output "hoop_support_role_arn" {
+  description = "IRSA role ARN attached to the Hoop agent service account."
+  value       = var.hoop_enabled ? module.hoop[0].support_role_arn : null
+}
+
+output "uptime_webhook" {
+  description = "BetterStack Grafana integration webhook URL, empty when BetterStack Uptime is disabled."
+  value       = module.uptime.webhook
+  sensitive   = true
+}
+
+output "waf_web_acl_arn" {
+  description = "ARN of the regional WAFv2 Web ACL. Copy into gitops/<id>/values.yaml as global.ingress.wafv2_acl_arn."
+  value       = local.waf_active ? module.waf[0].web_acl_arn : null
+}
+
+output "waf_logs_bucket" {
+  description = "S3 bucket name for WAF traffic logs."
+  value       = local.waf_active ? module.waf[0].waf_logs_bucket : null
+}
+
+output "grafana_role_arn" {
+  description = "IAM role ARN for Grafana CloudWatch access via Pod Identity."
+  value       = var.paragon_monitors_enabled ? module.monitors[0].grafana_role_arn : null
+}
+
 output "karpenter" {
   description = "AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace."
   value       = module.cluster.karpenter

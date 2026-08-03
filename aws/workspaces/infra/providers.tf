@@ -30,6 +30,14 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 4.42"
     }
+    hoop = {
+      source  = "hoophq/hoop"
+      version = ">= 0.0.19"
+    }
+    betteruptime = {
+      source  = "BetterStackHQ/better-uptime"
+      version = "~> 0.11.5"
+    }
   }
 }
 
@@ -55,6 +63,15 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
+provider "hoop" {
+  api_url = var.hoop_api_url
+  api_key = coalesce(var.hoop_api_key, "dummy-token")
+}
+
+provider "betteruptime" {
+  api_token = coalesce(var.uptime_api_token, "dummy")
+}
+
 # Kubernetes providers:
 # - Spacelift injects backend-account env creds; the AWS provider assumes the customer role
 #   in-process. Subprocess exec (aws eks get-token) only sees env creds, so pass --role-arn
@@ -69,7 +86,7 @@ data "aws_eks_cluster_auth" "cluster" {
 }
 
 locals {
-  k8s_gitops_enabled = var.argocd_enabled || var.k8s_providers_enabled
+  k8s_gitops_enabled = var.argocd_enabled || var.hoop_enabled || var.enable_karpenter || var.k8s_providers_enabled
   # Legacy non-GitOps path installs cluster-autoscaler via Helm when legacy MNG pools
   # are active or Karpenter is disabled. GitOps path uses Argo CD instead.
   k8s_cluster_autoscaler_helm = (
