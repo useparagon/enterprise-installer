@@ -20,6 +20,24 @@ module "managed_sync_config" {
   })
 }
 
+module "waf" {
+  source = "./waf"
+  count  = local.waf_active ? 1 : 0
+
+  workspace                        = local.workspace
+  waf_ip_whitelist                 = var.waf_ip_whitelist
+  waf_ip_blacklist                 = var.waf_ip_blacklist
+  waf_ip_blacklist_deny_status     = var.waf_ip_blacklist_deny_status
+  waf_rate_limit_global            = var.waf_rate_limit_global
+  waf_rate_limit_global_window_sec = var.waf_rate_limit_global_window_sec
+  waf_rate_limit_paths             = var.waf_rate_limit_paths
+  waf_rate_limit_path_window_sec   = var.waf_rate_limit_path_window_sec
+  waf_rate_limit_options           = var.waf_rate_limit_options
+  waf_preconfigured_rules          = var.waf_preconfigured_rules
+  waf_custom_rules                 = var.waf_custom_rules
+  waf_advanced_options             = var.waf_advanced_options
+}
+
 module "helm" {
   source = "./helm"
 
@@ -45,28 +63,30 @@ module "helm" {
     openobserve     = google_secret_manager_secret_version.openobserve[0].name
     openobserve_gcs = local.gcp_creds != null ? google_secret_manager_secret_version.openobserve_gcs[0].name : null
   }))
-  ingress_scheme                         = var.ingress_scheme
-  k8s_version                            = var.k8s_version
-  logs_bucket                            = local.logs_bucket
-  managed_sync_enabled                   = var.managed_sync_enabled
-  managed_sync_secret_name               = var.managed_sync_enabled ? google_secret_manager_secret.managed_sync[0].secret_id : null
-  managed_sync_version                   = var.managed_sync_version
-  microservices                          = local.microservices
-  monitor_version                        = local.monitor_version
-  monitors                               = local.monitors
-  monitors_enabled                       = var.monitors_enabled
-  openobserve_email                      = local.openobserve_email
-  openobserve_gcs_secret_name            = local.gcp_creds != null ? google_secret_manager_secret.openobserve_gcs[0].secret_id : null
-  openobserve_password                   = local.openobserve_password
-  openobserve_secret_name                = google_secret_manager_secret.openobserve[0].secret_id
-  public_microservices                   = local.public_microservices
-  public_monitors                        = local.public_monitors
-  public_services                        = local.public_services
-  redis_ca_cert_secret_name              = local.infra_secret_names.redis_ca_cert
-  region                                 = var.region
-  storage_service_account                = try(local.storage_output.service_account, null)
-  infra_vars                             = local.infra_vars
-  workspace                              = local.workspace
+  ingress_scheme              = var.ingress_scheme
+  k8s_version                 = var.k8s_version
+  logs_bucket                 = local.logs_bucket
+  managed_sync_enabled        = var.managed_sync_enabled
+  managed_sync_secret_name    = var.managed_sync_enabled ? google_secret_manager_secret.managed_sync[0].secret_id : null
+  managed_sync_version        = var.managed_sync_version
+  microservices               = local.microservices
+  monitor_version             = local.monitor_version
+  monitors                    = local.monitors
+  monitors_enabled            = var.monitors_enabled
+  openobserve_email           = local.openobserve_email
+  openobserve_gcs_secret_name = local.gcp_creds != null ? google_secret_manager_secret.openobserve_gcs[0].secret_id : null
+  openobserve_password        = local.openobserve_password
+  openobserve_secret_name     = google_secret_manager_secret.openobserve[0].secret_id
+  public_microservices        = local.public_microservices
+  public_monitors             = local.public_monitors
+  public_services             = local.public_services
+  redis_ca_cert_secret_name   = local.infra_secret_names.redis_ca_cert
+  region                      = var.region
+  storage_service_account     = try(local.storage_output.service_account, null)
+  infra_vars                  = local.infra_vars
+  waf_security_policy_name    = local.waf_active ? module.waf[0].security_policy_name : ""
+  waf_logs_sample_rate        = var.waf_logs_sample_rate
+  workspace                   = local.workspace
 }
 
 module "hoop" {

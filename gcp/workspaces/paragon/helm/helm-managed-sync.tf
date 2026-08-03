@@ -22,6 +22,14 @@ locals {
       ]
     }
   }
+
+  # This chart publishes its own Ingress for api-sync, so the Service needs the
+  # BackendConfig annotation too or sync.${domain} bypasses Cloud Armor.
+  managed_sync_waf_values = {
+    "api-sync" = {
+      service = local.waf_service_annotations
+    }
+  }
 }
 
 resource "helm_release" "managed_sync" {
@@ -43,6 +51,7 @@ resource "helm_release" "managed_sync" {
     [local.global_values_minus_env],
     local.managed_sync_storage_values != {} ? [yamlencode(local.managed_sync_storage_values)] : [],
     [yamlencode(local.managed_sync_jobs_env_from)],
+    [yamlencode(local.managed_sync_waf_values)],
     [local.secret_hash]
   )
 
@@ -108,5 +117,6 @@ resource "helm_release" "managed_sync" {
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.managed_sync_secrets,
+    kubectl_manifest.waf_backendconfig,
   ]
 }

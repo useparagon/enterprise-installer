@@ -379,7 +379,7 @@ variable "hoop_agent_name" {
 variable "hoop_reviewers_access_groups" {
   description = "Reviewer groups required for customer-facing app connections."
   type        = list(string)
-  default     = ["dev-team-managers", "admin"]
+  default     = ["dev-team-managers"]
 }
 
 variable "customer_facing" {
@@ -874,12 +874,6 @@ locals {
     "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
   )
 
-  # Infra ElastiCache exposes managed_sync (not workflow) when managed sync is enabled.
-  workflow_redis = coalesce(
-    try(local.infra_vars.redis.value.workflow, null),
-    try(local.infra_vars.redis.value.managed_sync, null),
-  )
-
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       env = merge(
@@ -1022,23 +1016,19 @@ locals {
           # Redis configurations
           REDIS_URL = local.default_redis_url
 
-          CACHE_REDIS_CLUSTER_ENABLED  = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
-          CACHE_REDIS_TLS_ENABLED      = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
-          CACHE_REDIS_URL              = try("${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
-          QUEUE_REDIS_CLUSTER_ENABLED  = try(local.infra_vars.redis.value.queue.cluster, local.default_redis_cluster)
-          QUEUE_REDIS_TLS_ENABLED      = try(local.infra_vars.redis.value.queue.ssl, local.default_redis_ssl)
-          QUEUE_REDIS_URL              = try("${local.infra_vars.redis.value.queue.host}:${local.infra_vars.redis.value.queue.port}", local.default_redis_url)
-          SYSTEM_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
-          SYSTEM_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
-          SYSTEM_REDIS_URL             = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
-          # Prefer managed_sync (workflow cluster) when present — matches infra/argocd_env.tf.
-          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.managed_sync.cluster, local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
-          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.managed_sync.ssl, local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-          WORKFLOW_REDIS_URL = try(
-            "${local.infra_vars.redis.value.managed_sync.host}:${local.infra_vars.redis.value.managed_sync.port}",
-            "${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}",
-            local.default_redis_url
-          )
+          CACHE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
+          CACHE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
+          CACHE_REDIS_URL                = try("${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
+          QUEUE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.queue.cluster, local.default_redis_cluster)
+          QUEUE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.queue.ssl, local.default_redis_ssl)
+          QUEUE_REDIS_URL                = try("${local.infra_vars.redis.value.queue.host}:${local.infra_vars.redis.value.queue.port}", local.default_redis_url)
+          SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
+          SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
+          SYSTEM_REDIS_URL               = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
+          # Workflow Redis shares cache — there is no dedicated workflow cluster.
+          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
+          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
+          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
 
           # Cloud Storage configurations (S3 auth via EKS Pod Identity; no static access keys)
           CLOUD_STORAGE_PUBLIC_BUCKET = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
