@@ -33,7 +33,7 @@ This is a **Paragon Enterprise** self-hosted deployment repository — an infras
 
 ### Gotchas
 
-- `prepare.sh` uses `sed -i ''` (macOS syntax). On Linux this produces harmless `sed: can't read : No such file or directory` warnings — the `__PARAGON_VERSION__` placeholders in prepared charts won't be replaced, but the rest of the script works fine. If you need the version replacement to work on Linux, use `sed -i` (no empty string argument).
+- `prepare.sh` uses OS-aware in-place `sed` (BSD on macOS, GNU on Linux) and fails if `__PARAGON_VERSION__` placeholders remain. Spacelift `before_init-paragon.sh` also removes placeholder `vars.auto.tfvars` so `TF_VAR_*` from context is not overridden.
 - The source Helm charts in `charts/` contain `__PARAGON_VERSION__` placeholders and will fail `helm lint`. Always lint the **prepared** charts under `<provider>/workspaces/paragon/charts/` after running `prepare.sh`.
 - Helm lint on `paragon-onprem` and `paragon-monitoring` will show errors about missing `paragon-templates` dependency — this is expected since the library chart dependency is resolved by `helm dependency build` during Terraform-driven deployment.
 - `terraform init -backend=false` is required for local validation since backend configs reference remote state stores.

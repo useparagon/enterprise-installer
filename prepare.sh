@@ -117,13 +117,22 @@ else
     rsync -aqv --delete --exclude='example.yaml' --exclude='values.placeholder.yaml' --exclude='bootstrap/' $script_dir/charts/ $destination
 fi
 
+# Portable in-place sed (BSD/macOS vs GNU/Linux). Spacelift workers are Linux.
 # update version using hash of chart folders
 charts=($destination/*/)
 for chart in "${charts[@]}"
 do
     # sha256 hash of all files in the chart folder with paths sorted then stripped for consistency across providers
     hash=$(find $chart -type f | sort | xargs shasum -a 256 -b | awk '{print $1}' | shasum -a 256 | awk '{print $1}' | cut -c1-8)
-    find $chart -type f -exec sed -i '' -e "s/__PARAGON_VERSION__/$version-$hash/g" {} +
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        find "$chart" -type f -exec sed -i '' -e "s/__PARAGON_VERSION__/${version}-${hash}/g" {} +
+    else
+        find "$chart" -type f -exec sed -i -e "s/__PARAGON_VERSION__/${version}-${hash}/g" {} +
+    fi
+    if grep -rql '__PARAGON_VERSION__' "$chart" 2>/dev/null; then
+        echo "Error: __PARAGON_VERSION__ placeholders remain under $chart (sed in-place failed?)" >&2
+        exit 1
+    fi
     echo "$(basename "$chart"): $hash"
 done
 

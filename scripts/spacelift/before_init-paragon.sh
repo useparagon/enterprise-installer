@@ -62,6 +62,17 @@ fi
 echo "Running prepare.sh -p aws -t ${PARAGON_CHART_TAG}"
 ./prepare.sh -p aws -t "${PARAGON_CHART_TAG}"
 
+# prepare.sh writes placeholder *.auto.tfvars for local use. Those files outrank
+# TF_VAR_* from Spacelift context — remove them so stack env wins.
+rm -f "${WS}/vars.auto.tfvars"
+rm -f "${REPO_ROOT}/aws/workspaces/infra/vars.auto.tfvars"
+
+# Fail closed if chart version substitution did not run (e.g. broken sed on worker).
+if grep -rql '__PARAGON_VERSION__' "${WS}/charts" 2>/dev/null; then
+  echo "ERROR: __PARAGON_VERSION__ placeholders remain under ${WS}/charts after prepare.sh" >&2
+  exit 1
+fi
+
 # Placeholder .secure/values.yaml from prepare is NOT sufficient for LICENSE/VERSION.
 # Spacelift must supply TF_VAR_helm_yaml. Warn if missing (plan will fail later).
 if [[ -z "${TF_VAR_helm_yaml:-}" ]]; then

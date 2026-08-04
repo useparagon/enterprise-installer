@@ -32,7 +32,7 @@ Omit `infra_json` / `infra_json_path`. Infra writes Secrets Manager secrets; par
 
 | Need | Spacelift |
 |------|-----------|
-| Charts + `service-inputs.json` | `before_init-paragon.sh` runs `./prepare.sh -p aws -t "$PARAGON_CHART_TAG"` |
+| Charts + `service-inputs.json` | `before_init-paragon.sh` runs `./prepare.sh -p aws -t "$PARAGON_CHART_TAG"`, then deletes placeholder `vars.auto.tfvars` so Spacelift `TF_VAR_*` wins |
 | Helm values (`VERSION`, `LICENSE`, …) | **`TF_VAR_helm_yaml`** (multiline secret). Do not rely on `.secure/values.yaml` on the worker. |
 | Feature flags | Omit for git-backed Flipt, or set **`TF_VAR_feature_flags_yaml`**. |
 
