@@ -80,3 +80,16 @@ resource "aws_eks_addon" "eks_pod_identity_agent" {
     aws_eks_addon.coredns,
   ]
 }
+
+resource "aws_eks_addon" "metrics_server" {
+  cluster_name                = module.eks.cluster_name
+  addon_name                  = "metrics-server"
+  addon_version               = local.eks_addon_versions["metrics-server"]
+  resolve_conflicts_on_create = local.eks_addon_resolve_conflicts.resolve_conflicts_on_create
+  resolve_conflicts_on_update = local.eks_addon_resolve_conflicts.resolve_conflicts_on_update
+
+  depends_on = [
+    aws_eks_addon.coredns,
+    module.eks_managed_node_group,
+  ]
+}

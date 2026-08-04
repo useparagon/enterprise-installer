@@ -43,6 +43,17 @@ module "karpenter" {
   cluster_endpoint        = module.eks.cluster_endpoint
   chart_version           = var.karpenter_chart_version
   interruption_queue_name = module.sqs[0].queue_name
+  workspace               = var.workspace
+  k8s_version             = var.k8s_version
+  ebs_os_volume_size_gib  = var.karpenter_node_os_volume_size_gib
+  ebs_volume_size_gib     = var.karpenter_node_volume_size_gib
+  aws = {
+    node_role_name     = module.iam[0].node_iam_role_name
+    security_group_ids = local.eks_worker_security_group_ids
+    ebs_kms_key_arn    = module.ebs_kms_key.key_arn
+  }
+  karpenter_node_pools = var.karpenter_node_pools
+  karpenter_defaults   = var.karpenter_defaults
 
   depends_on = [
     module.eks,

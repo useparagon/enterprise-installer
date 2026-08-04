@@ -115,6 +115,53 @@ variable "karpenter_iam_names" {
   })
 }
 
+variable "karpenter_node_os_volume_size_gib" {
+  description = "Bottlerocket OS (control) volume size in GiB for Karpenter worker nodes (/dev/xvda)."
+  type        = number
+}
+
+variable "karpenter_node_volume_size_gib" {
+  description = "Bottlerocket container data volume size in GiB for Karpenter worker nodes (/dev/xvdb)."
+  type        = number
+}
+
+variable "karpenter_node_pools" {
+  description = "Karpenter NodePool definitions. Map key is the NodePool name."
+  type = map(object({
+    capacity_types = list(string)
+    instance_types = list(string)
+    cpu_limit      = string
+    memory_limit   = string
+    nodes_limit    = number
+    weight         = number
+    labels         = optional(map(string))
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
+  }))
+}
+
+variable "karpenter_defaults" {
+  description = "Optional overrides for shared EC2NodeClass and NodePool defaults."
+  type = object({
+    ami_selector_alias              = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+    expire_after             = optional(string)
+    termination_grace_period = optional(string)
+    ec2_kubelet_max_pods     = optional(number)
+  })
+  default = {}
+}
+
 variable "eks_system_managed_node_group" {
   description = "System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default)."
   type = object({

@@ -21,7 +21,7 @@ metadata:
   annotations:
     "helm.sh/hook": "pre-install,pre-upgrade"
     "helm.sh/hook-weight": "-1"
-    "helm.sh/hook-delete-policy": hook-succeeded
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
 spec:
   template:
     metadata:
@@ -30,7 +30,12 @@ spec:
         {{- toYaml $podAnnotations | nindent 8 }}
       {{- end }}
       labels:
-        {{- include (printf "%s.selectorLabels" $name) $root | nindent 8 }}
+        # Do NOT reuse Deployment selectorLabels — PDBs match those labels and
+        # fail with "jobs.batch does not implement the scale subresource" while
+        # completed migration Job pods are still around.
+        app.kubernetes.io/name: {{ printf "%s-migration" $name }}
+        app.kubernetes.io/instance: {{ $root.Release.Name }}
+        app.kubernetes.io/component: migration
     spec:
       {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" $root) -}}
       {{- if $pullSecrets }}

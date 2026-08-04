@@ -82,6 +82,52 @@ locals {
     env_key => "https://${subdomain}.${local.argocd_domain}"
   } : {}
 
+  # BetterStack monitors only public Paragon services. Keep this in infra so
+  # monitors follow the ArgoCD/GitOps public domain rather than legacy Helm values.
+  uptime_service_subdomains = {
+    account            = "account"
+    api-triggerkit     = "api-triggerkit"
+    cache-replay       = "cache-replay"
+    cerberus           = "cerberus"
+    connect            = "connect"
+    dashboard          = "dashboard"
+    hades              = "hades"
+    health-checker     = "health-checker"
+    hermes             = "hermes"
+    passport           = "passport"
+    pheme              = "pheme"
+    release            = "release"
+    zeus               = "zeus"
+    worker-actionkit   = "worker-actionkit"
+    worker-actions     = "worker-actions"
+    worker-auditlogs   = "worker-auditlogs"
+    worker-credentials = "worker-credentials"
+    worker-crons       = "worker-crons"
+    worker-deployments = "worker-deployments"
+    worker-eventlogs   = "worker-eventlogs"
+    worker-proxy       = "worker-proxy"
+    worker-triggerkit  = "worker-triggerkit"
+    worker-triggers    = "worker-triggers"
+    worker-workflows   = "worker-workflows"
+  }
+
+  public_microservices = local.argocd_domain != "" ? {
+    for service, subdomain in local.uptime_service_subdomains :
+    service => {
+      healthcheck_path = "/healthz"
+      monitor_path     = service == "health-checker" ? "/status" : null
+      public_url       = "https://${subdomain}.${local.argocd_domain}"
+    }
+  } : {}
+
+  # Legacy behavior: when health-checker is enabled, it is the sole external
+  # health endpoint; otherwise BetterStack monitors every public service.
+  uptime_services = var.argocd_ingress_scheme != "internal" ? {
+    for service, config in local.public_microservices :
+    service => config
+    if service == "health-checker" || !var.health_checker_enabled
+  } : {}
+
   argocd_env_overrides = var.argocd_env_overrides != null ? var.argocd_env_overrides : {}
 
   argocd_postgres_env_prefixes = {
@@ -136,6 +182,30 @@ locals {
     CLOUD_STORAGE_PRIVATE_URL       = local.argocd_s3_endpoint
   })
 
+  # In-cluster monitoring component hosts (paragon-monitoring). Same defaults as
+  # gitops/base/values-common.yaml — required by Grafana dashboard generation.
+  # Harmless when monitors are disabled; override via argocd_env_overrides.
+  argocd_monitor_host_defaults = {
+    MONITOR_BULL_EXPORTER_HOST         = "http://bull-exporter"
+    MONITOR_BULL_EXPORTER_PORT         = "9538"
+    MONITOR_GRAFANA_HOST               = "http://grafana"
+    MONITOR_GRAFANA_PORT               = "4500"
+    MONITOR_KUBE_STATE_METRICS_HOST    = "http://kube-state-metrics"
+    MONITOR_KUBE_STATE_METRICS_PORT    = "2550"
+    MONITOR_PGADMIN_HOST               = "http://pgadmin"
+    MONITOR_PGADMIN_PORT               = "5050"
+    MONITOR_PGADMIN_SSL_MODE           = "disable"
+    MONITOR_POSTGRES_EXPORTER_HOST     = "http://postgres-exporter"
+    MONITOR_POSTGRES_EXPORTER_PORT     = "9187"
+    MONITOR_POSTGRES_EXPORTER_SSL_MODE = "require"
+    MONITOR_PROMETHEUS_HOST            = "http://prometheus"
+    MONITOR_PROMETHEUS_PORT            = "9090"
+    MONITOR_REDIS_EXPORTER_HOST        = "http://redis-exporter"
+    MONITOR_REDIS_EXPORTER_PORT        = "9121"
+    MONITOR_REDIS_INSIGHT_HOST         = "http://redis-insight"
+    MONITOR_REDIS_INSIGHT_PORT         = "8500"
+  }
+
   argocd_app_secret_overrides = var.argocd_app_secrets != null ? var.argocd_app_secrets : {}
 
   argocd_license_admin_auth = try(local.argocd_app_secret_overrides.LICENSE, null) != null ? {
@@ -148,6 +218,7 @@ locals {
       local.argocd_infra_env,
       local.argocd_postgres_env,
       local.argocd_public_url_defaults,
+      local.argocd_monitor_host_defaults,
       local.argocd_monitor_creds,
       local.argocd_env_overrides,
       local.argocd_license_admin_auth,

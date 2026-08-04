@@ -197,6 +197,7 @@ locals {
     { for name, cfg in local.cluster_addons_legacy : name => cfg.version },
     {
       "eks-pod-identity-agent" = local.cluster_addons_karpenter["eks-pod-identity-agent"].version
+      "metrics-server"         = "v0.8.0-eksbuild.2"
     },
   )
 

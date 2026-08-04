@@ -1,5 +1,11 @@
 {{/*
 Environment variables helper
+
+Rules:
+- Non-empty values from chart/global env → literal `value:`
+- Missing or empty → `valueFrom` secretKeyRef (optional)
+- secretKeys never duplicate a key already emitted above
+- Keep a space after `name:` before templating (avoid `name:{{-` YAML break)
 */}}
 {{- define "env.standard" -}}
 {{- $serviceData := include "service.inputs" . | fromJson }}
@@ -7,36 +13,53 @@ Environment variables helper
 {{- if and $.Values.envKeys (kindIs "slice" $.Values.envKeys) }}
   {{- $envKeys = uniq (concat $envKeys $.Values.envKeys) }}
 {{- end }}
+{{- $emitted := dict }}
+{{- $secretName := $.Values.secretName | default "paragon-secrets" }}
 {{- range $key := $envKeys }}
-{{- if and $.Values.env (kindIs "map" $.Values.env) (hasKey $.Values.env $key) }}
+{{- $fromEnv := and $.Values.env (kindIs "map" $.Values.env) (hasKey $.Values.env $key) }}
+{{- $fromGlobal := and $.Values.global.env (kindIs "map" $.Values.global.env) (hasKey $.Values.global.env $key) }}
+{{- $raw := "" }}
+{{- if $fromEnv }}{{ $raw = index $.Values.env $key }}{{ end }}
+{{- if and (not $fromEnv) $fromGlobal }}{{ $raw = index $.Values.global.env $key }}{{ end }}
+{{- $hasLiteral := and (or $fromEnv $fromGlobal) (ne (printf "%v" $raw) "") }}
+{{- if $hasLiteral }}
 - name: {{ $key }}
-  value: {{ index $.Values.env $key | quote }}
-{{- else if and $.Values.global.env (kindIs "map" $.Values.global.env) (hasKey $.Values.global.env $key) }}
-- name: {{ $key }}
-  value: {{ index $.Values.global.env $key | quote }}
+  value: {{ $raw | quote }}
 {{- else }}
 - name: {{ $key }}
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.secretName }}
+      name: {{ $secretName }}
       key: {{ $key }}
       optional: true
 {{- end }}
+{{- $_ := set $emitted $key true }}
 {{- end }}
 {{- $secretKeys := $serviceData.secretKeys | default (list) }}
 {{- if and $.Values.secretKeys (kindIs "slice" $.Values.secretKeys) }}
   {{- $secretKeys = uniq (concat $secretKeys $.Values.secretKeys) }}
 {{- end }}
 {{- range $key := $secretKeys }}
+{{- if not (hasKey $emitted $key) }}
+{{- /* Prefer non-empty chart/global env literals (e.g. in-cluster MONITOR_*_HOST) over empty optional secrets */}}
+{{- $fromEnv := and $.Values.env (kindIs "map" $.Values.env) (hasKey $.Values.env $key) }}
+{{- $fromGlobal := and $.Values.global.env (kindIs "map" $.Values.global.env) (hasKey $.Values.global.env $key) }}
+{{- $raw := "" }}
+{{- if $fromEnv }}{{ $raw = index $.Values.env $key }}{{ end }}
+{{- if and (not $fromEnv) $fromGlobal }}{{ $raw = index $.Values.global.env $key }}{{ end }}
+{{- $hasLiteral := and (or $fromEnv $fromGlobal) (ne (printf "%v" $raw) "") }}
+{{- if $hasLiteral }}
+- name: {{ $key }}
+  value: {{ $raw | quote }}
+{{- else }}
 - name: {{ $key }}
   valueFrom:
     secretKeyRef:
-      name: {{- if and $.Values.secrets (kindIs "map" $.Values.secrets) (hasKey $.Values.secrets $key) }}
-               {{ $.Values.secretName }}-{{ $.Chart.Name }}
-             {{- else }}
-               {{ $.Values.secretName }}
-             {{- end }}
+      name: {{ if and $.Values.secrets (kindIs "map" $.Values.secrets) (hasKey $.Values.secrets $key) }}{{ $secretName }}-{{ $.Chart.Name }}{{ else }}{{ $secretName }}{{ end }}
       key: {{ $key }}
       optional: true
+{{- end }}
+{{- $_ := set $emitted $key true }}
+{{- end }}
 {{- end }}
 {{- end -}}

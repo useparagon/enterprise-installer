@@ -275,6 +275,86 @@ variable "karpenter_iam_names" {
   default = {}
 }
 
+variable "karpenter_node_os_volume_size_gib" {
+  description = "Bottlerocket OS (control) volume size in GiB for Karpenter worker nodes (/dev/xvda)."
+  type        = number
+  default     = 15
+}
+
+variable "karpenter_node_volume_size_gib" {
+  description = "Bottlerocket container data volume size in GiB for Karpenter worker nodes (/dev/xvdb)."
+  type        = number
+  default     = 50
+}
+
+variable "karpenter_node_pools" {
+  description = "Karpenter NodePool definitions. Map key is the NodePool name."
+  type = map(object({
+    capacity_types = list(string)
+    instance_types = list(string)
+    cpu_limit      = string
+    memory_limit   = string
+    nodes_limit    = number
+    weight         = number
+    labels         = optional(map(string))
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
+  }))
+
+  default = {
+    "default-spot" = {
+      capacity_types = ["spot"]
+      instance_types = [
+        "t3a.xlarge", "t3.xlarge",
+        "m5a.xlarge", "m5.xlarge",
+        "m6a.xlarge", "m6i.xlarge",
+        "m7a.xlarge", "m7i.xlarge",
+        "r5a.xlarge",
+      ]
+      cpu_limit    = "160"
+      memory_limit = "610Gi"
+      nodes_limit  = 40
+      weight       = 75
+    }
+    "default-ondemand" = {
+      capacity_types = ["on-demand"]
+      instance_types = [
+        "t3a.xlarge", "t3.xlarge",
+        "m5a.xlarge", "m5.xlarge",
+        "m6a.xlarge", "m6i.xlarge",
+        "m7a.xlarge", "m7i.xlarge",
+        "r5a.xlarge",
+      ]
+      cpu_limit    = "80"
+      memory_limit = "305Gi"
+      nodes_limit  = 20
+      weight       = 25
+    }
+  }
+}
+
+variable "karpenter_defaults" {
+  description = "Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults."
+  type = object({
+    ami_selector_alias              = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+    expire_after             = optional(string)
+    termination_grace_period = optional(string)
+    ec2_kubelet_max_pods     = optional(number)
+  })
+  default = {}
+}
+
 variable "eks_system_managed_node_group" {
   description = "System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default)."
   type = object({
@@ -509,6 +589,282 @@ variable "argocd_enabled" {
 
 variable "k8s_providers_enabled" {
   description = "Configure kubernetes/helm/kubectl providers against the EKS API. Defaults to false; set true when destroying a stack that still has GitOps resources in state while argocd_enabled is false."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+# ---------------------------------------------------------------------------
+# Hoop access management
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# WAF
+# ---------------------------------------------------------------------------
+
+variable "waf_enabled" {
+  description = "Enable AWS WAF v2 on the public ALB. Set true and configure managed rule groups, rate limits, or IP lists."
+  type        = bool
+  default     = false
+}
+
+variable "waf_ip_whitelist" {
+  description = "CIDRs to bypass WAF rules (office IPs). Empty list = no whitelist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_ip_blacklist" {
+  description = "CIDRs to always block. Empty list = no blacklist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_rate_limit_global" {
+  description = "Max requests per IP across all endpoints in the evaluation window. null or 0 = no global rate limit rule."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.waf_rate_limit_global == null || var.waf_rate_limit_global == 0 || coalesce(var.waf_rate_limit_global, 100) >= 100
+    error_message = "waf_rate_limit_global must be null, 0 (disabled), or >= 100 (AWS WAF minimum)."
+  }
+}
+
+variable "waf_rate_limit_global_window_sec" {
+  description = "Evaluation window for global rate limit (60, 120, 300, or 600)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_global_window_sec)
+    error_message = "waf_rate_limit_global_window_sec must be 60, 120, 300, or 600."
+  }
+}
+
+variable "waf_rate_limit_paths" {
+  description = "Map of URI path prefix to max requests per IP per window. Empty = no path rate limit rules."
+  type        = map(number)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for limit in values(var.waf_rate_limit_paths) : limit >= 100])
+    error_message = "waf_rate_limit_paths values must be >= 100 (AWS WAF minimum)."
+  }
+}
+
+variable "waf_rate_limit_path_window_sec" {
+  description = "Evaluation window for path rate limits (60, 120, 300, or 600)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_path_window_sec)
+    error_message = "waf_rate_limit_path_window_sec must be 60, 120, 300, or 600."
+  }
+}
+
+variable "waf_managed_rule_groups" {
+  description = "Map of AWS WAF managed rule groups to attach to the Web ACL."
+  type = map(object({
+    name                         = string
+    vendor_name                  = optional(string, "AWS")
+    priority                     = optional(number)
+    override_action              = optional(string, "none")
+    excluded_rules               = optional(list(string), [])
+    rule_action_overrides        = optional(map(string), {})
+    bot_control_inspection_level = optional(string)
+  }))
+  default = {}
+}
+
+variable "waf_logs_retention_days" {
+  description = "Number of days to retain WAF logs in S3 before lifecycle expiration."
+  type        = number
+  default     = 30
+}
+
+# ---------------------------------------------------------------------------
+# Hoop
+# ---------------------------------------------------------------------------
+
+variable "hoop_enabled" {
+  description = "Whether to deploy the Hoop agent and configure its connections."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "hoop_agent_id" {
+  description = "Hoop agent ID used by connection resources."
+  type        = string
+  default     = null
+}
+
+variable "hoop_agent_name" {
+  description = "Optional Hoop agent name override used in the agent key."
+  type        = string
+  default     = null
+}
+
+variable "hoop_api_key" {
+  description = "Hoop API key. Set through TF_VAR_hoop_api_key; never commit it."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "hoop_api_url" {
+  description = "Hoop API URL."
+  type        = string
+  default     = "https://hoop.ops.paragoninternal.com/api"
+}
+
+variable "hoop_key" {
+  description = "Hoop agent key. Set through TF_VAR_hoop_key; never commit it."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "hoop_slack_bot_token" {
+  description = "Slack bot token for Hoop review notifications."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "hoop_slack_app_token" {
+  description = "Slack app token for Hoop review notifications."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "hoop_slack_channel_ids" {
+  description = "Slack channel IDs to notify for Hoop connections requiring review."
+  type        = list(string)
+  default     = []
+}
+
+variable "hoop_all_access_groups" {
+  description = "Additional Hoop access-control groups allowed for non-customer-facing connections."
+  type        = list(string)
+  default     = ["dev-team-engineering"]
+}
+
+variable "hoop_restricted_access_groups" {
+  description = "Base Hoop access-control groups allowed for all connections."
+  type        = list(string)
+  default     = ["dev-team-oncall", "dev-team-managers", "admin"]
+}
+
+variable "hoop_reviewers_access_groups" {
+  description = "Hoop reviewer groups required for customer-facing application connections."
+  type        = list(string)
+  default     = ["dev-team-managers"]
+}
+
+variable "hoop_postgres_guardrail_rules" {
+  description = "Hoop guardrail rule IDs for PostgreSQL connections."
+  type        = list(string)
+  default     = ["a85115f6-5ef3-4618-b70c-f7cccdc62c5a"]
+}
+
+variable "hoop_redis_guardrail_rules" {
+  description = "Hoop guardrail rule IDs for Redis connections."
+  type        = list(string)
+  default     = ["182f59b2-5d5d-4ab8-978e-94472b3915fc"]
+}
+
+variable "hoop_grafana_connection" {
+  description = "Whether to create a Hoop TCP connection to Grafana."
+  type        = bool
+  default     = false
+}
+
+variable "hoop_custom_connections" {
+  description = "Custom Hoop connections keyed by connection name."
+  type = map(object({
+    type                  = string
+    subtype               = optional(string)
+    access_mode_runbooks  = optional(string, "enabled")
+    access_mode_exec      = optional(string, "enabled")
+    access_mode_connect   = optional(string, "disabled")
+    access_schema         = optional(string, "disabled")
+    command               = optional(list(string))
+    secrets               = map(string)
+    tags                  = optional(map(string), {})
+    guardrail_rules       = optional(list(string), [])
+    reviewers             = optional(list(string), [])
+    access_control_groups = optional(list(string), [])
+  }))
+  sensitive = true
+  default   = {}
+}
+
+variable "hoop_k8s_connections" {
+  description = "Kubernetes Hoop connections keyed by connection name. A k8s-admin connection is created when empty."
+  type = map(object({
+    type                  = optional(string, "custom")
+    subtype               = optional(string)
+    access_mode_runbooks  = optional(string, "enabled")
+    access_mode_exec      = optional(string, "enabled")
+    access_mode_connect   = optional(string, "enabled")
+    access_schema         = optional(string, "disabled")
+    command               = optional(list(string), ["bash"])
+    remote_url            = optional(string, "https://kubernetes.default.svc.cluster.local")
+    insecure              = optional(string, "true")
+    namespace             = optional(string, "paragon")
+    secrets               = optional(map(string), {})
+    tags                  = optional(map(string), {})
+    guardrail_rules       = optional(list(string), [])
+    reviewers             = optional(list(string), [])
+    access_control_groups = optional(list(string), [])
+  }))
+  sensitive = true
+  default   = {}
+}
+
+variable "customer_facing" {
+  description = "Whether Hoop connections are customer-facing and should use restricted access groups."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
+# ---------------------------------------------------------------------------
+# Better Uptime
+# ---------------------------------------------------------------------------
+
+variable "uptime_api_token" {
+  description = "BetterStack Uptime API token. Set through TF_VAR_uptime_api_token; never commit it."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "uptime_company" {
+  description = "Optional company name shown in BetterStack Uptime monitors."
+  type        = string
+  default     = null
+}
+
+variable "uptime_policy" {
+  description = "BetterStack Uptime escalation policy name."
+  type        = string
+  default     = "Standard Escalation Policy"
+}
+
+variable "uptime_regions" {
+  description = "Regions enabled for BetterStack Uptime monitors."
+  type        = list(string)
+  default     = ["as", "au", "eu", "us"]
+}
+
+variable "health_checker_enabled" {
+  description = "When true, BetterStack monitors the public health-checker endpoint instead of each service."
   type        = bool
   default     = false
   nullable    = false
@@ -808,6 +1164,7 @@ locals {
       Name        = "paragon-${var.organization}"
       Environment = local.environment
       Creator     = "Terraform"
+      aws-apn-id  = "pc:3elab41fw971izucbsjrfn81o"
     },
     trimspace(var.organization) == "" ? {} : { Organization = var.organization }
   )
