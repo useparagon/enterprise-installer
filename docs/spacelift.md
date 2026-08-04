@@ -20,32 +20,38 @@ Prefer ambient credentials from the Spacelift AWS integration plus:
 TF_VAR_aws_assume_role_arn = "arn:aws:iam::ACCOUNT:role/paragon-terraform-role-<customer>"
 ```
 
-Static `aws_access_key_id` / `aws_secret_access_key` remain supported for local legacy applies (both optional when assume-role is set).
+(Readable context var — not write-only.) Static `aws_access_key_id` /
+`aws_secret_access_key` remain supported for local legacy applies (both optional
+when assume-role is set).
 
-The customer role must allow `secretsmanager:*` on `paragon/<workspace>/*` (already in `enterprise-deployments` bootstrap `tf-role-aws.yaml`).
+The customer role must allow `secretsmanager:*` on `paragon/<workspace>/*`
+(already in `enterprise-deployments` bootstrap `tf-role-aws.yaml`).
 
 ## Infra → paragon handoff
 
-Omit `infra_json` / `infra_json_path`. Infra writes Secrets Manager secrets; paragon reads them (`infra_secrets.tf`). Keep `organization` / `migrated_workspace` aligned on both stacks.
+Omit `infra_json` / `infra_json_path`. Infra writes Secrets Manager secrets;
+paragon reads them (`infra_secrets.tf`). Keep `organization` /
+`migrated_workspace` aligned on both stacks.
 
 ## Paragon Helm values and charts
 
 | Need | Spacelift |
 |------|-----------|
 | Charts + `service-inputs.json` | `before_init-paragon.sh` runs `./prepare.sh -p aws -t "$PARAGON_CHART_TAG"`, then deletes placeholder `vars.auto.tfvars` so Spacelift `TF_VAR_*` wins |
-| Helm values (`VERSION`, `LICENSE`, …) | **`TF_VAR_helm_yaml`** (multiline secret). Do not rely on `.secure/values.yaml` on the worker. |
-| Feature flags | Omit for git-backed Flipt, or set **`TF_VAR_feature_flags_yaml`**. |
+| Helm values (`VERSION`, `LICENSE`, …) | Mounted file `paragon-values.yaml` → `/mnt/workspace/paragon-values.yaml` + **`TF_VAR_helm_yaml_path`** (Spacelift forbids newlines in env vars). |
+| Feature flags | Omit for git-backed Flipt, or mount / set **`TF_VAR_feature_flags_yaml`**. |
 
 ## Backend env vars (both stacks)
 
-Set on each stack (context or env):
+Set on each stack (context or env) by `migrate:spacelift-prep`:
 
 - `SPACELIFT_STATE_BUCKET`
 - `SPACELIFT_STATE_KEY` — `<id>/infra.tfstate` or `<id>/paragon.tfstate`
 - `SPACELIFT_STATE_REGION`
 - `SPACELIFT_STATE_DYNAMODB_TABLE`
-- `SPACELIFT_STATE_ROLE_ARN` (optional)
-- Paragon only: `PARAGON_CHART_TAG`
+- `SPACELIFT_STATE_ROLE_ARN` — **omit** when the Spacelift AWS integration
+  already assumes `terraform-backend-access-<tier>` (self-assume fails).
+- Paragon only: `PARAGON_CHART_TAG`, `TF_VAR_helm_yaml_path`
 
-Use `pnpm run migrate:prepare-customer` in enterprise-deployments to print these
-values filled in for a customer.
+Commands: `pnpm run migrate:spacelift-prep` and `pnpm run migrate:state-copy`
+in enterprise-deployments.
