@@ -12,6 +12,8 @@ Each of the cloud deployments is split into two Terraform workspaces (`infra` an
 
 See the README files in each of the relevant workspace folders for more details.
 
+For **Spacelift** (state migration / dual infra+paragon stacks, no Argo CD), see [docs/spacelift.md](./docs/spacelift.md).
+
 ## Disclaimers
 
 ### Modification strongly discouraged.
