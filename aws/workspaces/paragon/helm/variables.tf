@@ -3,6 +3,33 @@ variable "aws_region" {
   type        = string
 }
 
+variable "aws_access_key_id" {
+  description = "Optional static AWS access key for aws eks get-token (null = ambient credentials)."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "aws_secret_access_key" {
+  description = "Optional static AWS secret key for aws eks get-token (null = ambient credentials)."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "aws_session_token" {
+  description = "Optional AWS session token for aws eks get-token."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "aws_assume_role_arn" {
+  description = "Optional IAM role ARN for aws eks get-token --role-arn (Spacelift customer terraform role)."
+  type        = string
+  default     = null
+}
+
 variable "workspace" {
   description = "The name of the resource group that all resources are associated with."
   type        = string
