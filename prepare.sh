@@ -38,62 +38,76 @@ else
   fi
 fi
 
-# Fetch the tags from the remote repository
-git fetch --tags --quiet
+# Resolve charts/files/service-inputs.json for update-charts.mjs.
+# Local/dev: git archive from -t <tag>.
+# Spacelift (often no .git / no tags on the worker): PARAGON_SERVICE_INPUTS_JSON
+# (before_init downloads from the state bucket) or /mnt/workspace/service-inputs.json.
+temp_dir=$(mktemp -d)
+trap "rm -rf $temp_dir" EXIT
+input_json=""
 
-# If tag is not provided, use latest tag
-if [[ -z "$tag" ]]; then
-  echo "No tag provided, attempting to use latest tag"
-  tag=$(git tag --sort=-v:refname | head -n 1)
+mounted_inputs="${PARAGON_SERVICE_INPUTS_JSON:-/mnt/workspace/service-inputs.json}"
+in_git=false
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  in_git=true
+fi
+
+if [[ -f "${mounted_inputs}" ]]; then
+  input_json="${temp_dir}/service-inputs.json"
+  cp "${mounted_inputs}" "${input_json}"
+  echo "Using service-inputs from ${mounted_inputs}"
+elif [[ "${in_git}" == "true" ]]; then
+  git fetch --tags --quiet 2>/dev/null || true
 
   if [[ -z "$tag" ]]; then
-    echo "Error: No tags found in this repository"
+    echo "No tag provided, attempting to use latest tag"
+    tag=$(git tag --sort=-v:refname | head -n 1)
+    if [[ -z "$tag" ]]; then
+      echo "Error: No tags found in this repository"
+      exit 1
+    fi
+    echo "Using latest tag: $tag"
+  fi
+
+  if ! git show-ref --tags --quiet "refs/tags/$tag"; then
+    echo "Error: Tag '$tag' not found"
     exit 1
   fi
 
-  echo "Using latest tag: $tag"
-fi
-
-# validate tag exists
-if ! git show-ref --tags --quiet "refs/tags/$tag"; then
-  echo "Error: Tag '$tag' not found"
+  repo_root=$(git rev-parse --show-toplevel)
+  if ! (cd "$repo_root" && git archive --format=tar "$tag") | tar -xf - -C "$temp_dir"; then
+    echo "Error: Failed to extract files from git tag '$tag'"
+    exit 1
+  fi
+  input_json="$temp_dir/charts/files/service-inputs.json"
+else
+  echo "Error: Not in a git repository and no service-inputs file found."
+  echo "  For Spacelift, mount charts/files/service-inputs.json from the release tag"
+  echo "  at /mnt/workspace/service-inputs.json (migrate:state-copy does this),"
+  echo "  or set PARAGON_SERVICE_INPUTS_JSON to that path."
   exit 1
 fi
-
-# Fetch services inputs from git tag
-# Create a temp directory
-temp_dir=$(mktemp -d)
-trap "rm -rf $temp_dir" EXIT
-
-# Get the repository root directory (where .git folder is)
-# This ensures git archive works correctly even when script is run from a subdirectory
-repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
-if [[ -z "$repo_root" ]]; then
-  echo "Error: Not in a git repository"
-  exit 1
-fi
-
-# Extract files from the git tag to temp directory
-# Run git archive from the repo root to ensure we get all files
-if ! (cd "$repo_root" && git archive --format=tar "$tag") | tar -xf - -C "$temp_dir"; then
-  echo "Error: Failed to extract files from git tag '$tag'"
-  exit 1
-fi
-
-# Path to the input JSON file from the tag
-input_json="$temp_dir/charts/files/service-inputs.json"
 
 if [[ ! -f "$input_json" ]]; then
-  echo "Error: Input JSON file not found in temp directory: $input_json"
+  echo "Error: Input JSON file not found: $input_json"
   exit 1
 fi
 
 # allow calling from other directories
 script_dir=$(dirname "$(realpath "$0")")
 
-# Execute update-charts.mjs with the input JSON
-# Use script_dir to ensure the path is correct regardless of where the script is run from
-node "$script_dir/scripts/update-charts.mjs" "$input_json"
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# Write per-chart fixtures from the input JSON. Spacelift's Alpine runner has no
+# node, so fall back to the python3 port (identical output).
+if have node; then
+  node "$script_dir/scripts/update-charts.mjs" "$input_json"
+elif have python3; then
+  python3 "$script_dir/scripts/update-charts.py" "$input_json"
+else
+  echo "Error: need node or python3 to generate chart fixtures"
+  exit 1
+fi
 workspaces=$script_dir/$provider/workspaces
 
 # aws, azure and gcp use terraform, k8s uses helm from dist
@@ -108,13 +122,46 @@ echo "ℹ️ preparing: $provider"
 # create charts folder as needed
 mkdir -p $destination
 
+# Mirror src into dest, dropping any entry whose name matches one of the excludes.
+# Spacelift's runner has no rsync, so fall back to tar + prune.
+mirror_charts() {
+    local src="$1" dest="$2"
+    shift 2
+    local excludes=("$@") name
+
+    if have rsync; then
+        local args=(-aq --delete)
+        for name in "${excludes[@]}"; do
+            args+=(--exclude="$name")
+        done
+        rsync "${args[@]}" "$src" "$dest"
+        return
+    fi
+
+    rm -rf "$dest"
+    mkdir -p "$dest"
+    (cd "$src" && tar -cf - .) | (cd "$dest" && tar -xf -)
+    for name in "${excludes[@]}"; do
+        find "$dest" -depth -name "${name%/}" -exec rm -rf {} +
+    done
+}
+
 # copy charts to provider destination
 if [[ "$provider" == "k8s" ]]; then
     # For k8s provider, copy everything including example.yaml and bootstrap
-    rsync -aqv --delete $script_dir/charts/ $destination
+    mirror_charts "$script_dir/charts/" "$destination"
 else
     # For terraform providers (aws, azure, gcp), exclude example.yaml and bootstrap
-    rsync -aqv --delete --exclude='example.yaml' --exclude='values.placeholder.yaml' --exclude='bootstrap/' $script_dir/charts/ $destination
+    mirror_charts "$script_dir/charts/" "$destination" 'example.yaml' 'values.placeholder.yaml' 'bootstrap/'
+fi
+
+# BSD shasum (macOS) vs GNU coreutils sha256sum (Spacelift's Alpine runner). Both
+# print "<hex> *<name>" and read stdin with no file arguments, so the digest below
+# is the same either way.
+if have shasum; then
+    sha256=(shasum -a 256 -b)
+else
+    sha256=(sha256sum -b)
 fi
 
 # Portable in-place sed (BSD/macOS vs GNU/Linux). Spacelift workers are Linux.
@@ -123,7 +170,7 @@ charts=($destination/*/)
 for chart in "${charts[@]}"
 do
     # sha256 hash of all files in the chart folder with paths sorted then stripped for consistency across providers
-    hash=$(find $chart -type f | sort | xargs shasum -a 256 -b | awk '{print $1}' | shasum -a 256 | awk '{print $1}' | cut -c1-8)
+    hash=$(find $chart -type f | LC_ALL=C sort | xargs "${sha256[@]}" | awk '{print $1}' | "${sha256[@]}" | awk '{print $1}' | cut -c1-8)
     if [[ "$(uname -s)" == "Darwin" ]]; then
         find "$chart" -type f -exec sed -i '' -e "s/__PARAGON_VERSION__/${version}-${hash}/g" {} +
     else
@@ -161,6 +208,13 @@ if [[ "$provider" != "k8s" ]]; then
         local out_file="$2"
 
         if [[ -f "$out_file" ]]; then
+            return
+        fi
+
+        # Placeholder tfvars are for local runs only; on Spacelift the values come
+        # from context TF_VAR_* and there is no node to generate them.
+        if ! have node; then
+            echo "skipping $out_file (no node)"
             return
         fi
 

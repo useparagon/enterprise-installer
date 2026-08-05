@@ -10,8 +10,10 @@
 # Optional:
 #   SPACELIFT_STATE_ROLE_ARN   backend access role (if not using Spacelift AWS integration alone)
 #
-# Also set TF_VAR_helm_yaml (secret) and TF_VAR_aws_assume_role_arn in context.
-# Do not rely on .secure/values.yaml on the worker.
+# Also set TF_VAR_helm_yaml_path (mounted paragon-values.yaml) and
+# TF_VAR_aws_assume_role_arn in context.
+# service-inputs.json is fetched from s3://$SPACELIFT_STATE_BUCKET/<customer>/service-inputs.json
+# (uploaded by migrate:state-copy — too large for Spacelift GraphQL file mounts).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -60,6 +62,20 @@ if [[ ! -f "${WS}/main.tf" ]]; then
 fi
 
 echo "Running prepare.sh -p aws -t ${PARAGON_CHART_TAG}"
+# Spacelift local-preview / shallow checkouts have no git tags. Prefer an
+# explicit mount, else download the object uploaded next to state by state-copy.
+if [[ -f /mnt/workspace/service-inputs.json ]]; then
+  export PARAGON_SERVICE_INPUTS_JSON=/mnt/workspace/service-inputs.json
+elif [[ -z "${PARAGON_SERVICE_INPUTS_JSON:-}" ]]; then
+  # SPACELIFT_STATE_KEY is <customer>/paragon.tfstate → <customer>/service-inputs.json
+  si_key="${SPACELIFT_STATE_KEY%/*}/service-inputs.json"
+  # GNU mktemp requires the X's at the end of the template.
+  si_local="$(mktemp -t service-inputs.XXXXXX)"
+  echo "Downloading s3://${SPACELIFT_STATE_BUCKET}/${si_key}"
+  aws s3 cp "s3://${SPACELIFT_STATE_BUCKET}/${si_key}" "${si_local}" \
+    --region "${SPACELIFT_STATE_REGION}"
+  export PARAGON_SERVICE_INPUTS_JSON="${si_local}"
+fi
 ./prepare.sh -p aws -t "${PARAGON_CHART_TAG}"
 
 # prepare.sh writes placeholder *.auto.tfvars for local use. Those files outrank
@@ -74,9 +90,8 @@ if grep -rql '__PARAGON_VERSION__' "${WS}/charts" 2>/dev/null; then
 fi
 
 # Placeholder .secure/values.yaml from prepare is NOT sufficient for LICENSE/VERSION.
-# Spacelift must supply TF_VAR_helm_yaml. Warn if missing (plan will fail later).
-if [[ -z "${TF_VAR_helm_yaml:-}" ]]; then
-  echo "WARNING: TF_VAR_helm_yaml is unset. Set it in the Spacelift stack context (contents of legacy .secure/values.yaml)." >&2
+if [[ -z "${TF_VAR_helm_yaml_path:-}" && -z "${TF_VAR_helm_yaml:-}" ]]; then
+  echo "WARNING: TF_VAR_helm_yaml_path (or TF_VAR_helm_yaml) is unset. Mount paragon-values.yaml via migrate:state-copy." >&2
 fi
 
 echo "Paragon before_init complete."
