@@ -42,7 +42,7 @@ terraform {
     dynamodb_table = "${SPACELIFT_STATE_DYNAMODB_TABLE}"
     encrypt        = true
 $(if [[ -n "${SPACELIFT_STATE_ROLE_ARN:-}" ]]; then
-  printf '    role_arn       = "%s"\n' "${SPACELIFT_STATE_ROLE_ARN}"
+  printf '    assume_role = {\n      role_arn = "%s"\n    }\n' "${SPACELIFT_STATE_ROLE_ARN}"
 fi)
   }
 }

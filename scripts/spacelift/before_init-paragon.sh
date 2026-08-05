@@ -50,7 +50,7 @@ terraform {
     dynamodb_table = "${SPACELIFT_STATE_DYNAMODB_TABLE}"
     encrypt        = true
 $(if [[ -n "${SPACELIFT_STATE_ROLE_ARN:-}" ]]; then
-  printf '    role_arn       = "%s"\n' "${SPACELIFT_STATE_ROLE_ARN}"
+  printf '    assume_role = {\n      role_arn = "%s"\n    }\n' "${SPACELIFT_STATE_ROLE_ARN}"
 fi)
   }
 }
@@ -72,8 +72,25 @@ elif [[ -z "${PARAGON_SERVICE_INPUTS_JSON:-}" ]]; then
   # GNU mktemp requires the X's at the end of the template.
   si_local="$(mktemp -t service-inputs.XXXXXX)"
   echo "Downloading s3://${SPACELIFT_STATE_BUCKET}/${si_key}"
-  aws s3 cp "s3://${SPACELIFT_STATE_BUCKET}/${si_key}" "${si_local}" \
-    --region "${SPACELIFT_STATE_REGION}"
+  # Scope assumed-role creds to this download only — do not export into the
+  # rest of before_init (provider uses TF_VAR_aws_assume_role_arn separately).
+  if [[ -n "${SPACELIFT_STATE_ROLE_ARN:-}" ]]; then
+    read -r aws_access_key_id aws_secret_access_key aws_session_token < <(
+      aws sts assume-role \
+        --role-arn "${SPACELIFT_STATE_ROLE_ARN}" \
+        --role-session-name "spacelift-before-init-paragon" \
+        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+        --output text
+    )
+    AWS_ACCESS_KEY_ID="${aws_access_key_id}" \
+      AWS_SECRET_ACCESS_KEY="${aws_secret_access_key}" \
+      AWS_SESSION_TOKEN="${aws_session_token}" \
+      aws s3 cp "s3://${SPACELIFT_STATE_BUCKET}/${si_key}" "${si_local}" \
+      --region "${SPACELIFT_STATE_REGION}"
+  else
+    aws s3 cp "s3://${SPACELIFT_STATE_BUCKET}/${si_key}" "${si_local}" \
+      --region "${SPACELIFT_STATE_REGION}"
+  fi
   export PARAGON_SERVICE_INPUTS_JSON="${si_local}"
 fi
 ./prepare.sh -p aws -t "${PARAGON_CHART_TAG}"
@@ -84,6 +101,10 @@ rm -f "${WS}/vars.auto.tfvars"
 rm -f "${REPO_ROOT}/aws/workspaces/infra/vars.auto.tfvars"
 
 # Fail closed if chart version substitution did not run (e.g. broken sed on worker).
+if [[ ! -d "${WS}/charts" ]] || [[ -z "$(find "${WS}/charts" -mindepth 1 -maxdepth 1 -type d -print -quit 2>/dev/null)" ]]; then
+  echo "ERROR: no charts under ${WS}/charts after prepare.sh" >&2
+  exit 1
+fi
 if grep -rql '__PARAGON_VERSION__' "${WS}/charts" 2>/dev/null; then
   echo "ERROR: __PARAGON_VERSION__ placeholders remain under ${WS}/charts after prepare.sh" >&2
   exit 1

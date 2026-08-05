@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # version of charts, must be semver and doesn't have to match Paragon appVersion
 version="2026.08.05"
@@ -129,21 +130,31 @@ mirror_charts() {
     shift 2
     local excludes=("$@") name
 
+    if [[ ! -d "$src" ]]; then
+        echo "Error: chart source missing: $src" >&2
+        return 1
+    fi
+
     if have rsync; then
         local args=(-aq --delete)
         for name in "${excludes[@]}"; do
             args+=(--exclude="$name")
         done
         rsync "${args[@]}" "$src" "$dest"
-        return
+    else
+        rm -rf "$dest"
+        mkdir -p "$dest"
+        # pipefail (script-level) so a failed tar does not leave an empty dest.
+        (cd "$src" && tar -cf - .) | (cd "$dest" && tar -xf -)
+        for name in "${excludes[@]}"; do
+            find "$dest" -depth -name "${name%/}" -exec rm -rf {} +
+        done
     fi
 
-    rm -rf "$dest"
-    mkdir -p "$dest"
-    (cd "$src" && tar -cf - .) | (cd "$dest" && tar -xf -)
-    for name in "${excludes[@]}"; do
-        find "$dest" -depth -name "${name%/}" -exec rm -rf {} +
-    done
+    if [[ -z "$(find "$dest" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
+        echo "Error: chart mirror left empty destination: $dest" >&2
+        return 1
+    fi
 }
 
 # copy charts to provider destination
@@ -155,22 +166,35 @@ else
     mirror_charts "$script_dir/charts/" "$destination" 'example.yaml' 'values.placeholder.yaml' 'bootstrap/'
 fi
 
-# BSD shasum (macOS) vs GNU coreutils sha256sum (Spacelift's Alpine runner). Both
-# print "<hex> *<name>" and read stdin with no file arguments, so the digest below
-# is the same either way.
+# BSD shasum (macOS) vs sha256sum (Linux). Spacelift Alpine ships BusyBox
+# sha256sum, which rejects GNU's -b; we only use the hex field ($1), so omit -b.
 if have shasum; then
-    sha256=(shasum -a 256 -b)
+    sha256=(shasum -a 256)
 else
-    sha256=(sha256sum -b)
+    sha256=(sha256sum)
 fi
 
 # Portable in-place sed (BSD/macOS vs GNU/Linux). Spacelift workers are Linux.
 # update version using hash of chart folders
-charts=($destination/*/)
+shopt -s nullglob
+charts=("$destination"/*/)
+shopt -u nullglob
+if [[ ${#charts[@]} -eq 0 ]]; then
+    echo "Error: no charts found under $destination after mirror" >&2
+    exit 1
+fi
 for chart in "${charts[@]}"
 do
     # sha256 hash of all files in the chart folder with paths sorted then stripped for consistency across providers
-    hash=$(find $chart -type f | LC_ALL=C sort | xargs "${sha256[@]}" | awk '{print $1}' | "${sha256[@]}" | awk '{print $1}' | cut -c1-8)
+    if [[ -z "$(find "$chart" -type f -print -quit)" ]]; then
+        echo "Error: chart has no files: $chart" >&2
+        exit 1
+    fi
+    hash=$(find "$chart" -type f | LC_ALL=C sort | xargs "${sha256[@]}" | awk '{print $1}' | "${sha256[@]}" | awk '{print $1}' | cut -c1-8)
+    if [[ ! "$hash" =~ ^[0-9a-f]{8}$ ]]; then
+        echo "Error: failed to hash chart $chart (got '$hash')" >&2
+        exit 1
+    fi
     if [[ "$(uname -s)" == "Darwin" ]]; then
         find "$chart" -type f -exec sed -i '' -e "s/__PARAGON_VERSION__/${version}-${hash}/g" {} +
     else
