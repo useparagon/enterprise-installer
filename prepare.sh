@@ -41,8 +41,9 @@ fi
 
 # Resolve charts/files/service-inputs.json for update-charts.mjs.
 # Local/dev: git archive from -t <tag>.
-# Spacelift (often no .git / no tags on the worker): PARAGON_SERVICE_INPUTS_JSON
-# (before_init downloads from the state bucket) or /mnt/workspace/service-inputs.json.
+# Spacelift: before_init sets PARAGON_SERVICE_INPUTS_JSON after fetching
+# charts/files/service-inputs.json from the VERSION git tag (or a mount at
+# /mnt/workspace/service-inputs.json for local-preview).
 temp_dir=$(mktemp -d)
 trap "rm -rf $temp_dir" EXIT
 input_json=""
@@ -83,9 +84,9 @@ elif [[ "${in_git}" == "true" ]]; then
   input_json="$temp_dir/charts/files/service-inputs.json"
 else
   echo "Error: Not in a git repository and no service-inputs file found."
-  echo "  For Spacelift, mount charts/files/service-inputs.json from the release tag"
-  echo "  at /mnt/workspace/service-inputs.json (migrate:state-copy does this),"
-  echo "  or set PARAGON_SERVICE_INPUTS_JSON to that path."
+  echo "  For Spacelift, before_init fetches charts/files/service-inputs.json"
+  echo "  from the VERSION git tag, or mount it at /mnt/workspace/service-inputs.json"
+  echo "  (local-preview) / set PARAGON_SERVICE_INPUTS_JSON."
   exit 1
 fi
 

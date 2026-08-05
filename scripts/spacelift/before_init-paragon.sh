@@ -2,18 +2,21 @@
 # Spacelift before_init for aws/workspaces/paragon.
 #
 # Required env (set via Spacelift stack context / env):
-#   PARAGON_CHART_TAG          Git tag for prepare.sh -t (chart/app version)
 #   SPACELIFT_STATE_BUCKET     S3 backend bucket
 #   SPACELIFT_STATE_KEY        e.g. <customer-id>/paragon.tfstate
 #   SPACELIFT_STATE_REGION     e.g. us-east-2
 #   SPACELIFT_STATE_DYNAMODB_TABLE
 # Optional:
 #   SPACELIFT_STATE_ROLE_ARN   backend access role (if not using Spacelift AWS integration alone)
+#   PARAGON_CHART_TAG          Override release tag (default: global.env.VERSION from values)
+#   PARAGON_SERVICE_INPUTS_JSON  Path to service-inputs.json (skip git fetch)
 #
 # Also set TF_VAR_helm_yaml_path (mounted paragon-values.yaml) and
 # TF_VAR_aws_assume_role_arn in context.
-# service-inputs.json is fetched from s3://$SPACELIFT_STATE_BUCKET/<customer>/service-inputs.json
-# (uploaded by migrate:state-copy — too large for Spacelift GraphQL file mounts).
+#
+# service-inputs.json is taken from the release git tag matching VERSION
+# (charts/files/service-inputs.json). Mount /mnt/workspace/service-inputs.json
+# only for local-preview when .git/tags are unavailable.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -31,11 +34,40 @@ fi
 
 cd "${REPO_ROOT}"
 
-: "${PARAGON_CHART_TAG:?PARAGON_CHART_TAG is required (git tag for ./prepare.sh -t)}"
 : "${SPACELIFT_STATE_BUCKET:?SPACELIFT_STATE_BUCKET is required}"
 : "${SPACELIFT_STATE_KEY:?SPACELIFT_STATE_KEY is required}"
 : "${SPACELIFT_STATE_REGION:?SPACELIFT_STATE_REGION is required}"
 : "${SPACELIFT_STATE_DYNAMODB_TABLE:?SPACELIFT_STATE_DYNAMODB_TABLE is required}"
+
+# Resolve release tag: PARAGON_CHART_TAG override, else VERSION from mounted values.
+resolve_chart_tag() {
+  if [[ -n "${PARAGON_CHART_TAG:-}" ]]; then
+    printf '%s' "${PARAGON_CHART_TAG}"
+    return 0
+  fi
+
+  local values_file=""
+  if [[ -n "${TF_VAR_helm_yaml_path:-}" && -f "${TF_VAR_helm_yaml_path}" ]]; then
+    values_file="${TF_VAR_helm_yaml_path}"
+  elif [[ -f /mnt/workspace/paragon-values.yaml ]]; then
+    values_file=/mnt/workspace/paragon-values.yaml
+  fi
+
+  if [[ -z "${values_file}" ]]; then
+    echo "ERROR: set PARAGON_CHART_TAG or mount paragon-values.yaml (TF_VAR_helm_yaml_path) with global.env.VERSION" >&2
+    return 1
+  fi
+
+  local version
+  version="$(sed -nE 's/^[[:space:]]*VERSION:[[:space:]]*["'\'']?([^[:space:]"'\'']+).*/\1/p' "${values_file}" | head -n 1)"
+  if [[ -z "${version}" ]]; then
+    echo "ERROR: VERSION not found in ${values_file}" >&2
+    return 1
+  fi
+  printf '%s' "${version}"
+}
+
+CHART_TAG="$(resolve_chart_tag)"
 
 WS="${REPO_ROOT}/aws/workspaces/paragon"
 mkdir -p "${WS}"
@@ -61,39 +93,42 @@ if [[ ! -f "${WS}/main.tf" ]]; then
   cp "${WS}/main.tf.example" "${WS}/main.tf"
 fi
 
-echo "Running prepare.sh -p aws -t ${PARAGON_CHART_TAG}"
-# Spacelift local-preview / shallow checkouts have no git tags. Prefer an
-# explicit mount, else download the object uploaded next to state by state-copy.
-if [[ -f /mnt/workspace/service-inputs.json ]]; then
+# Resolve service-inputs.json for prepare.sh:
+# 1) explicit env / mount (local-preview)
+# 2) git show from the release tag (tracked VCS runs)
+if [[ -n "${PARAGON_SERVICE_INPUTS_JSON:-}" && -f "${PARAGON_SERVICE_INPUTS_JSON}" ]]; then
+  echo "Using service-inputs from PARAGON_SERVICE_INPUTS_JSON=${PARAGON_SERVICE_INPUTS_JSON}"
+elif [[ -f /mnt/workspace/service-inputs.json ]]; then
   export PARAGON_SERVICE_INPUTS_JSON=/mnt/workspace/service-inputs.json
-elif [[ -z "${PARAGON_SERVICE_INPUTS_JSON:-}" ]]; then
-  # SPACELIFT_STATE_KEY is <customer>/paragon.tfstate → <customer>/service-inputs.json
-  si_key="${SPACELIFT_STATE_KEY%/*}/service-inputs.json"
+  echo "Using service-inputs from /mnt/workspace/service-inputs.json"
+else
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "ERROR: no .git checkout and no mounted service-inputs.json." >&2
+    echo "  Tracked Spacelift runs fetch charts/files/service-inputs.json from tag ${CHART_TAG}." >&2
+    echo "  For local-preview, mount service-inputs.json at /mnt/workspace/service-inputs.json" >&2
+    echo "  or set PARAGON_SERVICE_INPUTS_JSON." >&2
+    exit 1
+  fi
+
+  echo "Fetching git tag ${CHART_TAG} for service-inputs.json"
+  if ! git fetch --depth 1 origin "refs/tags/${CHART_TAG}:refs/tags/${CHART_TAG}"; then
+    echo "ERROR: failed to fetch tag ${CHART_TAG} from origin" >&2
+    exit 1
+  fi
+
   # GNU mktemp requires the X's at the end of the template.
   si_local="$(mktemp -t service-inputs.XXXXXX)"
-  echo "Downloading s3://${SPACELIFT_STATE_BUCKET}/${si_key}"
-  # Scope assumed-role creds to this download only — do not export into the
-  # rest of before_init (provider uses TF_VAR_aws_assume_role_arn separately).
-  if [[ -n "${SPACELIFT_STATE_ROLE_ARN:-}" ]]; then
-    read -r aws_access_key_id aws_secret_access_key aws_session_token < <(
-      aws sts assume-role \
-        --role-arn "${SPACELIFT_STATE_ROLE_ARN}" \
-        --role-session-name "spacelift-before-init-paragon" \
-        --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-        --output text
-    )
-    AWS_ACCESS_KEY_ID="${aws_access_key_id}" \
-      AWS_SECRET_ACCESS_KEY="${aws_secret_access_key}" \
-      AWS_SESSION_TOKEN="${aws_session_token}" \
-      aws s3 cp "s3://${SPACELIFT_STATE_BUCKET}/${si_key}" "${si_local}" \
-      --region "${SPACELIFT_STATE_REGION}"
-  else
-    aws s3 cp "s3://${SPACELIFT_STATE_BUCKET}/${si_key}" "${si_local}" \
-      --region "${SPACELIFT_STATE_REGION}"
+  if ! git show "${CHART_TAG}:charts/files/service-inputs.json" > "${si_local}"; then
+    echo "ERROR: charts/files/service-inputs.json not found on tag ${CHART_TAG}" >&2
+    rm -f "${si_local}"
+    exit 1
   fi
   export PARAGON_SERVICE_INPUTS_JSON="${si_local}"
+  echo "Extracted service-inputs.json from tag ${CHART_TAG}"
 fi
-./prepare.sh -p aws -t "${PARAGON_CHART_TAG}"
+
+echo "Running prepare.sh -p aws -t ${CHART_TAG}"
+./prepare.sh -p aws -t "${CHART_TAG}"
 
 # prepare.sh writes placeholder *.auto.tfvars for local use. Those files outrank
 # TF_VAR_* from Spacelift context — remove them so stack env wins.
