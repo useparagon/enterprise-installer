@@ -69,6 +69,8 @@ module "bastion" {
   bastion_launch_template_name = substr(local.bastion_name, 0, 22)
   instance_type                = "t3.micro"
 
+  tags = var.bastion_tags
+
   # user data template
   extra_user_data_content = templatefile("${path.module}/../templates/bastion/bastion-startup.tpl.sh", {
     account_id      = var.cloudflare_tunnel_account_id,

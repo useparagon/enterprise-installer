@@ -104,6 +104,7 @@ module "bastion" {
   workspace     = local.workspace
   aws_region    = var.aws_region
   ssh_whitelist = local.ssh_whitelist
+  bastion_tags  = var.bastion_tags
 
   cloudflare_api_token           = var.cloudflare_api_token
   cloudflare_tunnel_enabled      = var.cloudflare_tunnel_enabled
