@@ -45,21 +45,22 @@ module "cloudtrail" {
 module "postgres" {
   source = "./postgres"
 
-  workspace                   = local.workspace
-  aws_region                  = var.aws_region
-  rds_instance_class          = var.rds_instance_class
-  rds_gp3_iops                = var.rds_gp3_iops
-  rds_gp3_storage_throughput  = var.rds_gp3_storage_throughput
-  rds_allocated_storage       = var.rds_allocated_storage
-  rds_max_allocated_storage   = var.rds_max_allocated_storage
-  rds_multi_az                = var.rds_multi_az
-  rds_multiple_instances      = var.rds_multiple_instances
-  rds_postgres_version        = var.rds_postgres_version
-  rds_restore_from_snapshot   = var.rds_restore_from_snapshot
-  rds_final_snapshot_enabled  = var.rds_final_snapshot_enabled
-  disable_deletion_protection = var.disable_deletion_protection
-  managed_sync_enabled        = var.managed_sync_enabled
-  migrated_passwords          = var.migrated_passwords
+  workspace                       = local.workspace
+  aws_region                      = var.aws_region
+  rds_instance_class              = var.rds_instance_class
+  rds_managed_sync_instance_class = var.rds_managed_sync_instance_class
+  rds_gp3_iops                    = var.rds_gp3_iops
+  rds_gp3_storage_throughput      = var.rds_gp3_storage_throughput
+  rds_allocated_storage           = var.rds_allocated_storage
+  rds_max_allocated_storage       = var.rds_max_allocated_storage
+  rds_multi_az                    = var.rds_multi_az
+  rds_multiple_instances          = var.rds_multiple_instances
+  rds_postgres_version            = var.rds_postgres_version
+  rds_restore_from_snapshot       = var.rds_restore_from_snapshot
+  rds_final_snapshot_enabled      = var.rds_final_snapshot_enabled
+  disable_deletion_protection     = var.disable_deletion_protection
+  managed_sync_enabled            = var.managed_sync_enabled
+  migrated_passwords              = var.migrated_passwords
 
   vpc                = module.network.vpc
   public_subnet      = module.network.public_subnet

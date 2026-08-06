@@ -33,6 +33,11 @@ variable "rds_instance_class" {
   description = "The RDS instance class type used for Postgres."
 }
 
+variable "rds_managed_sync_instance_class" {
+  description = "The RDS instance class type used for the managed sync Postgres instance."
+  type        = string
+}
+
 variable "rds_gp3_iops" {
   description = "gp3 provisioned IOPS for all RDS instances. Null uses size-based baseline (3000 below 400 GiB, 12000 at/above)."
   type        = number
@@ -123,7 +128,7 @@ locals {
     }, var.managed_sync_enabled ? {
     managed_sync = {
       name = "${var.workspace}-managed-sync"
-      size = "db.t4g.small"
+      size = var.rds_managed_sync_instance_class
       db   = "managed_sync"
     }
     } : {}) : {

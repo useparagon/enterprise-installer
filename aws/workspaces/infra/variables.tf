@@ -63,6 +63,12 @@ variable "rds_instance_class" {
   default     = "db.t4g.small"
 }
 
+variable "rds_managed_sync_instance_class" {
+  description = "The RDS instance class type used for the managed sync Postgres instance."
+  type        = string
+  default     = "db.t4g.small"
+}
+
 variable "rds_postgres_version" {
   description = "Postgres version for the database."
   type        = string
