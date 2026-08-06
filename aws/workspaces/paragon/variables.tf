@@ -4,17 +4,28 @@ variable "aws_region" {
 }
 
 variable "aws_access_key_id" {
-  description = "AWS Access Key for AWS account to provision resources on."
+  description = "AWS Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws_assume_role_arn."
   type        = string
+  sensitive   = true
+  default     = null
 }
 
 variable "aws_secret_access_key" {
-  description = "AWS Secret Access Key for AWS account to provision resources on."
+  description = "AWS Secret Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws_assume_role_arn."
   type        = string
+  sensitive   = true
+  default     = null
 }
 
 variable "aws_session_token" {
   description = "AWS session token."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "aws_assume_role_arn" {
+  description = "Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift)."
   type        = string
   default     = null
 }
@@ -100,6 +111,13 @@ variable "feature_flags" {
   description = "Optional path to feature flags YAML file."
   type        = string
   default     = null
+}
+
+variable "feature_flags_yaml" {
+  description = "Optional feature flags YAML string (Spacelift TF_VAR_feature_flags_yaml). Takes precedence over feature_flags path when set."
+  type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "ingress_scheme" {
@@ -413,9 +431,10 @@ variable "helm_yaml_path" {
 }
 
 variable "helm_yaml" {
-  description = "YAML string of helm values to use instead of `helm_yaml_path`"
+  description = "YAML string of helm values to use instead of `helm_yaml_path` (Spacelift: TF_VAR_helm_yaml)."
   type        = string
   default     = null
+  sensitive   = true
 }
 
 variable "managed_sync_enabled" {
@@ -1102,7 +1121,11 @@ locals {
 
   monitor_version = var.monitor_version != null ? var.monitor_version : try(local.helm_values.global.env["VERSION"], "latest")
 
-  feature_flags_content = var.feature_flags != null ? file(var.feature_flags) : null
+  feature_flags_content = (
+    var.feature_flags_yaml != null ? var.feature_flags_yaml :
+    var.feature_flags != null ? file(var.feature_flags) :
+    null
+  )
 
   flipt_options = {
     for key, value in merge(

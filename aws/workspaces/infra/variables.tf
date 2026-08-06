@@ -5,21 +5,29 @@ variable "aws_region" {
 }
 
 variable "aws_access_key_id" {
-  description = "AWS Access Key for AWS account to provision resources on."
+  description = "AWS Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws_assume_role_arn."
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "aws_secret_access_key" {
-  description = "AWS Secret Access Key for AWS account to provision resources on."
+  description = "AWS Secret Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws_assume_role_arn."
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "aws_session_token" {
   description = "AWS session token."
   type        = string
   sensitive   = true
+  default     = null
+}
+
+variable "aws_assume_role_arn" {
+  description = "Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift)."
+  type        = string
   default     = null
 }
 

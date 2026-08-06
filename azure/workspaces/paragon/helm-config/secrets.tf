@@ -138,6 +138,7 @@ locals {
     MANAGED_SYNC_URL              = try(var.base_helm_values.global.env["MANAGED_SYNC_URL"], "https://sync.${var.domain}")
     PARAGON_PROXY_BASE_URL        = try("http://worker-proxy:${var.microservices["worker-proxy"].port}", null)
     PARAGON_ZEUS_BASE_URL         = try("http://zeus:${var.microservices.zeus.port}", null)
+    API_TRIGGERKIT_PRIVATE_URL    = try(var.base_helm_values.global.env["API_TRIGGERKIT_PRIVATE_URL"], "http://api-triggerkit:${var.microservices["api-triggerkit"].port}")
     WORKER_ACTIONKIT_PRIVATE_URL  = try(var.base_helm_values.global.env["WORKER_ACTIONKIT_PRIVATE_URL"], "http://worker-actionkit:${var.microservices["worker-actionkit"].port}")
     WORKER_EVENT_LOGS_PRIVATE_URL = try(var.base_helm_values.global.env["WORKER_EVENT_LOGS_PRIVATE_URL"], "http://worker-eventlogs:${var.microservices["worker-eventlogs"].port}")
 
