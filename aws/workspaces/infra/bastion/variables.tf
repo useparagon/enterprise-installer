@@ -23,6 +23,12 @@ variable "ssh_whitelist" {
   type        = list(string)
 }
 
+variable "bastion_tags" {
+  description = "Optional additional tags applied to bastion resources (e.g. customer SCP-required tags)."
+  type        = map(string)
+  default     = {}
+}
+
 # Cloudflare variables
 variable "cloudflare_api_token" {
   description = "Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS`"
