@@ -112,3 +112,20 @@ resource "google_secret_manager_secret_version" "runtime_bastion" {
     private_key = module.bastion[0].connection.private_key
   })
 }
+
+resource "google_secret_manager_secret" "runtime_cluster" {
+  secret_id = "${local.runtime_secret_prefix}-cluster"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "runtime_cluster" {
+  secret = google_secret_manager_secret.runtime_cluster.id
+  secret_data = jsonencode({
+    cluster_name = module.cluster.kubernetes.name
+    location     = var.region
+    k8s_version  = var.k8s_version
+  })
+}

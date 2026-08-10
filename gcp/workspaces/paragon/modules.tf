@@ -55,6 +55,7 @@ module "helm" {
   feature_flags_content                  = local.feature_flags_content
   flipt_options                          = local.flipt_options
   gcp_creds                              = local.gcp_creds
+  gcp_project_id                         = local.gcp_project_id
   helm_values                            = local.helm_values_public
   secrets_revision = sha256(jsonencode({
     env             = google_secret_manager_secret_version.env.name
@@ -87,6 +88,13 @@ module "helm" {
   waf_security_policy_name    = local.waf_active ? module.waf[0].security_policy_name : ""
   waf_logs_sample_rate        = var.waf_logs_sample_rate
   workspace                   = local.workspace
+
+  # ESO must not reconcile until WI + secretAccessor exist; otherwise
+  # ClusterSecretStore stays InvalidProviderConfig / ExternalSecrets never sync.
+  depends_on = [
+    google_project_iam_member.eso_secret_accessor,
+    google_service_account_iam_member.eso_workload_identity,
+  ]
 }
 
 module "hoop" {

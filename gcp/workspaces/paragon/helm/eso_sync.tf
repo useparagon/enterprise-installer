@@ -10,7 +10,8 @@ locals {
 }
 
 resource "time_sleep" "wait_for_eso_core_secrets" {
-  create_duration = "90s"
+  # First apply: ESO webhook/controller + GSM sync often exceeds 90s on private GKE.
+  create_duration = "180s"
 
   depends_on = [
     kubectl_manifest.external_secret_paragon,

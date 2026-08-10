@@ -535,8 +535,9 @@ variable "waf_rate_limit_options" {
   }
 
   validation {
+    # try(): coalesce(null, "") errors because coalesce skips empty strings too.
     condition = !contains(["HTTP_HEADER", "HTTP_COOKIE"], coalesce(var.waf_rate_limit_options.enforce_on_key, "IP")) || (
-      var.waf_rate_limit_options.enforce_on_key_name != null && trimspace(coalesce(var.waf_rate_limit_options.enforce_on_key_name, "")) != ""
+      try(length(trimspace(var.waf_rate_limit_options.enforce_on_key_name)) > 0, false)
     )
     error_message = "waf_rate_limit_options.enforce_on_key_name is required when enforce_on_key is HTTP_HEADER or HTTP_COOKIE."
   }
@@ -682,7 +683,7 @@ variable "waf_preconfigured_rules" {
             coalesce(exclusion.request_uris, []),
             coalesce(exclusion.request_query_params, []),
           ) :
-          field.operator == "EQUALS_ANY" ? field.value == null : (field.value != null && trimspace(coalesce(field.value, "")) != "")
+          field.operator == "EQUALS_ANY" ? field.value == null : try(length(trimspace(field.value)) > 0, false)
         ]
       ]
     ]))
@@ -816,7 +817,7 @@ variable "waf_custom_rules" {
     condition = alltrue([
       for _, rule in var.waf_custom_rules :
       rule.rate_limit == null || !contains(["HTTP_HEADER", "HTTP_COOKIE"], coalesce(rule.rate_limit.enforce_on_key, "IP")) || (
-        rule.rate_limit.enforce_on_key_name != null && trimspace(coalesce(rule.rate_limit.enforce_on_key_name, "")) != ""
+        try(length(trimspace(rule.rate_limit.enforce_on_key_name)) > 0, false)
       )
     ])
     error_message = "waf_custom_rules.rate_limit.enforce_on_key_name is required when enforce_on_key is HTTP_HEADER or HTTP_COOKIE."
@@ -908,8 +909,14 @@ locals {
   # output; null-safe when neither is present.
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
-  workspace        = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
-  cluster_name     = coalesce(var.cluster_name_override, local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, null) : null, "${local.workspace}-cluster")
+  workspace = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
+  # Prefer infra GSM handoff (actual GKE name may be -private or -cluster).
+  cluster_name = coalesce(
+    var.cluster_name_override,
+    local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, null) : null,
+    try(local.provider_cluster.cluster_name, null),
+    "${local.workspace}-cluster"
+  )
   logs_bucket      = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
   auditlogs_bucket = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
