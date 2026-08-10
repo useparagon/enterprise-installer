@@ -4,17 +4,28 @@ variable "aws_region" {
 }
 
 variable "aws_access_key_id" {
-  description = "AWS Access Key for AWS account to provision resources on."
+  description = "AWS Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws_assume_role_arn."
   type        = string
+  sensitive   = true
+  default     = null
 }
 
 variable "aws_secret_access_key" {
-  description = "AWS Secret Access Key for AWS account to provision resources on."
+  description = "AWS Secret Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws_assume_role_arn."
   type        = string
+  sensitive   = true
+  default     = null
 }
 
 variable "aws_session_token" {
   description = "AWS session token."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "aws_assume_role_arn" {
+  description = "Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift)."
   type        = string
   default     = null
 }
@@ -36,24 +47,40 @@ variable "certificate" {
 }
 
 variable "docker_registry_server" {
-  description = "Docker container registry server."
+  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
   default     = "docker.io"
 }
 
-variable "docker_username" {
-  description = "Docker username to pull images."
+variable "docker_pull_secret_name" {
+  description = "Kubernetes secret name for registry pull credentials."
   type        = string
+  default     = "docker-cfg"
+}
+
+variable "create_docker_pull_secret" {
+  description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
+  type        = bool
+  default     = true
+}
+
+variable "docker_username" {
+  description = "Docker username to pull images. Null when using a pre-provisioned pull secret (create_docker_pull_secret=false) or when credentials are supplied only in the infra workspace."
+  type        = string
+  default     = null
 }
 
 variable "docker_password" {
-  description = "Docker password to pull images."
+  description = "Docker password to pull images. Null when using a pre-provisioned pull secret (create_docker_pull_secret=false) or when credentials are supplied only in the infra workspace."
   type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+  default     = null
 }
 
 variable "monitors_enabled" {
@@ -86,6 +113,13 @@ variable "feature_flags" {
   default     = null
 }
 
+variable "feature_flags_yaml" {
+  description = "Optional feature flags YAML string (Spacelift TF_VAR_feature_flags_yaml). Takes precedence over feature_flags path when set."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
 variable "ingress_scheme" {
   description = "Whether the load balancer is 'internet-facing' (public) or 'internal' (private)"
   type        = string
@@ -96,6 +130,85 @@ variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
   default     = "1.31"
+}
+
+variable "karpenter_node_os_volume_size_gib" {
+  description = "Bottlerocket OS (control) volume size in GiB for Karpenter worker nodes (/dev/xvda)."
+  type        = number
+  default     = 15
+}
+
+variable "karpenter_node_volume_size_gib" {
+  description = "Bottlerocket container data volume size in GiB for Karpenter worker nodes (/dev/xvdb)."
+  type        = number
+  default     = 50
+}
+
+variable "karpenter_node_pools" {
+  description = "Karpenter NodePool definitions. Map key is the NodePool name."
+  type = map(object({
+    capacity_types = list(string)
+    instance_types = list(string)
+    cpu_limit      = string
+    memory_limit   = string
+    nodes_limit    = number
+    weight         = number
+    labels         = optional(map(string))
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
+  }))
+
+  default = {
+    "default-spot" = {
+      capacity_types = ["spot"]
+      instance_types = [
+        "t3a.xlarge", "t3.xlarge",
+        "m5a.xlarge", "m5.xlarge",
+        "m6a.xlarge", "m6i.xlarge",
+        "m7a.xlarge", "m7i.xlarge",
+        "r5a.xlarge",
+      ]
+      cpu_limit    = "160"
+      memory_limit = "610Gi"
+      nodes_limit  = 40
+      weight       = 75
+    }
+    "default-ondemand" = {
+      capacity_types = ["on-demand"]
+      instance_types = ["m6a.xlarge"]
+      cpu_limit      = "60"
+      memory_limit   = "210Gi"
+      nodes_limit    = 20
+      weight         = 25
+    }
+  }
+
+  validation {
+    condition     = length(var.karpenter_node_pools) > 0
+    error_message = "At least one Karpenter NodePool must be defined in karpenter_node_pools."
+  }
+}
+
+variable "karpenter_defaults" {
+  description = "Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults."
+  type = object({
+    ami_selector_alias              = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+    expire_after             = optional(string)
+    termination_grace_period = optional(string)
+    ec2_kubelet_max_pods     = optional(number)
+  })
+  default = {}
 }
 
 variable "dns_provider" {
@@ -140,15 +253,16 @@ variable "health_checker_enabled" {
 }
 
 variable "openobserve_email" {
-  description = "OpenObserve admin login email."
+  description = "Deprecated. OpenObserve credentials are generated by the infra workspace in Secrets Manager (paragon/<workspace>/openobserve) and synced via ESO."
   type        = string
   default     = null
 }
 
 variable "openobserve_password" {
-  description = "OpenObserve admin login password."
+  description = "Deprecated. OpenObserve credentials are generated by the infra workspace in Secrets Manager (paragon/<workspace>/openobserve) and synced via ESO."
   type        = string
   default     = null
+  sensitive   = true
 }
 
 variable "hoop_agent_id" {
@@ -283,7 +397,7 @@ variable "hoop_agent_name" {
 variable "hoop_reviewers_access_groups" {
   description = "Reviewer groups required for customer-facing app connections."
   type        = list(string)
-  default     = ["dev-team-managers", "admin"]
+  default     = ["dev-team-managers"]
 }
 
 variable "customer_facing" {
@@ -293,13 +407,19 @@ variable "customer_facing" {
 }
 
 variable "infra_json_path" {
-  description = "Path to `infra` workspace output JSON file."
+  description = "Deprecated legacy path to infra workspace output JSON. Prefer reading infra handoff secrets from Secrets Manager (PARA-21726)."
   type        = string
-  default     = ".secure/infra-output.json"
+  default     = null
 }
 
 variable "infra_json" {
   description = "JSON string of `infra` workspace variables to use instead of `infra_json_path`"
+  type        = string
+  default     = null
+}
+
+variable "migrated_workspace" {
+  description = "Optional existing workspace name to reuse when reading Secrets Manager handoff secrets (instead of deriving paragon-<org>-<hash>)."
   type        = string
   default     = null
 }
@@ -311,9 +431,10 @@ variable "helm_yaml_path" {
 }
 
 variable "helm_yaml" {
-  description = "YAML string of helm values to use instead of `helm_yaml_path`"
+  description = "YAML string of helm values to use instead of `helm_yaml_path` (Spacelift: TF_VAR_helm_yaml)."
   type        = string
   default     = null
+  sensitive   = true
 }
 
 variable "managed_sync_enabled" {
@@ -326,6 +447,138 @@ variable "managed_sync_version" {
   description = "The version of the Managed Sync helm chart to install."
   type        = string
   default     = "latest"
+}
+
+variable "waf_enabled" {
+  description = "Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf_managed_rule_groups, rate limits, or IP lists in tfvars."
+  type        = bool
+  default     = false
+}
+
+variable "waf_ip_whitelist" {
+  description = "CIDRs to bypass WAF rules (office IPs). Empty list = no whitelist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_ip_blacklist" {
+  description = "CIDRs to always block. Empty list = no blacklist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_rate_limit_global" {
+  description = "Max requests per IP across all endpoints in the evaluation window. null or 0 = no global rate limit rule."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.waf_rate_limit_global == null || var.waf_rate_limit_global == 0 || coalesce(var.waf_rate_limit_global, 100) >= 100
+    error_message = "waf_rate_limit_global must be null, 0 (disabled), or >= 100 (AWS WAF minimum)."
+  }
+}
+
+variable "waf_rate_limit_global_window_sec" {
+  description = "Evaluation window for global rate limit (60, 120, 300, or 600)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_global_window_sec)
+    error_message = "waf_rate_limit_global_window_sec must be 60, 120, 300, or 600."
+  }
+}
+
+variable "waf_rate_limit_paths" {
+  description = "Map of URI path prefix to max requests per IP per window. Paths without a leading / are normalized. Empty = no path rate limit rules."
+  type        = map(number)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for limit in values(var.waf_rate_limit_paths) : limit >= 100])
+    error_message = "waf_rate_limit_paths values must be >= 100 (AWS WAF minimum)."
+  }
+}
+
+variable "waf_rate_limit_path_window_sec" {
+  description = "Evaluation window for path rate limits (60, 120, 300, or 600)."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = contains([60, 120, 300, 600], var.waf_rate_limit_path_window_sec)
+    error_message = "waf_rate_limit_path_window_sec must be 60, 120, 300, or 600."
+  }
+}
+
+variable "waf_managed_rule_groups" {
+  description = <<-EOT
+    Map of AWS WAF managed rule groups to attach to the Web ACL. Empty by default — you choose which groups to enable.
+
+    Each key is the Web ACL rule name (unique). Each value configures one managed rule group:
+
+    - name (required): e.g. AWSManagedRulesCommonRuleSet, AWSManagedRulesAmazonIpReputationList
+    - vendor_name: default "AWS"
+    - priority: evaluation order (lower first). Auto-assigned after IP/rate rules when omitted.
+    - override_action: "none" (enforce) or "count" (observe only, no block)
+    - excluded_rules: rule names to count (not block); translated to rule_action_overrides internally
+    - rule_action_overrides: per-rule override — "count", "block", or "allow"
+    - bot_control_inspection_level: "COMMON" or "TARGETED" for AWSManagedRulesBotControlRuleSet only
+
+    Reference config (Paragon SaaS): paragon/terraform/workspaces/environment/shared/waf.tf
+  EOT
+  type = map(object({
+    name                         = string
+    vendor_name                  = optional(string, "AWS")
+    priority                     = optional(number)
+    override_action              = optional(string, "none")
+    excluded_rules               = optional(list(string), [])
+    rule_action_overrides        = optional(map(string), {})
+    bot_control_inspection_level = optional(string)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      contains(["none", "count"], coalesce(rule.override_action, "none"))
+    ])
+    error_message = "waf_managed_rule_groups.override_action must be \"none\" or \"count\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      alltrue([
+        for action in values(coalesce(rule.rule_action_overrides, {})) :
+        contains(["count", "block", "allow"], action)
+      ])
+    ])
+    error_message = "waf_managed_rule_groups.rule_action_overrides values must be \"count\", \"block\", or \"allow\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      rule.bot_control_inspection_level == null ? true : contains(["COMMON", "TARGETED"], rule.bot_control_inspection_level)
+    ])
+    error_message = "waf_managed_rule_groups.bot_control_inspection_level must be \"COMMON\" or \"TARGETED\" when set."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, rule in var.waf_managed_rule_groups :
+      rule.bot_control_inspection_level == null || rule.name == "AWSManagedRulesBotControlRuleSet"
+    ])
+    error_message = "bot_control_inspection_level is only valid when name is AWSManagedRulesBotControlRuleSet."
+  }
+}
+
+variable "waf_logs_retention_days" {
+  description = "Number of days to retain WAF logs in S3 before lifecycle expiration. Only applies when waf_enabled is true."
+  type        = number
+  default     = 30
 }
 
 locals {
@@ -341,15 +594,26 @@ locals {
     Creator      = "Terraform"
   }
 
-  infra_json_path = abspath(var.infra_json_path)
-  infra_vars      = jsondecode(fileexists(local.infra_json_path) && var.infra_json == null ? file(local.infra_json_path) : var.infra_json)
+  infra_json_path       = var.infra_json_path != null ? abspath(var.infra_json_path) : null
+  use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
+  legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
 
-  workspace = try(local.infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}")
+  # `local.infra_vars` is resolved in infra_secrets.tf (legacy infra.json when provided,
+  # otherwise infra secrets sourced from Secrets Manager). Backward compatible with infra
+  # workspaces that still emit the legacy "minio" output instead of the renamed "storage"
+  # output; null-safe when neither is present.
+  storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
+
+  default_workspace = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
+  workspace         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace
+
+  waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
 
   # use default where standard value can be determined
-  cluster_name     = try(local.infra_vars.cluster_name.value, local.workspace)
-  logs_bucket      = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
-  auditlogs_bucket = try(local.infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs")
+  cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
+  cluster_k8s_version = try(local.infra_vars.k8s_version.value, var.k8s_version)
+  logs_bucket         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
+  auditlogs_bucket    = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
@@ -407,11 +671,6 @@ locals {
       "healthcheck_path" = "/healthz"
       "port"             = try(local.helm_vars.global.env["HERMES_PORT"], 1702)
       "public_url"       = try(local.helm_vars.global.env["HERMES_PUBLIC_URL"], "https://hermes.${var.domain}")
-    }
-    "minio" = {
-      "healthcheck_path" = "/minio/health/live"
-      "port"             = try(local.helm_vars.global.env["MINIO_PORT"], 9000)
-      "public_url"       = try(local.helm_vars.global.env["MINIO_PUBLIC_URL"], "https://minio.${var.domain}")
     }
     "passport" = {
       "healthcheck_path" = "/healthz"
@@ -518,7 +777,7 @@ locals {
   microservices = {
     for microservice, config in local.all_microservices :
     microservice => config
-    if !contains(var.excluded_microservices, microservice) && !(microservice == "minio" && local.cloud_storage_type == "S3")
+    if !contains(var.excluded_microservices, microservice)
   }
 
   public_microservices = {
@@ -590,6 +849,12 @@ locals {
     "POSTGRES_DATABASE",
     "REDIS_HOST",
     "REDIS_PORT",
+    # AWS uses EKS Pod Identity for Grafana CloudWatch — strip static keys if present in customer values.
+    "MONITOR_GRAFANA_AWS_ACCESS_ID",
+    "MONITOR_GRAFANA_AWS_SECRET_KEY",
+    # AWS uses EKS Pod Identity for S3 — strip static access keys even if present in customer values.
+    "CLOUD_STORAGE_MICROSERVICE_USER",
+    "CLOUD_STORAGE_MICROSERVICE_PASS",
   ]
 
   default_redis_cluster = try(
@@ -635,7 +900,6 @@ locals {
           HADES_PORT              = try(local.microservices.hades.port, null)
           HEALTH_CHECKER_PORT     = try(local.microservices["health-checker"].port, null)
           HERMES_PORT             = try(local.microservices.hermes.port, null)
-          MINIO_PORT              = try(local.microservices.minio.port, null)
           PASSPORT_PORT           = try(local.microservices.passport.port, null)
           PHEME_PORT              = try(local.microservices.pheme.port, null)
           RELEASE_PORT            = try(local.microservices.release.port, null)
@@ -662,7 +926,6 @@ locals {
           HADES_PRIVATE_URL              = try("http://hades:${local.microservices.hades.port}", null)
           HEALTH_CHECKER_PRIVATE_URL     = try("http://health-checker:${local.microservices["health-checker"].port}", null)
           HERMES_PRIVATE_URL             = try("http://hermes:${local.microservices.hermes.port}", null)
-          MINIO_PRIVATE_URL              = try("http://minio:${local.microservices.minio.port}", null)
           PASSPORT_PRIVATE_URL           = try("http://passport:${local.microservices.passport.port}", null)
           PHEME_PRIVATE_URL              = try("http://pheme:${local.microservices.pheme.port}", null)
           RELEASE_PRIVATE_URL            = try("http://release:${local.microservices.release.port}", null)
@@ -688,7 +951,6 @@ locals {
           HADES_PUBLIC_URL              = try(local.microservices.hades.public_url, null)
           HEALTH_CHECKER_PUBLIC_URL     = try(local.microservices["health-checker"].public_url, null)
           HERMES_PUBLIC_URL             = try(local.microservices.hermes.public_url, null)
-          MINIO_PUBLIC_URL              = try(local.microservices.minio.public_url, null)
           PASSPORT_PUBLIC_URL           = try(local.microservices.passport.public_url, null)
           PHEME_PUBLIC_URL              = try(local.microservices.pheme.public_url, null)
           PUBLIC_UPLOAD_PROXY_BASE_URL  = try("${local.microservices.zeus.public_url}/public-upload-proxy", null)
@@ -710,9 +972,9 @@ locals {
           WORKER_WORKFLOWS_MINIMUM_HERMES_PROCESSOR_QUEUE_COUNT = 0
           WORKER_WORKFLOWS_MINIMUM_TEST_WORKFLOW_QUEUE_COUNT    = 1
 
-          # Authentication
-          ADMIN_BASIC_AUTH_USERNAME = local.helm_vars.global.env["LICENSE"]
-          ADMIN_BASIC_AUTH_PASSWORD = local.helm_vars.global.env["LICENSE"]
+          # Authentication (LICENSE may live only in infra app_secrets)
+          ADMIN_BASIC_AUTH_USERNAME = try(local.helm_vars.global.env["LICENSE"], null)
+          ADMIN_BASIC_AUTH_PASSWORD = try(local.helm_vars.global.env["LICENSE"], null)
 
           # Feature flags
           FEATURE_FLAG_PLATFORM_ENABLED  = "true"
@@ -764,47 +1026,28 @@ locals {
           SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
           SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
           SYSTEM_REDIS_URL               = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
-          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
-          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}", local.default_redis_url)
+          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
+          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
+          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
 
-          # Cloud Storage configurations
-          CLOUD_STORAGE_MICROSERVICE_PASS = local.cloud_storage_type == "S3" ? local.infra_vars.minio.value.root_password : local.infra_vars.minio.value.microservice_pass
-          CLOUD_STORAGE_MICROSERVICE_USER = local.cloud_storage_type == "S3" ? local.infra_vars.minio.value.root_user : local.infra_vars.minio.value.microservice_user
-          CLOUD_STORAGE_PUBLIC_BUCKET     = try(local.infra_vars.minio.value.public_bucket, "${local.workspace}-cdn")
-          CLOUD_STORAGE_SYSTEM_BUCKET     = try(local.infra_vars.minio.value.private_bucket, "${local.workspace}-app")
-          CLOUD_STORAGE_TYPE              = local.cloud_storage_type
-          CLOUD_STORAGE_REGION            = var.aws_region
+          # Cloud Storage configurations (S3 auth via EKS Pod Identity; no static access keys)
+          CLOUD_STORAGE_PUBLIC_BUCKET = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
+          CLOUD_STORAGE_SYSTEM_BUCKET = try(local.storage_output.private_bucket, "${local.workspace}-app")
+          CLOUD_STORAGE_TYPE          = local.cloud_storage_type
+          CLOUD_STORAGE_REGION        = var.aws_region
 
           CLOUD_STORAGE_PUBLIC_URL = coalesce(
             try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
             local.cloud_storage_type == "S3" ? "https://s3.${var.aws_region}.amazonaws.com" : null,
-            try(local.microservices.minio.public_url, null), null
           )
           CLOUD_STORAGE_PRIVATE_URL = coalesce(
             try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
             local.cloud_storage_type == "S3" ? "https://s3.${var.aws_region}.amazonaws.com" : null,
-            try(local.microservices.minio.public_url, null), null
           )
 
-          # MinIO configurations
-          MINIO_BROWSER           = "off"
-          MINIO_INSTANCE_COUNT    = "1"
-          MINIO_MICROSERVICE_PASS = local.infra_vars.minio.value.microservice_pass
-          MINIO_MICROSERVICE_USER = local.infra_vars.minio.value.microservice_user
-          MINIO_MODE              = "gateway-s3"
-          MINIO_NGINX_PROXY       = "on"
-          MINIO_PUBLIC_BUCKET     = try(local.infra_vars.minio.value.public_bucket, "${local.workspace}-cdn")
-          MINIO_REGION            = var.aws_region
-          MINIO_ROOT_PASSWORD     = local.infra_vars.minio.value.root_password
-          MINIO_ROOT_USER         = local.infra_vars.minio.value.root_user
-          MINIO_SYSTEM_BUCKET     = try(local.infra_vars.minio.value.private_bucket, "${local.workspace}-app")
-
-          # Monitor configurations
+          # Monitor configurations (Grafana CloudWatch via EKS Pod Identity; no static AWS keys)
           MONITOR_BULL_EXPORTER_HOST               = "http://bull-exporter"
           MONITOR_BULL_EXPORTER_PORT               = try(local.monitors["bull-exporter"].port, null)
-          MONITOR_GRAFANA_AWS_ACCESS_ID            = var.monitors_enabled ? module.monitors[0].grafana_aws_access_key_id : null
-          MONITOR_GRAFANA_AWS_SECRET_KEY           = var.monitors_enabled ? module.monitors[0].grafana_aws_secret_access_key : null
           MONITOR_GRAFANA_HOST                     = "http://grafana"
           MONITOR_GRAFANA_PORT                     = try(local.monitors["grafana"].port, null)
           MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD  = var.monitors_enabled ? module.monitors[0].grafana_admin_password : null
@@ -841,9 +1084,48 @@ locals {
     })
   })
 
+  # Split env by prepared chart service-inputs.json (./prepare.sh):
+  # - envKeys → Helm global.env (plain `value:` on pods)
+  # - secretKeys (and not also envKeys) → Secrets Manager for secretKeyRef
+  # Chart metadata is the source of truth (e.g. CERBERUS_POSTGRES_PORT is an envKey).
+  chart_service_input_files = fileset("${path.root}/charts", "**/files/service-inputs.json")
+  chart_service_inputs = [
+    for f in local.chart_service_input_files :
+    jsondecode(file("${path.root}/charts/${f}"))
+  ]
+  chart_env_keys = toset(flatten([
+    for s in local.chart_service_inputs : try(s.envKeys, [])
+  ]))
+  chart_secret_keys = toset(flatten([
+    for s in local.chart_service_inputs : try(s.secretKeys, [])
+  ]))
+  # Prefer envKeys when a key appears in both lists.
+  helm_is_secret_env_key = {
+    for key, _ in local.helm_values.global.env :
+    key => contains(local.chart_secret_keys, key) && !contains(local.chart_env_keys, key)
+  }
+  helm_secret_values = {
+    for key, value in local.helm_values.global.env :
+    key => tostring(value)
+    if value != null && tostring(value) != "" && local.helm_is_secret_env_key[key]
+  }
+  helm_values_public = merge(local.helm_values, {
+    global = merge(local.helm_values.global, {
+      env = {
+        for key, value in local.helm_values.global.env :
+        key => value
+        if value != null && !local.helm_is_secret_env_key[key]
+      }
+    })
+  })
+
   monitor_version = var.monitor_version != null ? var.monitor_version : try(local.helm_values.global.env["VERSION"], "latest")
 
-  feature_flags_content = var.feature_flags != null ? file(var.feature_flags) : null
+  feature_flags_content = (
+    var.feature_flags_yaml != null ? var.feature_flags_yaml :
+    var.feature_flags != null ? file(var.feature_flags) :
+    null
+  )
 
   flipt_options = {
     for key, value in merge(

@@ -5,10 +5,10 @@ output "workspace" {
 
 output "bastion" {
   description = "Bastion server connection info."
-  value = {
-    public_dns  = module.bastion.connection.bastion_dns
-    private_key = module.bastion.connection.private_key
-  }
+  value = var.bastion_enabled ? {
+    public_dns  = module.bastion[0].connection.bastion_dns
+    private_key = module.bastion[0].connection.private_key
+  } : null
   sensitive = true
 }
 
@@ -36,14 +36,12 @@ output "auditlogs_bucket" {
   sensitive   = true
 }
 
-output "minio" {
-  description = "MinIO server connection info."
+output "storage" {
+  description = "Object storage connection info."
   value = {
     public_bucket       = module.storage.storage.public_bucket
     private_bucket      = module.storage.storage.private_bucket
     managed_sync_bucket = module.storage.storage.managed_sync_bucket
-    microservice_user   = module.storage.storage.minio_microservice_user
-    microservice_pass   = module.storage.storage.minio_microservice_pass
     root_user           = module.storage.storage.project_id
     root_password       = module.storage.storage.private_key
     service_account     = module.storage.storage.service_account
@@ -74,4 +72,5 @@ output "kafka" {
 output "cluster_name" {
   description = "The name of the GKE cluster."
   value       = module.cluster.kubernetes.name
+  sensitive   = true
 }

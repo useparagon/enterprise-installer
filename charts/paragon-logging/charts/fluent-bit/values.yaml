@@ -21,8 +21,7 @@ testFramework:
     tag: latest
     digest:
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 
 nameOverride: "fluent-bit"
 fullnameOverride: "fluent-bit"
@@ -290,7 +289,8 @@ podDisruptionBudget:
 
 nodeSelector: {}
 
-tolerations: []
+tolerations:
+  - operator: Exists
 
 affinity: {}
 
@@ -442,8 +442,8 @@ config:
         Retry_Limit 10
         Path /api/default
         Suppress_Type_Name On
-        HTTP_User {{ .Values.secrets.ZO_ROOT_USER_EMAIL }}
-        HTTP_Passwd {{ .Values.secrets.ZO_ROOT_USER_PASSWORD }}
+        HTTP_User ${ZO_ROOT_USER_EMAIL}
+        HTTP_Passwd ${ZO_ROOT_USER_PASSWORD}
         Buffer_Size 1MB
 
   ## https://docs.fluentbit.io/manual/administration/configuring-fluent-bit/classic-mode/upstream-servers
@@ -516,7 +516,7 @@ initContainers: []
 # Array mode
 # initContainers:
 #   - name: do-something
-#     image: alpine/kubectl:1.33.4
+#     image: alpine/kubectl:1.36.2
 #     command: ['kubectl', 'version']
 
 # String mode

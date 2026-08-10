@@ -24,20 +24,19 @@ resources:
 autoscaling:
   enabled: false
   # minReplicas: 4
-  # maxReplicas: 10
+  # maxReplicas: 20
   # targetCPUUtilizationPercentage: 75
   # targetMemoryUtilizationPercentage: 75
 
 secretName: "paragon-secrets"
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: 'worker-workflows'
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.

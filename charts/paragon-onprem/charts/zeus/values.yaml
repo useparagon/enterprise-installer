@@ -16,28 +16,27 @@ service:
 
 resources:
   limits:
-    memory: 600Mi
+    memory: 800Mi
   requests:
-    cpu: 200m
-    memory: 600Mi
+    cpu: 400m
+    memory: 800Mi
 
 autoscaling:
   enabled: true
   minReplicas: 2
-  maxReplicas: 10
+  maxReplicas: 20
   targetCPUUtilizationPercentage: 75
   targetMemoryUtilizationPercentage: 75
 
 secretName: "paragon-secrets"
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: 'zeus'
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.

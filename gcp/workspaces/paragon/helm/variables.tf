@@ -26,27 +26,59 @@ variable "cluster_name" {
 }
 
 variable "docker_registry_server" {
-  description = "Docker container registry server."
+  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
+}
+
+variable "docker_cfg_secret_name" {
+  description = "Secret Manager secret name for docker credentials. Null when unused (e.g. pre-provisioned Artifactory pull secret)."
+  type        = string
+  default     = null
+}
+
+variable "docker_pull_secret_name" {
+  description = "Kubernetes secret name for registry pull credentials."
+  type        = string
+  default     = "docker-cfg"
+}
+
+variable "create_docker_pull_secret" {
+  description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
+  type        = bool
+  default     = true
 }
 
 variable "docker_username" {
   description = "Docker username to pull images."
   type        = string
+  default     = null
 }
 
 variable "docker_password" {
   description = "Docker password to pull images."
   type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+  default     = null
 }
 
 variable "domain" {
   description = "The domain used for the application. Used to generate an SSL certificate and associates CNAMEs."
+  type        = string
+}
+
+variable "env_secret_name" {
+  description = "Secret Manager secret name for shared Paragon application secrets."
+  type        = string
+}
+
+variable "external_secrets_service_account_email" {
+  description = "Google service account email used by External Secrets Operator."
   type        = string
 }
 
@@ -76,6 +108,12 @@ variable "helm_values" {
   description = "Object containing values to pass to the helm chart."
   type        = any
   sensitive   = true
+}
+
+variable "secrets_revision" {
+  description = "Opaque revision of cloud-store secrets synced via ESO. Included in secret_hash so secret-only changes still force Helm upgrades (Reloader remains the runtime path)."
+  type        = string
+  default     = ""
 }
 
 variable "feature_flags_content" {
@@ -158,11 +196,47 @@ variable "storage_service_account" {
   default     = null
 }
 
+variable "managed_sync_secret_name" {
+  description = "Secret Manager secret name for managed-sync secrets."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_secret_name" {
+  description = "Secret Manager secret name for OpenObserve credentials."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_gcs_secret_name" {
+  description = "Secret Manager secret name for the OpenObserve GCS credentials file."
+  type        = string
+  default     = null
+}
+
+variable "redis_ca_cert_secret_name" {
+  description = "Secret Manager secret name for the Redis CA certificate bundle."
+  type        = string
+  default     = null
+}
+
 variable "infra_vars" {
   description = "Infrastructure output variables (from infra workspace)."
   type        = any
   default     = {}
   sensitive   = true
+}
+
+variable "waf_security_policy_name" {
+  description = "Cloud Armor security policy to attach to the public backend services. Empty disables the attachment."
+  type        = string
+  default     = ""
+}
+
+variable "waf_logs_sample_rate" {
+  description = "Fraction of requests logged on the protected backend services, between 0 and 1."
+  type        = number
+  default     = 1
 }
 
 locals {

@@ -11,6 +11,9 @@ resource "aws_s3_bucket_ownership_controls" "logs" {
   }
 }
 
+# Always SSE-S3: this bucket receives ALB access logs and S3 server access logs,
+# neither of which support SSE-KMS destination buckets (delivery fails / objects
+# remain SSE-S3). Do not switch this bucket to aws:kms.
 resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
   bucket = aws_s3_bucket.logs.id
   rule {
@@ -26,7 +29,7 @@ data "aws_iam_policy_document" "logs_bucket_policy" {
     actions = ["s3:PutObject"]
     effect  = "Allow"
     resources = [
-      "${aws_s3_bucket.logs.arn}",
+      aws_s3_bucket.logs.arn,
       "${aws_s3_bucket.logs.arn}/access_logs/AWSLogs/${data.aws_caller_identity.current.account_id}/*",
     ]
     principals {
@@ -45,7 +48,7 @@ data "aws_iam_policy_document" "logs_bucket_policy" {
     ]
     effect = "Allow"
     resources = [
-      "${aws_s3_bucket.logs.arn}",
+      aws_s3_bucket.logs.arn,
       "${aws_s3_bucket.logs.arn}/*",
     ]
     principals {
@@ -56,6 +59,73 @@ data "aws_iam_policy_document" "logs_bucket_policy" {
       test     = "StringEquals"
       variable = "aws:PrincipalAccount"
       values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = var.network_firewall_enabled ? [1] : []
+    content {
+      sid    = "AWSLogDeliveryWriteNetworkFirewall"
+      effect = "Allow"
+
+      principals {
+        type        = "Service"
+        identifiers = ["delivery.logs.amazonaws.com"]
+      }
+
+      actions = ["s3:PutObject"]
+      resources = [
+        "${aws_s3_bucket.logs.arn}/network-firewall/AWSLogs/${data.aws_caller_identity.current.account_id}/*",
+      ]
+
+      condition {
+        test     = "StringEquals"
+        variable = "s3:x-amz-acl"
+        values   = ["bucket-owner-full-control"]
+      }
+
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [data.aws_caller_identity.current.account_id]
+      }
+
+      condition {
+        test     = "ArnLike"
+        variable = "aws:SourceArn"
+        values   = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = var.network_firewall_enabled ? [1] : []
+    content {
+      sid    = "AWSLogDeliveryAclCheckNetworkFirewall"
+      effect = "Allow"
+
+      principals {
+        type        = "Service"
+        identifiers = ["delivery.logs.amazonaws.com"]
+      }
+
+      actions = [
+        "s3:GetBucketAcl",
+        "s3:ListBucket",
+      ]
+      resources = [aws_s3_bucket.logs.arn]
+
+      condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [data.aws_caller_identity.current.account_id]
+      }
+
+      condition {
+        test     = "ArnLike"
+        variable = "aws:SourceArn"
+        values   = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"]
+      }
     }
   }
 }
@@ -72,9 +142,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     id     = "abort-incomplete"
     status = "Enabled"
 
-    filter {
-      prefix = "files/"
-    }
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
@@ -82,7 +150,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   }
 
   rule {
-    id     = "expire"
+    id     = "expire-files"
     status = "Enabled"
 
     filter {
@@ -91,6 +159,48 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
 
     expiration {
       days = 365
+    }
+  }
+
+  rule {
+    id     = "expire-s3-access-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = "s3/"
+    }
+
+    expiration {
+      days = 365
+    }
+  }
+
+  rule {
+    id     = "expire-alb-access-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = "access_logs/"
+    }
+
+    expiration {
+      days = 365
+    }
+  }
+
+  dynamic "rule" {
+    for_each = var.network_firewall_enabled ? [1] : []
+    content {
+      id     = "expire-network-firewall-logs"
+      status = "Enabled"
+
+      filter {
+        prefix = "network-firewall/"
+      }
+
+      expiration {
+        days = 365
+      }
     }
   }
 }

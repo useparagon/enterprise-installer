@@ -1,1 +1,0 @@
-{{- include "statefulset.standard" (dict "root" $ "volumeName" "minio" "mountPath" "/var/paragon" "storageSize" "500M") }}

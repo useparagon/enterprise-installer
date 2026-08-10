@@ -11,7 +11,8 @@ output "namespace_paragon" {
 }
 
 output "openobserve_email" {
-  value = local.openobserve_email
+  value     = local.openobserve_email
+  sensitive = true
 }
 
 output "openobserve_password" {

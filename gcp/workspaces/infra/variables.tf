@@ -90,6 +90,13 @@ variable "region_zone_backup" {
   type        = string
 }
 
+# bastion
+variable "bastion_enabled" {
+  description = "Whether to create the bastion host and its associated Cloudflare tunnel."
+  type        = bool
+  default     = true
+}
+
 # cloudflare
 variable "cloudflare_api_token" {
   description = "Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS`"
@@ -241,7 +248,7 @@ variable "gmk_sasl_plain_key_file_path" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.33"
+  default     = "1.34"
 }
 
 variable "k8s_min_node_count" {
@@ -253,7 +260,7 @@ variable "k8s_min_node_count" {
 variable "k8s_max_node_count" {
   description = "Maximum number of node Kubernetes can scale up to."
   type        = number
-  default     = 20
+  default     = 50
 }
 
 variable "k8s_spot_instance_percent" {

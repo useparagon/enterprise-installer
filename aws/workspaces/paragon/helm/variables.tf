@@ -3,6 +3,33 @@ variable "aws_region" {
   type        = string
 }
 
+variable "aws_access_key_id" {
+  description = "Optional static AWS access key for aws eks get-token (null = ambient credentials)."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "aws_secret_access_key" {
+  description = "Optional static AWS secret key for aws eks get-token (null = ambient credentials)."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "aws_session_token" {
+  description = "Optional AWS session token for aws eks get-token."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "aws_assume_role_arn" {
+  description = "Optional IAM role ARN for aws eks get-token --role-arn (Spacelift customer terraform role)."
+  type        = string
+  default     = null
+}
+
 variable "workspace" {
   description = "The name of the resource group that all resources are associated with."
   type        = string
@@ -14,23 +41,39 @@ variable "cluster_name" {
 }
 
 variable "docker_registry_server" {
-  description = "Docker container registry server."
+  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
+}
+
+variable "docker_pull_secret_name" {
+  description = "Kubernetes secret name for registry pull credentials."
+  type        = string
+  default     = "docker-cfg"
+}
+
+variable "create_docker_pull_secret" {
+  description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
+  type        = bool
+  default     = true
 }
 
 variable "docker_username" {
   description = "Docker username to pull images."
   type        = string
+  default     = null
 }
 
 variable "docker_password" {
   description = "Docker password to pull images."
   type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+  default     = null
 }
 
 variable "openobserve_email" {
@@ -54,6 +97,12 @@ variable "helm_values" {
   description = "Object containing values to pass to the helm chart."
   type        = any
   sensitive   = true
+}
+
+variable "secrets_revision" {
+  description = "Opaque revision of cloud-store secrets synced via ESO. Included in secret_hash so secret-only changes still force Helm upgrades (Reloader remains the runtime path)."
+  type        = string
+  default     = ""
 }
 
 variable "feature_flags_content" {
@@ -127,6 +176,11 @@ variable "k8s_version" {
   type        = string
 }
 
+variable "cluster_k8s_version" {
+  description = "EKS control plane version from infra output. Used for Karpenter EC2NodeClass drift tagging."
+  type        = string
+}
+
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync."
   type        = bool
@@ -135,6 +189,116 @@ variable "managed_sync_enabled" {
 variable "managed_sync_version" {
   description = "The version of the Managed Sync helm chart to install."
   type        = string
+}
+
+variable "waf_web_acl_arn" {
+  description = "Regional WAFv2 Web ACL ARN for the shared ALB. Empty disables WAF association."
+  type        = string
+  default     = ""
+}
+
+variable "enable_legacy_mng_pools" {
+  description = "Whether legacy on-demand and spot managed node groups are active (from infra output)."
+  type        = bool
+  default     = true
+}
+
+variable "karpenter_enabled" {
+  description = "Whether Karpenter autoscaling is enabled (from infra output)."
+  type        = bool
+  default     = false
+}
+
+variable "karpenter_aws" {
+  description = "Karpenter AWS resources from infra output (IAM role, security groups, KMS). Null when Karpenter is disabled."
+  type = object({
+    node_role_name     = string
+    security_group_ids = list(string)
+    ebs_kms_key_arn    = string
+  })
+  default  = null
+  nullable = true
+}
+
+variable "karpenter_node_os_volume_size_gib" {
+  description = "Bottlerocket OS (control) volume size in GiB for Karpenter worker nodes (/dev/xvda)."
+  type        = number
+}
+
+variable "karpenter_node_volume_size_gib" {
+  description = "Bottlerocket container data volume size in GiB for Karpenter worker nodes (/dev/xvdb)."
+  type        = number
+}
+
+variable "karpenter_node_pools" {
+  description = "Karpenter NodePool definitions. Map key is the NodePool name."
+  type = map(object({
+    capacity_types = list(string)
+    instance_types = list(string)
+    cpu_limit      = string
+    memory_limit   = string
+    nodes_limit    = number
+    weight         = number
+    labels         = optional(map(string))
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })))
+  }))
+}
+
+variable "karpenter_defaults" {
+  description = "Optional overrides for Karpenter EC2NodeClass and shared NodePool defaults."
+  type = object({
+    ami_selector_alias              = optional(string)
+    disruption_consolidation_policy = optional(string)
+    disruption_consolidate_after    = optional(string)
+    disruption_budgets = optional(list(object({
+      nodes    = string
+      reasons  = optional(list(string))
+      schedule = optional(string)
+      duration = optional(string)
+    })))
+    expire_after             = optional(string)
+    termination_grace_period = optional(string)
+    ec2_kubelet_max_pods     = optional(number)
+  })
+  default = {}
+}
+
+variable "install_external_secrets" {
+  description = "Install External Secrets Operator and sync Secrets Manager values into Kubernetes."
+  type        = bool
+  default     = true
+}
+
+variable "env_secret_name" {
+  description = "Secrets Manager secret name for Paragon env config synced by ESO."
+  type        = string
+}
+
+variable "eso_role_arn" {
+  description = "IAM role ARN assumed by the External Secrets Operator service account."
+  type        = string
+}
+
+variable "docker_cfg_secret_name" {
+  description = "Secrets Manager secret name for Docker registry credentials. Null when unused."
+  type        = string
+  default     = null
+}
+
+variable "managed_sync_secret_name" {
+  description = "Secrets Manager secret name for managed-sync credentials. Null when managed sync is disabled."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_secret_name" {
+  description = "Secrets Manager secret name for OpenObserve credentials. Null when unused."
+  type        = string
+  default     = null
 }
 
 locals {

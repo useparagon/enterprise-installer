@@ -71,6 +71,38 @@ After running `prepare.sh`, you need to configure the following files before run
 
 3. **`{provider}/workspaces/paragon/.secure/values.yaml`** - Helm values containing Paragon application configuration and secrets (VERSION, LICENSE, and all environment variables). This file is created from `charts/values.placeholder.yaml` - see that file for the complete list of configurable values.
 
+### Private container registry (Artifactory / proxy)
+
+To pull images through a customer-provided registry (e.g. Artifactory) instead of public upstreams, configure `global` settings in `.secure/values.yaml`:
+
+```yaml
+global:
+  imageRegistry: artifactory.example.com/paragon
+  imageRepositoryPrefix: ""   # omit key entirely to keep useparagon/ in paths
+  imagePullSecrets:
+    - name: workday-af-secret
+```
+
+- **`imageRegistry`** — prepended to image repository paths (host and optional remote-repo path).
+- **`imageRepositoryPrefix`** — when set (including `""`), rewrites the default `useparagon/` prefix. Omit to preserve `useparagon/` in mirrored paths.
+- **`imagePullSecrets`** — merged with per-chart pull secrets on all workloads, jobs, and hooks.
+- **`testImage`** / **`kubectlImage`** — override busybox (helm tests) and alpine/kubectl (restart cron) defaults.
+
+Per-subchart `image.repository` overrides remain available for third-party images with non-standard mirror paths.
+
+**Terraform pull credentials** (in `vars.auto.tfvars`):
+
+```hcl
+docker_registry_server    = "artifactory.example.com"  # must match imageRegistry host
+docker_pull_secret_name   = "docker-cfg"               # or customer secret name
+create_docker_pull_secret = true                       # false if secret is pre-provisioned
+# When create_docker_pull_secret = false, omit docker_username / docker_password /
+# docker_email; Terraform will not create or sync a registry pull secret. Point
+# global.imagePullSecrets at the pre-provisioned secret name instead.
+```
+
+Verify rendered images with `helm template` and grep for unexpected upstream hosts (`docker.io`, `ghcr.io`, `public.ecr.aws`, etc.).
+
 ## Usage
 
 ### Infrastructure Provisioning
@@ -100,14 +132,11 @@ This will produce an `infra-output.json` file that will generally follow the sch
   "logs_container": {
     "value": "<logs-bucket-name>"
   },
-  "minio": {
+  "storage": {
     "value": {
-      "microservice_pass": "<service-password>",
-      "microservice_user": "<service-username>",
       "private_bucket": "<private-bucket-name>",
-      "public_bucket": "<private-bucket-name>",
-      "root_password": "<iam-password>",
-      "root_user": "<iam-username>"
+      "public_bucket": "<public-bucket-name>",
+      "role_arn": "<iam-role-arn-for-eks-pod-identity>"
     }
   },
   "postgres": {

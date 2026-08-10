@@ -3,16 +3,14 @@ variable "workspace" {
   type        = string
 }
 
-variable "grafana_aws_access_key_id" {
-  description = "AWS access key id for Grafana. Optional and can be provisioned outside of Terraform."
+variable "cluster_name" {
+  description = "EKS cluster name for Grafana Pod Identity association."
   type        = string
-  default     = null
 }
 
-variable "grafana_aws_secret_access_key" {
-  description = "AWS secret access key for Grafana. Optional and can be provisioned outside of Terraform."
+variable "namespace" {
+  description = "Kubernetes namespace where the grafana ServiceAccount lives."
   type        = string
-  default     = null
 }
 
 variable "grafana_admin_email" {

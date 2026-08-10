@@ -20,20 +20,12 @@ variable "tags" {
   type        = map(string)
 }
 
-variable "postgres_redundant" {
-  description = "Whether zone redundant HA should be enabled"
-  type        = bool
-}
-
-variable "postgres_sku_name" {
-  description = "PostgreSQL SKU name"
-  type        = string
-}
-
-variable "postgres_base_sku_name" {
-  description = "Default PostgreSQL SKU name for instances that don't use the main postgres_sku_name"
-  type        = string
-  default     = "B_Standard_B2s"
+variable "instances" {
+  description = "PostgreSQL instances to deploy. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon)."
+  type = map(object({
+    sku       = string
+    redundant = bool
+  }))
 }
 
 variable "postgres_version" {
@@ -47,61 +39,33 @@ variable "postgres_port" {
   default     = "5432"
 }
 
-variable "postgres_multiple_instances" {
-  description = "Whether or not to create multiple Postgres instances."
-  type        = bool
-}
-
-variable "managed_sync_enabled" {
-  description = "Whether to enable managed sync."
-  type        = bool
-}
-
 locals {
-  postgres_instances = var.postgres_multiple_instances ? merge({
-    cerberus = {
-      name = "${var.workspace}-cerberus"
-      db   = "cerberus"
-      ha   = var.postgres_redundant
-      sku  = var.postgres_base_sku_name
-    }
-    eventlogs = {
-      name = "${var.workspace}-eventlogs"
-      db   = "eventlogs"
-      ha   = var.postgres_redundant
-      sku  = var.postgres_base_sku_name
-    }
-    hermes = {
-      name = "${var.workspace}-hermes"
-      db   = "hermes"
-      ha   = var.postgres_redundant
-      sku  = var.postgres_sku_name
-    }
-    triggerkit = {
-      name = "${var.workspace}-triggerkit"
-      db   = "triggerkit"
-      ha   = var.postgres_redundant
-      sku  = var.postgres_base_sku_name
-    }
-    zeus = {
-      name = "${var.workspace}-zeus"
-      db   = "zeus"
-      ha   = var.postgres_redundant
-      sku  = var.postgres_base_sku_name
-    }
-    }, var.managed_sync_enabled ? {
-    managed_sync = {
-      name = "${var.workspace}-managed-sync"
-      db   = "managed_sync"
-      ha   = var.postgres_redundant
-      sku  = var.postgres_base_sku_name
-    }
-    } : {}) : {
-    paragon = {
-      name = "${var.workspace}"
-      db   = "postgres"
-      ha   = var.postgres_redundant
-      sku  = var.postgres_sku_name
+  postgres_db_names = {
+    cerberus     = "cerberus"
+    eventlogs    = "eventlogs"
+    hermes       = "hermes"
+    triggerkit   = "triggerkit"
+    zeus         = "zeus"
+    managed_sync = "managed_sync"
+    paragon      = "postgres"
+  }
+
+  postgres_server_names = {
+    cerberus     = "${var.workspace}-cerberus"
+    eventlogs    = "${var.workspace}-eventlogs"
+    hermes       = "${var.workspace}-hermes"
+    triggerkit   = "${var.workspace}-triggerkit"
+    zeus         = "${var.workspace}-zeus"
+    managed_sync = "${var.workspace}-managed-sync"
+    paragon      = var.workspace
+  }
+
+  postgres_instances = {
+    for name, cfg in var.instances : name => {
+      name = local.postgres_server_names[name]
+      db   = local.postgres_db_names[name]
+      ha   = cfg.redundant
+      sku  = cfg.sku
     }
   }
 }

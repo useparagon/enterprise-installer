@@ -19,8 +19,6 @@ subchart:
     enabled: false
   hermes:
     enabled: true
-  minio:
-    enabled: false
   passport:
     enabled: true
   pheme:
@@ -59,6 +57,18 @@ restart:
   windowMinutes: 180 # stable per-deployment offset within this window (from PARAGON_DOMAIN hash)
 
 global:
+  # Optional private registry / Artifactory proxy (prepended to image repository paths).
+  imageRegistry: ""
+  # When set (including ""), rewrites useparagon/ prefix in repository paths. Omit to preserve useparagon/.
+  # imageRepositoryPrefix: null
+  migrationImageRegistry: ""
+  imagePullSecrets: []
   pullPolicy: IfNotPresent
+  testImage:
+    repository: busybox
+    tag: latest
+  kubectlImage:
+    repository: alpine/kubectl
+    tag: "1.36.2"
   namespace: paragon
   env: {}

@@ -1,39 +1,31 @@
-resource "aws_iam_user" "grafana" {
-  count = var.grafana_aws_access_key_id == null && var.grafana_aws_secret_access_key == null ? 1 : 0
+# Grafana CloudWatch access via EKS Pod Identity (no long-lived IAM access keys).
+data "aws_iam_policy_document" "grafana_assume" {
+  statement {
+    sid = "PodIdentity"
+    actions = [
+      "sts:AssumeRole",
+      "sts:TagSession",
+    ]
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+  }
+}
 
-  name = "${var.workspace}-iam-grafana"
-  path = "/env/"
+resource "aws_iam_role" "grafana" {
+  name               = "${var.workspace}-iam-grafana"
+  path               = "/env/"
+  assume_role_policy = data.aws_iam_policy_document.grafana_assume.json
 
   tags = {
     Name = "${var.workspace}-iam-grafana"
   }
 }
 
-resource "aws_iam_access_key" "grafana" {
-  count = var.grafana_aws_access_key_id == null && var.grafana_aws_secret_access_key == null ? 1 : 0
-
-  user = aws_iam_user.grafana[0].name
-}
-
-resource "aws_iam_group" "grafana" {
-  count = var.grafana_aws_access_key_id == null && var.grafana_aws_secret_access_key == null ? 1 : 0
-
-  name = "${var.workspace}-iam-grafana-group"
-}
-
-resource "aws_iam_group_membership" "grafana" {
-  count = var.grafana_aws_access_key_id == null && var.grafana_aws_secret_access_key == null ? 1 : 0
-
-  name  = "${var.workspace}-iam-grafana-group-membership"
-  group = aws_iam_group.grafana[0].name
-  users = [aws_iam_user.grafana[0].name]
-}
-
-resource "aws_iam_group_policy" "grafana_ro" {
-  count = var.grafana_aws_access_key_id == null && var.grafana_aws_secret_access_key == null ? 1 : 0
-
-  name  = "${var.workspace}-iam-grafana-group-policy"
-  group = aws_iam_group.grafana[0].name
+resource "aws_iam_role_policy" "grafana_ro" {
+  name = "${var.workspace}-iam-grafana-policy"
+  role = aws_iam_role.grafana.id
 
   policy = jsonencode({
     "Version" : "2012-10-17",
@@ -62,6 +54,13 @@ resource "aws_iam_group_policy" "grafana_ro" {
       }
     ]
   })
+}
+
+resource "aws_eks_pod_identity_association" "grafana" {
+  cluster_name    = var.cluster_name
+  namespace       = var.namespace
+  service_account = "grafana"
+  role_arn        = aws_iam_role.grafana.arn
 }
 
 resource "random_string" "grafana_admin_email_prefix" {

@@ -61,13 +61,9 @@ locals {
           },
           try(instance_config.ssl, false) == true ? { "envvar:REDIS_TLS" = "1" } : {},
           try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {},
-          {
-            for k, v in {
-              "envvar:PASS" = try(instance_config.password, null)
-              "envvar:USER" = try(instance_config.user, null)
-            } : k => v
-            if v != null && v != ""
-          }
+          try(instance_config.password, null) != null && try(instance_config.password, "") != "" ? {
+            "envvar:PASS" = instance_config.password
+          } : {},
         )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"

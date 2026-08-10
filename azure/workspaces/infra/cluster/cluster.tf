@@ -34,6 +34,15 @@ locals {
   )
 }
 
+# AKS rejects userAssignedNATGateway until the node subnet has a NAT gateway associated.
+# The cluster only references private_subnet.id (which pre-exists), so without this hook
+# Terraform can update outbound_type in parallel with the new association resource.
+resource "terraform_data" "nat_gateway_ready" {
+  count = var.k8s_outbound_type == "userAssignedNATGateway" ? 1 : 0
+
+  input = var.private_subnet_nat_gateway_id
+}
+
 resource "azurerm_kubernetes_cluster" "cluster" {
   name                = local.cluster_name
   location            = var.resource_group.location
@@ -68,20 +77,45 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   }
 
   network_profile {
-    network_plugin = "azure"
-    dns_service_ip = "172.0.0.10"
-    service_cidr   = "172.0.0.0/16"
+    network_plugin      = var.k8s_network_plugin
+    network_plugin_mode = var.k8s_network_plugin_mode
+    pod_cidr            = var.k8s_pod_cidr
+    dns_service_ip      = var.k8s_dns_service_ip
+    service_cidr        = var.k8s_service_cidr
+    outbound_type       = var.k8s_outbound_type
+    load_balancer_sku   = var.k8s_load_balancer_sku
+    network_policy      = var.k8s_network_policy
   }
 
   identity {
     type = "SystemAssigned"
   }
 
+  depends_on = [terraform_data.nat_gateway_ready]
+
   lifecycle {
     ignore_changes = [
       default_node_pool[0].upgrade_settings
     ]
   }
+}
+
+# required for subnet join when provisioning LoadBalancers / updating VMSS.
+# skip_service_principal_aad_check is intentionally omitted: changing it on an
+# existing assignment is ForceNew and azurerm errors with "doesn't support update".
+# For greenfield AAD lag, re-run apply (or wait briefly) rather than toggling that flag.
+resource "azurerm_role_assignment" "aks_network_contributor" {
+  scope                = var.private_subnet.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_kubernetes_cluster.cluster.identity[0].principal_id
+}
+
+# cloud-provider-azure updates security rules on the subnet's NSG when syncing
+# LoadBalancers; Network Contributor on the subnet alone does not cover the NSG.
+resource "azurerm_role_assignment" "aks_nsg_network_contributor" {
+  scope                = var.aks_nsg_id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_kubernetes_cluster.cluster.identity[0].principal_id
 }
 
 # created as a separate resource so config can be updated
@@ -120,6 +154,11 @@ resource "azurerm_kubernetes_cluster_node_pool" "pool" {
   upgrade_settings {
     max_surge = "1"
   }
+
+  depends_on = [
+    azurerm_role_assignment.aks_network_contributor,
+    azurerm_role_assignment.aks_nsg_network_contributor,
+  ]
 
   # Ensure new nodes are created before old ones are destroyed
   lifecycle {

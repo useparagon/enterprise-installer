@@ -16,33 +16,37 @@ service:
 
 resources:
   limits:
-    memory: 1000Mi
+    memory: 1200Mi
   requests:
-    cpu: 200m
-    memory: 1000Mi
+    cpu: 300m
+    memory: 1200Mi
 
 autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 75
-  targetMemoryUtilizationPercentage: 75
+  enabled: false
+  # minReplicas: 2
+  # maxReplicas: 20
+  # targetCPUUtilizationPercentage: 75
+  # targetMemoryUtilizationPercentage: 75
 
 secretName: "paragon-secrets"
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: 'worker-triggers'
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ''
+
+env:
+  WORKER_SHARED_AUTOSCALING_DISABLED: false
+  WORKER_SHARED_SERVICE_MAX_INSTANCES: 20
+  WORKER_SHARED_SERVICE_MIN_INSTANCES: 2
 
 podAnnotations:
   prometheus.io/scrape: "true"

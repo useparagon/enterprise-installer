@@ -19,8 +19,8 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 ## Requirements
 
 | Name | Version |
-|------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.0 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
 | <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | >= 0.0.19 |
@@ -29,13 +29,13 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 ## Providers
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.58.0 |
 
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
+| ---- | ------ | ------- |
 | <a name="module_dns"></a> [dns](#module\_dns) | ./dns | n/a |
 | <a name="module_helm"></a> [helm](#module\_helm) | ./helm | n/a |
 | <a name="module_hoop"></a> [hoop](#module\_hoop) | ./hoop | n/a |
@@ -46,23 +46,25 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [azurerm_kubernetes_cluster.cluster](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/kubernetes_cluster) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |
 | <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure\_client\_secret) | Azure client secret | `string` | n/a | yes |
 | <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure\_subscription\_id) | Azure subscription ID | `string` | n/a | yes |
 | <a name="input_azure_tenant_id"></a> [azure\_tenant\_id](#input\_azure\_tenant\_id) | Azure tenant ID | `string` | n/a | yes |
 | <a name="input_cloudflare_api_token"></a> [cloudflare\_api\_token](#input\_cloudflare\_api\_token) | Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Zone `DNS` | `string` | `null` | no |
 | <a name="input_cloudflare_zone_id"></a> [cloudflare\_zone\_id](#input\_cloudflare\_zone\_id) | Cloudflare zone id to set CNAMEs. | `string` | `null` | no |
+| <a name="input_create_docker_pull_secret"></a> [create\_docker\_pull\_secret](#input\_create\_docker\_pull\_secret) | Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm\_values. | `bool` | `true` | no |
 | <a name="input_customer_facing"></a> [customer\_facing](#input\_customer\_facing) | Whether the connections are customer-facing (true limits access to dev-team-oncall/dev-team-managers/admin, false adds dev-team-engineering). | `bool` | `true` | no |
 | <a name="input_docker_email"></a> [docker\_email](#input\_docker\_email) | Docker email to pull images. | `string` | n/a | yes |
 | <a name="input_docker_password"></a> [docker\_password](#input\_docker\_password) | Docker password to pull images. | `string` | n/a | yes |
-| <a name="input_docker_registry_server"></a> [docker\_registry\_server](#input\_docker\_registry\_server) | Docker container registry server. | `string` | `"docker.io"` | no |
+| <a name="input_docker_pull_secret_name"></a> [docker\_pull\_secret\_name](#input\_docker\_pull\_secret\_name) | Kubernetes secret name for registry pull credentials. | `string` | `"docker-cfg"` | no |
+| <a name="input_docker_registry_server"></a> [docker\_registry\_server](#input\_docker\_registry\_server) | Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry. | `string` | `"docker.io"` | no |
 | <a name="input_docker_username"></a> [docker\_username](#input\_docker\_username) | Docker username to pull images. | `string` | n/a | yes |
 | <a name="input_domain"></a> [domain](#input\_domain) | The root domain used for the microservices. | `string` | n/a | yes |
 | <a name="input_excluded_microservices"></a> [excluded\_microservices](#input\_excluded\_microservices) | The microservices that should be excluded from the deployment. | `list(string)` | `[]` | no |
@@ -77,12 +79,13 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | <a name="input_hoop_api_url"></a> [hoop\_api\_url](#input\_hoop\_api\_url) | Hoop API URL. | `string` | `"https://hoop.ops.paragoninternal.com/api"` | no |
 | <a name="input_hoop_custom_connections"></a> [hoop\_custom\_connections](#input\_hoop\_custom\_connections) | Custom Hoop connections defined via tfvars. Map of connection names to their configuration. | <pre>map(object({<br/>    type                  = string<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "disabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string))<br/>    secrets               = map(string)<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_enabled"></a> [hoop\_enabled](#input\_hoop\_enabled) | Whether to enable Hoop agent. hoop\_key, hoop\_api\_key, and hoop\_agent\_id must be set if this is true. | `bool` | `true` | no |
+| <a name="input_hoop_grafana_connection"></a> [hoop\_grafana\_connection](#input\_hoop\_grafana\_connection) | Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500). | `bool` | `false` | no |
 | <a name="input_hoop_k8s_connections"></a> [hoop\_k8s\_connections](#input\_hoop\_k8s\_connections) | Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created. | <pre>map(object({<br/>    type                  = optional(string, "custom")<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "enabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string), ["bash"])<br/>    remote_url            = optional(string, "https://kubernetes.default.svc.cluster.local")<br/>    insecure              = optional(string, "true")<br/>    namespace             = optional(string, "paragon")<br/>    secrets               = optional(map(string), {})<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_key"></a> [hoop\_key](#input\_hoop\_key) | Hoop agent key (token). Only used if hoop\_enabled is true. | `string` | `null` | no |
 | <a name="input_hoop_postgres_guardrail_rules"></a> [hoop\_postgres\_guardrail\_rules](#input\_hoop\_postgres\_guardrail\_rules) | Guardrail rule IDs for PostgreSQL connections. | `list(string)` | <pre>[<br/>  "a85115f6-5ef3-4618-b70c-f7cccdc62c5a"<br/>]</pre> | no |
 | <a name="input_hoop_redis_guardrail_rules"></a> [hoop\_redis\_guardrail\_rules](#input\_hoop\_redis\_guardrail\_rules) | Guardrail rule IDs for Redis connections. | `list(string)` | <pre>[<br/>  "182f59b2-5d5d-4ab8-978e-94472b3915fc"<br/>]</pre> | no |
 | <a name="input_hoop_restricted_access_groups"></a> [hoop\_restricted\_access\_groups](#input\_hoop\_restricted\_access\_groups) | Base access-control groups allowed for all connections. | `list(string)` | <pre>[<br/>  "dev-team-oncall",<br/>  "dev-team-managers",<br/>  "admin"<br/>]</pre> | no |
-| <a name="input_hoop_reviewers_access_groups"></a> [hoop\_reviewers\_access\_groups](#input\_hoop\_reviewers\_access\_groups) | Reviewer groups required for customer-facing app connections. | `list(string)` | <pre>[<br/>  "dev-team-managers",<br/>  "admin"<br/>]</pre> | no |
+| <a name="input_hoop_reviewers_access_groups"></a> [hoop\_reviewers\_access\_groups](#input\_hoop\_reviewers\_access\_groups) | Reviewer groups required for customer-facing app connections. | `list(string)` | <pre>[<br/>  "dev-team-managers"<br/>]</pre> | no |
 | <a name="input_hoop_slack_app_token"></a> [hoop\_slack\_app\_token](#input\_hoop\_slack\_app\_token) | Slack app token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_bot_token"></a> [hoop\_slack\_bot\_token](#input\_hoop\_slack\_bot\_token) | Slack bot token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_channel_ids"></a> [hoop\_slack\_channel\_ids](#input\_hoop\_slack\_channel\_ids) | Slack channel IDs to notify for connections that require reviews. | `list(string)` | `[]` | no |
@@ -104,7 +107,7 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_grafana_admin_email"></a> [grafana\_admin\_email](#output\_grafana\_admin\_email) | Grafana admin login email. |
 | <a name="output_grafana_admin_password"></a> [grafana\_admin\_password](#output\_grafana\_admin\_password) | Grafana admin login password. |
 | <a name="output_load_balancer"></a> [load\_balancer](#output\_load\_balancer) | Location of the load balancer |

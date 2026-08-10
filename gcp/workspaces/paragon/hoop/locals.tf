@@ -45,29 +45,30 @@ locals {
 
   # Unified connections map - combines all non-PostgreSQL connection types
   connections_merge = merge(
-    # Redis connections
+    # Redis: TLS when ssl=true; --cacert when ca_certificate is set; REDISCLI_AUTH for password.
     try(var.infra_vars.redis.value, null) != null ? {
       for instance_name, instance_config in var.infra_vars.redis.value :
       "redis-${instance_name}" => {
         name    = "${local.connection_prefix}-redis-${instance_name}"
         type    = "custom"
         subtype = "redis"
-        command = ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"]
+        command = concat(
+          ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"],
+          try(instance_config.ssl, false) ? ["--tls"] : [],
+          try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? ["--cacert", "$REDIS_CACERT_PATH"] : [],
+        )
         secrets = merge(
           {
             "envvar:HOST"      = instance_config.host
             "envvar:PORT"      = tostring(instance_config.port)
             "envvar:DB_NUMBER" = tostring(try(instance_config.db_number, 0))
           },
-          try(instance_config.ssl, false) == true ? { "envvar:REDIS_TLS" = "1" } : {},
-          try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {},
-          {
-            for k, v in {
-              "envvar:PASS" = try(instance_config.password, null)
-              "envvar:USER" = try(instance_config.user, null)
-            } : k => v
-            if v != null && v != ""
-          }
+          try(instance_config.ssl, false) && try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? {
+            "filesystem:REDIS_CACERT_PATH" = instance_config.ca_certificate
+          } : {},
+          try(instance_config.password, null) != null && try(instance_config.password, "") != "" ? {
+            "envvar:REDISCLI_AUTH" = instance_config.password
+          } : {},
         )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"

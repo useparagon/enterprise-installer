@@ -1,13 +1,15 @@
 module "network" {
   source = "./network"
 
-  location  = var.location
-  tags      = local.default_tags
-  vpc_cidr  = var.vpc_cidr
-  workspace = local.workspace
+  location          = var.location
+  nsg_malicious_ips = var.nsg_malicious_ips
+  tags              = local.default_tags
+  vpc_cidr          = var.vpc_cidr
+  workspace         = local.workspace
 }
 
 module "bastion" {
+  count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
 
   azure_client_id       = var.azure_client_id
@@ -35,22 +37,19 @@ module "bastion" {
 module "postgres" {
   source = "./postgres"
 
-  managed_sync_enabled        = var.managed_sync_enabled
-  postgres_multiple_instances = var.postgres_multiple_instances
-  postgres_base_sku_name      = var.postgres_base_sku_name
-  postgres_redundant          = var.postgres_redundant
-  postgres_sku_name           = var.postgres_sku_name
-  postgres_version            = var.postgres_version
-  resource_group              = module.network.resource_group
-  tags                        = local.default_tags
-  virtual_network             = module.network.virtual_network
-  private_subnet              = module.network.postgres_subnet
-  workspace                   = local.workspace
+  instances        = local.postgres_instances
+  postgres_version = var.postgres_version
+  resource_group   = module.network.resource_group
+  tags             = local.default_tags
+  virtual_network  = module.network.virtual_network
+  private_subnet   = module.network.postgres_subnet
+  workspace        = local.workspace
 }
 
 module "redis" {
   source = "./redis"
 
+  enabled                  = var.redis_enabled
   managed_sync_enabled     = var.managed_sync_enabled
   private_subnet           = module.network.private_subnet
   public_subnet            = module.network.public_subnet
@@ -65,6 +64,22 @@ module "redis" {
   tags                     = local.default_tags
   virtual_network          = module.network.virtual_network
   workspace                = local.workspace
+}
+
+module "redis_managed" {
+  count  = var.redis_managed_enabled ? 1 : 0
+  source = "./redis-managed"
+
+  clustering_policy               = var.redis_managed_clustering_policy
+  export_storage_enabled          = var.redis_managed_export_storage_enabled
+  export_storage_replication_type = var.redis_managed_export_storage_replication_type
+  instances                       = local.redis_managed_instances
+  private_subnet                  = module.network.private_subnet
+  public_network_access           = var.redis_managed_public_network_access
+  resource_group                  = module.network.resource_group
+  tags                            = local.default_tags
+  virtual_network                 = module.network.virtual_network
+  workspace                       = local.workspace
 }
 
 module "storage" {
@@ -84,14 +99,24 @@ module "cluster" {
   source = "./cluster"
 
   k8s_default_node_pool_vm_size   = var.k8s_default_node_pool_vm_size
+  k8s_dns_service_ip              = var.k8s_dns_service_ip
+  k8s_load_balancer_sku           = var.k8s_load_balancer_sku
   k8s_max_node_count              = var.k8s_max_node_count
   k8s_min_node_count              = var.k8s_min_node_count
+  k8s_network_plugin              = var.k8s_network_plugin
+  k8s_network_plugin_mode         = var.k8s_network_plugin_mode
+  k8s_network_policy              = var.k8s_network_policy
   k8s_ondemand_node_instance_type = var.k8s_ondemand_node_instance_type
+  k8s_outbound_type               = var.k8s_outbound_type
+  k8s_pod_cidr                    = var.k8s_pod_cidr
+  k8s_service_cidr                = var.k8s_service_cidr
   k8s_sku_tier                    = var.k8s_sku_tier
   k8s_spot_instance_percent       = var.k8s_spot_instance_percent
   k8s_spot_node_instance_type     = var.k8s_spot_node_instance_type
   k8s_version                     = var.k8s_version
+  aks_nsg_id                      = module.network.aks_nsg_id
   private_subnet                  = module.network.private_subnet
+  private_subnet_nat_gateway_id   = module.network.private_subnet_nat_gateway_id
   resource_group                  = module.network.resource_group
   tags                            = local.default_tags
   workspace                       = local.workspace

@@ -10,8 +10,7 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: 'latest'
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: 'prometheus'
 
@@ -62,10 +61,10 @@ ingress:
 
 resources:
   limits:
-    memory: 2Gi
+    memory: 2048Mi
   requests:
     cpu: 200m
-    memory: 1Gi
+    memory: 1024Mi
 
 autoscaling:
   enabled: false

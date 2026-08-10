@@ -44,7 +44,20 @@ log "starting UDS apply for stream paragon (desired fields: ${expected_count})"
 log "openobserve endpoint: ${O2_HOST}"
 
 auth_curl() {
-  curl -sf -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" "$@"
+  curl -sf --connect-timeout 10 --max-time 120 -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" "$@"
+}
+
+verify_auth() {
+  _status="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 10 --max-time 30 \
+    -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
+    "${O2_HOST}/api/default/streams?type=logs")"
+  case "$_status" in
+    200|401|403) ;;
+    *) die "auth probe failed: GET /api/default/streams returned HTTP ${_status}" ;;
+  esac
+  if [ "$_status" = "401" ] || [ "$_status" = "403" ]; then
+    die "OpenObserve rejected credentials (HTTP ${_status}). Run scripts/migrate-openobserve-password.sh (--hoop or --o2-host) after terraform apply."
+  fi
 }
 
 schema_matches_desired() {
@@ -66,7 +79,7 @@ print_schema_counts() {
 
 log "waiting for ${O2_HOST}/healthz (max ${HEALTH_WAIT_SECONDS}s)..."
 elapsed=0
-until auth_curl "${O2_HOST}/healthz" >/dev/null 2>&1; do
+until curl -sf --connect-timeout 5 --max-time 10 "${O2_HOST}/healthz" >/dev/null 2>&1; do
   if [ "$elapsed" -ge "$HEALTH_WAIT_SECONDS" ]; then
     die "OpenObserve not ready after ${HEALTH_WAIT_SECONDS}s"
   fi
@@ -75,8 +88,14 @@ until auth_curl "${O2_HOST}/healthz" >/dev/null 2>&1; do
 done
 log "openobserve is healthy"
 
+log "verifying credentials against OpenObserve API"
+verify_auth
+log "credentials accepted"
+
 log "fetching current schema"
-current="$(auth_curl "${O2_HOST}/api/default/streams/paragon/schema?type=logs")"
+if ! current="$(auth_curl "${O2_HOST}/api/default/streams/paragon/schema?type=logs")"; then
+  die "failed to fetch stream schema (check that stream paragon exists and credentials are valid)"
+fi
 print_schema_counts "before apply" "$current"
 
 if schema_matches_desired "$current"; then

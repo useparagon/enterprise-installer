@@ -63,8 +63,14 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
+variable "enabled" {
+  description = "When false, no Azure Cache for Redis or RDB backup storage account resources are created."
+  type        = bool
+  default     = true
+}
+
 locals {
-  redis_instances = var.redis_multiple_instances ? merge({
+  redis_instances = !var.enabled ? {} : (var.redis_multiple_instances ? merge({
     cache = {
       cluster  = var.redis_sku_name == "Premium"
       capacity = var.redis_capacity
@@ -92,5 +98,5 @@ locals {
       capacity = var.redis_capacity
       sku      = var.redis_sku_name
     }
-  }
+  })
 }

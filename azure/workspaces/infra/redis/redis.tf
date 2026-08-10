@@ -1,4 +1,6 @@
 resource "random_string" "storage_hash" {
+  count = var.enabled ? 1 : 0
+
   length  = 8
   lower   = true
   upper   = false
@@ -6,13 +8,11 @@ resource "random_string" "storage_hash" {
   special = false
 }
 
-locals {
-  # storage accounts must be globally unique and only up to 24 lower case alphanumeric characters
-  storage_account_name = "${substr(replace(var.workspace, "/[^a-z0-9]/", ""), 0, 16)}${random_string.storage_hash.result}"
-}
-
 resource "azurerm_storage_account" "redis" {
-  name                = local.storage_account_name
+  count = var.enabled ? 1 : 0
+
+  # Storage account names must be globally unique (max 24 lowercase alphanumeric characters).
+  name                = "${substr(replace(var.workspace, "/[^a-z0-9]/", ""), 0, 16)}${random_string.storage_hash[0].result}"
   resource_group_name = var.resource_group.name
   location            = var.resource_group.location
 
@@ -20,7 +20,7 @@ resource "azurerm_storage_account" "redis" {
   account_tier                     = "Standard"
   allow_nested_items_to_be_public  = false
   cross_tenant_replication_enabled = false
-  tags                             = merge(var.tags, { Name = local.storage_account_name })
+  tags                             = merge(var.tags, { Name = "${substr(replace(var.workspace, "/[^a-z0-9]/", ""), 0, 16)}${random_string.storage_hash[0].result}" })
 }
 
 resource "azurerm_redis_cache" "redis" {
@@ -51,7 +51,7 @@ resource "azurerm_redis_cache" "redis" {
       rdb_backup_enabled            = true
       rdb_backup_frequency          = 60
       rdb_backup_max_snapshot_count = 1
-      rdb_storage_connection_string = azurerm_storage_account.redis.primary_blob_connection_string
+      rdb_storage_connection_string = azurerm_storage_account.redis[0].primary_blob_connection_string
     }
   }
 

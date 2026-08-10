@@ -5,10 +5,10 @@ output "workspace" {
 
 output "bastion" {
   description = "Bastion server connection info."
-  value = {
-    public_dns  = module.bastion.connection.bastion_dns
-    private_key = module.bastion.connection.private_key
-  }
+  value = var.bastion_enabled ? {
+    public_dns  = module.bastion[0].connection.bastion_dns
+    private_key = module.bastion[0].connection.private_key
+  } : null
   sensitive = true
 }
 
@@ -30,14 +30,12 @@ output "auditlogs_bucket" {
   sensitive   = true
 }
 
-output "minio" {
-  description = "MinIO server connection info."
+output "storage" {
+  description = "Object storage connection info."
   value = {
     public_bucket       = module.storage.blob.public_container
     private_bucket      = module.storage.blob.private_container
     managed_sync_bucket = module.storage.blob.managed_sync_container
-    microservice_user   = module.storage.blob.minio_microservice_user
-    microservice_pass   = module.storage.blob.minio_microservice_pass
     root_user           = module.storage.blob.name
     root_password       = module.storage.blob.access_key
   }
@@ -45,14 +43,26 @@ output "minio" {
 }
 
 output "redis" {
-  description = "Connection information for Redis."
-  value       = module.redis.redis
+  description = "Primary Redis connection info for the paragon workspace. During migration (both modules enabled), returns legacy endpoints until redis_enabled is set to false."
+  value       = var.redis_enabled ? module.redis.redis : module.redis_managed[0].redis
   sensitive   = true
+}
+
+output "redis_managed" {
+  description = "Azure Managed Redis 7.4 endpoints (null when redis_managed_enabled is false). Use during migration for kubectl trial routing while output redis still points at legacy."
+  value       = var.redis_managed_enabled ? module.redis_managed[0].redis : null
+  sensitive   = true
+}
+
+output "redis_managed_export_storage" {
+  description = "Blob storage for on-demand Azure Managed Redis RDB export (null when disabled or legacy Redis)."
+  value       = var.redis_managed_enabled ? module.redis_managed[0].export_storage : null
 }
 
 output "cluster_name" {
   description = "The name of the AKS cluster."
   value       = module.cluster.kubernetes.name
+  sensitive   = true
 }
 
 output "resource_group" {

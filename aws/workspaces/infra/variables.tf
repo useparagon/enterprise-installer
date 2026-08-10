@@ -5,21 +5,29 @@ variable "aws_region" {
 }
 
 variable "aws_access_key_id" {
-  description = "AWS Access Key for AWS account to provision resources on."
+  description = "AWS Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws_assume_role_arn."
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "aws_secret_access_key" {
-  description = "AWS Secret Access Key for AWS account to provision resources on."
+  description = "AWS Secret Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws_assume_role_arn."
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "aws_session_token" {
   description = "AWS session token."
   type        = string
   sensitive   = true
+  default     = null
+}
+
+variable "aws_assume_role_arn" {
+  description = "Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift)."
+  type        = string
   default     = null
 }
 
@@ -55,6 +63,12 @@ variable "rds_instance_class" {
   default     = "db.t4g.small"
 }
 
+variable "rds_managed_sync_instance_class" {
+  description = "The RDS instance class type used for the managed sync Postgres instance."
+  type        = string
+  default     = "db.t4g.small"
+}
+
 variable "rds_postgres_version" {
   description = "Postgres version for the database."
   type        = string
@@ -85,6 +99,46 @@ variable "rds_final_snapshot_enabled" {
   default     = true
 }
 
+variable "rds_gp3_iops" {
+  description = "gp3 IOPS for Postgres; null uses size-based baseline (3000 below 400 GiB, 12000 at/above). Set with rds_gp3_storage_throughput to override; only valid when rds_allocated_storage >= 400 GiB."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.rds_gp3_iops == null || var.rds_allocated_storage >= 400
+    error_message = "rds_gp3_iops can only be set when rds_allocated_storage is >= 400 GiB (PostgreSQL gp3 minimum at that size is 12000)."
+  }
+}
+
+variable "rds_gp3_storage_throughput" {
+  description = "gp3 throughput (MiB/s); null uses size-based baseline (125 below 400 GiB, 500 at/above). Use a valid pair with rds_gp3_iops when overriding."
+  type        = number
+  default     = null
+  nullable    = true
+
+  validation {
+    condition = var.rds_gp3_iops == null || var.rds_gp3_storage_throughput == null || (
+      var.rds_allocated_storage < 400 || (
+        coalesce(var.rds_gp3_iops, 12000) >= 12000 && coalesce(var.rds_gp3_storage_throughput, 500) >= 500
+      )
+    )
+    error_message = "For rds_allocated_storage >= 400 GiB, gp3 requires at least 12000 IOPS and 500 MiB/s throughput."
+  }
+}
+
+variable "rds_allocated_storage" {
+  description = "Initial allocated storage (GiB) for each Postgres RDS instance."
+  type        = number
+  default     = 20
+}
+
+variable "rds_max_allocated_storage" {
+  description = "Maximum storage (GiB) for autoscaling on each Postgres RDS instance."
+  type        = number
+  default     = 1000
+}
+
 # elasticache
 variable "elasticache_node_type" {
   description = "The ElastiCache node type used for Redis."
@@ -108,7 +162,7 @@ variable "elasticache_multi_az" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.33"
+  default     = "1.34"
 }
 
 variable "eks_ondemand_node_instance_type" {
@@ -142,7 +196,7 @@ variable "eks_min_node_count" {
 variable "eks_max_node_count" {
   description = "The maximum number of nodes to run in the Kubernetes cluster."
   type        = number
-  default     = 30
+  default     = 50
 }
 
 variable "eks_admin_arns" {
@@ -155,6 +209,54 @@ variable "create_autoscaling_linked_role" {
   description = "Whether or not to create an IAM role for autoscaling."
   type        = bool
   default     = true
+}
+
+variable "enable_karpenter" {
+  description = "Enable Karpenter autoscaling (SQS, IAM, Helm controller, EC2NodeClass, NodePools)."
+  type        = bool
+  default     = false
+}
+
+variable "enable_legacy_mng_pools" {
+  description = "Keep legacy on-demand and spot EKS managed node groups during Karpenter migration."
+  type        = bool
+  default     = true
+
+  validation {
+    condition     = var.enable_karpenter || var.enable_legacy_mng_pools
+    error_message = "At least one worker capacity source must be enabled: enable_karpenter or enable_legacy_mng_pools."
+  }
+}
+
+variable "karpenter_chart_version" {
+  description = "Karpenter Helm chart version (OCI public.ecr.aws/karpenter/karpenter)."
+  type        = string
+  default     = "1.13.0"
+}
+
+variable "karpenter_iam_names" {
+  description = "Optional override for Karpenter IAM role names."
+  type = object({
+    controller_role_name = optional(string)
+    node_role_name       = optional(string)
+  })
+  default = {}
+}
+
+variable "eks_system_managed_node_group" {
+  description = "System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default)."
+  type = object({
+    map_key         = optional(string, "node-default")
+    name            = optional(string)
+    use_name_prefix = optional(bool, false)
+    ec2_name_tag    = optional(string)
+    instance_types  = optional(list(string))
+    min_size        = optional(number, 2)
+    max_size        = optional(number, 3)
+    desired_size    = optional(number, 2)
+    labels          = optional(map(string), { "karpenter.sh/controller" = "true" })
+  })
+  default = {}
 }
 
 # security
@@ -204,6 +306,64 @@ variable "auditlogs_lock_enabled" {
   description = "Whether to enable S3 Object Lock for the audit logs bucket."
   type        = bool
   default     = false
+}
+
+variable "s3_kms_encryption_enabled" {
+  description = "Encrypt the app, CDN, audit logs, and managed sync S3 buckets with AWS KMS (SSE-KMS) instead of S3-managed keys (SSE-S3). Existing deployments default to SSE-S3; enable for new installs or to migrate existing buckets to KMS. The logs bucket always uses SSE-S3 because ALB and S3 server access logs do not support SSE-KMS."
+  type        = bool
+  default     = false
+}
+
+variable "s3_kms_key_arn" {
+  description = "ARN of an existing KMS key to use for S3 bucket encryption. When null and s3_kms_encryption_enabled is true, a dedicated KMS key is created and managed by Terraform. Ignored when s3_kms_encryption_enabled is false."
+  type        = string
+  default     = null
+}
+
+# network firewall
+variable "network_firewall" {
+  description = "Optional AWS Network Firewall for egress inspection with RAM-shared rule group ARNs (stateful or stateless). Enable on initial deployment only; not supported when adding to an existing workspace. Logs go to <workspace>-logs."
+  type = object({
+    enabled = optional(bool, false)
+
+    rule_group_arns = optional(list(string), [])
+
+    stateless_default_actions          = optional(list(string), ["aws:forward_to_sfe"])
+    stateless_fragment_default_actions = optional(list(string), ["aws:forward_to_sfe"])
+
+    # STRICT_ORDER (AWS-recommended) evaluates stateful rule groups by priority. It is
+    # required when any referenced rule group was created with STRICT_ORDER. DEFAULT_ACTION_ORDER
+    # lets the Suricata engine decide order and forbids priority/stateful_default_actions.
+    stateful_rule_order      = optional(string, "STRICT_ORDER")
+    stateful_default_actions = optional(list(string), ["aws:drop_strict", "aws:alert_strict"])
+  })
+  default = { enabled = false }
+
+  validation {
+    condition = (
+      !var.network_firewall.enabled ||
+      length(var.network_firewall.rule_group_arns) > 0
+    )
+    error_message = "When network_firewall.enabled is true, provide at least one rule_group_arn (RAM-shared)."
+  }
+
+  validation {
+    condition     = contains(["STRICT_ORDER", "DEFAULT_ACTION_ORDER"], var.network_firewall.stateful_rule_order)
+    error_message = "network_firewall.stateful_rule_order must be STRICT_ORDER or DEFAULT_ACTION_ORDER."
+  }
+}
+
+# bastion
+variable "bastion_enabled" {
+  description = "Whether to create the bastion host and its associated Cloudflare tunnel."
+  type        = bool
+  default     = true
+}
+
+variable "bastion_tags" {
+  description = "Optional additional tags applied to bastion resources (e.g. customer SCP-required tags)."
+  type        = map(string)
+  default     = {}
 }
 
 # cloudflare
@@ -259,6 +419,12 @@ variable "migrated_passwords" {
   default     = {}
 }
 
+variable "cdn_bucket_acl_reset" {
+  description = "Reset the CDN S3 bucket ACL to private before BucketOwnerEnforced. Defaults to false; set true once when migrating a legacy CDN bucket with existing ACL grants, then remove."
+  type        = bool
+  default     = false
+}
+
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync."
   type        = bool
@@ -268,9 +434,7 @@ variable "managed_sync_enabled" {
 variable "msk_kafka_version" {
   description = "The Kafka version for the MSK cluster."
   type        = string
-  // NOTE: to use a small instance type like `kafka.t3.small`, we need to use an older version that uses zookeeper
-  // we're default to an older version to keep costs low, but we can override this if we use a supported larger instance type
-  default = "3.6.0"
+  default     = "3.9.x"
 }
 
 variable "msk_kafka_num_broker_nodes" {
@@ -291,6 +455,68 @@ variable "msk_instance_type" {
   default     = "kafka.t3.small"
 }
 
+variable "env_overrides" {
+  description = "Optional overrides for any infra-derived env key written to Secrets Manager (e.g. PARAGON_DOMAIN, ACCOUNT_PUBLIC_URL, CERBERUS_POSTGRES_PORT). Merged on top of computed defaults; app_secrets wins if the same key is set in both. Domain and *_PUBLIC_URL chart envKeys are owned by the paragon workspace `domain` variable — seed them here only for GitOps-only flows that read Secrets Manager without that workspace."
+  type        = map(string)
+  default     = null
+}
+
+variable "app_secrets" {
+  description = "Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides env_overrides when the same key is set in both."
+  type        = map(string)
+  sensitive   = true
+  default     = null
+}
+
+variable "docker_registry_server" {
+  description = "Docker registry server for application image pulls."
+  type        = string
+  default     = null
+}
+
+variable "docker_username" {
+  description = "Docker username for application image pulls."
+  type        = string
+  default     = null
+}
+
+variable "docker_password" {
+  description = "Docker password for application image pulls."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "docker_email" {
+  description = "Docker email for application image pulls."
+  type        = string
+  default     = null
+}
+
+variable "paragon_managed_sync_config" {
+  description = "Optional managed-sync secret data to write to Secrets Manager. Null when managed sync is disabled."
+  type        = map(string)
+  sensitive   = true
+  default     = null
+}
+
+variable "openobserve_email" {
+  description = "Optional OpenObserve root user email. When set, used instead of the generated random email."
+  type        = string
+  default     = null
+}
+
+variable "secrets_recovery_window_in_days" {
+  description = "Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve) and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.secrets_recovery_window_in_days == 0 || (var.secrets_recovery_window_in_days >= 7 && var.secrets_recovery_window_in_days <= 30)
+    error_message = "secrets_recovery_window_in_days must be 0 (immediate) or between 7 and 30."
+  }
+}
+
 locals {
   # hash of account ID to help ensure uniqueness of resources like S3 bucket names
   hash        = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)
@@ -303,6 +529,8 @@ locals {
       Name        = "paragon-${var.organization}"
       Environment = local.environment
       Creator     = "Terraform"
+      Workspace   = "enterprise-installer"
+      aws-apn-id  = "pc:3elab41fw971izucbsjrfn81o"
     },
     trimspace(var.organization) == "" ? {} : { Organization = var.organization }
   )
@@ -314,4 +542,27 @@ locals {
   # split instance types by comma, trim, and remove duplicates
   eks_ondemand_node_instance_type = distinct([for value in split(",", var.eks_ondemand_node_instance_type) : trimspace(value)])
   eks_spot_node_instance_type     = distinct([for value in split(",", var.eks_spot_node_instance_type) : trimspace(value)])
+
+  # When using an assumed role the role itself must be referenced instead of the
+  # current session identity arn, otherwise KMS key policies are rejected with
+  # MalformedPolicyDocumentException.
+  is_assumed_role = can(regex("assumed-role", data.aws_caller_identity.current.arn))
+  assumed_role_parts = split(
+    "/",
+    replace(
+      replace(
+        data.aws_caller_identity.current.arn,
+        ":sts:",
+        ":iam:"
+      ),
+      ":assumed-role/",
+      local.is_assumed_role && strcontains(data.aws_caller_identity.current.arn, ":assumed-role/AWSReservedSSO") ? ":role__TEMPORARY_DIVIDER__aws-reserved__TEMPORARY_DIVIDER__sso.amazonaws.com/" : ":role/"
+    )
+  )
+  caller_arn = local.is_assumed_role ? replace(format("%s/%s", local.assumed_role_parts[0], local.assumed_role_parts[1]), "__TEMPORARY_DIVIDER__", "/") : data.aws_caller_identity.current.arn
+
+  admin_arns = distinct(compact(concat(
+    var.eks_admin_arns,
+    [local.caller_arn]
+  )))
 }

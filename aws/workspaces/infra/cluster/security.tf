@@ -7,7 +7,7 @@ resource "aws_iam_role" "eks_cluster_admin" {
       {
         Effect = "Allow",
         Principal = {
-          AWS = local.eks_admin_arns
+          AWS = var.eks_admin_arns
         },
         Action = "sts:AssumeRole"
       }

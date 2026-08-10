@@ -7,8 +7,10 @@ replicaCount: 1
 image:
   repository: public.ecr.aws/zinclabs/openobserve
   pullPolicy: IfNotPresent
-  tag: v0.20.1
-  # tag: v0.20.1-debug
+  tag: v0.91.0
+  # tag: v0.91.0-debug
+
+imagePullSecrets: []
 
 service:
   type: ClusterIP
@@ -33,8 +35,11 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ''
 
-# used to store GCP JSON creds as ConfigMap
+# GCP service-account JSON for ZO_S3 (base64). Used only when credsSecretName is empty.
 credsJson: ""
+
+# Existing Secret (e.g. ESO-synced) mounted at /creds. Takes precedence over credsJson.
+credsSecretName: ""
 
 ingress:
   enabled: false

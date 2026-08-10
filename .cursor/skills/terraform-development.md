@@ -17,7 +17,7 @@ The workspaces are coupled via a **JSON file**, not `terraform_remote_state`:
 infra workspace → terraform output -json → .secure/infra-output.json → paragon workspace
 ```
 
-The paragon workspace reads this file through `local.infra_vars = jsondecode(file(var.infra_json_path))`. Each key in the JSON corresponds to an infra output name (e.g., `postgres`, `redis`, `minio`, `workspace`, `cluster_name`).
+The paragon workspace reads this file through `local.infra_vars = jsondecode(file(var.infra_json_path))`. Each key in the JSON corresponds to an infra output name (e.g., `postgres`, `redis`, `storage`, `workspace`, `cluster_name`).
 
 ### Directory Layout
 
@@ -57,7 +57,7 @@ The paragon workspace reads this file through `local.infra_vars = jsondecode(fil
 All modules are **local path modules** (e.g., `source = "./network"`). No shared module directory exists across providers. Each provider maintains its own modules.
 
 External registry modules used:
-- **AWS**: `terraform-aws-modules/eks/aws`, `terraform-aws-modules/kms/aws`, `terraform-aws-modules/iam/aws`, `cloudposse/acm-request-certificate/aws`, `trussworks/cloudtrail/aws`, `lablabs/eks-cluster-autoscaler/aws`, `qvest-digital/aws-node-termination-handler/kubernetes`
+- **AWS**: `terraform-aws-modules/eks/aws`, `terraform-aws-modules/kms/aws`, `terraform-aws-modules/iam/aws`, `cloudposse/acm-request-certificate/aws`, `trussworks/cloudtrail/aws`, `lablabs/eks-cluster-autoscaler/aws`
 - **GCP**: `terraform-google-modules/kubernetes-engine/google//modules/private-cluster`
 - **Azure**: No external registry modules (uses native `azurerm` resources directly)
 
@@ -265,7 +265,7 @@ Infra output shape (each key wraps value in `.value`):
   "workspace": { "value": "paragon-org-abc12345" },
   "postgres": { "value": { "cerberus": { "host": "...", "port": "5432", ... }, ... } },
   "redis": { "value": { "cache": { "host": "...", "port": 6379, ... }, ... } },
-  "minio": { "value": { "public_bucket": "...", "private_bucket": "...", ... } },
+  "storage": { "value": { "public_bucket": "...", "private_bucket": "...", ... } },
   "cluster_name": { "value": "paragon-org-abc12345" }
 }
 ```

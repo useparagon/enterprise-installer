@@ -1,11 +1,34 @@
+# Logs bucket policy must exist before Network Firewall logging configuration.
+module "storage" {
+  source = "./storage"
+
+  workspace                 = local.workspace
+  aws_region                = var.aws_region
+  network_firewall_enabled  = var.network_firewall.enabled
+  force_destroy             = var.disable_deletion_protection
+  app_bucket_expiration     = var.app_bucket_expiration
+  auditlogs_retention_days  = var.auditlogs_retention_days
+  auditlogs_lock_enabled    = var.auditlogs_lock_enabled
+  managed_sync_enabled      = var.managed_sync_enabled
+  s3_kms_encryption_enabled = var.s3_kms_encryption_enabled
+  s3_kms_key_arn            = var.s3_kms_key_arn
+  admin_arns                = local.admin_arns
+
+  migrated             = var.migrated_workspace != null
+  cdn_bucket_acl_reset = var.cdn_bucket_acl_reset
+}
+
 module "network" {
   source = "./network"
 
-  workspace        = local.workspace
-  aws_region       = var.aws_region
-  az_count         = var.az_count
-  vpc_cidr         = var.vpc_cidr
-  vpc_cidr_newbits = var.vpc_cidr_newbits
+  workspace                = local.workspace
+  aws_region               = var.aws_region
+  az_count                 = var.az_count
+  vpc_cidr                 = var.vpc_cidr
+  vpc_cidr_newbits         = var.vpc_cidr_newbits
+  network_firewall_enabled = var.network_firewall.enabled
+  logs_bucket_name         = module.storage.logs_bucket_name
+  network_firewall         = var.network_firewall
 }
 
 module "cloudtrail" {
@@ -22,17 +45,22 @@ module "cloudtrail" {
 module "postgres" {
   source = "./postgres"
 
-  workspace                   = local.workspace
-  aws_region                  = var.aws_region
-  rds_instance_class          = var.rds_instance_class
-  rds_multi_az                = var.rds_multi_az
-  rds_multiple_instances      = var.rds_multiple_instances
-  rds_postgres_version        = var.rds_postgres_version
-  rds_restore_from_snapshot   = var.rds_restore_from_snapshot
-  rds_final_snapshot_enabled  = var.rds_final_snapshot_enabled
-  disable_deletion_protection = var.disable_deletion_protection
-  managed_sync_enabled        = var.managed_sync_enabled
-  migrated_passwords          = var.migrated_passwords
+  workspace                       = local.workspace
+  aws_region                      = var.aws_region
+  rds_instance_class              = var.rds_instance_class
+  rds_managed_sync_instance_class = var.rds_managed_sync_instance_class
+  rds_gp3_iops                    = var.rds_gp3_iops
+  rds_gp3_storage_throughput      = var.rds_gp3_storage_throughput
+  rds_allocated_storage           = var.rds_allocated_storage
+  rds_max_allocated_storage       = var.rds_max_allocated_storage
+  rds_multi_az                    = var.rds_multi_az
+  rds_multiple_instances          = var.rds_multiple_instances
+  rds_postgres_version            = var.rds_postgres_version
+  rds_restore_from_snapshot       = var.rds_restore_from_snapshot
+  rds_final_snapshot_enabled      = var.rds_final_snapshot_enabled
+  disable_deletion_protection     = var.disable_deletion_protection
+  managed_sync_enabled            = var.managed_sync_enabled
+  migrated_passwords              = var.migrated_passwords
 
   vpc                = module.network.vpc
   public_subnet      = module.network.public_subnet
@@ -55,19 +83,6 @@ module "redis" {
   private_subnet = module.network.private_subnet
 }
 
-module "storage" {
-  source = "./storage"
-
-  workspace                = local.workspace
-  force_destroy            = var.disable_deletion_protection
-  app_bucket_expiration    = var.app_bucket_expiration
-  auditlogs_retention_days = var.auditlogs_retention_days
-  auditlogs_lock_enabled   = var.auditlogs_lock_enabled
-  managed_sync_enabled     = var.managed_sync_enabled
-
-  migrated = var.migrated_workspace != null
-}
-
 module "kafka" {
   source = "./kafka"
   count  = var.managed_sync_enabled ? 1 : 0
@@ -84,11 +99,13 @@ module "kafka" {
 }
 
 module "bastion" {
+  count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
 
   workspace     = local.workspace
   aws_region    = var.aws_region
   ssh_whitelist = local.ssh_whitelist
+  bastion_tags  = var.bastion_tags
 
   cloudflare_api_token           = var.cloudflare_api_token
   cloudflare_tunnel_enabled      = var.cloudflare_tunnel_enabled
@@ -102,18 +119,25 @@ module "bastion" {
   private_subnet = module.network.private_subnet
   public_subnet  = module.network.public_subnet
   vpc_id         = module.network.vpc.id
+
+  # Workloads that bootstrap over the internet must wait for egress routing (NFW or NAT).
+  egress_ready = module.network.egress_ready
 }
 
 module "cluster" {
   source = "./cluster"
 
-  workspace = local.workspace
+  workspace  = local.workspace
+  aws_region = var.aws_region
 
-  bastion_role_arn          = module.bastion.bastion_role_arn
-  bastion_security_group_id = module.bastion.security_group.host[0]
+  egress_ready = module.network.egress_ready
+
+  bastion_enabled           = var.bastion_enabled
+  bastion_role_arn          = var.bastion_enabled ? module.bastion[0].bastion_role_arn : null
+  bastion_security_group_id = var.bastion_enabled ? module.bastion[0].security_group.host[0] : null
 
   create_autoscaling_linked_role  = var.create_autoscaling_linked_role
-  eks_admin_arns                  = var.eks_admin_arns
+  eks_admin_arns                  = local.admin_arns
   eks_max_node_count              = var.eks_max_node_count
   eks_min_node_count              = var.eks_min_node_count
   eks_ondemand_node_instance_type = local.eks_ondemand_node_instance_type
@@ -121,6 +145,41 @@ module "cluster" {
   eks_spot_node_instance_type     = local.eks_spot_node_instance_type
   k8s_version                     = var.k8s_version
 
+  enable_karpenter              = var.enable_karpenter
+  enable_legacy_mng_pools       = var.enable_legacy_mng_pools
+  karpenter_chart_version       = var.karpenter_chart_version
+  karpenter_iam_names           = var.karpenter_iam_names
+  eks_system_managed_node_group = var.eks_system_managed_node_group
+
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
+}
+
+module "secrets" {
+  source = "./secrets"
+
+  workspace    = local.workspace
+  organization = var.organization
+  env_config   = local.env_config
+
+  docker_config = (
+    var.docker_username != null &&
+    var.docker_password != null
+    ) ? jsonencode({
+      dockerconfigjson = jsonencode({
+        auths = {
+          (coalesce(var.docker_registry_server, "docker.io")) = {
+            username = var.docker_username
+            password = var.docker_password
+            email    = var.docker_email
+            auth     = base64encode("${var.docker_username}:${var.docker_password}")
+          }
+        }
+      })
+  }) : null
+
+  managed_sync_config     = var.managed_sync_enabled ? coalesce(var.paragon_managed_sync_config, {}) : null
+  create_openobserve      = true
+  openobserve_email       = var.openobserve_email
+  recovery_window_in_days = var.secrets_recovery_window_in_days
 }

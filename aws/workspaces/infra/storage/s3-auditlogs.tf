@@ -24,8 +24,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "auditlogs" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = local.s3_kms_enabled ? "aws:kms" : "AES256"
+      kms_master_key_id = local.s3_kms_enabled ? local.s3_kms_key_arn : null
     }
+    bucket_key_enabled = local.s3_kms_enabled ? true : null
   }
 }
 
@@ -62,16 +64,32 @@ resource "aws_s3_bucket_lifecycle_configuration" "auditlogs" {
   bucket = aws_s3_bucket.auditlogs.id
 
   rule {
-    id = "expiration"
+    id     = "expiration"
+    status = "Enabled"
+
+    filter {}
 
     expiration {
       days = var.auditlogs_retention_days
     }
 
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+
     noncurrent_version_expiration {
       noncurrent_days = var.auditlogs_retention_days
     }
+  }
 
+  rule {
+    id     = "delete-markers"
     status = "Enabled"
+
+    filter {}
+
+    expiration {
+      expired_object_delete_marker = true
+    }
   }
 }
