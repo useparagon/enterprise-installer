@@ -14,10 +14,12 @@ Call with: include "migration.standard" (dict "root" $ "imageName" "postgres-zeu
 {{- $podAnnotations = merge $podAnnotations $root.Values.podAnnotations -}}
 {{- end -}}
 {{- $migration := dict "activeDeadlineSeconds" 600 "queryTimeoutMillis" 600000 -}}
-{{- if and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "migration") (kindIs "map" $root.Values.global.migration) -}}
+{{- if kindIs "map" $root.Values.global -}}
+{{- if kindIs "map" (get $root.Values.global "migration") -}}
 {{- $migration = merge (deepCopy $root.Values.global.migration) $migration -}}
 {{- end -}}
-{{- if and (hasKey $root.Values "migration") (kindIs "map" $root.Values.migration) -}}
+{{- end -}}
+{{- if kindIs "map" (get $root.Values "migration") -}}
 {{- $migration = merge (deepCopy $root.Values.migration) $migration -}}
 {{- end -}}
 ---
