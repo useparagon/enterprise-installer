@@ -77,10 +77,19 @@ module "eks" {
     Name = var.workspace
   }
 
-  depends_on = [
-    aws_iam_role.eks_cluster_admin,
-    terraform_data.egress_ready,
-  ]
+  # NEVER add depends_on here. A module-level depends_on is inherited by the module's
+  # data sources, so `data.aws_partition.current` is deferred to apply time whenever any
+  # upstream object has a pending change. That makes local.iam_role_policy_prefix unknown
+  # at plan time, which makes policy_arn unknown on
+  # aws_iam_role_policy_attachment.this["AmazonEKSClusterPolicy"] and
+  # ["AmazonEKSVPCResourceController"]. policy_arn is ForceNew, so Terraform silently
+  # detaches and re-attaches both managed policies from the live cluster role on an
+  # otherwise unrelated apply, which takes the control plane's node/ENI management offline
+  # and drives every node NotReady (SEV-1130).
+  #
+  # aws_iam_role.eks_cluster_admin is already an implicit dependency via access_entries.
+  # The egress gate belongs on the node groups, which are what actually bootstrap over the
+  # internet; the control plane itself does not need private egress routing.
 }
 
 # Managed outside the EKS module so creation is ordered after the cluster (and the
@@ -176,8 +185,13 @@ module "eks_managed_node_group" {
   enable_monitoring       = true
   block_device_mappings = each.key == "system" && try(each.value.ami_type, null) == "BOTTLEROCKET_x86_64" ? local.bottlerocket_system_block_device_mappings : local.default_block_device_mappings
 
+  # depends_on is safe here only because create_iam_role = false: the data sources this
+  # defers (aws_partition, aws_caller_identity) feed nothing but the module's own node role
+  # policy ARNs, which are not created. Do not enable create_iam_role without first making
+  # these dependencies implicit — see the note on module.eks above.
   depends_on = [
     module.eks,
+    terraform_data.egress_ready,
     aws_iam_role.node_role,
     aws_iam_role_policy_attachment.custom_worker_policy_attachment,
     aws_iam_role_policy_attachment.AmazonEKSWorkerNodePolicy,

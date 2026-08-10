@@ -7,11 +7,6 @@ module "sqs" {
   tags = {
     ClusterName = var.workspace
   }
-
-  depends_on = [
-    module.eks,
-    module.ebs_kms_key,
-  ]
 }
 
 module "iam" {
@@ -29,10 +24,11 @@ module "iam" {
     ClusterName = var.workspace
   }
 
-  depends_on = [
-    module.eks,
-    module.sqs,
-  ]
+  # No depends_on: this module builds node role policy ARNs from data.aws_partition, so a
+  # module-level depends_on would defer that read to apply time and force Terraform to
+  # detach and re-attach the Karpenter node role's worker policies. cluster_name,
+  # interruption_queue_arn and kms_key_arn already order this after module.eks,
+  # module.sqs and module.ebs_kms_key.
 }
 
 module "karpenter" {
