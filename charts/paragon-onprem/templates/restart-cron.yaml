@@ -1,6 +1,7 @@
 {{- if .Values.restart.enabled }}
 {{- $seed := .Values.global.env.PARAGON_DOMAIN | default .Release.Name | toString }}
-{{- $windowMinutes := int (.Values.restart.windowMinutes | default 120) }}
+{{- /* hasKey so an explicit 0 is honored; Sprig default treats 0 as empty */}}
+{{- $windowMinutes := ternary (int .Values.restart.windowMinutes) 180 (hasKey .Values.restart "windowMinutes") }}
 {{- $offsetMinutes := cond (gt $windowMinutes 0) (mod (adler32sum $seed) $windowMinutes) 0 }}
 {{- $baseTotalMinutes := add (mul (int .Values.restart.hour) 60) (int .Values.restart.minute) }}
 {{- $scheduledTotalMinutes := add $baseTotalMinutes $offsetMinutes }}
