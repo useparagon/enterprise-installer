@@ -82,6 +82,11 @@ variable "external_secrets_service_account_email" {
   type        = string
 }
 
+variable "eso_iam_ready" {
+  description = "Opaque token referencing ESO IAM bindings so the ClusterSecretStore waits without module depends_on."
+  type        = string
+}
+
 variable "gcp_project_id" {
   description = "GCP project ID for Secret Manager (ClusterSecretStore provider.gcpsm.projectID)."
   type        = string

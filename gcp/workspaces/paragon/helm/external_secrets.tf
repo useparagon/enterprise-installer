@@ -47,6 +47,10 @@ locals {
     kind       = "ClusterSecretStore"
     metadata = {
       name = "gcp-secret-manager"
+      annotations = {
+        # Consumes eso_iam_ready so Terraform applies WI/secretAccessor before this manifest.
+        "paragon.useparagon.com/eso-iam-ready" = var.eso_iam_ready
+      }
     }
     spec = {
       provider = {
