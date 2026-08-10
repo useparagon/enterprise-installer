@@ -15,8 +15,9 @@
 # TF_VAR_aws_assume_role_arn in context.
 #
 # service-inputs.json is taken from the release git tag matching VERSION
-# (charts/files/service-inputs.json). Mount /mnt/workspace/service-inputs.json
-# only for local-preview when .git/tags are unavailable.
+# (charts/files/service-inputs.json). local-preview packs the working tree
+# without .git, so there either mount /mnt/workspace/service-inputs.json or
+# leave a copy at charts/files/service-inputs.json to be packed with it.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -96,20 +97,14 @@ fi
 # Resolve service-inputs.json for prepare.sh:
 # 1) explicit env / mount (local-preview)
 # 2) git show from the release tag (tracked VCS runs)
+# 3) charts/files/service-inputs.json in the workspace (local-preview packs the
+#    working tree without .git, so the tag fetch in 2 is unavailable there)
 if [[ -n "${PARAGON_SERVICE_INPUTS_JSON:-}" && -f "${PARAGON_SERVICE_INPUTS_JSON}" ]]; then
   echo "Using service-inputs from PARAGON_SERVICE_INPUTS_JSON=${PARAGON_SERVICE_INPUTS_JSON}"
 elif [[ -f /mnt/workspace/service-inputs.json ]]; then
   export PARAGON_SERVICE_INPUTS_JSON=/mnt/workspace/service-inputs.json
   echo "Using service-inputs from /mnt/workspace/service-inputs.json"
-else
-  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    echo "ERROR: no .git checkout and no mounted service-inputs.json." >&2
-    echo "  Tracked Spacelift runs fetch charts/files/service-inputs.json from tag ${CHART_TAG}." >&2
-    echo "  For local-preview, mount service-inputs.json at /mnt/workspace/service-inputs.json" >&2
-    echo "  or set PARAGON_SERVICE_INPUTS_JSON." >&2
-    exit 1
-  fi
-
+elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "Fetching git tag ${CHART_TAG} for service-inputs.json"
   if ! git fetch --depth 1 origin "refs/tags/${CHART_TAG}:refs/tags/${CHART_TAG}"; then
     echo "ERROR: failed to fetch tag ${CHART_TAG} from origin" >&2
@@ -125,6 +120,18 @@ else
   fi
   export PARAGON_SERVICE_INPUTS_JSON="${si_local}"
   echo "Extracted service-inputs.json from tag ${CHART_TAG}"
+elif [[ -f "${REPO_ROOT}/charts/files/service-inputs.json" ]]; then
+  export PARAGON_SERVICE_INPUTS_JSON="${REPO_ROOT}/charts/files/service-inputs.json"
+  echo "Using service-inputs from packed workspace charts/files/service-inputs.json"
+  echo "WARNING: service-inputs.json came from the packed workspace, not tag ${CHART_TAG}." >&2
+else
+  echo "ERROR: no .git checkout and no service-inputs.json available." >&2
+  echo "  Tracked Spacelift runs fetch charts/files/service-inputs.json from tag ${CHART_TAG}." >&2
+  echo "  For local-preview, extract it into the working tree before packing:" >&2
+  echo "    git fetch --tags && mkdir -p charts/files && \\" >&2
+  echo "    git show ${CHART_TAG}:charts/files/service-inputs.json > charts/files/service-inputs.json" >&2
+  echo "  Or mount it at /mnt/workspace/service-inputs.json / set PARAGON_SERVICE_INPUTS_JSON." >&2
+  exit 1
 fi
 
 echo "Running prepare.sh -p aws -t ${CHART_TAG}"
