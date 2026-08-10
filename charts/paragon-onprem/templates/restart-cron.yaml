@@ -1,12 +1,8 @@
 {{- if .Values.restart.enabled }}
 {{- $seed := .Values.global.env.PARAGON_DOMAIN | default .Release.Name | toString }}
-{{- /* hasKey so an explicit 0 is honored; Sprig default treats 0 as empty */}}
-{{- $windowMinutes := ternary (int .Values.restart.windowMinutes) 180 (hasKey .Values.restart "windowMinutes") }}
-{{- /* if (not cond): Go template args are eager, so mod would panic on windowMinutes 0 */}}
-{{- $offsetMinutes := 0 }}
-{{- if gt $windowMinutes 0 }}
-{{- $offsetMinutes = mod (adler32sum $seed) $windowMinutes }}
-{{- end }}
+{{- /* hasKey so an explicit 0 is honored; Sprig default treats 0 as empty. max 1 avoids mod-by-zero. */}}
+{{- $windowMinutes := max 1 (ternary (int .Values.restart.windowMinutes) 180 (hasKey .Values.restart "windowMinutes")) }}
+{{- $offsetMinutes := mod (adler32sum $seed) $windowMinutes }}
 {{- $baseTotalMinutes := add (mul (int .Values.restart.hour) 60) (int .Values.restart.minute) }}
 {{- $scheduledTotalMinutes := add $baseTotalMinutes $offsetMinutes }}
 {{- $scheduleMinute := mod $scheduledTotalMinutes 60 }}
