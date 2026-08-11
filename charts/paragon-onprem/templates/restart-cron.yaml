@@ -1,10 +1,21 @@
 {{- if .Values.restart.enabled }}
+{{- $seed := .Values.global.env.PARAGON_DOMAIN | default .Release.Name | toString }}
+{{- /* hasKey so an explicit 0 is honored; Sprig default treats 0 as empty. max 1 avoids mod-by-zero. */}}
+{{- $windowMinutes := max 1 (ternary (int .Values.restart.windowMinutes) 180 (hasKey .Values.restart "windowMinutes")) }}
+{{- $offsetMinutes := mod (adler32sum $seed) $windowMinutes }}
+{{- $baseTotalMinutes := add (mul (int .Values.restart.hour) 60) (int .Values.restart.minute) }}
+{{- $scheduledTotalMinutes := add $baseTotalMinutes $offsetMinutes }}
+{{- $scheduleMinute := mod $scheduledTotalMinutes 60 }}
+{{- $scheduleHour := mod (div $scheduledTotalMinutes 60) 24 }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: restart-paragon-pods-cronjob
+  annotations:
+    paragon.useparagon.com/restart-window-minutes: {{ $windowMinutes | quote }}
+    paragon.useparagon.com/restart-offset-minutes: {{ $offsetMinutes | quote }}
 spec:
-  schedule: "{{ .Values.restart.schedule }}"
+  schedule: "{{ $scheduleMinute }} {{ $scheduleHour }} * * *"
   jobTemplate:
     spec:
       template:

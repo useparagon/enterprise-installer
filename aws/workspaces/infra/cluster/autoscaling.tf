@@ -69,8 +69,12 @@ module "cluster_autoscaler" {
     }
   })
 
+  # Only the node groups are listed: module.eks is already implicit via cluster_name and the
+  # OIDC issuer inputs, and every module-level depends_on defers this module's
+  # data.aws_region read to apply time, which makes the Helm values unknown and rewrites the
+  # release on every run. Node group ordering is kept so the autoscaler pod has a node to
+  # schedule onto on a greenfield apply.
   depends_on = [
-    module.eks,
     module.eks_managed_node_group
   ]
 }

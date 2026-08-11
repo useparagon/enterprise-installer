@@ -13,6 +13,15 @@ Call with: include "migration.standard" (dict "root" $ "imageName" "postgres-zeu
 {{- if $root.Values.podAnnotations -}}
 {{- $podAnnotations = merge $podAnnotations $root.Values.podAnnotations -}}
 {{- end -}}
+{{- $migration := dict "activeDeadlineSeconds" 600 "queryTimeoutMillis" 600000 -}}
+{{- if kindIs "map" $root.Values.global -}}
+{{- if kindIs "map" (get $root.Values.global "migration") -}}
+{{- $migration = merge (deepCopy $root.Values.global.migration) $migration -}}
+{{- end -}}
+{{- end -}}
+{{- if kindIs "map" (get $root.Values "migration") -}}
+{{- $migration = merge (deepCopy $root.Values.migration) $migration -}}
+{{- end -}}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -21,8 +30,18 @@ metadata:
   annotations:
     "helm.sh/hook": "pre-install,pre-upgrade"
     "helm.sh/hook-weight": "-1"
-    "helm.sh/hook-delete-policy": hook-succeeded
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
+  # Failed jobs are kept for debugging and removed by before-hook-creation on the next upgrade.
+  # backoffLimit is left at the Kubernetes default (6) unless overridden via values.migration /
+  # global.migration — useful for transient DB errors; long CREATE INDEX work is bounded by
+  # activeDeadlineSeconds / POSTGRES_QUERY_TIMEOUT_MILLIS instead.
+  {{- if hasKey $migration "backoffLimit" }}
+  backoffLimit: {{ $migration.backoffLimit }}
+  {{- end }}
+  {{- if $migration.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ $migration.activeDeadlineSeconds }}
+  {{- end }}
   template:
     metadata:
       {{- if $podAnnotations }}
@@ -50,6 +69,9 @@ spec:
             {{- toYaml $root.Values.resources | nindent 12 }}
           env:
             {{- include "env.standard" $root | nindent 12 }}
+            # Override after env.standard so migrations can run longer than runtime query limits.
+            - name: POSTGRES_QUERY_TIMEOUT_MILLIS
+              value: {{ $migration.queryTimeoutMillis | quote }}
       restartPolicy: Never
       {{- with $root.Values.nodeSelector }}
       nodeSelector:
