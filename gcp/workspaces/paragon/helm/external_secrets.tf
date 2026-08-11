@@ -47,14 +47,21 @@ locals {
     kind       = "ClusterSecretStore"
     metadata = {
       name = "gcp-secret-manager"
+      annotations = {
+        # Consumes eso_iam_ready so Terraform applies WI/secretAccessor before this manifest.
+        "paragon.useparagon.com/eso-iam-ready" = var.eso_iam_ready
+      }
     }
     spec = {
       provider = {
         gcpsm = {
+          projectID = var.gcp_project_id
           auth = {
             workloadIdentity = {
-              clusterLocation = var.region
-              clusterName     = var.cluster_name
+              # Required by ESO 0.14 CRD validation (cannot be omitted/null).
+              clusterProjectID = var.gcp_project_id
+              clusterLocation  = var.region
+              clusterName      = var.cluster_name
               serviceAccountRef = {
                 name      = "external-secrets"
                 namespace = kubernetes_namespace_v1.external_secrets.id

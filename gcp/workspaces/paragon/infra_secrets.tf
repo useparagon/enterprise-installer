@@ -5,6 +5,7 @@ locals {
     storage       = "${local.workspace}-storage"
     kafka         = "${local.workspace}-kafka"
     redis_ca_cert = "${local.workspace}-redis-ca-cert"
+    cluster       = "${local.workspace}-cluster"
   }
 }
 
@@ -36,16 +37,30 @@ data "google_secret_manager_secret_version" "infra_kafka" {
   version = "latest"
 }
 
+data "google_secret_manager_secret_version" "infra_cluster" {
+  count   = local.use_legacy_infra_json ? 0 : 1
+  project = local.gcp_project_id
+  secret  = local.infra_secret_names.cluster
+  version = "latest"
+}
+
 locals {
+  # Cluster metadata is not sensitive; nonsensitive avoids propagating secret
+  # sensitivity into providers/modules that take a plain cluster name.
+  provider_cluster = local.use_legacy_infra_json ? {} : jsondecode(
+    nonsensitive(data.google_secret_manager_secret_version.infra_cluster[0].secret_data)
+  )
+
   provider_infra_vars = merge(
     {
       workspace        = { value = local.workspace }
-      cluster_name     = { value = local.cluster_name }
+      cluster_name     = { value = try(local.provider_cluster.cluster_name, local.cluster_name) }
       logs_bucket      = { value = local.logs_bucket }
       auditlogs_bucket = { value = local.auditlogs_bucket }
       postgres         = { value = jsondecode(data.google_secret_manager_secret_version.infra_postgres[0].secret_data) }
       redis            = { value = jsondecode(data.google_secret_manager_secret_version.infra_redis[0].secret_data) }
       storage          = { value = jsondecode(data.google_secret_manager_secret_version.infra_storage[0].secret_data) }
+      k8s_version      = { value = try(local.provider_cluster.k8s_version, null) }
     },
     var.managed_sync_enabled ? {
       kafka = { value = jsondecode(data.google_secret_manager_secret_version.infra_kafka[0].secret_data) }
