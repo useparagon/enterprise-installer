@@ -11,37 +11,42 @@
 
 locals {
   # Shared baseline applied to both NSGs (keeps deny/allow posture in one place).
+  # Use for/if (not ternary ? [...] : []) so Terraform does not have to unify a
+  # 2-object tuple with [] — the two deny objects put list(string) on different
+  # attributes (source vs destination prefixes), which fails type unification.
   nsg_baseline_rules = concat(
-    length(var.nsg_malicious_ips) > 0 ? [
-      {
-        name                         = "DenyMaliciousIpsInbound"
-        priority                     = 1000
-        direction                    = "Inbound"
-        access                       = "Deny"
-        protocol                     = "*"
-        source_port_range            = "*"
-        destination_port_range       = "*"
-        destination_port_ranges      = null
-        source_address_prefix        = null
-        source_address_prefixes      = var.nsg_malicious_ips
-        destination_address_prefix   = "*"
-        destination_address_prefixes = null
-      },
-      {
-        name                         = "DenyMaliciousIpsOutbound"
-        priority                     = 1100
-        direction                    = "Outbound"
-        access                       = "Deny"
-        protocol                     = "*"
-        source_port_range            = "*"
-        destination_port_range       = "*"
-        destination_port_ranges      = null
-        source_address_prefix        = "*"
-        source_address_prefixes      = null
-        destination_address_prefix   = null
-        destination_address_prefixes = var.nsg_malicious_ips
-      },
-    ] : [],
+    [
+      for rule in [
+        {
+          name                         = "DenyMaliciousIpsInbound"
+          priority                     = 1000
+          direction                    = "Inbound"
+          access                       = "Deny"
+          protocol                     = "*"
+          source_port_range            = "*"
+          destination_port_range       = "*"
+          destination_port_ranges      = null
+          source_address_prefix        = null
+          source_address_prefixes      = var.nsg_malicious_ips
+          destination_address_prefix   = "*"
+          destination_address_prefixes = null
+        },
+        {
+          name                         = "DenyMaliciousIpsOutbound"
+          priority                     = 1100
+          direction                    = "Outbound"
+          access                       = "Deny"
+          protocol                     = "*"
+          source_port_range            = "*"
+          destination_port_range       = "*"
+          destination_port_ranges      = null
+          source_address_prefix        = "*"
+          source_address_prefixes      = null
+          destination_address_prefix   = null
+          destination_address_prefixes = var.nsg_malicious_ips
+        },
+      ] : rule if length(var.nsg_malicious_ips) > 0
+    ],
     [
       {
         name                         = "DenyPort22Inbound"
