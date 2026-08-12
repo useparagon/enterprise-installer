@@ -1,6 +1,6 @@
 # Paragon AWS Infrastructure
 
-See [setup-policy.json](../../setup-policy.json) for permissions that are required to execute this. Note that `<AWS_ACCOUNT_ID>` must be replaced to match target account.
+See [setup-policy.json](../../setup-policy.json) for Terraform principal permissions. Bastion CLI diagnostics are a separate policy — [bastion-diagnostics-policy.json](../../bastion-diagnostics-policy.json) — attached to the bastion role by Terraform, not required on the installer principal. Replace `<AWS_ACCOUNT_ID>` to match the target account.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements

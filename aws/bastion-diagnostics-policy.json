@@ -1,0 +1,40 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "BastionInfraReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "acm:Describe*",
+                "acm:Get*",
+                "acm:List*",
+                "autoscaling:Describe*",
+                "autoscaling:Get*",
+                "cloudformation:Describe*",
+                "cloudformation:Get*",
+                "cloudformation:List*",
+                "cloudtrail:Describe*",
+                "cloudtrail:Get*",
+                "cloudtrail:List*",
+                "cloudtrail:LookupEvents",
+                "cloudwatch:Describe*",
+                "cloudwatch:Get*",
+                "cloudwatch:List*",
+                "ec2:Describe*",
+                "ec2:Get*",
+                "ecr:BatchGet*",
+                "ecr:Describe*",
+                "ecr:Get*",
+                "ecr:List*",
+                "eks:Describe*",
+                "eks:List*",
+                "iam:Get*",
+                "iam:List*",
+                "kms:Describe*",
+                "kms:Get*",
+                "ssm:Get*"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
