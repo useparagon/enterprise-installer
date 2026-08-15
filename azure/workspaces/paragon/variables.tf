@@ -603,14 +603,24 @@ locals {
     "true"
   )
 
-  default_redis_url = try(
+  # Azure connection_string is host:port with no scheme; clients need redis:// or rediss:// for TLS.
+  default_redis_url_raw = try(
     local.helm_vars.global.env["REDIS_URL"],
     "${local.helm_vars.global.env["REDIS_HOST"]}:${local.helm_vars.global.env["REDIS_PORT"]}",
     local.infra_vars.redis.value.cache.connection_string,
     "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
   )
 
-  # Build redis:// or rediss:// URLs (Azure connection_string has no scheme; clients need it for TLS).
+  default_redis_url = (
+    startswith(local.default_redis_url_raw, "redis://") || startswith(local.default_redis_url_raw, "rediss://")
+    ? local.default_redis_url_raw
+    : format(
+      "%s://%s",
+      contains(["true", "1", "yes"], lower(tostring(local.default_redis_ssl))) ? "rediss" : "redis",
+      local.default_redis_url_raw
+    )
+  )
+
   redis_instance_urls = {
     for name, r in try(local.infra_vars.redis.value, {}) : name => (
       startswith(try(r.connection_string, ""), "redis://") || startswith(try(r.connection_string, ""), "rediss://")
@@ -769,7 +779,8 @@ locals {
         SYSTEM_REDIS_URL               = try(local.redis_instance_urls["system"], local.default_redis_url)
         WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
         WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-        WORKFLOW_REDIS_URL             = try(local.redis_instance_urls["workflow"], local.default_redis_url)
+        # No dedicated workflow Redis on Azure — fall back to cache (matches secrets.tf / monorepo chart).
+        WORKFLOW_REDIS_URL = try(local.redis_instance_urls["workflow"], local.redis_instance_urls["cache"], local.default_redis_url)
 
         # Cloud Storage configurations
         CLOUD_STORAGE_MICROSERVICE_PASS = local.storage_output.root_password
