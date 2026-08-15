@@ -259,7 +259,6 @@ variable "eks_system_managed_node_group" {
   default = {}
 }
 
-
 variable "ami_release_version" {
   description = "Optional EKS managed node group AMI release version pin (passed to terraform-aws-modules/eks eks-managed-node-group)."
   type        = string

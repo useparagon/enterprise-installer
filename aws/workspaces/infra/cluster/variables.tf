@@ -124,7 +124,6 @@ variable "eks_system_managed_node_group" {
   })
 }
 
-
 variable "ami_release_version" {
   description = "Optional EKS managed node group AMI release version pin."
   type        = string

@@ -142,7 +142,7 @@ module "eks_managed_node_group" {
 
   for_each = local.managed_node_groups
 
-  name = each.key == "system" ? substr(local.system_node_group_name, 0, 38) : substr("${var.workspace}-${random_string.node_group[each.key].result}", 0, 38)
+  name            = each.key == "system" ? substr(local.system_node_group_name, 0, 38) : substr("${var.workspace}-${random_string.node_group[each.key].result}", 0, 38)
   use_name_prefix = each.key == "system" ? coalesce(try(each.value.use_name_prefix, null), false) : true
 
   cluster_name                      = module.eks.cluster_name
@@ -159,16 +159,16 @@ module "eks_managed_node_group" {
   ami_release_version            = var.ami_release_version
   use_latest_ami_release_version = var.use_latest_ami_release_version
   capacity_type                  = each.value.capacity
-  desired_size   = try(each.value.desired_size, each.value.min_count)
-  instance_types = each.value.instance_types
-  max_size       = each.value.max_count
-  min_size       = each.value.min_count
+  desired_size                   = try(each.value.desired_size, each.value.min_count)
+  instance_types                 = each.value.instance_types
+  max_size                       = each.value.max_count
+  min_size                       = each.value.min_count
 
   metadata_options = local.metadata_options
   labels           = try(each.value.labels, { "useparagon.com/capacityType" = each.key })
 
   tags = each.key == "system" ? {
-    Name                       = coalesce(try(var.eks_system_managed_node_group.ec2_name_tag, null), local.system_node_group_name)
+    Name                      = coalesce(try(var.eks_system_managed_node_group.ec2_name_tag, null), local.system_node_group_name)
     "useparagon.com/nodeRole" = "system"
   } : {}
 
@@ -185,7 +185,7 @@ module "eks_managed_node_group" {
   ebs_optimized           = true
   disable_api_termination = false
   enable_monitoring       = true
-  block_device_mappings = each.key == "system" && try(each.value.ami_type, null) == "BOTTLEROCKET_x86_64" ? local.bottlerocket_system_block_device_mappings : local.default_block_device_mappings
+  block_device_mappings   = each.key == "system" && try(each.value.ami_type, null) == "BOTTLEROCKET_x86_64" ? local.bottlerocket_system_block_device_mappings : local.default_block_device_mappings
 
   # depends_on is safe here only because create_iam_role = false: the data sources this
   # defers (aws_partition, aws_caller_identity) feed nothing but the module's own node role
