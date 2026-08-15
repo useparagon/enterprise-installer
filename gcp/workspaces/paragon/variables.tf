@@ -894,7 +894,7 @@ locals {
     creator      = "terraform"
   }
 
-  dns_enabled = var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
+  dns_enabled = nonsensitive(var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null)
 
   # Cloud Armor backend policies only apply to the external Application Load Balancer.
   waf_active = var.waf_enabled && var.ingress_scheme != "internal"
