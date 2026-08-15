@@ -155,8 +155,10 @@ module "eks_managed_node_group" {
   subnet_ids             = var.private_subnet_ids
   vpc_security_group_ids = [module.eks.cluster_security_group_id]
 
-  ami_type       = try(each.value.ami_type, null)
-  capacity_type  = each.value.capacity
+  ami_type                       = try(each.value.ami_type, null)
+  ami_release_version            = var.ami_release_version
+  use_latest_ami_release_version = var.use_latest_ami_release_version
+  capacity_type                  = each.value.capacity
   desired_size   = try(each.value.desired_size, each.value.min_count)
   instance_types = each.value.instance_types
   max_size       = each.value.max_count

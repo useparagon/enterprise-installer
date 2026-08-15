@@ -149,7 +149,9 @@ module "cluster" {
   enable_legacy_mng_pools       = var.enable_legacy_mng_pools
   karpenter_chart_version       = var.karpenter_chart_version
   karpenter_iam_names           = var.karpenter_iam_names
-  eks_system_managed_node_group = var.eks_system_managed_node_group
+  eks_system_managed_node_group     = var.eks_system_managed_node_group
+  ami_release_version               = var.ami_release_version
+  use_latest_ami_release_version    = var.use_latest_ami_release_version
 
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id

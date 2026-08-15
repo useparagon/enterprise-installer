@@ -124,6 +124,19 @@ variable "eks_system_managed_node_group" {
   })
 }
 
+
+variable "ami_release_version" {
+  description = "Optional EKS managed node group AMI release version pin."
+  type        = string
+  default     = null
+}
+
+variable "use_latest_ami_release_version" {
+  description = "When true, resolve the latest AMI release version for the cluster Kubernetes version at plan/apply."
+  type        = bool
+  default     = false
+}
+
 variable "egress_ready" {
   description = "Set when private egress routing is ready. Implicit apply-order dependency for internet-bootstrapping workloads."
   type        = string

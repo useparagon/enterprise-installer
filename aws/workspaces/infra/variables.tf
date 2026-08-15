@@ -259,6 +259,19 @@ variable "eks_system_managed_node_group" {
   default = {}
 }
 
+
+variable "ami_release_version" {
+  description = "Optional EKS managed node group AMI release version pin (passed to terraform-aws-modules/eks eks-managed-node-group)."
+  type        = string
+  default     = null
+}
+
+variable "use_latest_ami_release_version" {
+  description = "When true, resolve the latest AMI release version for the cluster Kubernetes version at plan/apply."
+  type        = bool
+  default     = false
+}
+
 # security
 variable "master_guardduty_account_id" {
   description = "Optional AWS account id to delegate GuardDuty control to."
