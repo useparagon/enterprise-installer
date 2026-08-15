@@ -610,6 +610,15 @@ locals {
     "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
   )
 
+  # Build redis:// or rediss:// URLs (Azure connection_string has no scheme; clients need it for TLS).
+  redis_instance_urls = {
+    for name, r in try(local.infra_vars.redis.value, {}) : name => (
+      startswith(try(r.connection_string, ""), "redis://") || startswith(try(r.connection_string, ""), "rediss://")
+      ? r.connection_string
+      : format("%s://%s", try(r.ssl, true) ? "rediss" : "redis", try(r.connection_string, "${r.host}:${r.port}"))
+    )
+  }
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       env = merge({
@@ -747,20 +756,20 @@ locals {
         ZEUS_POSTGRES_DATABASE          = try(local.infra_vars.postgres.value.zeus.database, local.infra_vars.postgres.value.paragon.database)
 
         # Redis configurations
-        REDIS_URL = local.default_redis_url
+        REDIS_URL = try(local.redis_instance_urls["cache"], local.default_redis_url)
 
         CACHE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
         CACHE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
-        CACHE_REDIS_URL                = try(local.infra_vars.redis.value.cache.connection_string, local.default_redis_url)
+        CACHE_REDIS_URL                = try(local.redis_instance_urls["cache"], local.default_redis_url)
         QUEUE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.queue.cluster, local.default_redis_cluster)
         QUEUE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.queue.ssl, local.default_redis_ssl)
-        QUEUE_REDIS_URL                = try(local.infra_vars.redis.value.queue.connection_string, local.default_redis_url)
+        QUEUE_REDIS_URL                = try(local.redis_instance_urls["queue"], local.default_redis_url)
         SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
         SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
-        SYSTEM_REDIS_URL               = try(local.infra_vars.redis.value.system.connection_string, local.default_redis_url)
+        SYSTEM_REDIS_URL               = try(local.redis_instance_urls["system"], local.default_redis_url)
         WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
         WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-        WORKFLOW_REDIS_URL             = try(local.infra_vars.redis.value.workflow.connection_string, local.default_redis_url)
+        WORKFLOW_REDIS_URL             = try(local.redis_instance_urls["workflow"], local.default_redis_url)
 
         # Cloud Storage configurations
         CLOUD_STORAGE_MICROSERVICE_PASS = local.storage_output.root_password

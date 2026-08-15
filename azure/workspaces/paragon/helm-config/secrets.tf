@@ -79,9 +79,14 @@ locals {
 
   # Workflow Redis shares cache when there is no dedicated workflow instance (matches monorepo chart).
   workflow_redis_from_infra = try(var.infra_values.redis.value.workflow, var.infra_values.redis.value.cache, null)
-  workflow_redis_url = try(
+  workflow_redis_connection = try(
     local.workflow_redis_from_infra.connection_string,
     local.workflow_redis_from_infra != null ? "${local.workflow_redis_from_infra.host}:${local.workflow_redis_from_infra.port}" : null
+  )
+  workflow_redis_url = local.workflow_redis_connection == null ? null : (
+    startswith(local.workflow_redis_connection, "redis://") || startswith(local.workflow_redis_connection, "rediss://")
+    ? local.workflow_redis_connection
+    : format("%s://%s", try(local.workflow_redis_from_infra.ssl, true) ? "rediss" : "redis", local.workflow_redis_connection)
   )
 
   # Backward compatible with infra workspaces that still emit the legacy "minio" output
