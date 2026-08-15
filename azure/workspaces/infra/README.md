@@ -62,13 +62,13 @@ One map drives every instance (`for_each` in `./redis-managed`). Globals stay fi
 Built-in default map (used when `redis_managed_instances` is null):
 
 ```hcl
-cache        = { sku = "Balanced_B10", ha_enabled = true,  cluster_enabled = true }
+cache        = { sku = "Balanced_B10", ha_enabled = true,  cluster_enabled = false }
 queue        = { sku = "Balanced_B3",  ha_enabled = true,  cluster_enabled = false }
 system       = { sku = "Balanced_B3",  ha_enabled = true,  cluster_enabled = false }
 managed-sync = { sku = "Balanced_B10", ha_enabled = true,  cluster_enabled = false }
 ```
 
-`managed-sync` uses `cluster_enabled = false` (NoCluster policy). Bull/ioredis over a private endpoint cannot use OSS cluster slot discovery (internal shard addresses such as `10.0.16.x:8501` are not reachable with TLS), and a non-cluster client against OSSCluster receives `MOVED` redirects. Use NoCluster for the dedicated managed-sync instance; keep OSSCluster on `cache` when the monorepo client supports it.
+`managed-sync` uses `cluster_enabled = false` (NoCluster policy). Bull/ioredis over a private endpoint cannot use OSS cluster slot discovery (internal shard addresses such as `10.0.16.x:8501` are not reachable with TLS), and a non-cluster client against OSSCluster receives `MOVED` redirects. Use NoCluster for cache and managed-sync by default. OSSCluster on private endpoint + TLS breaks ioredis slot discovery (`ClusterAllFailedError`); override `cluster_enabled = true` only when the client and network path support it.
 
 Greenfield example:
 
