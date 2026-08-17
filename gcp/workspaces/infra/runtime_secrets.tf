@@ -44,8 +44,9 @@ resource "google_secret_manager_secret_version" "runtime_storage" {
     managed_sync_bucket = module.storage.storage.managed_sync_bucket
     logs_bucket         = module.storage.storage.logs_bucket
     auditlogs_bucket    = module.storage.storage.auditlogs_bucket
-    microservice_user   = module.storage.storage.minio_microservice_user
-    microservice_pass   = module.storage.storage.minio_microservice_pass
+    # GCS (no MinIO): microservice creds are the same SA key as root.
+    microservice_user   = module.storage.storage.project_id
+    microservice_pass   = module.storage.storage.private_key
     root_user           = module.storage.storage.project_id
     root_password       = module.storage.storage.private_key
     service_account     = module.storage.storage.service_account
@@ -109,5 +110,22 @@ resource "google_secret_manager_secret_version" "runtime_bastion" {
   secret_data = jsonencode({
     public_dns  = module.bastion[0].connection.bastion_dns
     private_key = module.bastion[0].connection.private_key
+  })
+}
+
+resource "google_secret_manager_secret" "runtime_cluster" {
+  secret_id = "${local.runtime_secret_prefix}-cluster"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "runtime_cluster" {
+  secret = google_secret_manager_secret.runtime_cluster.id
+  secret_data = jsonencode({
+    cluster_name = module.cluster.kubernetes.name
+    location     = var.region
+    k8s_version  = var.k8s_version
   })
 }

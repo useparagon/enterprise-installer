@@ -8,19 +8,22 @@ locals {
     managed_sync = "paragon/${local.workspace}/managed-sync"
     openobserve  = "paragon/${local.workspace}/openobserve"
   }
-  runtime_docker_cfg_enabled = var.docker_username != null && var.docker_password != null
-  runtime_docker_cfg_json = jsonencode({
-    dockerconfigjson = jsonencode({
-      auths = {
-        (var.docker_registry_server) = {
-          username = var.docker_username
-          password = var.docker_password
-          email    = var.docker_email
-          auth     = base64encode("${var.docker_username}:${var.docker_password}")
-        }
-      }
-    })
-  })
+  runtime_docker_username = trimspace(coalesce(var.docker_username, ""))
+  runtime_docker_password = trimspace(coalesce(var.docker_password, ""))
+
+  # Blank credentials produce a well-formed but unusable pull secret
+  # (auth = base64(":")), which fails image pulls with insufficient_scope
+  # instead of failing the apply, so blank is treated the same as unset.
+  runtime_docker_cfg_enabled = local.runtime_docker_username != "" && local.runtime_docker_password != ""
+
+  runtime_docker_cfg_paragon_auths = local.runtime_docker_cfg_enabled ? {
+    (var.docker_registry_server) = {
+      username = local.runtime_docker_username
+      password = local.runtime_docker_password
+      email    = coalesce(var.docker_email, "")
+      auth     = base64encode("${local.runtime_docker_username}:${local.runtime_docker_password}")
+    }
+  } : {}
 }
 
 data "aws_secretsmanager_secret" "env" {
@@ -57,15 +60,29 @@ data "aws_secretsmanager_secret_version" "docker_cfg" {
 }
 
 locals {
-  runtime_docker_cfg_from_infra = try(
-    keys(jsondecode(jsondecode(data.aws_secretsmanager_secret_version.docker_cfg.secret_string).dockerconfigjson).auths),
-    []
+  runtime_docker_cfg_base_auths = try(
+    jsondecode(jsondecode(data.aws_secretsmanager_secret_version.docker_cfg.secret_string).dockerconfigjson).auths,
+    {}
   )
-  runtime_docker_cfg_has_infra_auths = length(local.runtime_docker_cfg_from_infra) > 0
-  runtime_docker_cfg_needs_paragon_overlay = (
-    local.runtime_docker_cfg_enabled &&
-    !local.runtime_docker_cfg_has_infra_auths
-  )
+  # An entry missing a username or password cannot pull images, so it does not
+  # count as populated and must not suppress this workspace's credentials.
+  runtime_docker_cfg_usable_base_auths = {
+    for registry, auth in local.runtime_docker_cfg_base_auths : registry => auth
+    if trimspace(try(auth.username, "")) != "" && trimspace(try(auth.password, "")) != ""
+  }
+  runtime_docker_cfg_has_infra_auths = length(keys(local.runtime_docker_cfg_usable_base_auths)) > 0
+
+  # Other registries infra may own are preserved; this workspace only owns the
+  # entry for its own registry.
+  runtime_docker_cfg_json = jsonencode({
+    dockerconfigjson = jsonencode({
+      auths = merge(
+        local.runtime_docker_cfg_usable_base_auths,
+        local.runtime_docker_cfg_paragon_auths
+      )
+    })
+  })
+
   # Sync into the cluster only when Terraform should create the pull secret.
   # create_docker_pull_secret=false is the Artifactory/proxy path where a
   # customer-pre-provisioned secret is referenced via helm imagePullSecrets.
@@ -75,8 +92,11 @@ locals {
   )
 }
 
+# count must not depend on the auths this resource writes: gating it on the
+# current secret value made the overlay delete itself on the following plan,
+# reverting AWSCURRENT to the infra base version with nothing to repopulate it.
 resource "aws_secretsmanager_secret_version" "docker_cfg_paragon_overlay" {
-  count = local.runtime_docker_cfg_needs_paragon_overlay ? 1 : 0
+  count = local.runtime_docker_cfg_enabled ? 1 : 0
 
   secret_id     = data.aws_secretsmanager_secret.docker_cfg.id
   secret_string = local.runtime_docker_cfg_json
@@ -115,7 +135,7 @@ locals {
   runtime_docker_cfg_secret_name   = local.runtime_docker_cfg_sync_enabled ? data.aws_secretsmanager_secret.docker_cfg.name : null
   runtime_openobserve_secret_name  = data.aws_secretsmanager_secret.openobserve.name
   runtime_managed_sync_secret_name = var.managed_sync_enabled ? data.aws_secretsmanager_secret.managed_sync[0].name : null
-  runtime_docker_cfg_version_id = local.runtime_docker_cfg_needs_paragon_overlay ? (
+  runtime_docker_cfg_version_id = local.runtime_docker_cfg_enabled ? (
     aws_secretsmanager_secret_version.docker_cfg_paragon_overlay[0].version_id
   ) : data.aws_secretsmanager_secret_version.docker_cfg.version_id
 }

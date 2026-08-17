@@ -52,10 +52,16 @@ module "helm" {
   domain                                 = var.domain
   env_secret_name                        = google_secret_manager_secret.env.secret_id
   external_secrets_service_account_email = google_service_account.eso.email
-  feature_flags_content                  = local.feature_flags_content
-  flipt_options                          = local.flipt_options
-  gcp_creds                              = local.gcp_creds
-  helm_values                            = local.helm_values_public
+  # Implicit ordering (helm has local providers, so module depends_on is illegal).
+  eso_iam_ready = sha256(jsonencode([
+    google_project_iam_member.eso_secret_accessor.id,
+    google_service_account_iam_member.eso_workload_identity.id,
+  ]))
+  feature_flags_content = local.feature_flags_content
+  flipt_options         = local.flipt_options
+  gcp_creds             = local.gcp_creds
+  gcp_project_id        = local.gcp_project_id
+  helm_values           = local.helm_values_public
   secrets_revision = sha256(jsonencode({
     env             = google_secret_manager_secret_version.env.name
     docker_cfg      = length(google_secret_manager_secret_version.docker_cfg) > 0 ? google_secret_manager_secret_version.docker_cfg[0].name : null
