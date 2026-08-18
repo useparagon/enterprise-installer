@@ -107,6 +107,159 @@ variable "ingress_scheme" {
   default     = "internet-facing"
 }
 
+variable "agc_enabled" {
+  description = "Deploy AGC as the public front door. false = nginx only; true = AGC (+ WAF by default)."
+  type        = bool
+  default     = false
+}
+
+variable "agc_direct_routing" {
+  description = "false = AGC -> ingress-nginx (DNS stays on nginx); true = AGC -> Services and nginx is removed."
+  type        = bool
+  default     = false
+}
+
+variable "dns_provider" {
+  description = "DNS provider for public records. Use azure_dns to create an azurerm_dns_zone (required for App Gateway wildcard certs via DNS-01). cloudflare keeps the existing Cloudflare CNAME path for Paragon-managed zones."
+  type        = string
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "cloudflare", "azure_dns"], var.dns_provider)
+    error_message = "dns_provider must be none, cloudflare, or azure_dns."
+  }
+}
+
+variable "agc_alb_controller_version" {
+  description = "Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27."
+  type        = string
+  default     = "1.11.3"
+}
+
+variable "waf_enabled" {
+  description = "Attach WAF to AGC when AGC is enabled. Default Detection with DRS 2.1 and no custom/rate-limit rules: requests are inspected and logged, never blocked."
+  type        = bool
+  default     = true
+}
+
+variable "waf_mode" {
+  description = "Detection (default) logs matches without blocking; Prevention blocks them. Switch to Prevention after reviewing Detection logs, since DRS 2.1 can flag legitimate traffic."
+  type        = string
+  default     = "Detection"
+
+  validation {
+    condition     = contains(["Detection", "Prevention"], var.waf_mode)
+    error_message = "waf_mode must be Detection or Prevention."
+  }
+}
+
+variable "waf_ip_whitelist" {
+  description = "CIDRs allowed by a high-priority custom rule. Empty = no whitelist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_ip_blacklist" {
+  description = "CIDRs blocked by a custom rule. Empty = no blacklist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_rate_limit_global" {
+  description = "Max requests per client IP per window. null or 0 = no global rate-limit rule."
+  type        = number
+  default     = null
+  nullable    = true
+}
+
+variable "waf_rate_limit_global_duration" {
+  description = "Evaluation window for the optional global rate-limit rule: OneMin or FiveMins. Has no effect while waf_rate_limit_global is null or 0."
+  type        = string
+  default     = "FiveMins"
+
+  validation {
+    condition     = contains(["OneMin", "FiveMins"], var.waf_rate_limit_global_duration)
+    error_message = "waf_rate_limit_global_duration must be OneMin or FiveMins."
+  }
+}
+
+variable "waf_rate_limit_paths" {
+  description = "Map of URI path prefix to max requests per client IP per window. Empty = no path rate-limit rules."
+  type        = map(number)
+  default     = {}
+}
+
+variable "waf_rate_limit_path_duration" {
+  description = "Evaluation window for optional path rate-limit rules: OneMin or FiveMins. Has no effect while waf_rate_limit_paths is empty."
+  type        = string
+  default     = "FiveMins"
+
+  validation {
+    condition     = contains(["OneMin", "FiveMins"], var.waf_rate_limit_path_duration)
+    error_message = "waf_rate_limit_path_duration must be OneMin or FiveMins."
+  }
+}
+
+variable "waf_rate_limit_group_by" {
+  description = "Rate-limit grouping key. Use ClientAddr with AGC (XFF variables unsupported)."
+  type        = string
+  default     = "ClientAddr"
+
+  validation {
+    condition = contains([
+      "ClientAddr",
+      "GeoLocation",
+      "None",
+    ], var.waf_rate_limit_group_by)
+    error_message = "waf_rate_limit_group_by must be ClientAddr, GeoLocation, or None. AGC does not support X-Forwarded-For variables."
+  }
+}
+
+variable "waf_max_request_body_size_kb" {
+  description = "WAF max request body size in KB. 2000 is the DRS 2.1 engine maximum and avoids HTTP 413 on large Paragon payloads."
+  type        = number
+  default     = 2000
+
+  validation {
+    condition     = var.waf_max_request_body_size_kb >= 8 && var.waf_max_request_body_size_kb <= 2000
+    error_message = "waf_max_request_body_size_kb must be between 8 and 2000."
+  }
+}
+
+variable "waf_file_upload_limit_mb" {
+  description = "WAF file upload limit in MB."
+  type        = number
+  default     = 100
+}
+
+variable "waf_logs_retention_days" {
+  description = "Days to retain Application Gateway Firewall and Access logs."
+  type        = number
+  default     = 30
+}
+
+variable "waf_managed_rule_sets" {
+  description = "Managed rule sets to attach. Azure requires a primary rule set on every policy, and AGC only accepts DRS 2.1 (no CRS). Bot Manager 1.0/1.1 can be added alongside it."
+  type = map(object({
+    type    = string
+    version = string
+    action  = optional(string)
+  }))
+  default = {
+    drs = {
+      type    = "Microsoft_DefaultRuleSet"
+      version = "2.1"
+    }
+  }
+
+  validation {
+    condition = anytrue([
+      for set in values(var.waf_managed_rule_sets) : set.type == "Microsoft_DefaultRuleSet"
+    ])
+    error_message = "waf_managed_rule_sets must include a Microsoft_DefaultRuleSet entry: Azure rejects any policy without a primary rule set, and AGC supports only DRS 2.1."
+  }
+}
+
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
@@ -341,7 +494,26 @@ locals {
   legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
   workspace             = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}") : "paragon-${var.organization}-${local.hash}")
 
-  dns_enabled = var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
+  dns_enabled = var.ingress_scheme != "internal" && (
+    (var.dns_provider == "cloudflare" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null) ||
+    var.dns_provider == "azure_dns" ||
+    # Backward compatible: Cloudflare credentials without dns_provider=azure_dns keep working.
+    (var.dns_provider == "none" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null)
+  )
+
+  cloudflare_dns_enabled = local.dns_enabled && var.dns_provider != "azure_dns" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
+  azure_dns_enabled      = var.ingress_scheme != "internal" && var.dns_provider == "azure_dns"
+
+  # AGC is only a public front door; internal-scheme stays nginx-only.
+  agc_active = var.agc_enabled && var.ingress_scheme != "internal"
+  # Direct: AGC -> Services; nginx removed.
+  agc_direct = local.agc_active && var.agc_direct_routing
+  # Keep nginx except in AGC direct mode.
+  nginx_enabled = !local.agc_direct
+  # Public nginx LB until AGC owns the edge directly.
+  nginx_public   = var.ingress_scheme != "internal" && !local.agc_direct
+  dns_target_agc = local.agc_direct
+  waf_active     = var.waf_enabled && local.agc_active
 
   resource_group_name = local.use_legacy_infra_json ? try(local.legacy_infra_vars.resource_group.value.name, "${local.workspace}-resources") : "${local.workspace}-resources"
   cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, "${local.workspace}-cluster") : "${local.workspace}-cluster"

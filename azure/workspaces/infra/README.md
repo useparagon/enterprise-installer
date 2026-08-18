@@ -229,8 +229,10 @@ nsg_malicious_ips = [
 | [azurerm_key_vault_access_policy.terraform](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_access_policy) | resource |
 | [azurerm_key_vault_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_key_vault_secret.runtime_network](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_key_vault_secret.runtime_redis_managed](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
 
@@ -238,6 +240,7 @@ nsg_malicious_ips = [
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agc_subnet_enabled"></a> [agc\_subnet\_enabled](#input\_agc\_subnet\_enabled) | Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required before enabling agc\_enabled in the paragon workspace. | `bool` | `false` | no |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to lock the audit logs container immutability policy. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |
@@ -309,6 +312,8 @@ nsg_malicious_ips = [
 | <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | The name of the AKS cluster. |
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka (Event Hubs for Kafka). |
 | <a name="output_logs_container"></a> [logs\_container](#output\_logs\_container) | The bucket used to store system logs. |
+| <a name="output_network"></a> [network](#output\_network) | Network identifiers for AGC association subnet and nginx internal LB wiring. |
+| <a name="output_oidc_issuer_url"></a> [oidc\_issuer\_url](#output\_oidc\_issuer\_url) | AKS OIDC issuer URL for workload-identity federated credentials (AGC ALB controller). |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Primary Redis connection info for the paragon workspace. During migration (both modules enabled), returns legacy endpoints until redis\_enabled is set to false. |
 | <a name="output_redis_managed"></a> [redis\_managed](#output\_redis\_managed) | Azure Managed Redis 7.4 endpoints (null when redis\_managed\_enabled is false). Use during migration for kubectl trial routing while output redis still points at legacy. |

@@ -69,6 +69,12 @@ variable "nsg_malicious_ips" {
   }
 }
 
+variable "agc_subnet_enabled" {
+  description = "Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required before enabling agc_enabled in the paragon workspace."
+  type        = bool
+  default     = false
+}
+
 variable "auditlogs_retention_days" {
   description = "The number of days to retain audit logs before deletion."
   type        = number

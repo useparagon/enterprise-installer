@@ -22,24 +22,31 @@ module "helm" {
     managed_sync = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
     openobserve  = azurerm_key_vault_secret.openobserve[0].version
   }))
-  ingress_scheme                 = var.ingress_scheme
-  key_vault_name                 = data.azurerm_key_vault.paragon.name
-  k8s_version                    = var.k8s_version
-  logs_bucket                    = local.logs_bucket
-  managed_sync_enabled           = var.managed_sync_enabled
-  managed_sync_secret_name       = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
-  managed_sync_version           = var.managed_sync_version
-  microservices                  = local.microservices
-  monitor_version                = local.monitor_version
-  monitors                       = local.monitors
-  monitors_enabled               = var.monitors_enabled
-  openobserve_email              = local.openobserve_email
-  openobserve_password           = local.openobserve_password
-  openobserve_secret_name        = azurerm_key_vault_secret.openobserve[0].name
-  public_microservices           = local.public_microservices
-  public_monitors                = local.public_monitors
-  resource_group                 = local.infra_vars.resource_group.value
-  workspace                      = local.workspace
+  ingress_scheme           = var.ingress_scheme
+  nginx_enabled            = local.nginx_enabled
+  nginx_public             = local.nginx_public
+  agc_active               = local.agc_active
+  agc_direct               = local.agc_direct
+  agc_subnet_cidr          = try(local.infra_vars.network.value.agc_subnet_cidr, null)
+  azure_subscription_id    = var.azure_subscription_id
+  domain                   = var.domain
+  key_vault_name           = data.azurerm_key_vault.paragon.name
+  k8s_version              = var.k8s_version
+  logs_bucket              = local.logs_bucket
+  managed_sync_enabled     = var.managed_sync_enabled
+  managed_sync_secret_name = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
+  managed_sync_version     = var.managed_sync_version
+  microservices            = local.microservices
+  monitor_version          = local.monitor_version
+  monitors                 = local.monitors
+  monitors_enabled         = var.monitors_enabled
+  openobserve_email        = local.openobserve_email
+  openobserve_password     = local.openobserve_password
+  openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
+  public_microservices     = local.public_microservices
+  public_monitors          = local.public_monitors
+  resource_group           = local.infra_vars.resource_group.value
+  workspace                = local.workspace
 }
 
 module "managed_sync_config" {
@@ -100,13 +107,102 @@ module "uptime" {
   microservices    = local.uptime_services
 }
 
+locals {
+  # Public front door for DNS. Transition keeps nginx and lowers TTL for cutover.
+  dns_ingress_target = local.dns_target_agc ? module.agc.fqdn : module.helm.load_balancer
+  dns_record_ttl     = local.agc_active && !local.agc_direct ? 60 : 300
+
+  # The paragon-onprem chart gates each service with subchart.<name>.enabled. Disabled
+  # services (e.g. cache-replay, health-checker) render no Ingress and no cert, so AGC
+  # must not create HTTPS listeners for them or the listener stays unprogrammed.
+  onprem_subchart_enabled = try(
+    yamldecode(file("${path.root}/charts/paragon-onprem/values.yaml")).subchart,
+    {},
+  )
+
+  # Per-host backends and HTTPS listeners for AGC, limited to services the chart publishes.
+  agc_public_routes = {
+    for name, cfg in local.public_services :
+    name => {
+      host = replace(replace(cfg.public_url, "https://", ""), "http://", "")
+      port = cfg.port
+    }
+    if try(local.onprem_subchart_enabled[name].enabled, true)
+  }
+}
+
 module "dns" {
   source = "./dns"
 
-  enabled              = local.dns_enabled
+  enabled              = local.cloudflare_dns_enabled
   cloudflare_api_token = var.cloudflare_api_token
   cloudflare_zone_id   = var.cloudflare_zone_id
   domain               = var.domain
-  ingress_loadbalancer = module.helm.load_balancer
+  ingress_loadbalancer = local.dns_ingress_target
   public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
+  ttl                  = local.dns_record_ttl
+}
+
+module "dns_zone" {
+  source = "./dns-zone"
+
+  enabled              = local.azure_dns_enabled
+  workspace            = local.workspace
+  resource_group_name  = local.infra_vars.resource_group.value.name
+  domain               = var.domain
+  dns_provider         = var.cloudflare_api_token != null && var.cloudflare_zone_id != null ? "cloudflare" : "none"
+  cloudflare_api_token = var.cloudflare_api_token
+  cloudflare_zone_id   = var.cloudflare_zone_id
+}
+
+module "dns_records" {
+  source = "./dns-records"
+  count  = local.azure_dns_enabled ? 1 : 0
+
+  enabled              = true
+  zone_name            = module.dns_zone.zone_name
+  resource_group_name  = module.dns_zone.resource_group_name
+  domain               = var.domain
+  ingress_loadbalancer = local.dns_ingress_target
+  public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
+  record_ttl           = local.dns_record_ttl
+}
+
+module "waf" {
+  source = "./waf"
+  count  = local.waf_active ? 1 : 0
+
+  workspace                      = local.workspace
+  resource_group_name            = local.infra_vars.resource_group.value.name
+  location                       = local.infra_vars.resource_group.value.location
+  waf_mode                       = var.waf_mode
+  waf_ip_whitelist               = var.waf_ip_whitelist
+  waf_ip_blacklist               = var.waf_ip_blacklist
+  waf_rate_limit_global          = var.waf_rate_limit_global
+  waf_rate_limit_global_duration = var.waf_rate_limit_global_duration
+  waf_rate_limit_paths           = var.waf_rate_limit_paths
+  waf_rate_limit_path_duration   = var.waf_rate_limit_path_duration
+  waf_rate_limit_group_by        = var.waf_rate_limit_group_by
+  waf_max_request_body_size_kb   = var.waf_max_request_body_size_kb
+  waf_file_upload_limit_mb       = var.waf_file_upload_limit_mb
+  waf_managed_rule_sets          = var.waf_managed_rule_sets
+}
+
+# AGC module; gated by `enabled` (owns its own kube providers like helm).
+module "agc" {
+  source = "./agc"
+
+  enabled                = local.agc_active
+  direct_routing         = var.agc_direct_routing
+  workspace              = local.workspace
+  resource_group_name    = local.infra_vars.resource_group.value.name
+  location               = local.infra_vars.resource_group.value.location
+  cluster_name           = local.cluster_name
+  subnet_id              = try(local.infra_vars.network.value.agc_subnet_id, null)
+  namespace              = module.helm.namespace_paragon.metadata[0].name
+  domain                 = var.domain
+  public_services        = local.agc_public_routes
+  waf_enabled            = local.waf_active
+  waf_policy_id          = local.waf_active ? module.waf[0].policy_id : null
+  alb_controller_version = var.agc_alb_controller_version
 }

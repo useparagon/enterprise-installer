@@ -34,9 +34,9 @@ resource "helm_release" "cert_manager" {
   }
 }
 
-# ingress controller
+# Public static IP for nginx when nginx keeps a public LB.
 resource "azurerm_public_ip" "ingress" {
-  count = var.ingress_scheme == "internal" ? 0 : 1
+  count = var.nginx_public ? 1 : 0
 
   name                = "AKS-Ingress-Controller"
   allocation_method   = "Static"
@@ -47,11 +47,13 @@ resource "azurerm_public_ip" "ingress" {
 }
 
 resource "helm_release" "ingress" {
+  count = var.nginx_enabled ? 1 : 0
+
   name       = "ingress-nginx"
   namespace  = kubernetes_namespace.paragon.id
   repository = "https://kubernetes.github.io/ingress-nginx"
   chart      = "ingress-nginx"
-  version    = "4.12.0"
+  version    = "4.15.1"
 
   set {
     name  = "controller.admissionWebhooks.enabled"
@@ -74,15 +76,16 @@ resource "helm_release" "ingress" {
   }
 
   dynamic "set" {
-    for_each = var.ingress_scheme == "internal" ? [] : [1]
+    for_each = var.nginx_public ? [1] : []
     content {
       name  = "controller.service.loadBalancerIP"
       value = azurerm_public_ip.ingress[0].ip_address
     }
   }
 
+  # Internal LB when nginx is not public.
   dynamic "set" {
-    for_each = var.ingress_scheme == "internal" ? [1] : []
+    for_each = var.nginx_public ? [] : [1]
     content {
       name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/azure-load-balancer-internal"
       value = "true"
@@ -109,6 +112,23 @@ resource "helm_release" "ingress" {
     value = "16k"
   }
 
+  # Trust X-Forwarded-For from AGC during transition.
+  dynamic "set" {
+    for_each = var.agc_active ? [1] : []
+    content {
+      name  = "controller.config.use-forwarded-headers"
+      value = "true"
+    }
+  }
+
+  dynamic "set" {
+    for_each = var.agc_active && var.agc_subnet_cidr != null ? [1] : []
+    content {
+      name  = "controller.config.proxy-real-ip-cidr"
+      value = var.agc_subnet_cidr
+    }
+  }
+
   depends_on = [
     helm_release.cert_manager,
     azurerm_key_vault_access_policy.aks_access_to_kv,
@@ -122,27 +142,35 @@ resource "time_sleep" "wait" {
   depends_on = [helm_release.ingress]
 }
 
-resource "kubectl_manifest" "certificate_issuer" {
-  yaml_body = <<YAML
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-  namespace: ${kubernetes_namespace.paragon.id}
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: enterprise@useparagon.com
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    solvers:
-    - http01:
-        ingress:
-          class: nginx
-YAML
+resource "kubectl_manifest" "certificate_issuer_http01" {
+  yaml_body = yamlencode({
+    apiVersion = "cert-manager.io/v1"
+    kind       = "ClusterIssuer"
+    metadata = {
+      name      = "letsencrypt-prod"
+      namespace = kubernetes_namespace.paragon.id
+    }
+    spec = {
+      acme = {
+        server = "https://acme-v02.api.letsencrypt.org/directory"
+        email  = "enterprise@useparagon.com"
+        privateKeySecretRef = {
+          name = "letsencrypt-prod"
+        }
+        solvers = [{
+          http01 = {
+            ingress = {
+              class = "nginx"
+            }
+          }
+        }]
+      }
+    }
+  })
 
   depends_on = [
     helm_release.cert_manager,
-    time_sleep.wait
+    time_sleep.wait,
   ]
 }
+
