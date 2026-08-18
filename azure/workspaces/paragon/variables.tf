@@ -607,6 +607,9 @@ locals {
   # Do not prefix Azure connection_string: classic Cache keys are unencoded
   # (:password@host:port), and Managed Redis already urlencodes the password in
   # connection_string — encoding the whole string would double-encode (%3D → %253D).
+  # Premium Cache with authentication_enabled=false emits passwordless
+  # connection_string (host:port) while still exporting primary_access_key as
+  # password — only include userinfo when connection_string has "@" (or is absent).
   redis_instance_urls = {
     for name, r in try(local.infra_vars.redis.value, {}) : name => (
       startswith(try(r.connection_string, ""), "redis://") || startswith(try(r.connection_string, ""), "rediss://")
@@ -614,7 +617,11 @@ locals {
       : format(
         "%s://%s%s:%s",
         contains(["true", "1", "yes"], lower(tostring(try(r.ssl, true)))) ? "rediss" : "redis",
-        try(r.password, null) != null ? ":${urlencode(r.password)}@" : "",
+        (
+          try(r.password, null) != null && strcontains(try(r.connection_string, "@"), "@")
+          ? ":${urlencode(r.password)}@"
+          : ""
+        ),
         r.host,
         r.port
       )
