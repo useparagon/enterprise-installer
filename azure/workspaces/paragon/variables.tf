@@ -603,11 +603,47 @@ locals {
     "true"
   )
 
-  default_redis_url = try(
-    local.helm_vars.global.env["REDIS_URL"],
-    "${local.helm_vars.global.env["REDIS_HOST"]}:${local.helm_vars.global.env["REDIS_PORT"]}",
-    local.infra_vars.redis.value.cache.connection_string,
-    "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
+  # Rebuild scheme-prefixed Redis URLs from host/password/port (same as GCP).
+  # Do not prefix Azure connection_string: classic Cache keys are unencoded
+  # (:password@host:port), and Managed Redis already urlencodes the password in
+  # connection_string — encoding the whole string would double-encode (%3D → %253D).
+  # Premium Cache with authentication_enabled=false emits passwordless
+  # connection_string (host:port) while still exporting primary_access_key as
+  # password — only include userinfo when connection_string has "@" (or is absent).
+  redis_instance_urls = {
+    for name, r in try(local.infra_vars.redis.value, {}) : name => (
+      startswith(try(r.connection_string, ""), "redis://") || startswith(try(r.connection_string, ""), "rediss://")
+      ? r.connection_string
+      : format(
+        "%s://%s%s:%s",
+        contains(["true", "1", "yes"], lower(tostring(try(r.ssl, true)))) ? "rediss" : "redis",
+        (
+          try(r.password, null) != null && strcontains(try(r.connection_string, "@"), "@")
+          ? ":${urlencode(r.password)}@"
+          : ""
+        ),
+        r.host,
+        r.port
+      )
+    )
+  }
+
+  # Prefer an explicitly schemed helm REDIS_URL; otherwise use rebuilt cache URL.
+  default_redis_url = (
+    try(
+      startswith(local.helm_vars.global.env["REDIS_URL"], "redis://") || startswith(local.helm_vars.global.env["REDIS_URL"], "rediss://"),
+      false
+    )
+    ? local.helm_vars.global.env["REDIS_URL"]
+    : try(
+      local.redis_instance_urls["cache"],
+      format(
+        "%s://%s:%s",
+        contains(["true", "1", "yes"], lower(tostring(local.default_redis_ssl))) ? "rediss" : "redis",
+        local.helm_vars.global.env["REDIS_HOST"],
+        local.helm_vars.global.env["REDIS_PORT"]
+      )
+    )
   )
 
   helm_values = merge(local.helm_vars, {
@@ -747,20 +783,21 @@ locals {
         ZEUS_POSTGRES_DATABASE          = try(local.infra_vars.postgres.value.zeus.database, local.infra_vars.postgres.value.paragon.database)
 
         # Redis configurations
-        REDIS_URL = local.default_redis_url
+        REDIS_URL = try(local.redis_instance_urls["cache"], local.default_redis_url)
 
         CACHE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
         CACHE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
-        CACHE_REDIS_URL                = try(local.infra_vars.redis.value.cache.connection_string, local.default_redis_url)
+        CACHE_REDIS_URL                = try(local.redis_instance_urls["cache"], local.default_redis_url)
         QUEUE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.queue.cluster, local.default_redis_cluster)
         QUEUE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.queue.ssl, local.default_redis_ssl)
-        QUEUE_REDIS_URL                = try(local.infra_vars.redis.value.queue.connection_string, local.default_redis_url)
+        QUEUE_REDIS_URL                = try(local.redis_instance_urls["queue"], local.default_redis_url)
         SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
         SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
-        SYSTEM_REDIS_URL               = try(local.infra_vars.redis.value.system.connection_string, local.default_redis_url)
+        SYSTEM_REDIS_URL               = try(local.redis_instance_urls["system"], local.default_redis_url)
         WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
         WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-        WORKFLOW_REDIS_URL             = try(local.infra_vars.redis.value.workflow.connection_string, local.default_redis_url)
+        # No dedicated workflow Redis on Azure — fall back to cache (matches secrets.tf / monorepo chart).
+        WORKFLOW_REDIS_URL = try(local.redis_instance_urls["workflow"], local.redis_instance_urls["cache"], local.default_redis_url)
 
         # Cloud Storage configurations
         CLOUD_STORAGE_MICROSERVICE_PASS = local.storage_output.root_password

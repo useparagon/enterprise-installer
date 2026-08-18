@@ -78,10 +78,23 @@ locals {
   managed_sync_redis_url = "${local.redis_config.redis_tls_enabled ? "rediss" : "redis"}://${local.redis_config.password != null ? ":${urlencode(local.redis_config.password)}@" : ""}${local.redis_config.host}:${local.redis_config.port}"
 
   # Workflow Redis shares cache when there is no dedicated workflow instance (matches monorepo chart).
+  # Rebuild from host/password/port with urlencode — same as managed_sync_redis_url / GCP.
+  # Omit userinfo when connection_string is passwordless (Premium auth disabled).
   workflow_redis_from_infra = try(var.infra_values.redis.value.workflow, var.infra_values.redis.value.cache, null)
-  workflow_redis_url = try(
-    local.workflow_redis_from_infra.connection_string,
-    local.workflow_redis_from_infra != null ? "${local.workflow_redis_from_infra.host}:${local.workflow_redis_from_infra.port}" : null
+  workflow_redis_url = local.workflow_redis_from_infra == null ? null : (
+    startswith(try(local.workflow_redis_from_infra.connection_string, ""), "redis://") || startswith(try(local.workflow_redis_from_infra.connection_string, ""), "rediss://")
+    ? local.workflow_redis_from_infra.connection_string
+    : format(
+      "%s://%s%s:%s",
+      contains(["true", "1", "yes"], lower(tostring(try(local.workflow_redis_from_infra.ssl, true)))) ? "rediss" : "redis",
+      (
+        try(local.workflow_redis_from_infra.password, null) != null && strcontains(try(local.workflow_redis_from_infra.connection_string, "@"), "@")
+        ? ":${urlencode(local.workflow_redis_from_infra.password)}@"
+        : ""
+      ),
+      local.workflow_redis_from_infra.host,
+      local.workflow_redis_from_infra.port
+    )
   )
 
   # Backward compatible with infra workspaces that still emit the legacy "minio" output
