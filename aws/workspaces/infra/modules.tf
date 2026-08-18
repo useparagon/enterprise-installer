@@ -155,6 +155,16 @@ module "cluster" {
   private_subnet_ids = module.network.private_subnet[*].id
 }
 
+locals {
+  docker_username = trimspace(coalesce(var.docker_username, ""))
+  docker_password = trimspace(coalesce(var.docker_password, ""))
+
+  # Blank credentials produce a well-formed but unusable pull secret
+  # (auth = base64(":")), which fails image pulls with insufficient_scope
+  # instead of failing the apply, so blank is treated the same as unset.
+  docker_credentials_set = local.docker_username != "" && local.docker_password != ""
+}
+
 module "secrets" {
   source = "./secrets"
 
@@ -162,20 +172,17 @@ module "secrets" {
   organization = var.organization
   env_config   = local.env_config
 
-  docker_config = (
-    var.docker_username != null &&
-    var.docker_password != null
-    ) ? jsonencode({
-      dockerconfigjson = jsonencode({
-        auths = {
-          (coalesce(var.docker_registry_server, "docker.io")) = {
-            username = var.docker_username
-            password = var.docker_password
-            email    = var.docker_email
-            auth     = base64encode("${var.docker_username}:${var.docker_password}")
-          }
+  docker_config = local.docker_credentials_set ? jsonencode({
+    dockerconfigjson = jsonencode({
+      auths = {
+        (coalesce(var.docker_registry_server, "docker.io")) = {
+          username = local.docker_username
+          password = local.docker_password
+          email    = coalesce(var.docker_email, "")
+          auth     = base64encode("${local.docker_username}:${local.docker_password}")
         }
-      })
+      }
+    })
   }) : null
 
   managed_sync_config     = var.managed_sync_enabled ? coalesce(var.paragon_managed_sync_config, {}) : null
