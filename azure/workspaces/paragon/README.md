@@ -19,6 +19,8 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 
 With `agc_enabled = true` (and `agc_direct_routing = false`, the default), Terraform adds AGC+WAF in front of public ingress-nginx. DNS stays on nginx until you CNAME to `agc_fqdn`.
 
+With `agc_direct_routing = true`, nginx is removed and AGC routes to Services. TLS renewals switch to cert-manager HTTP-01 over Gateway API (`gatewayHTTPRoute` on `paragon-agc`) and Terraform owns the per-host `Certificate` CRs that keep the `*-secret` objects current.
+
 WAF defaults: `waf_mode = "Detection"` with DRS 2.1 and **no** custom or rate-limit rules. In Detection mode matches are logged, never blocked, so the brownfield apply cannot break live traffic. Review the firewall logs, then switch to `Prevention`.
 
 Azure rejects any WAF policy without a primary rule set, so `waf_managed_rule_sets` must keep a `Microsoft_DefaultRuleSet` entry. AGC accepts only **DRS 2.1** (no CRS); Bot Manager 1.0/1.1 can be added alongside it.

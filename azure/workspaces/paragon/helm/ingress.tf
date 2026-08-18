@@ -5,6 +5,23 @@ data "azurerm_key_vault" "paragon" {
   resource_group_name = var.resource_group.name
 }
 
+locals {
+  # Same enablement as root agc_public_routes / helm subchart_values: every
+  # microservice forced on, then helm_values.subchart overrides. Avoids issuing
+  # LE certs for hosts Helm does not actually publish (e.g. cache-replay).
+  subchart_enabled = merge(
+    { for name in keys(var.microservices) : name => { enabled = true } },
+    try(nonsensitive(var.helm_values.subchart), {}),
+  )
+
+  # Hostnames that need Certificate CRs when nginx Ingress is gone (AGC direct).
+  agc_direct_certificate_hosts = {
+    for name, cfg in merge(var.public_microservices, var.public_monitors) :
+    name => replace(replace(cfg.public_url, "https://", ""), "http://", "")
+    if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true)
+  }
+}
+
 resource "azurerm_key_vault_access_policy" "aks_access_to_kv" {
   key_vault_id = data.azurerm_key_vault.paragon.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
@@ -31,6 +48,12 @@ resource "helm_release" "cert_manager" {
   set {
     name  = "installCRDs"
     value = true
+  }
+
+  # Required for ACME HTTP-01 via Gateway API when AGC direct-routing removes nginx.
+  set {
+    name  = "extraArgs[0]"
+    value = "--enable-gateway-api"
   }
 }
 
@@ -157,13 +180,29 @@ resource "kubectl_manifest" "certificate_issuer_http01" {
         privateKeySecretRef = {
           name = "letsencrypt-prod"
         }
-        solvers = [{
-          http01 = {
-            ingress = {
-              class = "nginx"
+        # Transition (nginx present): HTTP-01 via ingress-nginx.
+        # Direct (nginx removed): HTTP-01 via temporary HTTPRoutes on the AGC Gateway.
+        # Encode each branch before the ternary so object shapes need not match.
+        solvers = jsondecode(
+          var.agc_direct ? jsonencode([{
+            http01 = {
+              gatewayHTTPRoute = {
+                parentRefs = [{
+                  group     = "gateway.networking.k8s.io"
+                  kind      = "Gateway"
+                  name      = var.agc_gateway_name
+                  namespace = kubernetes_namespace.paragon.id
+                }]
+              }
             }
-          }
-        }]
+          }]) : jsonencode([{
+            http01 = {
+              ingress = {
+                class = "nginx"
+              }
+            }
+          }])
+        )
       }
     }
   })
@@ -171,6 +210,38 @@ resource "kubectl_manifest" "certificate_issuer_http01" {
   depends_on = [
     helm_release.cert_manager,
     time_sleep.wait,
+  ]
+}
+
+# In AGC direct mode Ingress (and ingress-shim Certificates) are gone. Own the
+# Certificate CRs here so renewals keep updating the per-host secrets AGC terminates.
+resource "kubectl_manifest" "agc_direct_certificate" {
+  for_each = var.agc_direct ? local.agc_direct_certificate_hosts : {}
+
+  # Do not block apply on ACME; cert-manager renews asynchronously and existing
+  # TLS secrets stay valid while challenges complete.
+  wait_for_rollout = false
+
+  yaml_body = yamlencode({
+    apiVersion = "cert-manager.io/v1"
+    kind       = "Certificate"
+    metadata = {
+      name      = "${each.key}-secret"
+      namespace = kubernetes_namespace.paragon.id
+    }
+    spec = {
+      secretName = "${each.key}-secret"
+      issuerRef = {
+        name = "letsencrypt-prod"
+        kind = "ClusterIssuer"
+      }
+      dnsNames = [each.value]
+    }
+  })
+
+  depends_on = [
+    kubectl_manifest.certificate_issuer_http01,
+    helm_release.cert_manager,
   ]
 }
 

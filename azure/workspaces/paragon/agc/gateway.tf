@@ -56,7 +56,9 @@ locals {
     }
   })
 
-  # HTTP -> HTTPS redirect.
+  # HTTP -> HTTPS redirect for non-ACME traffic. Leave /.well-known/acme-challenge
+  # unmatched here so cert-manager's temporary HTTPRoute can solve HTTP-01 on this
+  # Gateway when nginx is gone (agc_direct_routing).
   redirect_route_yaml = yamlencode({
     apiVersion = "gateway.networking.k8s.io/v1"
     kind       = "HTTPRoute"
@@ -70,6 +72,12 @@ locals {
         sectionName = local.http_listener
       }]
       rules = [{
+        matches = [{
+          path = {
+            type  = "PathPrefix"
+            value = "/"
+          }
+        }]
         filters = [{
           type = "RequestRedirect"
           requestRedirect = {

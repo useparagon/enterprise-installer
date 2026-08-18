@@ -112,15 +112,16 @@ locals {
   dns_ingress_target = local.dns_target_agc ? module.agc.fqdn : module.helm.load_balancer
   dns_record_ttl     = local.agc_active && !local.agc_direct ? 60 : 300
 
-  # The paragon-onprem chart gates each service with subchart.<name>.enabled. Disabled
-  # services (e.g. cache-replay, health-checker) render no Ingress and no cert, so AGC
-  # must not create HTTPS listeners for them or the listener stays unprogrammed.
-  onprem_subchart_enabled = try(
-    yamldecode(file("${path.root}/charts/paragon-onprem/values.yaml")).subchart,
-    {},
+  # Match helm/helm.tf subchart_values: every microservice is forced on, then
+  # helm_values.subchart overrides (later merge wins). Do NOT read the chart's
+  # values.yaml defaults — those keep cache-replay/health-checker off while Helm
+  # still deploys them, which would omit AGC HTTPS listeners for live hosts.
+  onprem_subchart_enabled = merge(
+    { for name in keys(local.microservices) : name => { enabled = true } },
+    try(local.helm_vars.subchart, {}),
   )
 
-  # Per-host backends and HTTPS listeners for AGC, limited to services the chart publishes.
+  # Per-host backends and HTTPS listeners for AGC, limited to services Helm publishes.
   agc_public_routes = {
     for name, cfg in local.public_services :
     name => {

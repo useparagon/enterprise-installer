@@ -191,6 +191,12 @@ variable "agc_direct" {
   default     = false
 }
 
+variable "agc_gateway_name" {
+  description = "Gateway name used for cert-manager HTTP-01 challenges when agc_direct is true."
+  type        = string
+  default     = "paragon-agc"
+}
+
 variable "agc_subnet_cidr" {
   description = "CIDR of the AGC association subnet (used as nginx proxy-real-ip-cidr during transition)."
   type        = string
