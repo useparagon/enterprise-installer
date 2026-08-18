@@ -102,6 +102,7 @@
                         "elasticache.application-autoscaling.amazonaws.com",
                         "elasticloadbalancing.amazonaws.com",
                         "kafka.amazonaws.com",
+                        "kafka.application-autoscaling.amazonaws.com",
                         "rds.amazonaws.com",
                         "ssm.amazonaws.com"
                     ],
