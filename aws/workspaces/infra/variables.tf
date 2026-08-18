@@ -260,13 +260,19 @@ variable "eks_system_managed_node_group" {
 }
 
 variable "ami_release_version" {
-  description = "Optional EKS managed node group AMI release version pin (passed to terraform-aws-modules/eks eks-managed-node-group)."
+  description = "Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2 legacy coexistence, use ami_release_versions instead."
   type        = string
   default     = null
 }
 
+variable "ami_release_versions" {
+  description = "Optional map of managed node group key (system, ondemand, spot) to AMI release version pin. When non-empty, overrides ami_release_version and pins only the listed groups."
+  type        = map(string)
+  default     = {}
+}
+
 variable "use_latest_ami_release_version" {
-  description = "When true, resolve the latest AMI release version for the cluster Kubernetes version at plan/apply."
+  description = "When true, resolve the latest AMI release version per node group ami_type for the cluster Kubernetes version at plan/apply."
   type        = bool
   default     = false
 }

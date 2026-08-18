@@ -151,6 +151,7 @@ module "cluster" {
   karpenter_iam_names            = var.karpenter_iam_names
   eks_system_managed_node_group  = var.eks_system_managed_node_group
   ami_release_version            = var.ami_release_version
+  ami_release_versions           = var.ami_release_versions
   use_latest_ami_release_version = var.use_latest_ami_release_version
 
   vpc_id             = module.network.vpc.id

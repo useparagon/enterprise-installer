@@ -1,3 +1,14 @@
+check "ami_release_version_homogeneous_ami_family" {
+  assert {
+    condition = (
+      var.ami_release_version == null
+      || length(var.ami_release_versions) > 0
+      || length(local.managed_node_group_ami_types) <= 1
+    )
+    error_message = "ami_release_version cannot be used alone when managed node groups span multiple AMI families (e.g. BOTTLEROCKET system + AL2 legacy). Set ami_release_versions keyed by node group (system, ondemand, spot), or leave ami_release_version null."
+  }
+}
+
 # Creating the EKS cluster
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
@@ -155,8 +166,13 @@ module "eks_managed_node_group" {
   subnet_ids             = var.private_subnet_ids
   vpc_security_group_ids = [module.eks.cluster_security_group_id]
 
-  ami_type                       = try(each.value.ami_type, null)
-  ami_release_version            = var.ami_release_version
+  ami_type = try(each.value.ami_type, null)
+  # Prefer per-node-group pins when set; otherwise a single pin only when AMI families are homogeneous.
+  ami_release_version = (
+    length(var.ami_release_versions) > 0
+    ? try(var.ami_release_versions[each.key], null)
+    : var.ami_release_version
+  )
   use_latest_ami_release_version = var.use_latest_ami_release_version
   capacity_type                  = each.value.capacity
   desired_size                   = try(each.value.desired_size, each.value.min_count)

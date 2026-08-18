@@ -109,6 +109,8 @@ locals {
         max_count      = ceil(var.eks_max_node_count * (1 - (var.eks_spot_instance_percent / 100)))
         instance_types = var.eks_ondemand_node_instance_type
         capacity       = "ON_DEMAND"
+        # Explicit so use_latest_ami_release_version can resolve SSM paths (upstream requires ami_type).
+        ami_type = "AL2_x86_64"
         labels = {
           "useparagon.com/capacityType" = "ondemand"
         }
@@ -118,6 +120,7 @@ locals {
         max_count      = ceil(var.eks_max_node_count * (var.eks_spot_instance_percent / 100))
         instance_types = var.eks_spot_node_instance_type
         capacity       = "SPOT"
+        ami_type       = "AL2_x86_64"
         labels = {
           "useparagon.com/capacityType" = "spot"
         }
@@ -127,14 +130,14 @@ locals {
   }
 
   system_node_group = {
-    min_count      = var.eks_system_managed_node_group.min_size
-    max_count      = var.eks_system_managed_node_group.max_size
-    desired_size   = var.eks_system_managed_node_group.desired_size
+    min_count    = var.eks_system_managed_node_group.min_size
+    max_count    = var.eks_system_managed_node_group.max_size
+    desired_size = var.eks_system_managed_node_group.desired_size
     instance_types = coalesce(
       try(var.eks_system_managed_node_group.instance_types, null),
       local.system_node_instance_types,
     )
-    capacity       = "ON_DEMAND"
+    capacity        = "ON_DEMAND"
     ami_type        = "BOTTLEROCKET_x86_64"
     labels          = var.eks_system_managed_node_group.labels
     use_name_prefix = coalesce(var.eks_system_managed_node_group.use_name_prefix, false)
@@ -146,6 +149,11 @@ locals {
     var.enable_karpenter ? { system = local.system_node_group } : {},
     var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
   )
+
+  # Release-version pins are AMI-family-specific (Bottlerocket vs AL2).
+  managed_node_group_ami_types = distinct([
+    for _, v in local.managed_node_groups : coalesce(try(v.ami_type, null), "AL2_x86_64")
+  ])
 
   cluster_autoscaler_node_groups = var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {}
 
