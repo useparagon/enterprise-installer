@@ -155,6 +155,12 @@ variable "postgres_version" {
   default     = "14"
 }
 
+variable "postgres_management_lock_enabled" {
+  description = "When true, apply Azure CanNotDelete management locks on Postgres Flexible Servers (opt-in)."
+  type        = bool
+  default     = false
+}
+
 variable "postgres_multiple_instances" {
   description = "Whether or not to create multiple Postgres instances. Used for higher volume installations."
   type        = bool
@@ -536,7 +542,7 @@ locals {
     cache = {
       sku                   = "Balanced_B10"
       ha_enabled            = true
-      cluster_enabled       = true
+      cluster_enabled       = false
       persistence_mode      = null
       persistence_frequency = null
     }
