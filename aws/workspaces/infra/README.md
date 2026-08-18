@@ -10,6 +10,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 
 ## Providers
 
@@ -28,27 +29,45 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="module_network"></a> [network](#module\_network) | ./network | n/a |
 | <a name="module_postgres"></a> [postgres](#module\_postgres) | ./postgres | n/a |
 | <a name="module_redis"></a> [redis](#module\_redis) | ./redis | n/a |
+| <a name="module_secrets"></a> [secrets](#module\_secrets) | ./secrets | n/a |
 | <a name="module_storage"></a> [storage](#module\_storage) | ./storage | n/a |
 
 ## Resources
 
 | Name | Type |
 | ---- | ---- |
+| [aws_secretsmanager_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret.runtime_cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret_version.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.runtime_cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.runtime_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_ami_release_version"></a> [ami\_release\_version](#input\_ami\_release\_version) | Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2 legacy coexistence, use ami\_release\_versions instead. | `string` | `null` | no |
+| <a name="input_ami_release_versions"></a> [ami\_release\_versions](#input\_ami\_release\_versions) | Optional map of managed node group key (system, ondemand, spot) to AMI release version pin. When non-empty, overrides ami\_release\_version and pins only the listed groups. | `map(string)` | `{}` | no |
 | <a name="input_app_bucket_expiration"></a> [app\_bucket\_expiration](#input\_app\_bucket\_expiration) | The number of days to retain S3 app data before deleting | `number` | `90` | no |
+| <a name="input_app_secrets"></a> [app\_secrets](#input\_app\_secrets) | Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides env\_overrides when the same key is set in both. | `map(string)` | `null` | no |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to enable S3 Object Lock for the audit logs bucket. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
-| <a name="input_aws_access_key_id"></a> [aws\_access\_key\_id](#input\_aws\_access\_key\_id) | AWS Access Key for AWS account to provision resources on. | `string` | n/a | yes |
+| <a name="input_aws_access_key_id"></a> [aws\_access\_key\_id](#input\_aws\_access\_key\_id) | AWS Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws\_assume\_role\_arn. | `string` | `null` | no |
+| <a name="input_aws_assume_role_arn"></a> [aws\_assume\_role\_arn](#input\_aws\_assume\_role\_arn) | Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift). | `string` | `null` | no |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | The AWS region resources are created in. | `string` | n/a | yes |
-| <a name="input_aws_secret_access_key"></a> [aws\_secret\_access\_key](#input\_aws\_secret\_access\_key) | AWS Secret Access Key for AWS account to provision resources on. | `string` | n/a | yes |
+| <a name="input_aws_secret_access_key"></a> [aws\_secret\_access\_key](#input\_aws\_secret\_access\_key) | AWS Secret Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws\_assume\_role\_arn. | `string` | `null` | no |
 | <a name="input_aws_session_token"></a> [aws\_session\_token](#input\_aws\_session\_token) | AWS session token. | `string` | `null` | no |
 | <a name="input_az_count"></a> [az\_count](#input\_az\_count) | Number of AZs to cover in a given region. | `number` | `2` | no |
 | <a name="input_bastion_enabled"></a> [bastion\_enabled](#input\_bastion\_enabled) | Whether to create the bastion host and its associated Cloudflare tunnel. | `bool` | `true` | no |
+| <a name="input_bastion_tags"></a> [bastion\_tags](#input\_bastion\_tags) | Optional additional tags applied to bastion resources (e.g. customer SCP-required tags). | `map(string)` | `{}` | no |
 | <a name="input_cdn_bucket_acl_reset"></a> [cdn\_bucket\_acl\_reset](#input\_cdn\_bucket\_acl\_reset) | Reset the CDN S3 bucket ACL to private before BucketOwnerEnforced. Defaults to false; set true once when migrating a legacy CDN bucket with existing ACL grants, then remove. | `bool` | `false` | no |
 | <a name="input_cloudflare_api_token"></a> [cloudflare\_api\_token](#input\_cloudflare\_api\_token) | Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS` | `string` | `"dummy-cloudflare-tokens-must-be-40-chars"` | no |
 | <a name="input_cloudflare_tunnel_account_id"></a> [cloudflare\_tunnel\_account\_id](#input\_cloudflare\_tunnel\_account\_id) | Account ID for Cloudflare account | `string` | `""` | no |
@@ -59,6 +78,10 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_create_autoscaling_linked_role"></a> [create\_autoscaling\_linked\_role](#input\_create\_autoscaling\_linked\_role) | Whether or not to create an IAM role for autoscaling. | `bool` | `true` | no |
 | <a name="input_disable_cloudtrail"></a> [disable\_cloudtrail](#input\_disable\_cloudtrail) | Used to specify that Cloudtrail is disabled. | `bool` | `true` | no |
 | <a name="input_disable_deletion_protection"></a> [disable\_deletion\_protection](#input\_disable\_deletion\_protection) | Used to disable deletion protection on RDS and S3 resources. | `bool` | `false` | no |
+| <a name="input_docker_email"></a> [docker\_email](#input\_docker\_email) | Docker email for application image pulls. | `string` | `null` | no |
+| <a name="input_docker_password"></a> [docker\_password](#input\_docker\_password) | Docker password for application image pulls. | `string` | `null` | no |
+| <a name="input_docker_registry_server"></a> [docker\_registry\_server](#input\_docker\_registry\_server) | Docker registry server for application image pulls. | `string` | `null` | no |
+| <a name="input_docker_username"></a> [docker\_username](#input\_docker\_username) | Docker username for application image pulls. | `string` | `null` | no |
 | <a name="input_eks_admin_arns"></a> [eks\_admin\_arns](#input\_eks\_admin\_arns) | Array of ARNs for IAM users or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard. | `list(string)` | `[]` | no |
 | <a name="input_eks_max_node_count"></a> [eks\_max\_node\_count](#input\_eks\_max\_node\_count) | The maximum number of nodes to run in the Kubernetes cluster. | `number` | `50` | no |
 | <a name="input_eks_min_node_count"></a> [eks\_min\_node\_count](#input\_eks\_min\_node\_count) | The minimum number of nodes to run in the Kubernetes cluster. | `number` | `4` | no |
@@ -71,6 +94,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_elasticache_node_type"></a> [elasticache\_node\_type](#input\_elasticache\_node\_type) | The ElastiCache node type used for Redis. | `string` | `"cache.r6g.large"` | no |
 | <a name="input_enable_karpenter"></a> [enable\_karpenter](#input\_enable\_karpenter) | Enable Karpenter autoscaling (SQS, IAM, Helm controller, EC2NodeClass, NodePools). | `bool` | `false` | no |
 | <a name="input_enable_legacy_mng_pools"></a> [enable\_legacy\_mng\_pools](#input\_enable\_legacy\_mng\_pools) | Keep legacy on-demand and spot EKS managed node groups during Karpenter migration. | `bool` | `true` | no |
+| <a name="input_env_overrides"></a> [env\_overrides](#input\_env\_overrides) | Optional overrides for any infra-derived env key written to Secrets Manager (e.g. PARAGON\_DOMAIN, ACCOUNT\_PUBLIC\_URL, CERBERUS\_POSTGRES\_PORT). Merged on top of computed defaults; app\_secrets wins if the same key is set in both. Domain and *\_PUBLIC\_URL chart envKeys are owned by the paragon workspace `domain` variable — seed them here only for GitOps-only flows that read Secrets Manager without that workspace. | `map(string)` | `null` | no |
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.34"` | no |
 | <a name="input_karpenter_chart_version"></a> [karpenter\_chart\_version](#input\_karpenter\_chart\_version) | Karpenter Helm chart version (OCI public.ecr.aws/karpenter/karpenter). | `string` | `"1.13.0"` | no |
 | <a name="input_karpenter_iam_names"></a> [karpenter\_iam\_names](#input\_karpenter\_iam\_names) | Optional override for Karpenter IAM role names. | <pre>object({<br/>    controller_role_name = optional(string)<br/>    node_role_name       = optional(string)<br/>  })</pre> | `{}` | no |
@@ -84,12 +108,15 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_msk_kafka_num_broker_nodes"></a> [msk\_kafka\_num\_broker\_nodes](#input\_msk\_kafka\_num\_broker\_nodes) | The number of broker nodes for the MSK cluster. | `number` | `2` | no |
 | <a name="input_msk_kafka_version"></a> [msk\_kafka\_version](#input\_msk\_kafka\_version) | The Kafka version for the MSK cluster. | `string` | `"3.9.x"` | no |
 | <a name="input_network_firewall"></a> [network\_firewall](#input\_network\_firewall) | Optional AWS Network Firewall for egress inspection with RAM-shared rule group ARNs (stateful or stateless). Enable on initial deployment only; not supported when adding to an existing workspace. Logs go to <workspace>-logs. | <pre>object({<br/>    enabled = optional(bool, false)<br/><br/>    rule_group_arns = optional(list(string), [])<br/><br/>    stateless_default_actions          = optional(list(string), ["aws:forward_to_sfe"])<br/>    stateless_fragment_default_actions = optional(list(string), ["aws:forward_to_sfe"])<br/><br/>    # STRICT_ORDER (AWS-recommended) evaluates stateful rule groups by priority. It is<br/>    # required when any referenced rule group was created with STRICT_ORDER. DEFAULT_ACTION_ORDER<br/>    # lets the Suricata engine decide order and forbids priority/stateful_default_actions.<br/>    stateful_rule_order      = optional(string, "STRICT_ORDER")<br/>    stateful_default_actions = optional(list(string), ["aws:drop_strict", "aws:alert_strict"])<br/>  })</pre> | <pre>{<br/>  "enabled": false<br/>}</pre> | no |
+| <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve\_email) | Optional OpenObserve root user email. When set, used instead of the generated random email. | `string` | `null` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
+| <a name="input_paragon_managed_sync_config"></a> [paragon\_managed\_sync\_config](#input\_paragon\_managed\_sync\_config) | Optional managed-sync secret data to write to Secrets Manager. Null when managed sync is disabled. | `map(string)` | `null` | no |
 | <a name="input_rds_allocated_storage"></a> [rds\_allocated\_storage](#input\_rds\_allocated\_storage) | Initial allocated storage (GiB) for each Postgres RDS instance. | `number` | `20` | no |
 | <a name="input_rds_final_snapshot_enabled"></a> [rds\_final\_snapshot\_enabled](#input\_rds\_final\_snapshot\_enabled) | Specifies that RDS instances should perform a final snapshot before being deleted. | `bool` | `true` | no |
 | <a name="input_rds_gp3_iops"></a> [rds\_gp3\_iops](#input\_rds\_gp3\_iops) | gp3 IOPS for Postgres; null uses size-based baseline (3000 below 400 GiB, 12000 at/above). Set with rds\_gp3\_storage\_throughput to override; only valid when rds\_allocated\_storage >= 400 GiB. | `number` | `null` | no |
 | <a name="input_rds_gp3_storage_throughput"></a> [rds\_gp3\_storage\_throughput](#input\_rds\_gp3\_storage\_throughput) | gp3 throughput (MiB/s); null uses size-based baseline (125 below 400 GiB, 500 at/above). Use a valid pair with rds\_gp3\_iops when overriding. | `number` | `null` | no |
 | <a name="input_rds_instance_class"></a> [rds\_instance\_class](#input\_rds\_instance\_class) | The RDS instance class type used for Postgres. | `string` | `"db.t4g.small"` | no |
+| <a name="input_rds_managed_sync_instance_class"></a> [rds\_managed\_sync\_instance\_class](#input\_rds\_managed\_sync\_instance\_class) | The RDS instance class type used for the managed sync Postgres instance. | `string` | `"db.t4g.small"` | no |
 | <a name="input_rds_max_allocated_storage"></a> [rds\_max\_allocated\_storage](#input\_rds\_max\_allocated\_storage) | Maximum storage (GiB) for autoscaling on each Postgres RDS instance. | `number` | `1000` | no |
 | <a name="input_rds_multi_az"></a> [rds\_multi\_az](#input\_rds\_multi\_az) | Whether or not to enable multi-AZ in each RDS instance. | `bool` | `true` | no |
 | <a name="input_rds_multiple_instances"></a> [rds\_multiple\_instances](#input\_rds\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
@@ -97,7 +124,9 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_rds_restore_from_snapshot"></a> [rds\_restore\_from\_snapshot](#input\_rds\_restore\_from\_snapshot) | Specifies that RDS instances should be restored from a snapshot. | `bool` | `false` | no |
 | <a name="input_s3_kms_encryption_enabled"></a> [s3\_kms\_encryption\_enabled](#input\_s3\_kms\_encryption\_enabled) | Encrypt the app, CDN, audit logs, and managed sync S3 buckets with AWS KMS (SSE-KMS) instead of S3-managed keys (SSE-S3). Existing deployments default to SSE-S3; enable for new installs or to migrate existing buckets to KMS. The logs bucket always uses SSE-S3 because ALB and S3 server access logs do not support SSE-KMS. | `bool` | `false` | no |
 | <a name="input_s3_kms_key_arn"></a> [s3\_kms\_key\_arn](#input\_s3\_kms\_key\_arn) | ARN of an existing KMS key to use for S3 bucket encryption. When null and s3\_kms\_encryption\_enabled is true, a dedicated KMS key is created and managed by Terraform. Ignored when s3\_kms\_encryption\_enabled is false. | `string` | `null` | no |
+| <a name="input_secrets_recovery_window_in_days"></a> [secrets\_recovery\_window\_in\_days](#input\_secrets\_recovery\_window\_in\_days) | Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve) and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection. | `number` | `0` | no |
 | <a name="input_ssh_whitelist"></a> [ssh\_whitelist](#input\_ssh\_whitelist) | An optional list of IP addresses to whitelist ssh access. | `string` | `""` | no |
+| <a name="input_use_latest_ami_release_version"></a> [use\_latest\_ami\_release\_version](#input\_use\_latest\_ami\_release\_version) | When true, resolve the latest AMI release version per node group ami\_type for the cluster Kubernetes version at plan/apply. | `bool` | `false` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR for the VPC. | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_vpc_cidr_newbits"></a> [vpc\_cidr\_newbits](#input\_vpc\_cidr\_newbits) | Newbits used for calculating subnets. | `number` | `3` | no |
 
@@ -116,7 +145,9 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | The bucket used to store system logs. |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
-| <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. |
+| <a name="output_secrets_manager_env_secret"></a> [secrets\_manager\_env\_secret](#output\_secrets\_manager\_env\_secret) | Name of the Secrets Manager secret containing Paragon env config. |
+| <a name="output_secrets_manager_secret_arns"></a> [secrets\_manager\_secret\_arns](#output\_secrets\_manager\_secret\_arns) | ARNs of application Secrets Manager secrets. |
+| <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. S3 access uses EKS Pod Identity (role\_arn); static access keys are no longer provisioned. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->
 
