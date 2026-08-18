@@ -145,11 +145,14 @@ module "cluster" {
   eks_spot_node_instance_type     = local.eks_spot_node_instance_type
   k8s_version                     = var.k8s_version
 
-  enable_karpenter              = var.enable_karpenter
-  enable_legacy_mng_pools       = var.enable_legacy_mng_pools
-  karpenter_chart_version       = var.karpenter_chart_version
-  karpenter_iam_names           = var.karpenter_iam_names
-  eks_system_managed_node_group = var.eks_system_managed_node_group
+  enable_karpenter               = var.enable_karpenter
+  enable_legacy_mng_pools        = var.enable_legacy_mng_pools
+  karpenter_chart_version        = var.karpenter_chart_version
+  karpenter_iam_names            = var.karpenter_iam_names
+  eks_system_managed_node_group  = var.eks_system_managed_node_group
+  ami_release_version            = var.ami_release_version
+  ami_release_versions           = var.ami_release_versions
+  use_latest_ami_release_version = var.use_latest_ami_release_version
 
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
