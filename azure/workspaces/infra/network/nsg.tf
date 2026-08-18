@@ -284,3 +284,67 @@ resource "azurerm_subnet_network_security_group_association" "redis" {
   subnet_id                 = azurerm_subnet.redis.id
   network_security_group_id = azurerm_network_security_group.default_closed.id
 }
+
+# AGC association subnet NSG: allow Internet 80/443 and AzureLoadBalancer.
+# GatewayManager 65200-65535 is not required for AGC.
+resource "azurerm_network_security_group" "agc" {
+  count = var.agc_subnet_enabled ? 1 : 0
+
+  name                = "${var.workspace}-agc-nsg"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  tags                = var.tags
+}
+
+resource "azurerm_network_security_rule" "agc" {
+  for_each = var.agc_subnet_enabled ? {
+    AllowHttpInbound = {
+      priority                   = 110
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      destination_port_range     = "80"
+      source_address_prefix      = "Internet"
+      destination_address_prefix = "*"
+    }
+    AllowHttpsInbound = {
+      priority                   = 120
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      destination_port_range     = "443"
+      source_address_prefix      = "Internet"
+      destination_address_prefix = "*"
+    }
+    AllowAzureLoadBalancer = {
+      priority                   = 130
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "*"
+      destination_port_range     = "*"
+      source_address_prefix      = "AzureLoadBalancer"
+      destination_address_prefix = "*"
+    }
+  } : {}
+
+  name                        = each.key
+  priority                    = each.value.priority
+  direction                   = each.value.direction
+  access                      = each.value.access
+  protocol                    = each.value.protocol
+  source_port_range           = "*"
+  destination_port_range      = each.value.destination_port_range
+  source_address_prefix       = each.value.source_address_prefix
+  destination_address_prefix  = each.value.destination_address_prefix
+  resource_group_name         = azurerm_resource_group.main.name
+  network_security_group_name = azurerm_network_security_group.agc[0].name
+}
+
+resource "azurerm_subnet_network_security_group_association" "agc" {
+  count = var.agc_subnet_enabled ? 1 : 0
+
+  subnet_id                 = azurerm_subnet.agc[0].id
+  network_security_group_id = azurerm_network_security_group.agc[0].id
+
+  depends_on = [azurerm_network_security_rule.agc]
+}

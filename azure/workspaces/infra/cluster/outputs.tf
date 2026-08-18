@@ -15,3 +15,8 @@ output "wait_for_cluster" {
   description = "Variable that can be referenced to ensure cluster is initialized."
   value       = azurerm_kubernetes_cluster.cluster.fqdn
 }
+
+output "oidc_issuer_url" {
+  description = "AKS OIDC issuer URL used for workload-identity federated credentials (e.g. the AGC ALB controller)."
+  value       = azurerm_kubernetes_cluster.cluster.oidc_issuer_url
+}

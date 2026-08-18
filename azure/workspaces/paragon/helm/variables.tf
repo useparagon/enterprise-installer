@@ -167,6 +167,55 @@ variable "ingress_scheme" {
   type        = string
 }
 
+variable "nginx_enabled" {
+  description = "Whether to deploy ingress-nginx at all. False only in the AGC direct-routing final state."
+  type        = bool
+  default     = true
+}
+
+variable "nginx_public" {
+  description = "Whether the nginx controller should expose a public LoadBalancer."
+  type        = bool
+  default     = true
+}
+
+variable "agc_active" {
+  description = "Whether the Application Gateway for Containers path is active (enables the DNS-01 wildcard cert pipeline and forwarded-headers on nginx)."
+  type        = bool
+  default     = false
+}
+
+variable "agc_direct" {
+  description = "Whether AGC routes directly to Services (nginx Ingress objects are disabled)."
+  type        = bool
+  default     = false
+}
+
+variable "agc_gateway_name" {
+  description = "Gateway name used for cert-manager HTTP-01 challenges when agc_direct is true."
+  type        = string
+  default     = "paragon-agc"
+}
+
+variable "agc_subnet_cidr" {
+  description = "CIDR of the AGC association subnet (used as nginx proxy-real-ip-cidr during transition)."
+  type        = string
+  default     = null
+}
+
+variable "azure_subscription_id" {
+  description = "Azure subscription ID for cert-manager azureDNS solver."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "domain" {
+  description = "Root domain for wildcard certificate."
+  type        = string
+  default     = null
+}
+
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string

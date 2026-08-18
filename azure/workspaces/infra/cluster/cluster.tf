@@ -56,6 +56,10 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   # disable automatic upgrades - manual upgrades only
   node_os_upgrade_channel = "Unmanaged"
 
+  # OIDC issuer + workload identity for the AGC ALB controller federated credential.
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
+
   # NOTE: The configuration for the cluster can't change at all
   # We're intentionally setting very low settings.
   # This way, we can instead reconfigure the node pools using `azurerm_kubernetes_cluster_node_pool` resource.

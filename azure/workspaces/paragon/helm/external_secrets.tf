@@ -196,21 +196,23 @@ resource "kubectl_manifest" "external_secret_paragon" {
   depends_on = [kubectl_manifest.secret_store]
 }
 
+# count uses the inputs, not the rendered YAML: the YAML embeds the namespace id,
+# which is unknown until apply and would make count unresolvable at plan time.
 resource "kubectl_manifest" "external_secret_docker" {
-  count = local.external_secret_docker_yaml != null ? 1 : 0
+  count = var.create_docker_pull_secret && var.docker_cfg_secret_name != null ? 1 : 0
 
   yaml_body  = local.external_secret_docker_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
 
 resource "kubectl_manifest" "external_secret_managed_sync" {
-  count      = local.external_secret_managed_sync_yaml != null ? 1 : 0
+  count      = var.managed_sync_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_managed_sync_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
 
 resource "kubectl_manifest" "external_secret_openobserve" {
-  count      = local.external_secret_openobserve_yaml != null ? 1 : 0
+  count      = var.openobserve_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_openobserve_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
