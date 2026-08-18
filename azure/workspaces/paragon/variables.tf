@@ -603,31 +603,41 @@ locals {
     "true"
   )
 
-  # Azure connection_string is host:port with no scheme; clients need redis:// or rediss:// for TLS.
-  default_redis_url_raw = try(
-    local.helm_vars.global.env["REDIS_URL"],
-    "${local.helm_vars.global.env["REDIS_HOST"]}:${local.helm_vars.global.env["REDIS_PORT"]}",
-    local.infra_vars.redis.value.cache.connection_string,
-    "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
-  )
-
-  default_redis_url = (
-    startswith(local.default_redis_url_raw, "redis://") || startswith(local.default_redis_url_raw, "rediss://")
-    ? local.default_redis_url_raw
-    : format(
-      "%s://%s",
-      contains(["true", "1", "yes"], lower(tostring(local.default_redis_ssl))) ? "rediss" : "redis",
-      local.default_redis_url_raw
-    )
-  )
-
+  # Rebuild scheme-prefixed Redis URLs from host/password/port (same as GCP).
+  # Do not prefix Azure connection_string: classic Cache keys are unencoded
+  # (:password@host:port), and Managed Redis already urlencodes the password in
+  # connection_string — encoding the whole string would double-encode (%3D → %253D).
   redis_instance_urls = {
     for name, r in try(local.infra_vars.redis.value, {}) : name => (
       startswith(try(r.connection_string, ""), "redis://") || startswith(try(r.connection_string, ""), "rediss://")
       ? r.connection_string
-      : format("%s://%s", try(r.ssl, true) ? "rediss" : "redis", try(r.connection_string, "${r.host}:${r.port}"))
+      : format(
+        "%s://%s%s:%s",
+        contains(["true", "1", "yes"], lower(tostring(try(r.ssl, true)))) ? "rediss" : "redis",
+        try(r.password, null) != null ? ":${urlencode(r.password)}@" : "",
+        r.host,
+        r.port
+      )
     )
   }
+
+  # Prefer an explicitly schemed helm REDIS_URL; otherwise use rebuilt cache URL.
+  default_redis_url = (
+    try(
+      startswith(local.helm_vars.global.env["REDIS_URL"], "redis://") || startswith(local.helm_vars.global.env["REDIS_URL"], "rediss://"),
+      false
+    )
+    ? local.helm_vars.global.env["REDIS_URL"]
+    : try(
+      local.redis_instance_urls["cache"],
+      format(
+        "%s://%s:%s",
+        contains(["true", "1", "yes"], lower(tostring(local.default_redis_ssl))) ? "rediss" : "redis",
+        local.helm_vars.global.env["REDIS_HOST"],
+        local.helm_vars.global.env["REDIS_PORT"]
+      )
+    )
+  )
 
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
