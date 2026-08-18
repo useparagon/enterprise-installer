@@ -110,7 +110,8 @@ locals {
         instance_types = var.eks_ondemand_node_instance_type
         capacity       = "ON_DEMAND"
         # Explicit so use_latest_ami_release_version can resolve SSM paths (upstream requires ami_type).
-        ami_type = "AL2_x86_64"
+        # AL2023 matches the EKS default on Kubernetes 1.30+; AL2 is unsupported on current k8s_version.
+        ami_type = "AL2023_x86_64"
         labels = {
           "useparagon.com/capacityType" = "ondemand"
         }
@@ -120,7 +121,7 @@ locals {
         max_count      = ceil(var.eks_max_node_count * (var.eks_spot_instance_percent / 100))
         instance_types = var.eks_spot_node_instance_type
         capacity       = "SPOT"
-        ami_type       = "AL2_x86_64"
+        ami_type       = "AL2023_x86_64"
         labels = {
           "useparagon.com/capacityType" = "spot"
         }
@@ -150,9 +151,9 @@ locals {
     var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
   )
 
-  # Release-version pins are AMI-family-specific (Bottlerocket vs AL2).
+  # Release-version pins are AMI-family-specific (Bottlerocket vs AL2023).
   managed_node_group_ami_types = distinct([
-    for _, v in local.managed_node_groups : coalesce(try(v.ami_type, null), "AL2_x86_64")
+    for _, v in local.managed_node_groups : coalesce(try(v.ami_type, null), "AL2023_x86_64")
   ])
 
   cluster_autoscaler_node_groups = var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {}

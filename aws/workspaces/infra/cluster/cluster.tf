@@ -5,7 +5,7 @@ check "ami_release_version_homogeneous_ami_family" {
       || length(var.ami_release_versions) > 0
       || length(local.managed_node_group_ami_types) <= 1
     )
-    error_message = "ami_release_version cannot be used alone when managed node groups span multiple AMI families (e.g. BOTTLEROCKET system + AL2 legacy). Set ami_release_versions keyed by node group (system, ondemand, spot), or leave ami_release_version null."
+    error_message = "ami_release_version cannot be used alone when managed node groups span multiple AMI families (e.g. BOTTLEROCKET system + AL2023 legacy). Set ami_release_versions keyed by node group (system, ondemand, spot), or leave ami_release_version null."
   }
 }
 

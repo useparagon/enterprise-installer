@@ -260,7 +260,7 @@ variable "eks_system_managed_node_group" {
 }
 
 variable "ami_release_version" {
-  description = "Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2 legacy coexistence, use ami_release_versions instead."
+  description = "Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2023 legacy coexistence, use ami_release_versions instead."
   type        = string
   default     = null
 }

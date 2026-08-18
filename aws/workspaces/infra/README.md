@@ -54,7 +54,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_ami_release_version"></a> [ami\_release\_version](#input\_ami\_release\_version) | Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2 legacy coexistence, use ami\_release\_versions instead. | `string` | `null` | no |
+| <a name="input_ami_release_version"></a> [ami\_release\_version](#input\_ami\_release\_version) | Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2023 legacy coexistence, use ami\_release\_versions instead. | `string` | `null` | no |
 | <a name="input_ami_release_versions"></a> [ami\_release\_versions](#input\_ami\_release\_versions) | Optional map of managed node group key (system, ondemand, spot) to AMI release version pin. When non-empty, overrides ami\_release\_version and pins only the listed groups. | `map(string)` | `{}` | no |
 | <a name="input_app_bucket_expiration"></a> [app\_bucket\_expiration](#input\_app\_bucket\_expiration) | The number of days to retain S3 app data before deleting | `number` | `90` | no |
 | <a name="input_app_secrets"></a> [app\_secrets](#input\_app\_secrets) | Customer-provided secret env vars (LICENSE, OAuth client secrets, SMTP, etc.) merged into the flat paragon/env Secrets Manager secret last. Overrides env\_overrides when the same key is set in both. | `map(string)` | `null` | no |
