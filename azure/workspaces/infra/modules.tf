@@ -37,13 +37,14 @@ module "bastion" {
 module "postgres" {
   source = "./postgres"
 
-  instances        = local.postgres_instances
-  postgres_version = var.postgres_version
-  resource_group   = module.network.resource_group
-  tags             = local.default_tags
-  virtual_network  = module.network.virtual_network
-  private_subnet   = module.network.postgres_subnet
-  workspace        = local.workspace
+  instances                          = local.postgres_instances
+  postgres_management_lock_enabled   = var.postgres_management_lock_enabled
+  postgres_version                   = var.postgres_version
+  resource_group                     = module.network.resource_group
+  tags                               = local.default_tags
+  virtual_network                    = module.network.virtual_network
+  private_subnet                     = module.network.postgres_subnet
+  workspace                          = local.workspace
 }
 
 module "redis" {
