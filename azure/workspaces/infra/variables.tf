@@ -536,7 +536,7 @@ locals {
     cache = {
       sku                   = "Balanced_B10"
       ha_enabled            = true
-      cluster_enabled       = true
+      cluster_enabled       = false
       persistence_mode      = null
       persistence_frequency = null
     }
