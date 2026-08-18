@@ -33,6 +33,24 @@ resource "azurerm_web_application_firewall_policy" "this" {
       content {
         type    = managed_rule_set.value.type
         version = managed_rule_set.value.version
+
+        dynamic "rule_group_override" {
+          for_each = try(managed_rule_set.value.rule_group_overrides, {})
+
+          content {
+            rule_group_name = rule_group_override.value.rule_group_name
+
+            dynamic "rule" {
+              for_each = try(rule_group_override.value.rules, [])
+
+              content {
+                id      = rule.value.id
+                enabled = try(rule.value.enabled, null)
+                action  = try(rule.value.action, null)
+              }
+            }
+          }
+        }
       }
     }
   }

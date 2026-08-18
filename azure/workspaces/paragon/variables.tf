@@ -232,18 +232,19 @@ variable "waf_file_upload_limit_mb" {
   default     = 100
 }
 
-variable "waf_logs_retention_days" {
-  description = "Days to retain Application Gateway Firewall and Access logs."
-  type        = number
-  default     = 30
-}
-
 variable "waf_managed_rule_sets" {
-  description = "Managed rule sets to attach. Azure requires a primary rule set on every policy, and AGC only accepts DRS 2.1 (no CRS). Bot Manager 1.0/1.1 can be added alongside it."
+  description = "Managed rule sets to attach. Azure requires a primary rule set on every policy, and AGC only accepts DRS 2.1 (no CRS). Bot Manager 1.0/1.1 can be added alongside it. Per-rule actions go in rule_group_overrides (azurerm has no rule-set-level action)."
   type = map(object({
     type    = string
     version = string
-    action  = optional(string)
+    rule_group_overrides = optional(map(object({
+      rule_group_name = string
+      rules = optional(list(object({
+        id      = string
+        enabled = optional(bool)
+        action  = optional(string)
+      })), [])
+    })), {})
   }))
   default = {
     drs = {

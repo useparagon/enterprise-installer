@@ -56,10 +56,18 @@ variable "waf_file_upload_limit_mb" {
 }
 
 variable "waf_managed_rule_sets" {
+  description = "Managed rule sets to attach. Optional rule_group_overrides map per-rule enabled/action (Allow, Block, Log, AnomalyScoring; JSChallenge only on Bot Manager)."
   type = map(object({
     type    = string
     version = string
-    action  = optional(string)
+    rule_group_overrides = optional(map(object({
+      rule_group_name = string
+      rules = optional(list(object({
+        id      = string
+        enabled = optional(bool)
+        action  = optional(string)
+      })), [])
+    })), {})
   }))
 }
 
