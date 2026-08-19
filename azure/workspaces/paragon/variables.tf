@@ -108,7 +108,7 @@ variable "ingress_scheme" {
 }
 
 variable "agc_enabled" {
-  description = "Deploy AGC as the public front door. false = nginx only; true = AGC (+ WAF by default)."
+  description = "Deploy AGC as the public front door. false = nginx only."
   type        = bool
   default     = false
 }
@@ -137,9 +137,9 @@ variable "agc_alb_controller_version" {
 }
 
 variable "waf_enabled" {
-  description = "Attach WAF to AGC when AGC is enabled. Default Detection with DRS 2.1 and no custom/rate-limit rules: requests are inspected and logged, never blocked."
+  description = "Enable Azure WAF on AGC (same opt-in model as AWS). Requires agc_enabled=true; ignored otherwise. Default Detection + DRS 2.1, no custom/rate-limit rules."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "waf_mode" {
@@ -514,6 +514,7 @@ locals {
   # Public nginx LB until AGC owns the edge directly.
   nginx_public   = var.ingress_scheme != "internal" && !local.agc_direct
   dns_target_agc = local.agc_direct
+  # WAF only attaches when AGC is up; no validation — just skip creating the policy.
   waf_active     = var.waf_enabled && local.agc_active
 
   resource_group_name = local.use_legacy_infra_json ? try(local.legacy_infra_vars.resource_group.value.name, "${local.workspace}-resources") : "${local.workspace}-resources"

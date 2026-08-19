@@ -15,33 +15,6 @@ To update credentials when the app registration secret expires:
 
 Do not commit real secrets to git. Prefer environment variables or a secret manager for `azure_client_secret` / `ARM_CLIENT_SECRET`.
 
-## AGC WAF defaults
-
-With `agc_enabled = true` (and `agc_direct_routing = false`, the default), Terraform adds AGC+WAF in front of public ingress-nginx. DNS stays on nginx until you CNAME to `agc_fqdn`.
-
-With `agc_direct_routing = true`, nginx is removed and AGC routes to Services. TLS renewals switch to cert-manager HTTP-01 over Gateway API (`gatewayHTTPRoute` on `paragon-agc`) and Terraform owns the per-host `Certificate` CRs that keep the `*-secret` objects current.
-
-WAF defaults: `waf_mode = "Detection"` with DRS 2.1 and **no** custom or rate-limit rules. In Detection mode matches are logged, never blocked, so the brownfield apply cannot break live traffic. Review the firewall logs, then switch to `Prevention`.
-
-Azure rejects any WAF policy without a primary rule set, so `waf_managed_rule_sets` must keep a `Microsoft_DefaultRuleSet` entry. AGC accepts only **DRS 2.1** (no CRS); Bot Manager 1.0/1.1 can be added alongside it. Per-rule `action` / enablement uses `rule_group_overrides` (the AzureRM provider has no rule-set-level action).
-
-Opt into blocking and rules when ready:
-
-```hcl
-agc_enabled = true
-
-waf_mode = "Prevention"
-
-waf_rate_limit_global          = 1000
-waf_rate_limit_global_duration = "FiveMins"
-waf_rate_limit_paths = {
-  "/api/webhooks" = 500
-  "/api/auth"     = 100
-}
-
-waf_ip_blacklist = ["203.0.113.10/32"]
-```
-
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -101,7 +74,7 @@ waf_ip_blacklist = ["203.0.113.10/32"]
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_agc_alb_controller_version"></a> [agc\_alb\_controller\_version](#input\_agc\_alb\_controller\_version) | Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27. | `string` | `"1.11.3"` | no |
 | <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | false = AGC -> ingress-nginx (DNS stays on nginx); true = AGC -> Services and nginx is removed. | `bool` | `false` | no |
-| <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC as the public front door. false = nginx only; true = AGC (+ WAF by default). | `bool` | `false` | no |
+| <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC as the public front door. false = nginx only. | `bool` | `false` | no |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |
 | <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure\_client\_secret) | Azure client secret | `string` | n/a | yes |
 | <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure\_subscription\_id) | Azure subscription ID | `string` | n/a | yes |
@@ -153,7 +126,7 @@ waf_ip_blacklist = ["203.0.113.10/32"]
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that should not be publicly exposed (filtered from public\_microservices and public\_monitors). | `list(string)` | `[]` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
 | <a name="input_uptime_company"></a> [uptime\_company](#input\_uptime\_company) | Optional pretty company name to include in BetterStack Uptime monitors. | `string` | `null` | no |
-| <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf\_enabled) | Attach WAF to AGC when AGC is enabled. Default Detection with DRS 2.1 and no custom/rate-limit rules: requests are inspected and logged, never blocked. | `bool` | `true` | no |
+| <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf\_enabled) | Enable Azure WAF on AGC (same opt-in model as AWS). Requires agc\_enabled=true; ignored otherwise. Default Detection + DRS 2.1, no custom/rate-limit rules. | `bool` | `false` | no |
 | <a name="input_waf_file_upload_limit_mb"></a> [waf\_file\_upload\_limit\_mb](#input\_waf\_file\_upload\_limit\_mb) | WAF file upload limit in MB. | `number` | `100` | no |
 | <a name="input_waf_ip_blacklist"></a> [waf\_ip\_blacklist](#input\_waf\_ip\_blacklist) | CIDRs blocked by a custom rule. Empty = no blacklist rule. | `list(string)` | `[]` | no |
 | <a name="input_waf_ip_whitelist"></a> [waf\_ip\_whitelist](#input\_waf\_ip\_whitelist) | CIDRs allowed by a high-priority custom rule. Empty = no whitelist rule. | `list(string)` | `[]` | no |

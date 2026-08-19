@@ -66,10 +66,8 @@ variable "public_services" {
   default = {}
 }
 
-# Kept separate from waf_policy_id: on a greenfield apply the policy ID is unknown until
-# the WAF policy is created, so it cannot gate a count.
 variable "waf_enabled" {
-  description = "Whether to attach the WAF policy to AGC through a security policy."
+  description = "Attach the WAF policy to AGC. Root waf_enabled should only be true with agc_enabled."
   type        = bool
   default     = false
 }
