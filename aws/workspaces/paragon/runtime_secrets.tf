@@ -8,8 +8,9 @@ locals {
     managed_sync = "paragon/${local.workspace}/managed-sync"
     openobserve  = "paragon/${local.workspace}/openobserve"
   }
-  runtime_docker_username = trimspace(coalesce(var.docker_username, ""))
-  runtime_docker_password = trimspace(coalesce(var.docker_password, ""))
+  # coalesce(null, "") errors because coalesce skips empty strings as well as null.
+  runtime_docker_username = trimspace(var.docker_username != null ? var.docker_username : "")
+  runtime_docker_password = trimspace(var.docker_password != null ? var.docker_password : "")
 
   # Blank credentials produce a well-formed but unusable pull secret
   # (auth = base64(":")), which fails image pulls with insufficient_scope
@@ -20,7 +21,7 @@ locals {
     (var.docker_registry_server) = {
       username = local.runtime_docker_username
       password = local.runtime_docker_password
-      email    = coalesce(var.docker_email, "")
+      email    = var.docker_email != null ? var.docker_email : ""
       auth     = base64encode("${local.runtime_docker_username}:${local.runtime_docker_password}")
     }
   } : {}
