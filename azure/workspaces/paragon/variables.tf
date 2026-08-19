@@ -108,13 +108,13 @@ variable "ingress_scheme" {
 }
 
 variable "agc_enabled" {
-  description = "Deploy AGC as the public front door. false = nginx only."
+  description = "Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc_fqdn). false = nginx only."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "agc_direct_routing" {
-  description = "false = AGC -> ingress-nginx (DNS stays on nginx); true = AGC -> Services and nginx is removed."
+  description = "false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services and nginx is removed."
   type        = bool
   default     = false
 }
@@ -137,7 +137,7 @@ variable "agc_alb_controller_version" {
 }
 
 variable "waf_enabled" {
-  description = "Enable Azure WAF on AGC (same opt-in model as AWS). Requires agc_enabled=true; ignored otherwise. Default Detection + DRS 2.1, no custom/rate-limit rules."
+  description = "Attach Azure WAF to AGC when AGC is active. Opt-in; default Detection + DRS 2.1, no custom/rate-limit rules. Ignored when agc_enabled=false."
   type        = bool
   default     = false
 }

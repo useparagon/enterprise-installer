@@ -30,7 +30,7 @@ variable "nsg_malicious_ips" {
 }
 
 variable "agc_subnet_enabled" {
-  description = "Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required before enabling agc_enabled in the paragon workspace."
+  description = "Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required by the paragon workspace when agc_enabled is true (default)."
   type        = bool
-  default     = false
+  default     = true
 }

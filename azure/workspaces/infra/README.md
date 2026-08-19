@@ -240,7 +240,7 @@ nsg_malicious_ips = [
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_agc_subnet_enabled"></a> [agc\_subnet\_enabled](#input\_agc\_subnet\_enabled) | Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required before enabling agc\_enabled in the paragon workspace. | `bool` | `false` | no |
+| <a name="input_agc_subnet_enabled"></a> [agc\_subnet\_enabled](#input\_agc\_subnet\_enabled) | Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required by the paragon workspace when agc\_enabled is true (default). | `bool` | `true` | no |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to lock the audit logs container immutability policy. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |

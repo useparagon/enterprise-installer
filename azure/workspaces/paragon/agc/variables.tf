@@ -67,7 +67,7 @@ variable "public_services" {
 }
 
 variable "waf_enabled" {
-  description = "Attach the WAF policy to AGC. Root waf_enabled should only be true with agc_enabled."
+  description = "Attach the WAF policy to AGC. Root passes waf_active (waf_enabled && agc active)."
   type        = bool
   default     = false
 }

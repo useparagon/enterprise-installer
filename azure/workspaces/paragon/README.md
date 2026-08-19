@@ -73,8 +73,8 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_agc_alb_controller_version"></a> [agc\_alb\_controller\_version](#input\_agc\_alb\_controller\_version) | Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27. | `string` | `"1.11.3"` | no |
-| <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | false = AGC -> ingress-nginx (DNS stays on nginx); true = AGC -> Services and nginx is removed. | `bool` | `false` | no |
-| <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC as the public front door. false = nginx only. | `bool` | `false` | no |
+| <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services and nginx is removed. | `bool` | `false` | no |
+| <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc\_fqdn). false = nginx only. | `bool` | `true` | no |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |
 | <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure\_client\_secret) | Azure client secret | `string` | n/a | yes |
 | <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure\_subscription\_id) | Azure subscription ID | `string` | n/a | yes |
@@ -126,7 +126,7 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that should not be publicly exposed (filtered from public\_microservices and public\_monitors). | `list(string)` | `[]` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
 | <a name="input_uptime_company"></a> [uptime\_company](#input\_uptime\_company) | Optional pretty company name to include in BetterStack Uptime monitors. | `string` | `null` | no |
-| <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf\_enabled) | Enable Azure WAF on AGC (same opt-in model as AWS). Requires agc\_enabled=true; ignored otherwise. Default Detection + DRS 2.1, no custom/rate-limit rules. | `bool` | `false` | no |
+| <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf\_enabled) | Attach Azure WAF to AGC when AGC is active. Opt-in; default Detection + DRS 2.1, no custom/rate-limit rules. Ignored when agc\_enabled=false. | `bool` | `false` | no |
 | <a name="input_waf_file_upload_limit_mb"></a> [waf\_file\_upload\_limit\_mb](#input\_waf\_file\_upload\_limit\_mb) | WAF file upload limit in MB. | `number` | `100` | no |
 | <a name="input_waf_ip_blacklist"></a> [waf\_ip\_blacklist](#input\_waf\_ip\_blacklist) | CIDRs blocked by a custom rule. Empty = no blacklist rule. | `list(string)` | `[]` | no |
 | <a name="input_waf_ip_whitelist"></a> [waf\_ip\_whitelist](#input\_waf\_ip\_whitelist) | CIDRs allowed by a high-priority custom rule. Empty = no whitelist rule. | `list(string)` | `[]` | no |
