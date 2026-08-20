@@ -167,12 +167,6 @@ variable "ingress_scheme" {
   type        = string
 }
 
-variable "nginx_enabled" {
-  description = "Whether to deploy the ingress-nginx controller. Kept true in AGC direct mode so the controller is not destroyed before HTTPRoutes are programmed."
-  type        = bool
-  default     = true
-}
-
 variable "nginx_public" {
   description = "Whether the nginx controller should expose a public LoadBalancer."
   type        = bool

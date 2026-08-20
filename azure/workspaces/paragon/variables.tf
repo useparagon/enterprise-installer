@@ -119,6 +119,12 @@ variable "agc_direct_routing" {
   default     = false
 }
 
+variable "agc_dns_cutover" {
+  description = "Point Terraform-managed DNS (Cloudflare or Azure DNS) at agc_fqdn instead of the nginx load balancer. Set once AGC is validated; implied by agc_direct_routing."
+  type        = bool
+  default     = false
+}
+
 variable "dns_provider" {
   description = "DNS provider for public records. Use azure_dns to create an azurerm_dns_zone (required for App Gateway wildcard certs via DNS-01). cloudflare keeps the existing Cloudflare CNAME path for Paragon-managed zones."
   type        = string
@@ -515,12 +521,12 @@ locals {
   agc_active = var.agc_enabled && var.ingress_scheme != "internal"
   # Direct: AGC -> Services; nginx Ingress objects disabled (controller stays).
   agc_direct = local.agc_active && var.agc_direct_routing
-  # Keep the nginx controller even in direct mode so Terraform cannot destroy it
-  # before AGC HTTPRoutes are programmed. Ingress objects are disabled via helm values.
-  nginx_enabled = true
-  # Public nginx LB until AGC owns the edge directly.
-  nginx_public   = var.ingress_scheme != "internal" && !local.agc_direct
-  dns_target_agc = local.agc_direct
+  # nginx keeps its controller and public LB through every AGC mode so no cutover
+  # apply can tear down the old public path before AGC routes are programmed.
+  nginx_public = var.ingress_scheme != "internal"
+  # Managed DNS only follows AGC once the cutover flag is set, so a Terraform-owned
+  # zone never reverts records while AGC is still being validated.
+  dns_target_agc = local.agc_active && (var.agc_dns_cutover || local.agc_direct)
   # WAF only attaches when AGC is up; no validation — just skip creating the policy.
   waf_active = var.waf_enabled && local.agc_active
 

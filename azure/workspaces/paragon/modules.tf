@@ -23,7 +23,6 @@ module "helm" {
     openobserve  = azurerm_key_vault_secret.openobserve[0].version
   }))
   ingress_scheme           = var.ingress_scheme
-  nginx_enabled            = local.nginx_enabled
   nginx_public             = local.nginx_public
   agc_active               = local.agc_active
   agc_direct               = local.agc_direct
@@ -108,9 +107,11 @@ module "uptime" {
 }
 
 locals {
-  # Public front door for DNS. Transition keeps nginx and lowers TTL for cutover.
+  # Public front door for DNS. Records stay on nginx until agc_dns_cutover.
   dns_ingress_target = local.dns_target_agc ? module.agc.fqdn : module.helm.load_balancer
-  dns_record_ttl     = local.agc_active && !local.agc_direct ? 60 : 300
+  # Low TTL while AGC is enabled but records still point at nginx, so the cutover
+  # (and a rollback to nginx) propagates quickly.
+  dns_record_ttl = local.agc_active && !local.dns_target_agc ? 60 : 300
 
   # Match helm/helm.tf subchart_values: every microservice is forced on, then
   # helm_values.subchart overrides (later merge wins). Do NOT read the chart's

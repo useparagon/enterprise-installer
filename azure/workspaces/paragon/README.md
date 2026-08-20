@@ -76,6 +76,7 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_agc_alb_controller_version"></a> [agc\_alb\_controller\_version](#input\_agc\_alb\_controller\_version) | Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27. | `string` | `"1.11.3"` | no |
 | <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services (nginx Ingress disabled; controller stays). | `bool` | `false` | no |
+| <a name="input_agc_dns_cutover"></a> [agc\_dns\_cutover](#input\_agc\_dns\_cutover) | Point Terraform-managed DNS (Cloudflare or Azure DNS) at agc\_fqdn instead of the nginx load balancer. Set once AGC is validated; implied by agc\_direct\_routing. | `bool` | `false` | no |
 | <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc\_fqdn). false = nginx only. | `bool` | `false` | no |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |
 | <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure\_client\_secret) | Azure client secret | `string` | n/a | yes |
@@ -147,11 +148,12 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | ---- | ----------- |
 | <a name="output_agc_alb_id"></a> [agc\_alb\_id](#output\_agc\_alb\_id) | Application Gateway for Containers resource ID (null when agc\_enabled is false). |
 | <a name="output_agc_direct_routing"></a> [agc\_direct\_routing](#output\_agc\_direct\_routing) | false = AGC forwards to ingress-nginx (transition); true = AGC routes directly to Services (nginx Ingress disabled). |
+| <a name="output_agc_dns_cutover"></a> [agc\_dns\_cutover](#output\_agc\_dns\_cutover) | Whether Terraform-managed DNS points at agc\_fqdn instead of the nginx load balancer. |
 | <a name="output_agc_enabled"></a> [agc\_enabled](#output\_agc\_enabled) | Whether Application Gateway for Containers is the public front door. |
-| <a name="output_agc_fqdn"></a> [agc\_fqdn](#output\_agc\_fqdn) | AGC frontend FQDN for pre-cutover validation; CNAME hosts here on cutover (null when agc\_enabled is false). |
+| <a name="output_agc_fqdn"></a> [agc\_fqdn](#output\_agc\_fqdn) | AGC frontend FQDN for pre-cutover validation; DNS points here once agc\_dns\_cutover is true (null when agc\_enabled is false). |
 | <a name="output_grafana_admin_email"></a> [grafana\_admin\_email](#output\_grafana\_admin\_email) | Grafana admin login email. |
 | <a name="output_grafana_admin_password"></a> [grafana\_admin\_password](#output\_grafana\_admin\_password) | Grafana admin login password. |
-| <a name="output_load_balancer"></a> [load\_balancer](#output\_load\_balancer) | Active public front door FQDN (nginx, or AGC once agc\_direct\_routing is true). |
+| <a name="output_load_balancer"></a> [load\_balancer](#output\_load\_balancer) | Public front door FQDN that DNS records point at (nginx, or AGC once agc\_dns\_cutover is true). |
 | <a name="output_nameservers"></a> [nameservers](#output\_nameservers) | Azure DNS nameservers to delegate at the registrar (null when dns\_provider is not azure\_dns). |
 | <a name="output_pgadmin_admin_email"></a> [pgadmin\_admin\_email](#output\_pgadmin\_admin\_email) | PGAdmin admin login email. |
 | <a name="output_pgadmin_admin_password"></a> [pgadmin\_admin\_password](#output\_pgadmin\_admin\_password) | PGAdmin admin login password. |

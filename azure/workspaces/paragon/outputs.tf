@@ -29,12 +29,12 @@ output "uptime_webhook" {
 }
 
 output "load_balancer" {
-  description = "Active public front door FQDN (nginx, or AGC once agc_direct_routing is true)."
+  description = "Public front door FQDN that DNS records point at (nginx, or AGC once agc_dns_cutover is true)."
   value       = local.dns_ingress_target
 }
 
 output "agc_fqdn" {
-  description = "AGC frontend FQDN for pre-cutover validation; CNAME hosts here on cutover (null when agc_enabled is false)."
+  description = "AGC frontend FQDN for pre-cutover validation; DNS points here once agc_dns_cutover is true (null when agc_enabled is false)."
   value       = local.agc_active ? module.agc.fqdn : null
 }
 
@@ -56,4 +56,9 @@ output "agc_enabled" {
 output "agc_direct_routing" {
   description = "false = AGC forwards to ingress-nginx (transition); true = AGC routes directly to Services (nginx Ingress disabled)."
   value       = var.agc_direct_routing
+}
+
+output "agc_dns_cutover" {
+  description = "Whether Terraform-managed DNS points at agc_fqdn instead of the nginx load balancer."
+  value       = local.dns_target_agc
 }
