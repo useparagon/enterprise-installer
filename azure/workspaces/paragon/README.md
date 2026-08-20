@@ -74,7 +74,7 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_agc_alb_controller_version"></a> [agc\_alb\_controller\_version](#input\_agc\_alb\_controller\_version) | Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27. | `string` | `"1.11.3"` | no |
 | <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services and nginx is removed. | `bool` | `false` | no |
-| <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc\_fqdn). false = nginx only. | `bool` | `true` | no |
+| <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc\_fqdn). false = nginx only. | `bool` | `false` | no |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |
 | <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure\_client\_secret) | Azure client secret | `string` | n/a | yes |
 | <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure\_subscription\_id) | Azure subscription ID | `string` | n/a | yes |

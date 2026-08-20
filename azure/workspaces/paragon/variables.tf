@@ -110,7 +110,7 @@ variable "ingress_scheme" {
 variable "agc_enabled" {
   description = "Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc_fqdn). false = nginx only."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "agc_direct_routing" {
