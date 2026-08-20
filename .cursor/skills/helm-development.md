@@ -28,7 +28,7 @@ After `helm install` / `helm upgrade` of `paragon-logging`, the `openobserve` su
 - **Files**: `charts/paragon-logging/charts/openobserve/files/apply-uds.sh`, `openobserve-uds-schema.json` (Helm loads them as `files/<name>` via `.Files.Get`, same as `service-inputs.json` elsewhere)
 - **Templates**: `uds-configmap.yaml`, `uds-apply-job.yaml`
 - **Auth**: same Kubernetes secret as the OpenObserve StatefulSet (`secretName`, keys `ZO_ROOT_USER_EMAIL` / `ZO_ROOT_USER_PASSWORD` from `paragon-secrets` unless overridden in `openobserve.secrets`)
-- **Idempotent**: GET schema → skip PUT if `defined_schema_fields` already matches desired JSON
+- **Idempotent**: GET stream list (`fetchSchema=false`) → skip PUT if `defined_schema_fields` already matches desired JSON. Never GET `/schema` (inferred fields can exceed tens of MB).
 - **Disable**: `openobserve.uds.enabled: false`
 
 Local test (with OpenObserve reachable):

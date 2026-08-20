@@ -41,6 +41,8 @@ spec:
               value: /uds/openobserve-uds-schema.json
             - name: HEALTH_WAIT_SECONDS
               value: {{ .Values.uds.healthWaitSeconds | quote }}
+            - name: AUTH_CURL_MAX_TIME
+              value: {{ .Values.uds.authCurlMaxTime | default 600 | quote }}
             - name: ZO_ROOT_USER_EMAIL
               valueFrom:
                 secretKeyRef:

@@ -122,12 +122,13 @@ uds:
     tag: "3.20"
     pullPolicy: IfNotPresent
   backoffLimit: 3
-  activeDeadlineSeconds: 300
+  activeDeadlineSeconds: 900
   healthWaitSeconds: 120
+  authCurlMaxTime: 600
   resources:
     limits:
       cpu: 200m
-      memory: 128Mi
+      memory: 1Gi
     requests:
       cpu: 50m
-      memory: 64Mi
+      memory: 128Mi
