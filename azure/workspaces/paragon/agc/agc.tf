@@ -45,6 +45,13 @@ resource "azurerm_role_assignment" "alb_subnet" {
   scope                = var.subnet_id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_user_assigned_identity.alb[0].principal_id
+
+  lifecycle {
+    precondition {
+      condition     = var.subnet_id != null && var.subnet_id != ""
+      error_message = "agc_enabled=true requires infra agc_subnet_enabled=true first (missing AGC association subnet ID)."
+    }
+  }
 }
 
 # Lets the controller configure this ALB resource.

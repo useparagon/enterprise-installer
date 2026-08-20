@@ -31,8 +31,7 @@ resource "azurerm_key_vault_access_policy" "terraform" {
     "Set",
   ]
 
-  # Certificate Import/Get needed for ESO PushSecret (same SP as External Secrets)
-  # and for App Gateway TLS termination via Key Vault.
+  # Certificate Import/Get needed for ESO PushSecret (same SP as External Secrets).
   certificate_permissions = [
     "Create",
     "Delete",

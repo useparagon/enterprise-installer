@@ -54,6 +54,6 @@ output "agc_enabled" {
 }
 
 output "agc_direct_routing" {
-  description = "false = AGC forwards to ingress-nginx (transition); true = AGC routes directly to Services (nginx removed)."
+  description = "false = AGC forwards to ingress-nginx (transition); true = AGC routes directly to Services (nginx Ingress disabled)."
   value       = var.agc_direct_routing
 }

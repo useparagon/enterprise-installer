@@ -176,6 +176,7 @@ module "waf" {
   workspace                      = local.workspace
   resource_group_name            = local.infra_vars.resource_group.value.name
   location                       = local.infra_vars.resource_group.value.location
+  tags                           = local.default_tags
   waf_mode                       = var.waf_mode
   waf_ip_whitelist               = var.waf_ip_whitelist
   waf_ip_blacklist               = var.waf_ip_blacklist
@@ -187,6 +188,20 @@ module "waf" {
   waf_max_request_body_size_kb   = var.waf_max_request_body_size_kb
   waf_file_upload_limit_mb       = var.waf_file_upload_limit_mb
   waf_managed_rule_sets          = var.waf_managed_rule_sets
+}
+
+resource "terraform_data" "agc_requires_subnet" {
+  count = local.agc_active ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition = (
+        try(local.infra_vars.network.value.agc_subnet_id, null) != null &&
+        try(local.infra_vars.network.value.agc_subnet_cidr, null) != null
+      )
+      error_message = "agc_enabled=true requires infra agc_subnet_enabled=true first (AGC association subnet ID and CIDR). Apply the infra workspace before enabling AGC."
+    }
+  }
 }
 
 # AGC module; gated by `enabled` (owns its own kube providers like helm).
@@ -206,4 +221,5 @@ module "agc" {
   waf_enabled            = local.waf_active
   waf_policy_id          = local.waf_active ? module.waf[0].policy_id : null
   alb_controller_version = var.agc_alb_controller_version
+  tags                   = local.default_tags
 }

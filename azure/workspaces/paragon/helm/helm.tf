@@ -243,7 +243,8 @@ resource "helm_release" "paragon_on_prem" {
     helm_release.ingress,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
-    kubernetes_config_map.feature_flag_content
+    kubernetes_config_map.feature_flag_content,
+    kubectl_manifest.agc_direct_certificate,
   ]
 }
 

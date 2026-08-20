@@ -99,6 +99,7 @@ module "storage" {
 module "cluster" {
   source = "./cluster"
 
+  agc_subnet_enabled              = var.agc_subnet_enabled
   k8s_default_node_pool_vm_size   = var.k8s_default_node_pool_vm_size
   k8s_dns_service_ip              = var.k8s_dns_service_ip
   k8s_load_balancer_sku           = var.k8s_load_balancer_sku

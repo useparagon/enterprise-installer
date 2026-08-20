@@ -1,3 +1,9 @@
+variable "tags" {
+  description = "Tags applied to the WAF policy (workspace PascalCase)."
+  type        = map(string)
+  default     = {}
+}
+
 variable "workspace" {
   description = "Workspace prefix for WAF resources."
   type        = string

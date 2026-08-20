@@ -5,7 +5,7 @@ variable "enabled" {
 }
 
 variable "direct_routing" {
-  description = "false = AGC forwards to the ingress-nginx Service (transition); true = AGC routes directly to application Services via Gateway API (final state, nginx removed)."
+  description = "false = AGC forwards to the ingress-nginx Service (transition); true = AGC routes directly to application Services via Gateway API (nginx Ingress disabled; controller stays)."
   type        = bool
   default     = false
 }
@@ -33,6 +33,8 @@ variable "cluster_name" {
 variable "subnet_id" {
   description = "Dedicated AGC association subnet ID (delegated to Microsoft.ServiceNetworking/trafficControllers)."
   type        = string
+  nullable    = true
+  default     = null
 }
 
 variable "namespace" {

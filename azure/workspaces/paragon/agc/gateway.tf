@@ -56,9 +56,8 @@ locals {
     }
   })
 
-  # HTTP -> HTTPS redirect for non-ACME traffic. Leave /.well-known/acme-challenge
-  # unmatched here so cert-manager's temporary HTTPRoute can solve HTTP-01 on this
-  # Gateway when nginx is gone (agc_direct_routing).
+  # HTTP: ACME stays on HTTP (nginx in transition; cert-manager HTTPRoute in direct).
+  # Everything else 301s to HTTPS. PathPrefix / would otherwise match challenges too.
   redirect_route_yaml = yamlencode({
     apiVersion = "gateway.networking.k8s.io/v1"
     kind       = "HTTPRoute"
@@ -71,21 +70,35 @@ locals {
         name        = local.gateway_name
         sectionName = local.http_listener
       }]
-      rules = [{
-        matches = [{
-          path = {
-            type  = "PathPrefix"
-            value = "/"
-          }
+      rules = concat(
+        local.nginx_route_enabled ? [{
+          matches = [{
+            path = {
+              type  = "PathPrefix"
+              value = "/.well-known/acme-challenge"
+            }
+          }]
+          backendRefs = [{
+            name = var.nginx_service_name
+            port = var.nginx_service_port
+          }]
+        }] : [],
+        [{
+          matches = [{
+            path = {
+              type  = "PathPrefix"
+              value = "/"
+            }
+          }]
+          filters = [{
+            type = "RequestRedirect"
+            requestRedirect = {
+              scheme     = "https"
+              statusCode = 301
+            }
+          }]
         }]
-        filters = [{
-          type = "RequestRedirect"
-          requestRedirect = {
-            scheme     = "https"
-            statusCode = 301
-          }
-        }]
-      }]
+      )
     }
   })
 
@@ -148,8 +161,9 @@ resource "kubectl_manifest" "gateway" {
   depends_on = [helm_release.alb_controller]
 }
 
-# The controller programs the ALB-managed frontend asynchronously. Waiting here makes the
-# first greenfield apply return a usable agc_fqdn instead of racing the Gateway status.
+# The controller programs the ALB-managed frontend asynchronously. Sleep, then
+# require a Hostname address so the first apply fails closed instead of returning
+# an IP or empty FQDN.
 resource "time_sleep" "gateway_programming" {
   count = var.enabled ? 1 : 0
 
@@ -160,6 +174,7 @@ resource "time_sleep" "gateway_programming" {
 
   depends_on = [
     kubectl_manifest.gateway,
+    kubectl_manifest.https_redirect_route,
     kubectl_manifest.nginx_route,
     kubectl_manifest.direct_route,
   ]
@@ -180,6 +195,29 @@ data "kubernetes_resource" "gateway" {
   depends_on = [
     time_sleep.gateway_programming,
   ]
+}
+
+locals {
+  gateway_addresses = try(data.kubernetes_resource.gateway[0].object.status.addresses, [])
+  gateway_fqdn = try(
+    [for a in local.gateway_addresses : a.value if try(a.type, "") == "Hostname"][0],
+    null
+  )
+}
+
+resource "terraform_data" "gateway_hostname" {
+  count = var.enabled ? 1 : 0
+
+  input = local.gateway_fqdn
+
+  lifecycle {
+    precondition {
+      condition     = local.gateway_fqdn != null && local.gateway_fqdn != ""
+      error_message = "AGC Gateway has no Hostname address yet (not Programmed). Re-apply after the ALB controller finishes programming."
+    }
+  }
+
+  depends_on = [data.kubernetes_resource.gateway]
 }
 
 resource "kubectl_manifest" "https_redirect_route" {

@@ -1,6 +1,6 @@
 output "fqdn" {
-  description = "ALB-managed AGC frontend FQDN from the Gateway status. Point DNS (CNAME) here on cutover (null until the controller programs the Gateway)."
-  value       = try(data.kubernetes_resource.gateway[0].object.status.addresses[0].value, null)
+  description = "ALB-managed AGC frontend Hostname from Gateway status. Point DNS (CNAME) here on cutover (null until the controller programs the Gateway)."
+  value       = var.enabled ? terraform_data.gateway_hostname[0].input : null
 }
 
 output "alb_id" {

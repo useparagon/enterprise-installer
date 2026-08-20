@@ -88,7 +88,5 @@ resource "azurerm_web_application_firewall_policy" "this" {
     }
   }
 
-  tags = {
-    Name = local.waf_policy_name
-  }
+  tags = var.tags
 }

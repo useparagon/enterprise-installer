@@ -27,10 +27,6 @@ resource "azurerm_key_vault_access_policy" "aks_access_to_kv" {
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = data.azurerm_kubernetes_cluster.cluster.kubelet_identity.0.object_id
 
-  certificate_permissions = [
-    "Get",
-  ]
-
   secret_permissions = [
     "Get",
   ]
@@ -50,10 +46,13 @@ resource "helm_release" "cert_manager" {
     value = true
   }
 
-  # Required for ACME HTTP-01 via Gateway API when AGC direct-routing removes nginx.
-  set {
-    name  = "extraArgs[0]"
-    value = "--enable-gateway-api"
+  # Gateway API HTTP-01 only when nginx Ingress is gone (direct mode).
+  dynamic "set" {
+    for_each = var.agc_direct ? [1] : []
+    content {
+      name  = "extraArgs[0]"
+      value = "--enable-gateway-api"
+    }
   }
 }
 
@@ -135,9 +134,9 @@ resource "helm_release" "ingress" {
     value = "16k"
   }
 
-  # Trust X-Forwarded-For from AGC during transition.
+  # Trust X-Forwarded-* only from the AGC subnet (never without proxy-real-ip-cidr).
   dynamic "set" {
-    for_each = var.agc_active ? [1] : []
+    for_each = var.agc_active && var.agc_subnet_cidr != null ? [1] : []
     content {
       name  = "controller.config.use-forwarded-headers"
       value = "true"
@@ -181,7 +180,7 @@ resource "kubectl_manifest" "certificate_issuer_http01" {
           name = "letsencrypt-prod"
         }
         # Transition (nginx present): HTTP-01 via ingress-nginx.
-        # Direct (nginx removed): HTTP-01 via temporary HTTPRoutes on the AGC Gateway.
+        # Direct: HTTP-01 via temporary HTTPRoutes on the AGC Gateway (Ingress objects disabled).
         # Encode each branch before the ternary so object shapes need not match.
         solvers = jsondecode(
           var.agc_direct ? jsonencode([{
@@ -195,7 +194,7 @@ resource "kubectl_manifest" "certificate_issuer_http01" {
                 }]
               }
             }
-          }]) : jsonencode([{
+            }]) : jsonencode([{
             http01 = {
               ingress = {
                 class = "nginx"

@@ -168,7 +168,7 @@ variable "ingress_scheme" {
 }
 
 variable "nginx_enabled" {
-  description = "Whether to deploy ingress-nginx at all. False only in the AGC direct-routing final state."
+  description = "Whether to deploy the ingress-nginx controller. Kept true in AGC direct mode so the controller is not destroyed before HTTPRoutes are programmed."
   type        = bool
   default     = true
 }
@@ -180,7 +180,7 @@ variable "nginx_public" {
 }
 
 variable "agc_active" {
-  description = "Whether the Application Gateway for Containers path is active (enables the DNS-01 wildcard cert pipeline and forwarded-headers on nginx)."
+  description = "Whether Application Gateway for Containers is active (forwarded-headers on nginx when the AGC subnet CIDR is known)."
   type        = bool
   default     = false
 }

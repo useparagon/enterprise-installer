@@ -32,6 +32,7 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | ---- | ------- |
 | <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.58.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | 3.8.1 |
+| <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
 
 ## Modules
 
@@ -58,6 +59,7 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | [azurerm_key_vault_secret.openobserve](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [random_password.openobserve_password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.openobserve_email](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
+| [terraform_data.agc_requires_subnet](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [azurerm_key_vault.paragon](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault) | data source |
 | [azurerm_key_vault_secret.infra_kafka](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
 | [azurerm_key_vault_secret.infra_network](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
@@ -73,7 +75,7 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_agc_alb_controller_version"></a> [agc\_alb\_controller\_version](#input\_agc\_alb\_controller\_version) | Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27. | `string` | `"1.11.3"` | no |
-| <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services and nginx is removed. | `bool` | `false` | no |
+| <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services (nginx Ingress disabled; controller stays). | `bool` | `false` | no |
 | <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc\_fqdn). false = nginx only. | `bool` | `false` | no |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |
 | <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure\_client\_secret) | Azure client secret | `string` | n/a | yes |
@@ -144,7 +146,7 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | Name | Description |
 | ---- | ----------- |
 | <a name="output_agc_alb_id"></a> [agc\_alb\_id](#output\_agc\_alb\_id) | Application Gateway for Containers resource ID (null when agc\_enabled is false). |
-| <a name="output_agc_direct_routing"></a> [agc\_direct\_routing](#output\_agc\_direct\_routing) | false = AGC forwards to ingress-nginx (transition); true = AGC routes directly to Services (nginx removed). |
+| <a name="output_agc_direct_routing"></a> [agc\_direct\_routing](#output\_agc\_direct\_routing) | false = AGC forwards to ingress-nginx (transition); true = AGC routes directly to Services (nginx Ingress disabled). |
 | <a name="output_agc_enabled"></a> [agc\_enabled](#output\_agc\_enabled) | Whether Application Gateway for Containers is the public front door. |
 | <a name="output_agc_fqdn"></a> [agc\_fqdn](#output\_agc\_fqdn) | AGC frontend FQDN for pre-cutover validation; CNAME hosts here on cutover (null when agc\_enabled is false). |
 | <a name="output_grafana_admin_email"></a> [grafana\_admin\_email](#output\_grafana\_admin\_email) | Grafana admin login email. |

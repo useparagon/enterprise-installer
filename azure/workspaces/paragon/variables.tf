@@ -114,7 +114,7 @@ variable "agc_enabled" {
 }
 
 variable "agc_direct_routing" {
-  description = "false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services and nginx is removed."
+  description = "false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services (nginx Ingress disabled; controller stays)."
   type        = bool
   default     = false
 }
@@ -495,6 +495,12 @@ locals {
   legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
   workspace             = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}") : "paragon-${var.organization}-${local.hash}")
 
+  default_tags = {
+    Name         = local.workspace
+    Organization = var.organization
+    Creator      = "Terraform"
+  }
+
   dns_enabled = var.ingress_scheme != "internal" && (
     (var.dns_provider == "cloudflare" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null) ||
     var.dns_provider == "azure_dns" ||
@@ -507,15 +513,16 @@ locals {
 
   # AGC is only a public front door; internal-scheme stays nginx-only.
   agc_active = var.agc_enabled && var.ingress_scheme != "internal"
-  # Direct: AGC -> Services; nginx removed.
+  # Direct: AGC -> Services; nginx Ingress objects disabled (controller stays).
   agc_direct = local.agc_active && var.agc_direct_routing
-  # Keep nginx except in AGC direct mode.
-  nginx_enabled = !local.agc_direct
+  # Keep the nginx controller even in direct mode so Terraform cannot destroy it
+  # before AGC HTTPRoutes are programmed. Ingress objects are disabled via helm values.
+  nginx_enabled = true
   # Public nginx LB until AGC owns the edge directly.
   nginx_public   = var.ingress_scheme != "internal" && !local.agc_direct
   dns_target_agc = local.agc_direct
   # WAF only attaches when AGC is up; no validation — just skip creating the policy.
-  waf_active     = var.waf_enabled && local.agc_active
+  waf_active = var.waf_enabled && local.agc_active
 
   resource_group_name = local.use_legacy_infra_json ? try(local.legacy_infra_vars.resource_group.value.name, "${local.workspace}-resources") : "${local.workspace}-resources"
   cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, "${local.workspace}-cluster") : "${local.workspace}-cluster"
