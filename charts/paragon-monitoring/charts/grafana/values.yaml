@@ -3,6 +3,7 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# SQLite cannot accept concurrent writers. Keep a single replica.
 replicaCount: 1
 
 image:
@@ -17,10 +18,10 @@ service:
 
 resources:
   limits:
-    memory: 400Mi
+    memory: 1Gi
   requests:
     cpu: 100m
-    memory: 400Mi
+    memory: 512Mi
 
 autoscaling:
   enabled: false
@@ -73,3 +74,14 @@ affinity: {}
 tls_secret: ''
 
 secretName: "paragon-secrets"
+
+# Grafana 12 contends on sqlite at boot. WAL + retries let overlapping
+# writers wait instead of failing provisioning immediately.
+envKeys:
+  - GF_DATABASE_WAL
+  - GF_DATABASE_QUERY_RETRIES
+  - GF_DATABASE_TRANSACTION_RETRIES
+env:
+  GF_DATABASE_WAL: "true"
+  GF_DATABASE_QUERY_RETRIES: "50"
+  GF_DATABASE_TRANSACTION_RETRIES: "50"

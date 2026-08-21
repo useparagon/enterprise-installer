@@ -122,12 +122,16 @@ uds:
     tag: "3.20"
     pullPolicy: IfNotPresent
   backoffLimit: 3
-  activeDeadlineSeconds: 300
+  # healthWait (120) + streamWait (300) + several 60s curl retries with backoff.
+  activeDeadlineSeconds: 1800
   healthWaitSeconds: 120
+  streamWaitSeconds: 300
+  # List API is small; 600s was for GET /schema and exceeded the Job deadline.
+  authCurlMaxTime: 60
   resources:
     limits:
       cpu: 200m
-      memory: 128Mi
+      memory: 1Gi
     requests:
       cpu: 50m
-      memory: 64Mi
+      memory: 128Mi
