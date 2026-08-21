@@ -81,6 +81,10 @@ containers:
     lifecycle:
       {{- toYaml . | nindent 6 }}
   {{- end }}
+    {{- with .Values.startupProbe }}
+    startupProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     livenessProbe:
       {{- toYaml .Values.livenessProbe | nindent 6 }}
     readinessProbe:
