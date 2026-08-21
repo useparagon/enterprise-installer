@@ -132,17 +132,24 @@ extract_paragon() {
 # 0 found, 1 HTTP failure after retries, 2 stream still missing after wait.
 wait_for_paragon_stream() {
   _dest="$1"
-  _elapsed=0
-  while [ "$_elapsed" -le "$STREAM_WAIT_SECONDS" ]; do
+  _deadline=$(($(date +%s) + STREAM_WAIT_SECONDS))
+  while [ "$(date +%s)" -le "$_deadline" ]; do
     if ! list_streams; then
       return 1
     fi
     if extract_paragon "$_dest"; then
       return 0
     fi
-    log "stream paragon not listed yet; waiting (${_elapsed}s/${STREAM_WAIT_SECONDS}s)"
-    sleep 5
-    _elapsed=$((_elapsed + 5))
+    _left=$((_deadline - $(date +%s)))
+    if [ "$_left" -le 0 ]; then
+      break
+    fi
+    log "stream paragon not listed yet; waiting (${_left}s remaining of ${STREAM_WAIT_SECONDS}s)"
+    _sleep=5
+    if [ "$_left" -lt "$_sleep" ]; then
+      _sleep="$_left"
+    fi
+    sleep "$_sleep"
   done
   return 2
 }
