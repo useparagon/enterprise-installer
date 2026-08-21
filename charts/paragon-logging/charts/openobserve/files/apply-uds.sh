@@ -7,23 +7,23 @@
 #   1. Load the desired field list from openobserve-uds-schema.json (chart files/).
 #   2. GET /api/default/streams?type=logs&fetchSchema=false (settings only; never the
 #      inferred field list — that payload can be tens of MB and times out).
-#   3. If settings.defined_schema_fields already matches desired names, skip PUT.
-#   4. Otherwise build a PUT body from the list-API settings object:
-#        - add: every desired field name + field definitions
-#        - remove: defined_schema_fields / uds_schema names on the server but not desired
-#   5. PUT stream settings, then GET the list again and fail unless defined_schema_fields
-#      matches the JSON. Do not GET /schema (historical inferred fields stay huge after UDS).
+#   3. If the paragon stream is missing, wait for Fluent Bit to create it, then PUT
+#      against empty settings if it still does not appear.
+#   4. If settings.defined_schema_fields already matches desired names, skip PUT.
+#   5. Otherwise PUT stream settings. Re-fetch is best-effort: a successful PUT must
+#      not fail the Helm hook.
 #
-# Transient HTTP failures on the settings fetch warn and exit 0 so an atomic Helm
-# upgrade cannot roll back paragon-logging when OpenObserve is still settling.
-# 401/403 still fail fast. Curl bodies are written to files, not shell variables.
+# Transient HTTP / readiness failures warn and exit 0 so an atomic Helm upgrade
+# cannot roll back paragon-logging. 401/403 still fail fast. Curl bodies are
+# written to files, not shell variables.
 set -eu
 
 LOG_PREFIX="[openobserve-uds]"
 DESIRED_SCHEMA_FILE="${DESIRED_SCHEMA_FILE:-/uds/openobserve-uds-schema.json}"
 O2_HOST="${O2_HOST:-http://openobserve:5080}"
 HEALTH_WAIT_SECONDS="${HEALTH_WAIT_SECONDS:-120}"
-AUTH_CURL_MAX_TIME="${AUTH_CURL_MAX_TIME:-600}"
+STREAM_WAIT_SECONDS="${STREAM_WAIT_SECONDS:-300}"
+AUTH_CURL_MAX_TIME="${AUTH_CURL_MAX_TIME:-60}"
 AUTH_CURL_RETRIES="${AUTH_CURL_RETRIES:-5}"
 WORKDIR="${TMPDIR:-/tmp}/uds-apply-$$"
 STREAMS_URL=""
@@ -42,6 +42,14 @@ warn_skip() {
   log "skipping UDS apply so the Helm release is not rolled back"
   log "done (skipped)"
   exit 0
+}
+
+last_http_status() {
+  if [ -f "$WORKDIR/http-status" ]; then
+    cat "$WORKDIR/http-status"
+  else
+    echo "000"
+  fi
 }
 
 cleanup() {
@@ -113,29 +121,34 @@ auth_curl_file() {
   return 1
 }
 
-verify_auth() {
-  _probe="$WORKDIR/auth-probe"
-  _status="$(curl_auth_status "$_probe" "$STREAMS_URL")" || _status="000"
-  case "$_status" in
-    200) ;;
-    401|403)
-      die "OpenObserve rejected credentials (HTTP ${_status}). Run scripts/migrate-openobserve-password.sh (--hoop or --o2-host) after terraform apply."
-      ;;
-    *) die "auth probe failed: GET /api/default/streams returned HTTP ${_status}" ;;
-  esac
+list_streams() {
+  auth_curl_file "$WORKDIR/streams.json" "$STREAMS_URL"
 }
 
-# Stream settings from the list API (no inferred schema). Empty file if paragon is missing.
-fetch_paragon_stream() {
+extract_paragon() {
+  jq -ce '.list[] | select(.name == "paragon")' "$WORKDIR/streams.json" >"$1"
+}
+
+# 0 found, 1 HTTP failure after retries, 2 stream still missing after wait.
+wait_for_paragon_stream() {
   _dest="$1"
-  _raw="$WORKDIR/streams.json"
-  if ! auth_curl_file "$_raw" "$STREAMS_URL"; then
-    return 1
-  fi
-  if ! jq -ce '.list[] | select(.name == "paragon")' "$_raw" >"$_dest"; then
-    return 1
-  fi
-  return 0
+  _elapsed=0
+  while [ "$_elapsed" -le "$STREAM_WAIT_SECONDS" ]; do
+    if ! list_streams; then
+      return 1
+    fi
+    if extract_paragon "$_dest"; then
+      return 0
+    fi
+    log "stream paragon not listed yet; waiting (${_elapsed}s/${STREAM_WAIT_SECONDS}s)"
+    sleep 5
+    _elapsed=$((_elapsed + 5))
+  done
+  return 2
+}
+
+write_empty_paragon() {
+  printf '%s\n' '{"name":"paragon","settings":{"defined_schema_fields":[]}}' >"$1"
 }
 
 schema_matches_desired() {
@@ -158,7 +171,7 @@ log "waiting for ${O2_HOST}/healthz (max ${HEALTH_WAIT_SECONDS}s)..."
 elapsed=0
 until curl -sf --connect-timeout 5 --max-time 10 "${O2_HOST}/healthz" >/dev/null 2>&1; do
   if [ "$elapsed" -ge "$HEALTH_WAIT_SECONDS" ]; then
-    die "OpenObserve not ready after ${HEALTH_WAIT_SECONDS}s"
+    warn_skip "OpenObserve not ready after ${HEALTH_WAIT_SECONDS}s"
   fi
   sleep 2
   elapsed=$((elapsed + 2))
@@ -166,13 +179,21 @@ done
 log "openobserve is healthy"
 
 log "verifying credentials against OpenObserve API"
-verify_auth
+if ! auth_curl_file "$WORKDIR/auth-probe" "$STREAMS_URL"; then
+  warn_skip "auth probe failed after retries (HTTP $(last_http_status))"
+fi
 log "credentials accepted"
 
 log "fetching current stream settings (list API, fetchSchema=false)"
 current="$WORKDIR/current.json"
-if ! fetch_paragon_stream "$current"; then
-  warn_skip "failed to fetch stream paragon settings (timeout or transient error)"
+wait_rc=0
+wait_for_paragon_stream "$current" || wait_rc=$?
+if [ "$wait_rc" -eq 1 ]; then
+  warn_skip "failed to list streams (HTTP $(last_http_status))"
+fi
+if [ "$wait_rc" -eq 2 ]; then
+  log "stream paragon still missing after ${STREAM_WAIT_SECONDS}s; applying UDS against empty settings"
+  write_empty_paragon "$current"
 fi
 print_schema_counts "before apply" "$current"
 
@@ -213,24 +234,28 @@ log "applying UDS via PUT ${O2_HOST}/api/default/streams/paragon/settings"
 put_out="$WORKDIR/put.json"
 if ! auth_curl_file "$put_out" -X PUT -H "Content-Type: application/json" -d @"$payload" \
   "${O2_HOST}/api/default/streams/paragon/settings"; then
-  die "PUT stream settings failed (HTTP $(cat "$WORKDIR/http-status"))"
+  _put_status="$(last_http_status)"
+  if [ "$_put_status" = "404" ]; then
+    warn_skip "PUT returned HTTP 404 (stream paragon does not exist yet)"
+  fi
+  die "PUT stream settings failed (HTTP ${_put_status})"
 fi
 
 log "verifying settings after PUT"
 updated="$WORKDIR/updated.json"
-if ! fetch_paragon_stream "$updated"; then
-  die "failed to re-fetch stream paragon after PUT"
+if ! list_streams || ! extract_paragon "$updated"; then
+  log "warning: PUT succeeded but could not re-fetch settings; not failing the Helm release"
+  log "done (unverified)"
+  exit 0
 fi
 print_schema_counts "after apply" "$updated"
 
 defined_count="$(jq '(.settings.defined_schema_fields // []) | length' "$updated")"
 
-if [ "$defined_count" -ne "$expected_count" ]; then
-  die "post-PUT defined_schema_fields count ${defined_count} != expected ${expected_count}"
-fi
-
-if ! schema_matches_desired "$updated"; then
-  die "post-PUT schema field names do not match desired list"
+if [ "$defined_count" -ne "$expected_count" ] || ! schema_matches_desired "$updated"; then
+  log "warning: PUT succeeded but post-PUT schema does not match desired list; not failing the Helm release"
+  log "done (unverified)"
+  exit 0
 fi
 
 log "UDS apply succeeded: ${defined_count} defined_schema_fields"
