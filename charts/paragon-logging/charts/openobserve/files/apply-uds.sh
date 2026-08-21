@@ -242,8 +242,10 @@ put_out="$WORKDIR/put.json"
 if ! auth_curl_file "$put_out" -X PUT -H "Content-Type: application/json" -d @"$payload" \
   "${O2_HOST}/api/default/streams/paragon/settings"; then
   _put_status="$(last_http_status)"
-  if [ "$_put_status" = "404" ]; then
-    warn_skip "PUT returned HTTP 404 (stream paragon does not exist yet)"
+  # 404: stream not created yet. 000/408/429/5xx: timeout or OpenObserve still settling.
+  # Other 4xx (400, 409, 422, …) are schema/request bugs and must fail the hook.
+  if [ "$_put_status" = "404" ] || is_transient_http "$_put_status"; then
+    warn_skip "PUT failed after retries (HTTP ${_put_status}); not rolling back the Helm release"
   fi
   die "PUT stream settings failed (HTTP ${_put_status})"
 fi
