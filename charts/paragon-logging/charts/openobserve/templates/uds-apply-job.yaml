@@ -8,7 +8,9 @@ metadata:
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "10"
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    # No hook-succeeded: the Job is kept so `kubectl logs` can show what was
+    # applied. before-hook-creation removes it at the start of the next upgrade.
+    "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   backoffLimit: {{ .Values.uds.backoffLimit }}
   activeDeadlineSeconds: {{ .Values.uds.activeDeadlineSeconds }}
@@ -29,11 +31,8 @@ spec:
           image: {{ include "paragon.image" (dict "root" . "repository" .Values.uds.image.repository "tag" .Values.uds.image.tag) | quote }}
           imagePullPolicy: {{ .Values.uds.image.pullPolicy | default .Values.global.pullPolicy | default "IfNotPresent" }}
           command:
-            - /bin/sh
-            - -c
-            - |
-              apk add --no-cache curl jq >/dev/null
-              exec /bin/sh /uds/apply-uds.sh
+            - node
+            - /uds/apply-uds.mjs
           env:
             - name: O2_HOST
               value: "http://{{ include "openobserve.fullname" . }}:{{ .Values.service.port }}"
@@ -42,9 +41,15 @@ spec:
             - name: HEALTH_WAIT_SECONDS
               value: {{ .Values.uds.healthWaitSeconds | quote }}
             - name: STREAM_WAIT_SECONDS
-              value: {{ .Values.uds.streamWaitSeconds | default 300 | quote }}
-            - name: AUTH_CURL_MAX_TIME
-              value: {{ .Values.uds.authCurlMaxTime | default 60 | quote }}
+              value: {{ .Values.uds.streamWaitSeconds | quote }}
+            - name: REQUEST_TIMEOUT_SECONDS
+              value: {{ .Values.uds.requestTimeoutSeconds | quote }}
+            - name: APPLY_ATTEMPTS
+              value: {{ .Values.uds.applyAttempts | quote }}
+            # Finish before activeDeadlineSeconds: a deadline kill marks the Job
+            # failed, which would roll back an atomic upgrade.
+            - name: TOTAL_BUDGET_SECONDS
+              value: {{ sub (int .Values.uds.activeDeadlineSeconds) 120 | quote }}
             - name: ZO_ROOT_USER_EMAIL
               valueFrom:
                 secretKeyRef:
@@ -69,6 +74,6 @@ spec:
             items:
               - key: openobserve-uds-schema.json
                 path: openobserve-uds-schema.json
-              - key: apply-uds.sh
-                path: apply-uds.sh
+              - key: apply-uds.mjs
+                path: apply-uds.mjs
 {{- end }}

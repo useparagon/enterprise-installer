@@ -118,16 +118,21 @@ secrets: {}
 uds:
   enabled: true
   image:
-    repository: alpine
-    tag: "3.20"
+    repository: node
+    tag: "22-alpine"
     pullPolicy: IfNotPresent
-  backoffLimit: 3
-  # healthWait (120) + streamWait (300) + several 60s curl retries with backoff.
+  # The script retries internally; this only covers pod-level failures
+  # (image pull, eviction, OOM).
+  backoffLimit: 2
+  # healthWait (120) + streamWait (300) + apply attempts, then 120s of slack
+  # that the script leaves itself via TOTAL_BUDGET_SECONDS.
   activeDeadlineSeconds: 1800
   healthWaitSeconds: 120
   streamWaitSeconds: 300
   # List API is small; 600s was for GET /schema and exceeded the Job deadline.
-  authCurlMaxTime: 60
+  requestTimeoutSeconds: 60
+  # Each attempt creates the columns, then selects them as the schema.
+  applyAttempts: 3
   resources:
     limits:
       cpu: 200m
