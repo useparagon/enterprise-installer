@@ -611,7 +611,7 @@ locals {
   # connection_string (host:port) while still exporting primary_access_key as
   # password — only include userinfo when connection_string has "@" (or is absent).
   redis_instance_urls = {
-    for name, r in try(local.infra_vars.redis.value, {}) : name => (
+    for name, r in coalesce(local.infra_vars.redis.value, {}) : name => (
       startswith(try(r.connection_string, ""), "redis://") || startswith(try(r.connection_string, ""), "rediss://")
       ? r.connection_string
       : format(
