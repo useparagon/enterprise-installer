@@ -33,14 +33,14 @@ At least one must be `true`. Existing customers keep defaults (`redis_enabled = 
 | Output | When | Contents |
 |--------|------|----------|
 | `redis` | `redis_enabled = true` (even if managed is also enabled) | Legacy BSP endpoints — **unchanged contract for paragon** |
-| `redis` | `redis_enabled = false`, `redis_managed_enabled = true` | Managed Redis endpoints (post-cutover) |
+| `redis` | `redis_enabled = false` | `null` (legacy cache and `redis` secret are not created) |
 | `redis_managed` | `redis_managed_enabled = true` | Managed Redis endpoints for trial `kubectl` patching |
 
 ### Customer migration tfvars sequence
 
 1. **Baseline:** `redis_enabled = true`, `redis_managed_enabled = false`
 2. **Parallel deploy:** `redis_enabled = true`, `redis_managed_enabled = true` → apply creates Managed Redis; legacy keeps running; use `terraform output -json redis_managed` for new endpoints
-3. **After validation:** `redis_enabled = false`, `redis_managed_enabled = true` → apply destroys legacy; `output redis` switches to managed
+3. **After validation:** `redis_enabled = false`, `redis_managed_enabled = true` → apply destroys legacy cache and the `redis` secret; paragon reads `redis-managed`
 
 ### Azure Managed Redis tuning (all regions)
 
