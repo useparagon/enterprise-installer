@@ -21,6 +21,10 @@ resource "azurerm_key_vault_secret" "env" {
       condition     = length(local.helm_secret_values) > 0
       error_message = "Paragon env secret would be empty after chart secretKeys split. Confirm prepare.sh charts and infra-backed helm_values contain postgres/redis credentials."
     }
+    precondition {
+      condition     = try(local.infra_vars.redis.value.cache.host, "") != ""
+      error_message = "Key Vault has neither a usable `redis` nor `redis-managed` secret with a cache.host. Create one of those secrets (same JSON shape as installer-managed Redis) before applying this workspace."
+    }
   }
 }
 
