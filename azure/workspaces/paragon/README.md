@@ -15,6 +15,44 @@ To update credentials when the app registration secret expires:
 
 Do not commit real secrets to git. Prefer environment variables or a secret manager for `azure_client_secret` / `ARM_CLIENT_SECRET`.
 
+## Failover with customer-managed data stores
+
+Applies to deployments where infra runs with `postgres_enabled = false` / `redis_enabled = false` and the data stores are failed over outside this repo (see [Customer-managed Postgres and Redis](../infra/README.md#customer-managed-postgres-and-redis)).
+
+### How connection info reaches pods
+
+1. This workspace reads the `postgres` / `redis` / `redis-managed` Key Vault secrets and builds `global.env`.
+2. Chart `service-inputs.json` splits that env: `secretKeys` go to the `env` Key Vault secret (and `managed-sync` when managed sync is deployed), `envKeys` stay plain pod env rendered by Helm.
+3. External Secrets projects `env` into the `paragon-secrets` Kubernetes secret every 5 minutes; pods read those keys through `secretKeyRef`.
+
+Hosts, usernames, passwords, database names, and the `*_REDIS_URL` values are all `secretKeys`. Changing them needs a new secret version plus a pod restart, **not** a Helm release. Ports and the TLS / cluster flags (`CERBERUS_POSTGRES_PORT`, `CACHE_REDIS_TLS_ENABLED`, `QUEUE_REDIS_CLUSTER_ENABLED`, …) are `envKeys` baked into the pod spec, so changing those does require a terraform apply.
+
+### Failover without terraform
+
+`azure/scripts/failover-datastores.sh` performs the whole cutover in one command: it rewrites the Key Vault secrets, forces an External Secrets resync instead of waiting out the refresh interval, and restarts the workloads that consume them.
+
+```bash
+./azure/scripts/failover-datastores.sh \
+  --vault "$KEY_VAULT" \
+  --replace primary.postgres.database.azure.com=standby.postgres.database.azure.com \
+  --replace primary.redis.cache.windows.net=standby.redis.cache.windows.net
+```
+
+`--replace OLD=NEW` is a literal substitution applied to every value, so it also rewrites hosts embedded in Redis URLs. Rehearse with `--dry-run`, which prints each key that would change. Passwords inside Redis URLs are URL encoded and will not match a raw `--replace`; pass the rebuilt URL with `--set CACHE_REDIS_URL=rediss://:...@host:6380`.
+
+By default the script updates both the connection secrets (`postgres`, `redis`, `redis-managed`) and the runtime secrets (`env`, `managed-sync`). Keeping them in sync is what makes the next terraform apply a no-op — this workspace rebuilds `env` from the connection secrets on every apply, so editing only `env` (or only the Kubernetes secret) is reverted on the next run.
+
+The equivalent manual steps:
+
+```bash
+az keyvault secret show --vault-name "$KEY_VAULT" --name env -o tsv --query value > env.json
+# edit hosts / credentials in env.json, and make the same edit to postgres.json / redis.json
+az keyvault secret set --vault-name "$KEY_VAULT" --name env --file env.json
+
+kubectl annotate externalsecret paragon-secrets -n paragon force-sync="$(date +%s)" --overwrite
+kubectl rollout restart deployment -n paragon
+```
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 

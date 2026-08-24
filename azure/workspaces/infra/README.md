@@ -129,6 +129,52 @@ Confirm SKU availability in the target region before apply.
 
 Requires `azurerm` provider `>= 4.60` in `main.tf` (see `main.tf.example`).
 
+## Customer-managed Postgres and Redis
+
+`postgres_enabled = false` and `redis_enabled = false` (with `redis_managed_enabled = false`) skip the data store modules entirely. Use this when the servers are provisioned and failed over outside this repo. Everything else — VNet, AKS, storage, Key Vault — is still created.
+
+Terraform only writes the `postgres` / `redis` / `redis-managed` Key Vault secrets for the modules it creates, so with those flags off the secrets are yours to maintain. The paragon workspace reads them, so seed them **before** its first apply:
+
+| Secret | Required | Shape |
+|--------|----------|-------|
+| `postgres` | Yes | Object keyed by logical instance (`paragon`, `cerberus`, `eventlogs`, `hermes`, `triggerkit`, `zeus`, `managed_sync`). Unlisted keys fall back to `paragon`. |
+| `redis` | One of `redis` / `redis-managed` | Object keyed by `cache`, `queue`, `system`, and `managed-sync` when managed sync is enabled. Workflow Redis falls back to `cache`. |
+| `redis-managed` | — | Same shape as `redis`; used only when `redis` is absent. |
+
+```jsonc
+// postgres
+{
+  "paragon": {
+    "host": "example.postgres.database.azure.com",
+    "port": "5432",
+    "user": "paragon",
+    "password": "...",
+    "database": "postgres"
+  }
+}
+
+// redis
+{
+  "cache": {
+    "host": "example.redis.cache.windows.net",
+    "port": 6380,
+    "password": "...",
+    "ssl": true,
+    "cluster": false,
+    "connection_string": ":PASSWORD@example.redis.cache.windows.net:6380"
+  }
+}
+```
+
+```bash
+az keyvault secret set --vault-name "$KEY_VAULT" --name postgres --file postgres.json
+az keyvault secret set --vault-name "$KEY_VAULT" --name redis --file redis.json
+```
+
+The installer no longer manages network paths to those servers. Private DNS resolution, VNet peering or private endpoints, and NSG rules from the AKS subnets must exist before workloads start.
+
+To repoint a running deployment at different endpoints, see [Failover with customer-managed data stores](../paragon/README.md#failover-with-customer-managed-data-stores) in the paragon workspace.
+
 ## AKS network profile
 
 The `k8s_*` network variables configure the AKS `network_profile`. Defaults are optimized for greenfield deployments:
