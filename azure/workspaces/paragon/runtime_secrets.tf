@@ -23,7 +23,7 @@ resource "azurerm_key_vault_secret" "env" {
     }
     precondition {
       condition     = try(local.infra_vars.redis.value.cache.host, "") != ""
-      error_message = "Key Vault has neither a usable `redis` nor `redis-managed` secret with a cache.host. Create one of those secrets (same JSON shape as installer-managed Redis) before applying this workspace."
+      error_message = "Neither `redis` nor `redis-managed` has a usable cache.host. Provide one via Key Vault or infra_json (same JSON shape as installer-managed Redis) before applying this workspace."
     }
   }
 }

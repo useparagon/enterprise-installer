@@ -64,15 +64,7 @@ locals {
       }
       postgres = { value = jsondecode(data.azurerm_key_vault_secret.infra_postgres[0].value) }
       redis = {
-        value = (
-          length(data.azurerm_key_vault_secret.infra_redis) > 0
-          ? jsondecode(data.azurerm_key_vault_secret.infra_redis[0].value)
-          : (
-            length(data.azurerm_key_vault_secret.infra_redis_managed) > 0
-            ? jsondecode(data.azurerm_key_vault_secret.infra_redis_managed[0].value)
-            : null
-          )
-        )
+        value = length(data.azurerm_key_vault_secret.infra_redis) > 0 ? jsondecode(data.azurerm_key_vault_secret.infra_redis[0].value) : null
       }
       redis_managed = {
         value = length(data.azurerm_key_vault_secret.infra_redis_managed) > 0 ? jsondecode(data.azurerm_key_vault_secret.infra_redis_managed[0].value) : null
@@ -84,5 +76,16 @@ locals {
     } : {}
   )
 
-  infra_vars = local.use_legacy_infra_json ? local.legacy_infra_vars : local.provider_infra_vars
+  # Helm still reads infra_vars.redis. After AMR cutover, installer Redis is
+  # gone (output redis / Key Vault `redis` are null) while redis_managed is set.
+  # Apply the same fallback for Key Vault and legacy infra_json.
+  infra_vars_source = local.use_legacy_infra_json ? local.legacy_infra_vars : local.provider_infra_vars
+  redis_from_infra = (
+    try(local.infra_vars_source.redis.value.cache.host, "") != ""
+    ? local.infra_vars_source.redis.value
+    : try(local.infra_vars_source.redis_managed.value, null)
+  )
+  infra_vars = merge(local.infra_vars_source, {
+    redis = { value = local.redis_from_infra }
+  })
 }
