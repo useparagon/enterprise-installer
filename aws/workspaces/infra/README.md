@@ -2,6 +2,11 @@
 
 See [setup-policy.json](../../setup-policy.json) for permissions that are required to execute this. Note that `<AWS_ACCOUNT_ID>` must be replaced to match target account.
 
+## Postgres storage autoscaling
+
+`rds_max_allocated_storage` (default **1000 GiB**) is the RDS storage autoscaling cap for each Postgres instance. The postgres handoff exposes that value as `max_storage_gib` on every instance so the paragon workspace can size Grafana storage alerts.
+
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 

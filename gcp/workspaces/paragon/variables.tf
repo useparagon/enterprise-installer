@@ -1169,6 +1169,26 @@ locals {
     try(local.redis_instance_urls["cache"], local.infra_vars.redis.value.cache.connection_string, "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}")
   )
 
+  # Cloud SQL 0/null = unlimited. Grafana 0 = disable alerts, unset = 1000 GiB default.
+  # Only inject *_POSTGRES_MAX_STORAGE_BYTES when the autoresize cap is a positive GB value.
+  postgres_max_storage_gib = try(
+    local.infra_vars.postgres.value.hermes.max_storage_gib,
+    local.infra_vars.postgres.value.paragon.max_storage_gib,
+    null
+  )
+  postgres_max_storage_limit_is_set = (
+    local.postgres_max_storage_gib != null &&
+    local.postgres_max_storage_gib > 0
+  )
+  postgres_max_storage_env = local.postgres_max_storage_limit_is_set ? {
+    CERBERUS_POSTGRES_MAX_STORAGE_BYTES   = tostring(try(local.infra_vars.postgres.value.cerberus.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
+    EVENT_LOGS_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.infra_vars.postgres.value.eventlogs.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
+    HERMES_POSTGRES_MAX_STORAGE_BYTES     = tostring(try(local.infra_vars.postgres.value.hermes.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
+    PHEME_POSTGRES_MAX_STORAGE_BYTES      = tostring(try(local.infra_vars.postgres.value.hermes.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
+    TRIGGERKIT_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.infra_vars.postgres.value.triggerkit.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
+    ZEUS_POSTGRES_MAX_STORAGE_BYTES       = tostring(try(local.infra_vars.postgres.value.zeus.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
+  } : {}
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       # Redis CA certificate configuration
@@ -1386,10 +1406,14 @@ locals {
         MONITOR_REDIS_EXPORTER_PORT             = try(local.monitors["redis-exporter"].port, null)
         MONITOR_REDIS_INSIGHT_HOST              = "http://redis-insight"
         MONITOR_REDIS_INSIGHT_PORT              = try(local.monitors["redis-insight"].port, null)
-        }, {
-        for key, value in local.helm_vars.global.env :
-        key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
-      }, var.managed_sync_enabled ? module.managed_sync_config[0].config : {})
+        },
+        local.postgres_max_storage_env,
+        {
+          for key, value in local.helm_vars.global.env :
+          key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+        },
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+      )
     })
   })
 

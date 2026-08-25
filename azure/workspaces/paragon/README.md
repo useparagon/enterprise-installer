@@ -116,6 +116,17 @@ Do not commit real secrets to git. Prefer environment variables or a secret mana
 | <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime\_webhook) | Uptime webhook URL |
 <!-- END_TF_DOCS -->
 
+
+## Postgres storage alerts (Grafana)
+
+Paragon Grafana `generate()` reads `*_POSTGRES_MAX_STORAGE_BYTES` for HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, and TRIGGERKIT.
+
+Azure Flexible Server enables `auto_grow_enabled` but Terraform has **no** separate max autogrow cap. This workspace does **not** derive a fake max from initial `storage_mb`. Grafana uses its 1000 GiB default until operators set `*_POSTGRES_MAX_STORAGE_BYTES` in Helm `global.env`. Use `0` to disable storage alerts.
+
+**Slack routing:** storage alerts use Grafana label `team: platform`. Set `MONITOR_GRAFANA_SLACK_TEAM_CHANNELS` to include `platform=<Slack channel id>` (Grafana envKey). This installer does not set that var by default; add it via Helm `global.env` in customer values.yaml. Without it, `severity: high` may fall through to uptime/canary.
+
+**Chart tag:** Grafana only mounts keys listed in grafana `service-inputs.json` (from Paragon atlas via `./prepare.sh -p <cloud> -t <GIT_TAG>`). Use a Paragon version that includes `*_POSTGRES_MAX_STORAGE_BYTES` as grafana `envKeys` (PARA-25692). Until then, Terraform can emit the values but they will not reach the Grafana pod. The source charts in this repo do not ship grafana `service-inputs.json`; `prepare.sh` extracts `charts/files/service-inputs.json` from the selected git tag (or `PARAGON_SERVICE_INPUTS_JSON` / `/mnt/workspace/service-inputs.json` in Spacelift).
+
 ## Updates
 
 This Terraform documentation can be automatically regenerated with:

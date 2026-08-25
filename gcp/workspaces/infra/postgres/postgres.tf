@@ -23,8 +23,9 @@ resource "google_sql_database_instance" "paragon" {
   deletion_protection = !var.disable_deletion_protection
 
   settings {
-    disk_autoresize = true
-    tier            = each.value.tier
+    disk_autoresize       = true
+    disk_autoresize_limit = var.postgres_disk_autoresize_limit != null ? var.postgres_disk_autoresize_limit : 0
+    tier                  = each.value.tier
 
     backup_configuration {
       binary_log_enabled = false
@@ -121,7 +122,7 @@ resource "google_sql_user" "postgres_user" {
 }
 
 locals {
-  openfga_instance_key       = var.managed_sync_enabled ? (contains(keys(local.postgres_instances), "managed_sync") ? "managed_sync" : "paragon") : null
+  openfga_instance_key        = var.managed_sync_enabled ? (contains(keys(local.postgres_instances), "managed_sync") ? "managed_sync" : "paragon") : null
   managed_sync_extra_db_names = toset(local.openfga_instance_key != null ? ["sync_project", "sync_instance"] : [])
 }
 

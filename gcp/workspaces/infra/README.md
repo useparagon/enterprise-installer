@@ -12,6 +12,11 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 - Kubernetes Engine API
 - Managed Service for Apache Kafka API (when managed sync / GMK is enabled)
 
+## Postgres disk autoresize limit
+
+`postgres_disk_autoresize_limit` is the Cloud SQL disk autoresize cap in GB (optional). Null or `0` means unlimited at the Cloud SQL platform default, which is not a useful Grafana alert cap. Set a positive GB value so the postgres handoff `max_storage_gib` can drive Grafana storage alerts.
+
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -82,6 +87,7 @@ No resources.
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.34"` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync (GMK cluster, managed\_sync bucket, postgres and redis instances). | `bool` | `false` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
+| <a name="input_postgres_disk_autoresize_limit"></a> [postgres\_disk\_autoresize\_limit](#input\_postgres\_disk\_autoresize\_limit) | Maximum Cloud SQL disk size in GB for autoresize. Null/unset means no Terraform limit (Cloud SQL platform max). 0 is treated as unlimited (GCP default). | `number` | `null` | no |
 | <a name="input_postgres_multiple_instances"></a> [postgres\_multiple\_instances](#input\_postgres\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_postgres_tier"></a> [postgres\_tier](#input\_postgres\_tier) | The instance type to use for Postgres. | `string` | `"db-custom-2-7680"` | no |
 | <a name="input_redis_memory_size"></a> [redis\_memory\_size](#input\_redis\_memory\_size) | The size of the Redis instance (in GB). | `number` | `2` | no |
