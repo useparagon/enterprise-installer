@@ -26,21 +26,21 @@ Two optional backends can run independently or **in parallel** during customer m
 | `redis_enabled` | `true` | `./redis` (`azurerm_redis_cache`) | 6 |
 | `redis_managed_enabled` | `false` | `./redis-managed` (`azurerm_managed_redis`) | 7.4 (service default) |
 
-At least one must be `true`. Existing customers keep defaults (`redis_enabled = true`, `redis_managed_enabled = false`) for a no-op plan on Redis.
+Either flag may be `false`. If both are `false`, this workspace does not create Redis and does not write the `redis` or `redis-managed` Key Vault secrets; the paragon workspace then expects a customer-provided `redis` or `redis-managed` secret. Existing customers keep defaults (`redis_enabled = true`, `redis_managed_enabled = false`) for a no-op plan on Redis.
 
 ### Outputs during migration
 
 | Output | When | Contents |
 |--------|------|----------|
 | `redis` | `redis_enabled = true` (even if managed is also enabled) | Legacy BSP endpoints — **unchanged contract for paragon** |
-| `redis` | `redis_enabled = false`, `redis_managed_enabled = true` | Managed Redis endpoints (post-cutover) |
+| `redis` | `redis_enabled = false` | `null` (legacy cache and `redis` secret are not created) |
 | `redis_managed` | `redis_managed_enabled = true` | Managed Redis endpoints for trial `kubectl` patching |
 
 ### Customer migration tfvars sequence
 
 1. **Baseline:** `redis_enabled = true`, `redis_managed_enabled = false`
 2. **Parallel deploy:** `redis_enabled = true`, `redis_managed_enabled = true` → apply creates Managed Redis; legacy keeps running; use `terraform output -json redis_managed` for new endpoints
-3. **After validation:** `redis_enabled = false`, `redis_managed_enabled = true` → apply destroys legacy; `output redis` switches to managed
+3. **After validation:** `redis_enabled = false`, `redis_managed_enabled = true` → apply destroys legacy cache and the `redis` secret; paragon reads `redis-managed`
 
 ### Azure Managed Redis tuning (all regions)
 
@@ -231,6 +231,7 @@ nsg_malicious_ips = [
 | [azurerm_key_vault_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_key_vault_secret.runtime_redis_managed](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
 
@@ -280,6 +281,7 @@ nsg_malicious_ips = [
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
 | <a name="input_postgres_base_sku_name"></a> [postgres\_base\_sku\_name](#input\_postgres\_base\_sku\_name) | PostgreSQL SKU for secondary instances. Use GP\_Standard\_D2ads\_v5 for HA support. SKU availability may vary by Azure region. | `string` | `"B_Standard_B2s"` | no |
 | <a name="input_postgres_instances"></a> [postgres\_instances](#input\_postgres\_instances) | Per-instance PostgreSQL overrides. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed\_sync, paragon).<br/>Both sku and redundant must be set on each entry you include. Omitted keys use built-in defaults (no HA). Null uses defaults for all instances. | <pre>map(object({<br/>    sku       = string<br/>    redundant = bool<br/>  }))</pre> | `null` | no |
+| <a name="input_postgres_management_lock_enabled"></a> [postgres\_management\_lock\_enabled](#input\_postgres\_management\_lock\_enabled) | When true, apply Azure CanNotDelete management locks on Postgres Flexible Servers (opt-in). | `bool` | `false` | no |
 | <a name="input_postgres_multiple_instances"></a> [postgres\_multiple\_instances](#input\_postgres\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_postgres_sku_name"></a> [postgres\_sku\_name](#input\_postgres\_sku\_name) | PostgreSQL SKU name (e.g. `B_Standard_B2s` or `GP_Standard_D2ds_v5`) | `string` | `"GP_Standard_D2ds_v5"` | no |
 | <a name="input_postgres_version"></a> [postgres\_version](#input\_postgres\_version) | PostgreSQL version (14, 15 or 16) | `string` | `"14"` | no |
@@ -310,7 +312,7 @@ nsg_malicious_ips = [
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka (Event Hubs for Kafka). |
 | <a name="output_logs_container"></a> [logs\_container](#output\_logs\_container) | The bucket used to store system logs. |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
-| <a name="output_redis"></a> [redis](#output\_redis) | Primary Redis connection info for the paragon workspace. During migration (both modules enabled), returns legacy endpoints until redis\_enabled is set to false. |
+| <a name="output_redis"></a> [redis](#output\_redis) | Connection info for installer-managed Azure Cache for Redis. Null when redis\_enabled is false. |
 | <a name="output_redis_managed"></a> [redis\_managed](#output\_redis\_managed) | Azure Managed Redis 7.4 endpoints (null when redis\_managed\_enabled is false). Use during migration for kubectl trial routing while output redis still points at legacy. |
 | <a name="output_redis_managed_export_storage"></a> [redis\_managed\_export\_storage](#output\_redis\_managed\_export\_storage) | Blob storage for on-demand Azure Managed Redis RDB export (null when disabled or legacy Redis). |
 | <a name="output_resource_group"></a> [resource\_group](#output\_resource\_group) | Resource Group that infrastructure was deployed to. |

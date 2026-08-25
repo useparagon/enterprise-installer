@@ -137,6 +137,13 @@ variable "cloudflare_tunnel_email_domain" {
 }
 
 # postgres
+# terraform-docs-ignore
+variable "postgres_enabled" {
+  description = "When false, skip creating Azure PostgreSQL Flexible Servers."
+  type        = bool
+  default     = true
+}
+
 variable "postgres_sku_name" {
   description = "PostgreSQL SKU name (e.g. `B_Standard_B2s` or `GP_Standard_D2ds_v5`)"
   type        = string
@@ -243,11 +250,6 @@ variable "redis_managed_enabled" {
   description = "Deploy Azure Managed Redis (Redis 7.4). When false, the redis-managed module is not created. May be true alongside redis_enabled during customer migration (both modules run in parallel)."
   type        = bool
   default     = false
-
-  validation {
-    condition     = var.redis_enabled || var.redis_managed_enabled
-    error_message = "At least one of redis_enabled or redis_managed_enabled must be true."
-  }
 }
 
 variable "redis_managed_instances" {
