@@ -95,14 +95,14 @@ const config = {
   org: process.env.O2_ORG || 'default',
   stream: process.env.O2_STREAM || 'paragon',
   schemaFile: process.env.DESIRED_SCHEMA_FILE || '/uds/openobserve-uds-schema.json',
-  healthWaitSeconds: intFromEnv('HEALTH_WAIT_SECONDS', 120),
-  streamWaitSeconds: intFromEnv('STREAM_WAIT_SECONDS', 300),
+  healthWaitSeconds: intFromEnv('HEALTH_WAIT_SECONDS', 60),
+  streamWaitSeconds: intFromEnv('STREAM_WAIT_SECONDS', 180),
   requestTimeoutSeconds: intFromEnv('REQUEST_TIMEOUT_SECONDS', 60),
   requestRetries: intFromEnv('REQUEST_RETRIES', 5),
   applyAttempts: Math.max(1, intFromEnv('APPLY_ATTEMPTS', 3)),
-  // Stay under the Job's activeDeadlineSeconds: a deadline kill marks the Job
-  // failed, which is exactly the rollback this hook must avoid.
-  budgetSeconds: intFromEnv('TOTAL_BUDGET_SECONDS', 1680),
+  // Stay under the Job's activeDeadlineSeconds and the Helm release timeout.
+  // A deadline or Helm timeout kill marks the Job failed and rolls back.
+  budgetSeconds: intFromEnv('TOTAL_BUDGET_SECONDS', 360),
 };
 
 // Read up front so a missing secret key fails before the health wait.

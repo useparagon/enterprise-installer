@@ -46,8 +46,8 @@ spec:
               value: {{ .Values.uds.requestTimeoutSeconds | quote }}
             - name: APPLY_ATTEMPTS
               value: {{ .Values.uds.applyAttempts | quote }}
-            # Finish before activeDeadlineSeconds: a deadline kill marks the Job
-            # failed, which would roll back an atomic upgrade.
+            # Finish before activeDeadlineSeconds and helm_release timeout
+            # (900s). A deadline kill marks the Job failed and rolls back.
             - name: TOTAL_BUDGET_SECONDS
               value: {{ sub (int .Values.uds.activeDeadlineSeconds) 120 | quote }}
             - name: ZO_ROOT_USER_EMAIL
