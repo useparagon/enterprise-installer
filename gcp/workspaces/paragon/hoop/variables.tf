@@ -150,6 +150,12 @@ variable "namespace_paragon" {
   type        = any
 }
 
+variable "docker_pull_secret_name" {
+  description = "Kubernetes dockerconfigjson secret used to pull images (same as microservices, default docker-cfg)."
+  type        = string
+  default     = "docker-cfg"
+}
+
 variable "custom_connections" {
   description = "Custom Hoop connections defined via tfvars. Map of connection names to their configuration."
   type = map(object({

@@ -157,6 +157,7 @@ module "hoop" {
   customer_facing               = var.customer_facing
   hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
+  docker_pull_secret_name       = var.docker_pull_secret_name
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections
   eks_oidc_issuer_url           = try(data.aws_eks_cluster.cluster.identity[0].oidc[0].issuer, null)
