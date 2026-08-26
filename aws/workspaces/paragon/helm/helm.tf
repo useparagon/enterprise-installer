@@ -1,6 +1,15 @@
 locals {
   version = var.helm_values.global.env["VERSION"]
 
+  # coalesce(null, "") errors because coalesce skips empty strings as well as null.
+  docker_username = trimspace(var.docker_username != null ? var.docker_username : "")
+  docker_password = trimspace(var.docker_password != null ? var.docker_password : "")
+
+  # Blank credentials produce a well-formed but unusable pull secret
+  # (auth = base64(":")), which fails image pulls with insufficient_scope
+  # instead of failing the apply, so blank is treated the same as unset.
+  docker_credentials_set = local.docker_username != "" && local.docker_password != ""
+
   helm_values_yaml = yamlencode(nonsensitive(var.helm_values))
 
   subchart_values = yamlencode({
@@ -220,8 +229,7 @@ resource "kubernetes_secret" "docker_login" {
   count = (
     var.create_docker_pull_secret &&
     !var.install_external_secrets &&
-    var.docker_username != null &&
-    var.docker_password != null
+    local.docker_credentials_set
   ) ? 1 : 0
 
   metadata {
@@ -235,10 +243,10 @@ resource "kubernetes_secret" "docker_login" {
     ".dockerconfigjson" = jsonencode({
       auths = {
         "${var.docker_registry_server}" = {
-          "username" = var.docker_username
-          "password" = var.docker_password
-          "email"    = var.docker_email
-          "auth"     = base64encode("${var.docker_username}:${var.docker_password}")
+          "username" = local.docker_username
+          "password" = local.docker_password
+          "email"    = var.docker_email != null ? var.docker_email : ""
+          "auth"     = base64encode("${local.docker_username}:${local.docker_password}")
         }
       }
     })
@@ -408,7 +416,7 @@ resource "helm_release" "paragon_on_prem" {
   cleanup_on_fail   = true
   create_namespace  = false
   dependency_update = true
-  force_update      = true
+  force_update      = false
   timeout           = 900 # 15 minutes
   verify            = false
 

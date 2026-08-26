@@ -1,6 +1,6 @@
 # Paragon GCP Infrastructure
 
-NOTE: The following APIs must be enabled for the project in the [GCP Console](https://console.cloud.google.com/apis/library).
+NOTE: The following APIs must be enabled for the project in the [GCP Console](https://console.cloud.google.com/apis/library). See [gcp/scripts/gcp-roles.sh](../../scripts/gcp-roles.sh) for Terraform service-account roles.
 
 - Identity and Access Management (IAM) API
 - Cloud Resource Manager API
@@ -8,6 +8,9 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 - Compute Engine API
 - Google Cloud Memorystore for Redis API
 - Service Networking API
+- Secret Manager API
+- Kubernetes Engine API
+- Managed Service for Apache Kafka API (when managed sync / GMK is enabled)
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements

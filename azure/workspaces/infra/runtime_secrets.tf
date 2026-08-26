@@ -5,6 +5,9 @@ locals {
   # a hyphen. Truncating local.workspace to 24 chars can leave a trailing hyphen,
   # so strip any trailing hyphens after truncation.
   key_vault_name = replace(substr(local.workspace, 0, 24), "/-+$/", "")
+
+  postgres_runtime = var.postgres_enabled ? module.postgres[0].postgres : null
+  redis_runtime    = var.redis_enabled ? module.redis.redis : null
 }
 
 resource "azurerm_key_vault" "paragon" {
@@ -43,25 +46,32 @@ resource "azurerm_key_vault_access_policy" "terraform" {
 }
 
 resource "azurerm_key_vault_secret" "runtime_postgres" {
+  count = var.postgres_enabled ? 1 : 0
+
   name         = "postgres"
   key_vault_id = azurerm_key_vault.paragon.id
-  value        = jsonencode(module.postgres.postgres)
+  value        = jsonencode(local.postgres_runtime)
 
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
 
 # Same contract as output.redis / output.redis_managed (and legacy infra-output.json):
-# - coexistence: redis = legacy, redis-managed = AMR
-# - cutover (legacy off): redis = AMR
+# - redis: Azure Cache for Redis when redis_enabled
+# - redis-managed: Azure Managed Redis when redis_managed_enabled
+# - coexistence: both secrets present; cutover: disable redis_enabled to remove the redis secret
 resource "azurerm_key_vault_secret" "runtime_redis" {
+  count = var.redis_enabled ? 1 : 0
+
   name         = "redis"
   key_vault_id = azurerm_key_vault.paragon.id
-  value        = jsonencode(var.redis_enabled ? module.redis.redis : module.redis_managed[0].redis)
+  value        = jsonencode(local.redis_runtime)
 
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
 
 resource "azurerm_key_vault_secret" "runtime_redis_managed" {
+  count = var.redis_managed_enabled ? 1 : 0
+
   name         = "redis-managed"
   key_vault_id = azurerm_key_vault.paragon.id
   # Always present so paragon KV handoff can resolve redis_managed (null when AMR disabled).

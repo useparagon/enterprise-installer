@@ -295,7 +295,7 @@ resource "helm_release" "paragon_on_prem" {
   verify            = false
   timeout           = 900 # 15 minutes
   dependency_update = true
-  force_update      = true
+  force_update      = false
 
   values = [
     local.helm_values_yaml,

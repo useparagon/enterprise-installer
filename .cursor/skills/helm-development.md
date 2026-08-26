@@ -25,10 +25,14 @@ Each application chart declares its subcharts as `file://` dependencies in `Char
 
 After `helm install` / `helm upgrade` of `paragon-logging`, the `openobserve` subchart runs a **post-install,post-upgrade** Helm hook `Job` that applies the user-defined schema for the `paragon` logs stream.
 
-- **Files**: `charts/paragon-logging/charts/openobserve/files/apply-uds.sh`, `openobserve-uds-schema.json` (Helm loads them as `files/<name>` via `.Files.Get`, same as `service-inputs.json` elsewhere)
+- **Files**: `charts/paragon-logging/charts/openobserve/files/apply-uds.mjs`, `openobserve-uds-schema.json` (Helm loads them as `files/<name>` via `.Files.Get`, same as `service-inputs.json` elsewhere)
 - **Templates**: `uds-configmap.yaml`, `uds-apply-job.yaml`
+- **Runtime**: `node:22-alpine`, no package installs — the script uses only built-in `fetch` and `node:fs`
 - **Auth**: same Kubernetes secret as the OpenObserve StatefulSet (`secretName`, keys `ZO_ROOT_USER_EMAIL` / `ZO_ROOT_USER_PASSWORD` from `paragon-secrets` unless overridden in `openobserve.secrets`)
-- **Idempotent**: GET schema → skip PUT if `defined_schema_fields` already matches desired JSON
+- **Idempotent**: GET stream list (`fetchSchema=false`) → skip both PUTs if `defined_schema_fields` already matches the desired JSON. Never GET `/schema` (inferred fields can exceed tens of MB).
+- **Two-phase apply**: `PUT {fields:{add}}` creates the columns, then `PUT {defined_schema_fields:{add,remove}}` selects them. OpenObserve silently drops `defined_schema_fields` for columns that do not exist yet (`save_stream_settings` in `src/service/stream.rs`), so a fresh install needs phase 1 or it lands a near-empty UDS.
+- **Failure policy**: only a broken configuration exits non-zero (missing credentials, invalid schema file, rejected credentials, a payload OpenObserve calls invalid). Timeouts, 5xx, a stream that never appears and partial applies warn and exit 0 so an atomic upgrade cannot roll back `paragon-logging`.
+- **Job retention**: hook delete policy is `before-hook-creation` only, so the Job survives success for `kubectl logs` and is cleaned up at the start of the next upgrade.
 - **Disable**: `openobserve.uds.enabled: false`
 
 Local test (with OpenObserve reachable):
@@ -37,7 +41,14 @@ Local test (with OpenObserve reachable):
 kubectl port-forward -n paragon svc/openobserve 5080:5080
 export O2_HOST=http://localhost:5080
 export ZO_ROOT_USER_EMAIL=... ZO_ROOT_USER_PASSWORD=...
-sh charts/paragon-logging/charts/openobserve/files/apply-uds.sh
+export DESIRED_SCHEMA_FILE=charts/paragon-logging/charts/openobserve/files/openobserve-uds-schema.json
+node charts/paragon-logging/charts/openobserve/files/apply-uds.mjs
+```
+
+Inspect what the hook actually applied:
+
+```bash
+kubectl logs -n paragon job/openobserve-uds-apply
 ```
 
 ### Subchart Enable/Disable

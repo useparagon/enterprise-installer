@@ -224,7 +224,7 @@ resource "helm_release" "paragon_on_prem" {
   create_namespace  = false
   cleanup_on_fail   = true
   atomic            = true
-  force_update      = true
+  force_update      = false
   verify            = false
   timeout           = 900 # 15 minutes
   dependency_update = true

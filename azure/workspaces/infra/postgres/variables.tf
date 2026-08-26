@@ -39,6 +39,12 @@ variable "postgres_port" {
   default     = "5432"
 }
 
+variable "postgres_management_lock_enabled" {
+  description = "When true, apply Azure CanNotDelete management locks on Postgres Flexible Servers."
+  type        = bool
+  default     = false
+}
+
 locals {
   postgres_db_names = {
     cerberus     = "cerberus"

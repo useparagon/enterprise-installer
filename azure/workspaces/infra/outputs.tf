@@ -14,7 +14,7 @@ output "bastion" {
 
 output "postgres" {
   description = "Connection info for Postgres."
-  value       = module.postgres.postgres
+  value       = local.postgres_runtime
   sensitive   = true
 }
 
@@ -43,8 +43,8 @@ output "storage" {
 }
 
 output "redis" {
-  description = "Primary Redis connection info for the paragon workspace. During migration (both modules enabled), returns legacy endpoints until redis_enabled is set to false."
-  value       = var.redis_enabled ? module.redis.redis : module.redis_managed[0].redis
+  description = "Connection info for installer-managed Azure Cache for Redis. Null when redis_enabled is false."
+  value       = local.redis_runtime
   sensitive   = true
 }
 

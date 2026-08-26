@@ -10,6 +10,15 @@ data "azurerm_key_vault" "paragon" {
   resource_group_name = local.resource_group_name
 }
 
+data "azurerm_key_vault_secrets" "infra" {
+  count        = local.use_legacy_infra_json ? 0 : 1
+  key_vault_id = data.azurerm_key_vault.paragon.id
+}
+
+locals {
+  infra_secret_names = local.use_legacy_infra_json ? toset([]) : toset(data.azurerm_key_vault_secrets.infra[0].names)
+}
+
 data "azurerm_key_vault_secret" "infra_postgres" {
   count        = local.use_legacy_infra_json ? 0 : 1
   name         = "postgres"
@@ -17,13 +26,13 @@ data "azurerm_key_vault_secret" "infra_postgres" {
 }
 
 data "azurerm_key_vault_secret" "infra_redis" {
-  count        = local.use_legacy_infra_json ? 0 : 1
+  count        = local.use_legacy_infra_json ? 0 : (contains(local.infra_secret_names, "redis") ? 1 : 0)
   name         = "redis"
   key_vault_id = data.azurerm_key_vault.paragon.id
 }
 
 data "azurerm_key_vault_secret" "infra_redis_managed" {
-  count        = local.use_legacy_infra_json ? 0 : 1
+  count        = local.use_legacy_infra_json ? 0 : (contains(local.infra_secret_names, "redis-managed") ? 1 : 0)
   name         = "redis-managed"
   key_vault_id = data.azurerm_key_vault.paragon.id
 }
@@ -75,5 +84,16 @@ locals {
     } : {}
   )
 
-  infra_vars = local.use_legacy_infra_json ? local.legacy_infra_vars : local.provider_infra_vars
+  # Helm still reads infra_vars.redis. After AMR cutover, installer Redis is
+  # gone (output redis / Key Vault `redis` are null) while redis_managed is set.
+  # Apply the same fallback for Key Vault and legacy infra_json.
+  infra_vars_source = local.use_legacy_infra_json ? local.legacy_infra_vars : local.provider_infra_vars
+  redis_from_infra = (
+    try(local.infra_vars_source.redis.value.cache.host, "") != ""
+    ? local.infra_vars_source.redis.value
+    : try(local.infra_vars_source.redis_managed.value, null)
+  )
+  infra_vars = merge(local.infra_vars_source, {
+    redis = { value = local.redis_from_infra }
+  })
 }
