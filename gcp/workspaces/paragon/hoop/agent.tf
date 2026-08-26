@@ -36,14 +36,4 @@ resource "helm_release" "hoopagent" {
       value = google_service_account.hoop_agent[0].email
     }
   }
-
-  # hoopagent-chart does not expose imagePullSecrets; inject the same registry
-  # secret the Paragon microservices use (docker-cfg by default).
-  postrender {
-    binary_path = "python3"
-    args = [
-      "${path.module}/../../../../scripts/hoop-postrender-image-pull-secrets.py",
-      var.docker_pull_secret_name,
-    ]
-  }
 }
