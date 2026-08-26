@@ -164,6 +164,25 @@ variable "docker_pull_secret_name" {
   default     = "docker-cfg"
 }
 
+variable "azure_subscription_id" {
+  description = "Azure subscription ID for the Hoop support Reader role assignment."
+  type        = string
+}
+
+variable "oidc_issuer_url" {
+  description = "AKS OIDC issuer URL for workload identity federation. Empty until oidc_issuer_enabled is set on the cluster."
+  type        = string
+  default     = ""
+}
+
+variable "resource_group" {
+  description = "Azure resource group for the Hoop support managed identity."
+  type = object({
+    name     = string
+    location = string
+  })
+}
+
 variable "custom_connections" {
   description = "Custom Hoop connections defined via tfvars. Map of connection names to their configuration."
   type = map(object({

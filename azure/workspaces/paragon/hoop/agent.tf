@@ -28,4 +28,12 @@ resource "helm_release" "hoopagent" {
     name  = "serviceAccount.create"
     value = "true"
   }
+
+  dynamic "set" {
+    for_each = try(azurerm_user_assigned_identity.hoop_support[0].client_id, null) != null ? [1] : []
+    content {
+      name  = "serviceAccount.annotations.azure\\.workload\\.identity/client-id"
+      value = azurerm_user_assigned_identity.hoop_support[0].client_id
+    }
+  }
 }

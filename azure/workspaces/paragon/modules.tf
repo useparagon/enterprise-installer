@@ -73,6 +73,12 @@ module "hoop" {
   hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   docker_pull_secret_name       = var.docker_pull_secret_name
+  azure_subscription_id         = var.azure_subscription_id
+  oidc_issuer_url               = try(data.azurerm_kubernetes_cluster.cluster.oidc_issuer_url, "")
+  resource_group = {
+    name     = local.infra_vars.resource_group.value.name
+    location = local.infra_vars.resource_group.value.location
+  }
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections
   infra_vars = {
