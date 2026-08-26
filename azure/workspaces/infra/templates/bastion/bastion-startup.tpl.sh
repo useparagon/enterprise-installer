@@ -5,6 +5,19 @@ function writeLog() {
     echo -e "\n\n$(date -Iseconds) $1\n"
 }
 
+function retry() {
+    local attempts=12
+    local delay=10
+
+    until "$@"; do
+        attempts=$((attempts - 1))
+        if [ "$attempts" -le 0 ]; then
+            return 1
+        fi
+        sleep "$delay"
+    done
+}
+
 writeLog "paragon setup starting as $(whoami) from $0"
 sudo mkdir -p /etc/apt/keyrings
 
@@ -163,9 +176,21 @@ chmod 644 /home/ubuntu/.bash_aliases
 
 # configure az, aks and kubectl
 writeLog "configuring k8s tools as ubuntu"
-sudo -u ubuntu az login --service-principal -u ${client_id} -p ${client_secret} --tenant ${tenant_id}
-sudo -u ubuntu az account set --subscription ${subscription_id}
-sudo -u ubuntu az aks get-credentials --overwrite-existing --resource-group ${resource_group} --name ${cluster_name}
-sudo -u ubuntu kubectl config set-context --current --namespace=paragon
+if ! retry sudo -u ubuntu az login --identity --client-id ${managed_identity_client_id}; then
+    writeLog "managed identity login failed after retries"
+    exit 1
+fi
+if ! retry sudo -u ubuntu az account set --subscription ${subscription_id}; then
+    writeLog "setting the Azure subscription failed after retries"
+    exit 1
+fi
+if ! retry sudo -u ubuntu az aks get-credentials --admin --overwrite-existing --resource-group ${resource_group} --name ${cluster_name}; then
+    writeLog "retrieving AKS admin credentials failed after retries"
+    exit 1
+fi
+if ! sudo -u ubuntu kubectl config set-context --current --namespace=paragon; then
+    writeLog "configuring the kubectl namespace failed"
+    exit 1
+fi
 
 writeLog "paragon setup complete"

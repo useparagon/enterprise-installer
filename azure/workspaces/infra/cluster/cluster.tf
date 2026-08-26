@@ -48,10 +48,12 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
 
-  dns_prefix          = local.cluster_name
-  kubernetes_version  = var.k8s_version
-  node_resource_group = "${local.cluster_name}-nodes"
-  sku_tier            = var.k8s_sku_tier
+  dns_prefix                = local.cluster_name
+  kubernetes_version        = var.k8s_version
+  node_resource_group       = "${local.cluster_name}-nodes"
+  sku_tier                  = var.k8s_sku_tier
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
 
   # disable automatic upgrades - manual upgrades only
   node_os_upgrade_channel = "Unmanaged"

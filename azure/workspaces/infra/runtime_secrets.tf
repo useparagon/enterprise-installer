@@ -33,6 +33,10 @@ resource "azurerm_key_vault_access_policy" "terraform" {
     "Recover",
     "Set",
   ]
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "azurerm_key_vault_secret" "runtime_postgres" {

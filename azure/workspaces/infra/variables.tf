@@ -1,14 +1,18 @@
 # credentials
 variable "azure_client_id" {
-  description = "Azure client ID"
+  description = "Optional Azure client ID. Leave null to use environment-provided credentials such as ARM_*."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_client_secret" {
-  description = "Azure client secret"
+  description = "Optional Azure client secret. Leave null to use short-lived environment-provided credentials."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_subscription_id" {
@@ -18,9 +22,11 @@ variable "azure_subscription_id" {
 }
 
 variable "azure_tenant_id" {
-  description = "Azure tenant ID"
+  description = "Optional Azure tenant ID. Leave null to use the tenant from environment-provided credentials."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 # account
