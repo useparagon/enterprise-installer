@@ -197,20 +197,23 @@ resource "kubectl_manifest" "external_secret_paragon" {
 }
 
 resource "kubectl_manifest" "external_secret_docker" {
-  count = local.external_secret_docker_yaml != null ? 1 : 0
+  # Gate on the known inputs, not yamlencode(...) != null. The YAML includes
+  # kubernetes_namespace.paragon.id, which is unknown on first apply, so using
+  # the encoded document for count makes Terraform refuse to plan.
+  count = var.create_docker_pull_secret && var.docker_cfg_secret_name != null ? 1 : 0
 
   yaml_body  = local.external_secret_docker_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
 
 resource "kubectl_manifest" "external_secret_managed_sync" {
-  count      = local.external_secret_managed_sync_yaml != null ? 1 : 0
+  count      = var.managed_sync_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_managed_sync_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
 
 resource "kubectl_manifest" "external_secret_openobserve" {
-  count      = local.external_secret_openobserve_yaml != null ? 1 : 0
+  count      = var.openobserve_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_openobserve_yaml
   depends_on = [kubectl_manifest.secret_store]
 }

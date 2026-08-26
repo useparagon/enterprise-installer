@@ -118,16 +118,26 @@ secrets: {}
 uds:
   enabled: true
   image:
-    repository: alpine
-    tag: "3.20"
+    repository: node
+    tag: "22-alpine"
     pullPolicy: IfNotPresent
-  backoffLimit: 3
-  activeDeadlineSeconds: 300
-  healthWaitSeconds: 120
+  # The script retries internally; this only covers pod-level failures
+  # (image pull, eviction, OOM).
+  backoffLimit: 2
+  # Must stay below helm_release.paragon_logging timeout (900s, atomic). Helm
+  # waits for the StatefulSet first, then this hook; a Job that outlives Helm
+  # is killed as failed and rolls the release back.
+  activeDeadlineSeconds: 480
+  healthWaitSeconds: 60
+  streamWaitSeconds: 180
+  # List API is small; 600s was for GET /schema and exceeded the Job deadline.
+  requestTimeoutSeconds: 60
+  # Each attempt creates the columns, then selects them as the schema.
+  applyAttempts: 3
   resources:
     limits:
       cpu: 200m
-      memory: 128Mi
+      memory: 1Gi
     requests:
       cpu: 50m
-      memory: 64Mi
+      memory: 128Mi

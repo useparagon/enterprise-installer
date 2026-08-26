@@ -22,24 +22,24 @@ module "helm" {
     managed_sync = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
     openobserve  = azurerm_key_vault_secret.openobserve[0].version
   }))
-  ingress_scheme                 = var.ingress_scheme
-  key_vault_name                 = data.azurerm_key_vault.paragon.name
-  k8s_version                    = var.k8s_version
-  logs_bucket                    = local.logs_bucket
-  managed_sync_enabled           = var.managed_sync_enabled
-  managed_sync_secret_name       = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
-  managed_sync_version           = var.managed_sync_version
-  microservices                  = local.microservices
-  monitor_version                = local.monitor_version
-  monitors                       = local.monitors
-  monitors_enabled               = var.monitors_enabled
-  openobserve_email              = local.openobserve_email
-  openobserve_password           = local.openobserve_password
-  openobserve_secret_name        = azurerm_key_vault_secret.openobserve[0].name
-  public_microservices           = local.public_microservices
-  public_monitors                = local.public_monitors
-  resource_group                 = local.infra_vars.resource_group.value
-  workspace                      = local.workspace
+  ingress_scheme           = var.ingress_scheme
+  key_vault_name           = data.azurerm_key_vault.paragon.name
+  k8s_version              = var.k8s_version
+  logs_bucket              = local.logs_bucket
+  managed_sync_enabled     = var.managed_sync_enabled
+  managed_sync_secret_name = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
+  managed_sync_version     = var.managed_sync_version
+  microservices            = local.microservices
+  monitor_version          = local.monitor_version
+  monitors                 = local.monitors
+  monitors_enabled         = var.monitors_enabled
+  openobserve_email        = local.openobserve_email
+  openobserve_password     = local.openobserve_password
+  openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
+  public_microservices     = local.public_microservices
+  public_monitors          = local.public_monitors
+  resource_group           = local.infra_vars.resource_group.value
+  workspace                = local.workspace
 }
 
 module "managed_sync_config" {
