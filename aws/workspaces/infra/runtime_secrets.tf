@@ -130,5 +130,8 @@ resource "aws_secretsmanager_secret_version" "runtime_cluster" {
     k8s_version             = module.cluster.k8s_version
     karpenter               = module.cluster.karpenter
     cluster_name            = module.cluster.eks_cluster.name
+    monitoring = {
+      pg_config = module.postgres.pg_config
+    }
   })
 }

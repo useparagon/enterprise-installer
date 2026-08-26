@@ -1170,23 +1170,24 @@ locals {
   )
 
   # Cloud SQL 0/null = unlimited. Grafana 0 = disable alerts, unset = 1000 GiB default.
-  # Only inject *_POSTGRES_MAX_STORAGE_BYTES when the autoresize cap is a positive GB value.
-  postgres_max_storage_gib = try(
-    local.infra_vars.postgres.value.hermes.max_storage_gib,
-    local.infra_vars.postgres.value.paragon.max_storage_gib,
+  # Only inject ${DB}_POSTGRES_MAX_STORAGE_BYTES when the autoresize cap is a positive byte value.
+  pg_config = try(local.infra_vars.monitoring.value.pg_config, {})
+  postgres_max_storage_bytes = try(
+    local.pg_config.hermes.max_storage_bytes,
+    local.pg_config.paragon.max_storage_bytes,
     null
   )
   postgres_max_storage_limit_is_set = (
-    local.postgres_max_storage_gib != null &&
-    local.postgres_max_storage_gib > 0
+    local.postgres_max_storage_bytes != null &&
+    local.postgres_max_storage_bytes > 0
   )
   postgres_max_storage_env = local.postgres_max_storage_limit_is_set ? {
-    CERBERUS_POSTGRES_MAX_STORAGE_BYTES   = tostring(try(local.infra_vars.postgres.value.cerberus.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
-    EVENT_LOGS_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.infra_vars.postgres.value.eventlogs.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
-    HERMES_POSTGRES_MAX_STORAGE_BYTES     = tostring(try(local.infra_vars.postgres.value.hermes.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
-    PHEME_POSTGRES_MAX_STORAGE_BYTES      = tostring(try(local.infra_vars.postgres.value.hermes.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
-    TRIGGERKIT_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.infra_vars.postgres.value.triggerkit.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
-    ZEUS_POSTGRES_MAX_STORAGE_BYTES       = tostring(try(local.infra_vars.postgres.value.zeus.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib) * 1073741824)
+    CERBERUS_POSTGRES_MAX_STORAGE_BYTES   = tostring(try(local.pg_config.cerberus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    EVENT_LOGS_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.pg_config.eventlogs.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    HERMES_POSTGRES_MAX_STORAGE_BYTES     = tostring(try(local.pg_config.hermes.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    PHEME_POSTGRES_MAX_STORAGE_BYTES      = tostring(try(local.pg_config.hermes.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    TRIGGERKIT_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.pg_config.triggerkit.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    ZEUS_POSTGRES_MAX_STORAGE_BYTES       = tostring(try(local.pg_config.zeus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
   } : {}
 
   helm_values = merge(local.helm_vars, {

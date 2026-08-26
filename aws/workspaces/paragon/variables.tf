@@ -875,6 +875,8 @@ locals {
     "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
   )
 
+  pg_config = try(local.infra_vars.monitoring.value.pg_config, {})
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       env = merge(
@@ -986,13 +988,13 @@ locals {
           CERBERUS_POSTGRES_USERNAME            = try(local.infra_vars.postgres.value.cerberus.user, local.infra_vars.postgres.value.paragon.user)
           CERBERUS_POSTGRES_PASSWORD            = try(local.infra_vars.postgres.value.cerberus.password, local.infra_vars.postgres.value.paragon.password)
           CERBERUS_POSTGRES_DATABASE            = try(local.infra_vars.postgres.value.cerberus.database, local.infra_vars.postgres.value.paragon.database)
-          CERBERUS_POSTGRES_MAX_STORAGE_BYTES   = tostring(try(local.infra_vars.postgres.value.cerberus.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib, 1000) * 1073741824)
+          CERBERUS_POSTGRES_MAX_STORAGE_BYTES   = tostring(try(local.pg_config.cerberus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
           EVENT_LOGS_POSTGRES_HOST              = try(local.infra_vars.postgres.value.eventlogs.host, local.infra_vars.postgres.value.paragon.host)
           EVENT_LOGS_POSTGRES_PORT              = try(local.infra_vars.postgres.value.eventlogs.port, local.infra_vars.postgres.value.paragon.port)
           EVENT_LOGS_POSTGRES_USERNAME          = try(local.infra_vars.postgres.value.eventlogs.user, local.infra_vars.postgres.value.paragon.user)
           EVENT_LOGS_POSTGRES_PASSWORD          = try(local.infra_vars.postgres.value.eventlogs.password, local.infra_vars.postgres.value.paragon.password)
           EVENT_LOGS_POSTGRES_DATABASE          = try(local.infra_vars.postgres.value.eventlogs.database, local.infra_vars.postgres.value.paragon.database)
-          EVENT_LOGS_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.infra_vars.postgres.value.eventlogs.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib, 1000) * 1073741824)
+          EVENT_LOGS_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.pg_config.eventlogs.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
           CLOUD_STORAGE_COMPLIANCE_BUCKET       = try(local.helm_vars.global.env["CLOUD_STORAGE_COMPLIANCE_BUCKET"], local.auditlogs_bucket)
           AUDIT_LOGS_EVENT_BATCH_SIZE           = try(local.helm_vars.global.env["AUDIT_LOGS_EVENT_BATCH_SIZE"], 1000)
           HERMES_POSTGRES_HOST                  = try(local.infra_vars.postgres.value.hermes.host, local.infra_vars.postgres.value.paragon.host)
@@ -1000,25 +1002,25 @@ locals {
           HERMES_POSTGRES_USERNAME              = try(local.infra_vars.postgres.value.hermes.user, local.infra_vars.postgres.value.paragon.user)
           HERMES_POSTGRES_PASSWORD              = try(local.infra_vars.postgres.value.hermes.password, local.infra_vars.postgres.value.paragon.password)
           HERMES_POSTGRES_DATABASE              = try(local.infra_vars.postgres.value.hermes.database, local.infra_vars.postgres.value.paragon.database)
-          HERMES_POSTGRES_MAX_STORAGE_BYTES     = tostring(try(local.infra_vars.postgres.value.hermes.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib, 1000) * 1073741824)
+          HERMES_POSTGRES_MAX_STORAGE_BYTES     = tostring(try(local.pg_config.hermes.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
           PHEME_POSTGRES_HOST                   = try(local.infra_vars.postgres.value.hermes.host, local.infra_vars.postgres.value.paragon.host)
           PHEME_POSTGRES_PORT                   = try(local.infra_vars.postgres.value.hermes.port, local.infra_vars.postgres.value.paragon.port)
           PHEME_POSTGRES_USERNAME               = try(local.infra_vars.postgres.value.hermes.user, local.infra_vars.postgres.value.paragon.user)
           PHEME_POSTGRES_PASSWORD               = try(local.infra_vars.postgres.value.hermes.password, local.infra_vars.postgres.value.paragon.password)
           PHEME_POSTGRES_DATABASE               = try(local.infra_vars.postgres.value.hermes.database, local.infra_vars.postgres.value.paragon.database)
-          PHEME_POSTGRES_MAX_STORAGE_BYTES      = tostring(try(local.infra_vars.postgres.value.hermes.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib, 1000) * 1073741824)
+          PHEME_POSTGRES_MAX_STORAGE_BYTES      = tostring(try(local.pg_config.hermes.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
           TRIGGERKIT_POSTGRES_HOST              = try(local.infra_vars.postgres.value.triggerkit.host, local.infra_vars.postgres.value.paragon.host)
           TRIGGERKIT_POSTGRES_PORT              = try(local.infra_vars.postgres.value.triggerkit.port, local.infra_vars.postgres.value.paragon.port)
           TRIGGERKIT_POSTGRES_USERNAME          = try(local.infra_vars.postgres.value.triggerkit.user, local.infra_vars.postgres.value.paragon.user)
           TRIGGERKIT_POSTGRES_PASSWORD          = try(local.infra_vars.postgres.value.triggerkit.password, local.infra_vars.postgres.value.paragon.password)
           TRIGGERKIT_POSTGRES_DATABASE          = try(local.infra_vars.postgres.value.triggerkit.database, local.infra_vars.postgres.value.paragon.database)
-          TRIGGERKIT_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.infra_vars.postgres.value.triggerkit.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib, 1000) * 1073741824)
+          TRIGGERKIT_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.pg_config.triggerkit.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
           ZEUS_POSTGRES_HOST                    = try(local.infra_vars.postgres.value.zeus.host, local.infra_vars.postgres.value.paragon.host)
           ZEUS_POSTGRES_PORT                    = try(local.infra_vars.postgres.value.zeus.port, local.infra_vars.postgres.value.paragon.port)
           ZEUS_POSTGRES_USERNAME                = try(local.infra_vars.postgres.value.zeus.user, local.infra_vars.postgres.value.paragon.user)
           ZEUS_POSTGRES_PASSWORD                = try(local.infra_vars.postgres.value.zeus.password, local.infra_vars.postgres.value.paragon.password)
           ZEUS_POSTGRES_DATABASE                = try(local.infra_vars.postgres.value.zeus.database, local.infra_vars.postgres.value.paragon.database)
-          ZEUS_POSTGRES_MAX_STORAGE_BYTES       = tostring(try(local.infra_vars.postgres.value.zeus.max_storage_gib, local.infra_vars.postgres.value.paragon.max_storage_gib, 1000) * 1073741824)
+          ZEUS_POSTGRES_MAX_STORAGE_BYTES       = tostring(try(local.pg_config.zeus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
 
           # Redis configurations
           REDIS_URL = local.default_redis_url

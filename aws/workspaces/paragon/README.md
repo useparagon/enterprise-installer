@@ -127,17 +127,13 @@
 
 ## Postgres storage alerts (Grafana)
 
-Paragon Grafana `generate()` reads `*_POSTGRES_MAX_STORAGE_BYTES` for HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, and TRIGGERKIT.
+Paragon Grafana reads `${DB}_POSTGRES_MAX_STORAGE_BYTES` for each named database (`DB` is HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, or TRIGGERKIT).
 
-This workspace injects those env vars from the infra postgres handoff `max_storage_gib` (GiB × 1073741824). Unset in Grafana uses a 1000 GiB default; `0` disables the storage alerts.
+This workspace injects those env vars from the infra `monitoring.pg_config` value `max_storage_bytes` (already converted from GiB). When unset, Grafana alerts assume a 1000 GiB default; Setting those vars to `0` disables the postgres storage-size alerts.
 
-Single-instance mode (`rds_multiple_instances = false`): all app DBs share one volume; we set the same instance cap on every `*_POSTGRES_MAX_STORAGE_BYTES`. That is conservative (each datname vs full volume; 80% fires late).
+Single-instance mode (`rds_multiple_instances = false`): all app DBs share one volume; we set the same instance cap on every `${DB}_POSTGRES_MAX_STORAGE_BYTES`.
 
 PHEME shares the hermes/paragon host, so PHEME bytes use the hermes cap.
-
-**Slack routing:** storage alerts use Grafana label `team: platform`. Set `MONITOR_GRAFANA_SLACK_TEAM_CHANNELS` to include `platform=<Slack channel id>` (Grafana envKey). This installer does not set that var by default; add it via Helm `global.env` in customer values.yaml. Without it, `severity: high` may fall through to uptime/canary.
-
-**Chart tag:** Grafana only mounts keys listed in grafana `service-inputs.json` (from Paragon atlas via `./prepare.sh -p <cloud> -t <GIT_TAG>`). Use a Paragon version that includes `*_POSTGRES_MAX_STORAGE_BYTES` as grafana `envKeys` (PARA-25692). Until then, Terraform can emit the values but they will not reach the Grafana pod. The source charts in this repo do not ship grafana `service-inputs.json`; `prepare.sh` extracts `charts/files/service-inputs.json` from the selected git tag (or `PARAGON_SERVICE_INPUTS_JSON` / `/mnt/workspace/service-inputs.json` in Spacelift).
 
 ## Updates
 

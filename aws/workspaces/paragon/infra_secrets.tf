@@ -49,6 +49,7 @@ locals {
       postgres                = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_postgres[0].secret_string) }
       redis                   = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_redis[0].secret_string) }
       storage                 = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_storage[0].secret_string) }
+      monitoring              = { value = try(local.provider_cluster.monitoring, {}) }
       enable_karpenter        = { value = try(local.provider_cluster.enable_karpenter, false) }
       enable_legacy_mng_pools = { value = try(local.provider_cluster.enable_legacy_mng_pools, true) }
       k8s_version             = { value = try(local.provider_cluster.k8s_version, var.k8s_version) }

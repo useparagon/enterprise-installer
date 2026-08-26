@@ -14,7 +14,7 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 
 ## Postgres disk autoresize limit
 
-`postgres_disk_autoresize_limit` is the Cloud SQL disk autoresize cap in GB (optional). Null or `0` means unlimited at the Cloud SQL platform default, which is not a useful Grafana alert cap. Set a positive GB value so the postgres handoff `max_storage_gib` can drive Grafana storage alerts.
+`postgres_disk_autoresize_limit` is the Cloud SQL disk autoresize cap in GB (optional). Null or `0` means unlimited at the Cloud SQL platform default, which is not a useful Grafana alert cap. Set a positive GB value so the non-sensitive `monitoring.pg_config` output `max_storage_bytes` (GB × 1073741824) can inform Grafana storage alerts.
 
 
 <!-- BEGIN_TF_DOCS -->
@@ -110,6 +110,7 @@ No resources.
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka (Managed Sync). OAUTHBEARER or PLAIN; when PLAIN, use cluster\_password\_file\_path for key JSON. |
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | Alias for logs\_container; used by paragon for managed-sync ingress.logsBucket. |
 | <a name="output_logs_container"></a> [logs\_container](#output\_logs\_container) | The bucket used to store system logs. |
+| <a name="output_monitoring"></a> [monitoring](#output\_monitoring) | Non-sensitive monitoring settings (includes pg\_config.max\_storage\_bytes for Grafana storage alerts). |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
 | <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. |

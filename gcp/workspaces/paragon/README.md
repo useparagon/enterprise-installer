@@ -161,15 +161,11 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 
 ## Postgres storage alerts (Grafana)
 
-Paragon Grafana `generate()` reads `*_POSTGRES_MAX_STORAGE_BYTES` for HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, and TRIGGERKIT.
+Paragon Grafana reads `${DB}_POSTGRES_MAX_STORAGE_BYTES` for each named database (`DB` is HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, or TRIGGERKIT).
 
-This workspace injects those env vars only when the infra postgres handoff `max_storage_gib` is a **positive** number (`postgres_disk_autoresize_limit` in GB). Null or `0` means Cloud SQL unlimited autoresize, which is not a useful alert cap; Grafana then uses its 1000 GiB default. Set `*_POSTGRES_MAX_STORAGE_BYTES` to `0` in Helm `global.env` to disable storage alerts.
+This workspace injects those env vars only when the infra `monitoring.pg_config` value `max_storage_bytes` is a **positive** number (`postgres_disk_autoresize_limit` in GB, converted to bytes). Null or `0` means Cloud SQL unlimited autoresize, which is not a useful alert cap; Grafana then uses its 1000 GiB default. Set `${DB}_POSTGRES_MAX_STORAGE_BYTES` to `0` in Helm `global.env` to disable storage alerts.
 
 PHEME shares the hermes/paragon host, so PHEME bytes use the hermes cap when injection runs.
-
-**Slack routing:** storage alerts use Grafana label `team: platform`. Set `MONITOR_GRAFANA_SLACK_TEAM_CHANNELS` to include `platform=<Slack channel id>` (Grafana envKey). This installer does not set that var by default; add it via Helm `global.env` in customer values.yaml. Without it, `severity: high` may fall through to uptime/canary.
-
-**Chart tag:** Grafana only mounts keys listed in grafana `service-inputs.json` (from Paragon atlas via `./prepare.sh -p <cloud> -t <GIT_TAG>`). Use a Paragon version that includes `*_POSTGRES_MAX_STORAGE_BYTES` as grafana `envKeys` (PARA-25692). Until then, Terraform can emit the values but they will not reach the Grafana pod. The source charts in this repo do not ship grafana `service-inputs.json`; `prepare.sh` extracts `charts/files/service-inputs.json` from the selected git tag (or `PARAGON_SERVICE_INPUTS_JSON` / `/mnt/workspace/service-inputs.json` in Spacelift).
 
 ## Updates
 

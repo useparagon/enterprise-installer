@@ -11,16 +11,10 @@ global:
     FLIPT_STORAGE_TYPE: local
     FLIPT_STORAGE_LOCAL_PATH: /etc/flipt
 
-    # Grafana Postgres storage alerts (PARA-25692). Unset = Grafana 1000 GiB default; 0 disables.
+    # Grafana Postgres used-storage alerts. One key per named database:
+    # ${DB}_POSTGRES_MAX_STORAGE_BYTES where DB is HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, or TRIGGERKIT.
+    # Unset = Grafana 1000 GiB default; 0 disables alerts. Example:
     # HERMES_POSTGRES_MAX_STORAGE_BYTES: "1073741824000"
-    # CERBERUS_POSTGRES_MAX_STORAGE_BYTES: "1073741824000"
-    # ZEUS_POSTGRES_MAX_STORAGE_BYTES: "1073741824000"
-    # PHEME_POSTGRES_MAX_STORAGE_BYTES: "1073741824000"
-    # EVENT_LOGS_POSTGRES_MAX_STORAGE_BYTES: "1073741824000"
-    # TRIGGERKIT_POSTGRES_MAX_STORAGE_BYTES: "1073741824000"
-
-    # Route Grafana alerts labeled team:platform (storage alerts) to Slack.
-    # MONITOR_GRAFANA_SLACK_TEAM_CHANNELS: "platform=<slack-channel-id>"
 
 # Optional examples. Uncomment to customize per chart.
 # subchart:
