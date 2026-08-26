@@ -34,14 +34,18 @@ resource "helm_release" "external_secrets" {
     value = var.external_secrets_tenant_id
   }
 
+  # Kubernetes label and annotation values must be strings. The default "auto"
+  # typing coerces "true" to a bool, which the API server rejects on patch.
   set {
     name  = "podLabels.azure\\.workload\\.identity/use"
     value = "true"
+    type  = "string"
   }
 
   set {
     name  = "podAnnotations.useparagon\\.com/workload-identity-ready"
     value = var.external_secrets_workload_identity_ready
+    type  = "string"
   }
 }
 
