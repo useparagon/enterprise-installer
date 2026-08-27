@@ -101,6 +101,12 @@ variable "key_vault_purge_protection_enabled" {
   default     = false
 }
 
+variable "key_vault_access_object_ids" {
+  description = "Entra object IDs granted secret access on the Paragon Key Vault in addition to the Terraform caller. Subscription roles are management plane only, so an incoming CI/CD principal must be listed here and applied with the outgoing credentials before a credential cutover; otherwise its first plan cannot read existing secrets."
+  type        = list(string)
+  default     = []
+}
+
 # cloudflare
 variable "cloudflare_api_token" {
   description = "Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS`"

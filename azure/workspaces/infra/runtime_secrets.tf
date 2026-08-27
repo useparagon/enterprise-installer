@@ -8,6 +8,11 @@ locals {
 
   postgres_runtime = var.postgres_enabled ? module.postgres[0].postgres : null
   redis_runtime    = var.redis_enabled ? module.redis.redis : null
+
+  key_vault_access_object_ids = distinct(compact(concat(
+    [data.azurerm_client_config.current.object_id],
+    var.key_vault_access_object_ids,
+  )))
 }
 
 resource "azurerm_key_vault" "paragon" {
@@ -21,9 +26,11 @@ resource "azurerm_key_vault" "paragon" {
 }
 
 resource "azurerm_key_vault_access_policy" "terraform" {
+  for_each = toset(local.key_vault_access_object_ids)
+
   key_vault_id = azurerm_key_vault.paragon.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = data.azurerm_client_config.current.object_id
+  object_id    = each.value
 
   secret_permissions = [
     "Delete",
