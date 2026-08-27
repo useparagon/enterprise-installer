@@ -68,6 +68,19 @@ provider "helm" {
   }
 }
 
+provider "kubectl" {
+  host                   = data.aws_eks_cluster.cluster.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster.certificate_authority[0].data)
+  load_config_file       = false
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = local.eks_get_token_args
+    env         = local.eks_exec_env
+  }
+}
+
 provider "hoop" {
   api_url = var.hoop_api_url
   api_key = coalesce(var.hoop_api_key, "dummy-token")
