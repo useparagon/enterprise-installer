@@ -170,10 +170,22 @@ variable "namespace_paragon" {
   type        = any
 }
 
+variable "docker_cfg_ready" {
+  description = "Gate value that resolves once the docker pull secret is synced into the namespace."
+  type        = string
+  default     = null
+}
+
 variable "docker_pull_secret_name" {
   description = "Kubernetes dockerconfigjson secret used to pull images (same as microservices, default docker-cfg)."
   type        = string
   default     = "docker-cfg"
+}
+
+variable "azure_tenant_id" {
+  description = "Azure tenant ID used by az in Hoop sessions via workload identity."
+  type        = string
+  default     = null
 }
 
 variable "azure_subscription_id" {

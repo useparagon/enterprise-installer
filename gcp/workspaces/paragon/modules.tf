@@ -116,6 +116,7 @@ module "hoop" {
   hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   docker_pull_secret_name       = var.docker_pull_secret_name
+  docker_cfg_ready              = module.helm.docker_cfg_ready
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections
   gcp_project_id                = local.gcp_project_id

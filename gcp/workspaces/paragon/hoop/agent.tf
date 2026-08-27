@@ -1,3 +1,11 @@
+# helm_release takes no gate value, so carry the ESO sync signal through a resource
+# the release can depend on: the agent image is private and docker-cfg lands late.
+resource "terraform_data" "docker_cfg_ready" {
+  count = var.hoop_enabled ? 1 : 0
+
+  input = var.docker_cfg_ready
+}
+
 # Hoop agent deployment
 resource "helm_release" "hoopagent" {
   count = var.hoop_enabled ? 1 : 0
@@ -51,4 +59,6 @@ resource "helm_release" "hoopagent" {
       value = google_service_account.hoop_agent[0].email
     }
   }
+
+  depends_on = [terraform_data.docker_cfg_ready]
 }

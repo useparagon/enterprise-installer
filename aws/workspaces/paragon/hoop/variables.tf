@@ -174,6 +174,12 @@ variable "docker_pull_secret_name" {
   default     = "docker-cfg"
 }
 
+variable "docker_cfg_ready" {
+  description = "Gate value that resolves once the docker pull secret is synced into the namespace."
+  type        = string
+  default     = null
+}
+
 variable "custom_connections" {
   description = "Custom Hoop connections defined via tfvars. Map of connection names to their configuration."
   type = map(object({
