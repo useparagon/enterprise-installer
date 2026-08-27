@@ -25,5 +25,7 @@ resource "kubectl_manifest" "hoopagent_workload_identity_label" {
     }
   })
 
+  # Helm already applied the SA with imagePullSecrets via postrender, so new
+  # pods from this template-hash change can pull the private image.
   depends_on = [helm_release.hoopagent]
 }

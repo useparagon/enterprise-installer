@@ -34,6 +34,16 @@ resource "helm_release" "hoopagent" {
     value = "true"
   }
 
+  # Chart cannot set imagePullSecrets. awk injects them onto the SA Helm creates
+  # so pods inherit docker-cfg at create time (before atomic/wait).
+  postrender {
+    binary_path = "awk"
+    args = [
+      "-v", "secret=${var.docker_pull_secret_name}",
+      "/^kind: ServiceAccount$/ { print; print \"imagePullSecrets:\"; print \"- name: \" secret; next } { print }",
+    ]
+  }
+
   dynamic "set" {
     for_each = try(azurerm_user_assigned_identity.hoop_support[0].client_id, null) != null ? [1] : []
     content {
