@@ -40,9 +40,21 @@ variable "hoop_server" {
 }
 
 variable "hoop_version" {
-  description = "The version of Hoop agent to install."
+  description = "Hoopagent Helm chart version."
   type        = string
   default     = "1.49.4"
+}
+
+variable "hoop_image_repository" {
+  description = "Container image repository for the Hoop agent."
+  type        = string
+  default     = "useparagon/hoop-agent-tools"
+}
+
+variable "hoop_image_tag" {
+  description = "Container image tag for the Hoop agent."
+  type        = string
+  default     = "1.0.1"
 }
 
 variable "hoop_postgres_guardrail_rules" {
