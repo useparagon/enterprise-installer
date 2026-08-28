@@ -65,14 +65,20 @@ moved {
   to   = kubernetes_secret.external_secrets_azure_auth[0]
 }
 
+locals {
+  # coalesce(null, "") errors because coalesce skips empty strings as well as null.
+  legacy_external_secrets_client_id     = trimspace(var.legacy_external_secrets_client_id != null ? var.legacy_external_secrets_client_id : "")
+  legacy_external_secrets_client_secret = trimspace(var.legacy_external_secrets_client_secret != null ? var.legacy_external_secrets_client_secret : "")
+}
+
 # Keep the existing credential secret during the cutover apply so ESO can
 # switch to workload identity without an authentication gap. Once the service-
 # principal variables are omitted, the already-unused secret is removed on the
 # next apply.
 resource "kubernetes_secret" "external_secrets_azure_auth" {
   count = (
-    coalesce(var.legacy_external_secrets_client_id, "") != "" &&
-    coalesce(var.legacy_external_secrets_client_secret, "") != ""
+    local.legacy_external_secrets_client_id != "" &&
+    local.legacy_external_secrets_client_secret != ""
   ) ? 1 : 0
 
   metadata {
