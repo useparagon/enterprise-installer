@@ -169,9 +169,12 @@ secret_field_hoop() {
   local b64 raw err
   log "reading ${key} via hoop connect ${HOOP_K8S_CONN} (secret ${SECRET_NAME})"
   err="$(mktemp)"
-  raw="$(hoop connect "$HOOP_K8S_CONN" -s -- \
-    kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" \
-    -o "jsonpath={.data.${key}}" 2>"$err" || true)"
+  # The k8s connection's command is `bash`, so argv after `--` would be taken as a
+  # script name (bash resolves it via PATH and fails on the kubectl binary, exit 126).
+  # `hoop exec -i` feeds the command to that bash on stdin instead.
+  raw="$(hoop exec "$HOOP_K8S_CONN" -s \
+    -i "kubectl get secret '${SECRET_NAME}' -n '${NAMESPACE}' -o 'jsonpath={.data.${key}}'" \
+    2>"$err" || true)"
   # kubectl jsonpath is a single base64 line; ignore any hoop banner noise on stdout
   b64="$(printf '%s\n' "$raw" | grep -E '^[A-Za-z0-9+/=]+$' | tail -1 | tr -d '[:space:]')"
   if [ -z "$b64" ]; then

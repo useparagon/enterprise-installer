@@ -26,6 +26,16 @@ provider "helm" {
   }
 }
 
+provider "kubectl" {
+  host                   = data.azurerm_kubernetes_cluster.cluster.kube_config[0].host
+  username               = data.azurerm_kubernetes_cluster.cluster.kube_config[0].username
+  password               = data.azurerm_kubernetes_cluster.cluster.kube_config[0].password
+  client_certificate     = base64decode(data.azurerm_kubernetes_cluster.cluster.kube_config[0].client_certificate)
+  client_key             = base64decode(data.azurerm_kubernetes_cluster.cluster.kube_config[0].client_key)
+  cluster_ca_certificate = base64decode(data.azurerm_kubernetes_cluster.cluster.kube_config[0].cluster_ca_certificate)
+  load_config_file       = false
+}
+
 provider "hoop" {
   api_url = var.hoop_api_url
   api_key = coalesce(var.hoop_api_key, "dummy-token")
