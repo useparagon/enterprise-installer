@@ -72,8 +72,6 @@ module "hoop" {
   customer_facing               = var.customer_facing
   hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
-  docker_pull_secret_name       = var.docker_pull_secret_name
-  docker_cfg_ready              = module.helm.docker_cfg_ready
   azure_subscription_id         = var.azure_subscription_id
   azure_tenant_id               = var.azure_tenant_id
   oidc_issuer_url               = try(data.azurerm_kubernetes_cluster.cluster.oidc_issuer_url, "")

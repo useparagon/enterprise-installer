@@ -1,11 +1,3 @@
-# helm_release takes no gate value, so carry the ESO sync signal through a resource
-# the release can depend on: the agent image is private and docker-cfg lands late.
-resource "terraform_data" "docker_cfg_ready" {
-  count = var.hoop_enabled ? 1 : 0
-
-  input = var.docker_cfg_ready
-}
-
 # Hoop agent deployment
 resource "helm_release" "hoopagent" {
   count = var.hoop_enabled ? 1 : 0
@@ -42,16 +34,6 @@ resource "helm_release" "hoopagent" {
     value = "true"
   }
 
-  # Chart cannot set imagePullSecrets. awk injects them onto the SA Helm creates
-  # so pods inherit docker-cfg at create time (before atomic/wait).
-  postrender {
-    binary_path = "awk"
-    args = [
-      "-v", "secret=${var.docker_pull_secret_name}",
-      "/^kind: ServiceAccount$/ { print; print \"imagePullSecrets:\"; print \"- name: \" secret; next } { print }",
-    ]
-  }
-
   dynamic "set" {
     for_each = try(aws_iam_role.hoop_support[0].arn, null) != null ? [1] : []
     content {
@@ -59,6 +41,4 @@ resource "helm_release" "hoopagent" {
       value = aws_iam_role.hoop_support[0].arn
     }
   }
-
-  depends_on = [terraform_data.docker_cfg_ready]
 }

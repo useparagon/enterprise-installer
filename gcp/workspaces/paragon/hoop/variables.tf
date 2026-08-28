@@ -46,7 +46,7 @@ variable "hoop_version" {
 }
 
 variable "hoop_image_repository" {
-  description = "Container image repository for the Hoop agent."
+  description = "Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets."
   type        = string
   default     = "useparagon/hoop-agent-tools"
 }
@@ -160,18 +160,6 @@ variable "gcp_project_id" {
 variable "namespace_paragon" {
   description = "Reference to kubernetes_namespace.paragon from helm module."
   type        = any
-}
-
-variable "docker_cfg_ready" {
-  description = "Gate value that resolves once the docker pull secret is synced into the namespace."
-  type        = string
-  default     = null
-}
-
-variable "docker_pull_secret_name" {
-  description = "Kubernetes dockerconfigjson secret used to pull images (same as microservices, default docker-cfg)."
-  type        = string
-  default     = "docker-cfg"
 }
 
 variable "custom_connections" {
