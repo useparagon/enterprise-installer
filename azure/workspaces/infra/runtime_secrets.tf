@@ -33,6 +33,16 @@ resource "azurerm_key_vault_access_policy" "terraform" {
     "Recover",
     "Set",
   ]
+
+  # Certificate Import/Get needed for ESO PushSecret (same SP as External Secrets).
+  certificate_permissions = [
+    "Create",
+    "Delete",
+    "Get",
+    "Import",
+    "List",
+    "Update",
+  ]
 }
 
 resource "azurerm_key_vault_secret" "runtime_postgres" {
@@ -64,7 +74,8 @@ resource "azurerm_key_vault_secret" "runtime_redis_managed" {
 
   name         = "redis-managed"
   key_vault_id = azurerm_key_vault.paragon.id
-  value        = jsonencode(module.redis_managed[0].redis)
+  # Always present so paragon KV handoff can resolve redis_managed (null when AMR disabled).
+  value = jsonencode(var.redis_managed_enabled ? module.redis_managed[0].redis : null)
 
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
@@ -99,6 +110,21 @@ resource "azurerm_key_vault_secret" "runtime_kafka" {
     cluster_password          = module.kafka[0].kafka_credentials.password
     cluster_mechanism         = module.kafka[0].kafka_credentials.mechanism
     cluster_tls_enabled       = module.kafka[0].tls_enabled
+  })
+
+  depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
+# Network handoff for AGC (paragon workspace). Always present so paragon can
+# resolve network even when the AGC association subnet is disabled.
+resource "azurerm_key_vault_secret" "runtime_network" {
+  name         = "network"
+  key_vault_id = azurerm_key_vault.paragon.id
+  value = jsonencode({
+    private_subnet_id   = module.network.private_subnet.id
+    private_subnet_cidr = module.network.private_subnet.address_prefixes[0]
+    agc_subnet_id       = var.agc_subnet_enabled ? module.network.agc_subnet.id : null
+    agc_subnet_cidr     = var.agc_subnet_enabled ? module.network.agc_subnet.address_prefixes[0] : null
   })
 
   depends_on = [azurerm_key_vault_access_policy.terraform]

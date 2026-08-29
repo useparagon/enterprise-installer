@@ -26,6 +26,12 @@ variable "tags" {
   type        = map(string)
 }
 
+variable "agc_subnet_enabled" {
+  description = "When true, enable AKS OIDC issuer and workload identity for the AGC ALB controller. Left off so brownfield applies without AGC do not mutate the cluster."
+  type        = bool
+  default     = false
+}
+
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string

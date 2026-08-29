@@ -196,10 +196,9 @@ resource "kubectl_manifest" "external_secret_paragon" {
   depends_on = [kubectl_manifest.secret_store]
 }
 
+# count uses the inputs, not the rendered YAML: the YAML embeds the namespace id,
+# which is unknown until apply and would make count unresolvable at plan time.
 resource "kubectl_manifest" "external_secret_docker" {
-  # Gate on the known inputs, not yamlencode(...) != null. The YAML includes
-  # kubernetes_namespace.paragon.id, which is unknown on first apply, so using
-  # the encoded document for count makes Terraform refuse to plan.
   count = var.create_docker_pull_secret && var.docker_cfg_secret_name != null ? 1 : 0
 
   yaml_body  = local.external_secret_docker_yaml

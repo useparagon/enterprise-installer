@@ -49,6 +49,14 @@ data "azurerm_key_vault_secret" "infra_kafka" {
   key_vault_id = data.azurerm_key_vault.paragon.id
 }
 
+data "azurerm_key_vault_secret" "infra_network" {
+  # Only required when AGC is enabled; existing nginx-only deployments may not
+  # have this secret until infra is re-applied.
+  count        = local.use_legacy_infra_json ? 0 : (local.agc_active ? 1 : 0)
+  name         = "network"
+  key_vault_id = data.azurerm_key_vault.paragon.id
+}
+
 locals {
   provider_infra_vars = merge(
     {
@@ -63,14 +71,14 @@ locals {
         }
       }
       postgres = { value = jsondecode(data.azurerm_key_vault_secret.infra_postgres[0].value) }
-      redis = {
-        value = length(data.azurerm_key_vault_secret.infra_redis) > 0 ? jsondecode(data.azurerm_key_vault_secret.infra_redis[0].value) : null
-      }
-      redis_managed = {
-        value = length(data.azurerm_key_vault_secret.infra_redis_managed) > 0 ? jsondecode(data.azurerm_key_vault_secret.infra_redis_managed[0].value) : null
-      }
-      storage = { value = jsondecode(data.azurerm_key_vault_secret.infra_storage[0].value) }
+      redis    = { value = jsondecode(data.azurerm_key_vault_secret.infra_redis[0].value) }
+      # Mirrors infra output redis_managed (null when AMR disabled / secret encodes null).
+      redis_managed = { value = jsondecode(data.azurerm_key_vault_secret.infra_redis_managed[0].value) }
+      storage       = { value = jsondecode(data.azurerm_key_vault_secret.infra_storage[0].value) }
     },
+    local.agc_active ? {
+      network = { value = jsondecode(data.azurerm_key_vault_secret.infra_network[0].value) }
+    } : {},
     var.managed_sync_enabled ? {
       kafka = { value = jsondecode(data.azurerm_key_vault_secret.infra_kafka[0].value) }
     } : {}

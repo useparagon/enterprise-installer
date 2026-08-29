@@ -1,11 +1,12 @@
 module "network" {
   source = "./network"
 
-  location          = var.location
-  nsg_malicious_ips = var.nsg_malicious_ips
-  tags              = local.default_tags
-  vpc_cidr          = var.vpc_cidr
-  workspace         = local.workspace
+  agc_subnet_enabled = var.agc_subnet_enabled
+  location           = var.location
+  nsg_malicious_ips  = var.nsg_malicious_ips
+  tags               = local.default_tags
+  vpc_cidr           = var.vpc_cidr
+  workspace          = local.workspace
 }
 
 module "bastion" {
@@ -100,6 +101,7 @@ module "storage" {
 module "cluster" {
   source = "./cluster"
 
+  agc_subnet_enabled              = var.agc_subnet_enabled
   k8s_default_node_pool_vm_size   = var.k8s_default_node_pool_vm_size
   k8s_dns_service_ip              = var.k8s_dns_service_ip
   k8s_load_balancer_sku           = var.k8s_load_balancer_sku
