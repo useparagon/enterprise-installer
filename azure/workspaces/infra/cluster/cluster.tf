@@ -93,6 +93,10 @@ resource "azurerm_kubernetes_cluster" "cluster" {
     type = "SystemAssigned"
   }
 
+  # Required for Hoop (and other pods) to federate a Kubernetes SA to Azure RBAC.
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
+
   depends_on = [terraform_data.nat_gateway_ready]
 
   lifecycle {

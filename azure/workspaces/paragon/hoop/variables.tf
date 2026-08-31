@@ -40,9 +40,21 @@ variable "hoop_server" {
 }
 
 variable "hoop_version" {
-  description = "The version of Hoop agent to install."
+  description = "Hoopagent Helm chart version."
   type        = string
   default     = "1.49.4"
+}
+
+variable "hoop_image_repository" {
+  description = "Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets."
+  type        = string
+  default     = "useparagon/hoop-agent-tools"
+}
+
+variable "hoop_image_tag" {
+  description = "Container image tag for the Hoop agent."
+  type        = string
+  default     = "1.0.2"
 }
 
 variable "hoop_postgres_guardrail_rules" {
@@ -156,6 +168,31 @@ variable "infra_vars" {
 variable "namespace_paragon" {
   description = "Reference to kubernetes_namespace.paragon from helm module."
   type        = any
+}
+
+variable "azure_tenant_id" {
+  description = "Azure tenant ID used by az in Hoop sessions via workload identity."
+  type        = string
+  default     = null
+}
+
+variable "azure_subscription_id" {
+  description = "Azure subscription ID for the Hoop support Reader role assignment."
+  type        = string
+}
+
+variable "oidc_issuer_url" {
+  description = "AKS OIDC issuer URL for workload identity federation. Empty until oidc_issuer_enabled is set on the cluster."
+  type        = string
+  default     = ""
+}
+
+variable "resource_group" {
+  description = "Azure resource group for the Hoop support managed identity."
+  type = object({
+    name     = string
+    location = string
+  })
 }
 
 variable "custom_connections" {

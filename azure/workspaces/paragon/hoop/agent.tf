@@ -20,7 +20,25 @@ resource "helm_release" "hoopagent" {
   }
 
   set {
+    name  = "image.repository"
+    value = var.hoop_image_repository
+  }
+
+  set {
     name  = "image.tag"
-    value = var.hoop_version
+    value = var.hoop_image_tag
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = "true"
+  }
+
+  dynamic "set" {
+    for_each = try(azurerm_user_assigned_identity.hoop_support[0].client_id, null) != null ? [1] : []
+    content {
+      name  = "serviceAccount.annotations.azure\\.workload\\.identity/client-id"
+      value = azurerm_user_assigned_identity.hoop_support[0].client_id
+    }
   }
 }

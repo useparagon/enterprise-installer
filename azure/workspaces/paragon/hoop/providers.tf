@@ -5,5 +5,9 @@ terraform {
       source  = "hoophq/hoop"
       version = ">= 0.0.19"
     }
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = ">= 1.17.0"
+    }
   }
 }
