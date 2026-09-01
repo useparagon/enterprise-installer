@@ -909,7 +909,8 @@ locals {
   # output; null-safe when neither is present.
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
-  workspace = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
+  workspace                = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
+  gke_connect_gateway_host = "https://connectgateway.googleapis.com/v1/projects/${data.google_project.paragon.number}/locations/global/gkeMemberships/${local.workspace}-fleet"
   # Prefer infra GSM handoff (actual GKE name may be -private or -cluster).
   cluster_name = coalesce(
     var.cluster_name_override,

@@ -20,6 +20,8 @@ ROLES=(
    "roles/compute.admin"                     # VPC, firewall, addresses, Cloud Armor, LB-related compute
    "roles/container.admin"                   # GKE cluster + Helm/K8s (covers container.developer)
    "roles/container.clusterAdmin"            # Cluster-level admin operations
+   "roles/gkehub.editor"                     # Register the private GKE cluster with Fleet
+   "roles/gkehub.gatewayEditor"              # Reach the private GKE API through Connect Gateway
    "roles/iam.serviceAccountAdmin"           # Create workload SAs
    "roles/iam.serviceAccountKeyAdmin"        # Optional SA keys (storage / Kafka SASL PLAIN)
    "roles/iam.serviceAccountUser"            # Attach / impersonate SAs

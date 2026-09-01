@@ -41,6 +41,7 @@ module "waf" {
 module "helm" {
   source = "./helm"
 
+  cluster_host                           = local.gke_connect_gateway_host
   cluster_name                           = local.cluster_name
   docker_cfg_secret_name                 = var.create_docker_pull_secret && length(google_secret_manager_secret.docker_cfg) > 0 ? google_secret_manager_secret.docker_cfg[0].secret_id : null
   docker_email                           = var.docker_email

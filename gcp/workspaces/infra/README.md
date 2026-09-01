@@ -10,7 +10,14 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 - Service Networking API
 - Secret Manager API
 - Kubernetes Engine API
+- GKE Hub API
+- Connect Gateway API
 - Managed Service for Apache Kafka API (when managed sync / GMK is enabled)
+
+The infra workspace registers the cluster with Fleet. The paragon workspace
+uses Connect Gateway for Terraform Helm and Kubernetes operations, allowing a
+public automation worker to manage a private GKE control plane without a
+private runner or public endpoint.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
