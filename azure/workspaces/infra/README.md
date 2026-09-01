@@ -24,6 +24,11 @@ listed and reads the admin kubeconfig from the cluster resource in that case.
 
 Do not commit real credentials to git.
 
+## Postgres Flexible Server storage
+
+Azure Database for PostgreSQL Flexible Server is configured with `auto_grow_enabled = true`. Terraform does **not** expose a separate maximum autogrow size (there is no max-storage argument on `azurerm_postgresql_flexible_server` in this module). Do not treat initial `storage_mb` as an alert cap. Grafana storage alerts default to 1000 GiB until operators set `${DB}_POSTGRES_MAX_STORAGE_BYTES` in Helm `global.env`.
+
+
 ## Redis: legacy vs Azure Managed Redis
 
 Branch: `fix/PARA-21251/managed-sync-redis` ([PARA-21251](https://useparagon.atlassian.net/browse/PARA-21251)).

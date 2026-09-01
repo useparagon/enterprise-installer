@@ -133,6 +133,13 @@ No requirements.
 | <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime\_webhook) | Uptime webhook URL |
 <!-- END_TF_DOCS -->
 
+
+## Postgres storage alerts (Grafana)
+
+Paragon Grafana reads `${DB}_POSTGRES_MAX_STORAGE_BYTES` for each named database (`DB` is HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, or TRIGGERKIT).
+
+Azure Flexible Server enables `auto_grow_enabled` but Terraform has **no** separate max autogrow cap. To prevent unbounded growth, Grafana alerts assume 1000 GiB default storage size maximum unless operators set `${DB}_POSTGRES_MAX_STORAGE_BYTES` in Helm `global.env`. Use `0` to disable postgres storage space alerts.
+
 ## Updates
 
 This Terraform documentation can be automatically regenerated with:

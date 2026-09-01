@@ -36,3 +36,26 @@ output "postgres" {
   )
   sensitive = true
 }
+
+output "pg_config" {
+  description = "Non-sensitive Postgres settings. Same instance keys as `postgres`."
+  value = merge(
+    {
+      for name, config in local.postgres_instances :
+      name => {
+        max_storage_bytes = local.max_storage_bytes
+      }
+    },
+    local.openfga_instance_key != null ? {
+      openfga = {
+        max_storage_bytes = local.max_storage_bytes
+      }
+      sync_project = {
+        max_storage_bytes = local.max_storage_bytes
+      }
+      sync_instance = {
+        max_storage_bytes = local.max_storage_bytes
+      }
+    } : {}
+  )
+}
