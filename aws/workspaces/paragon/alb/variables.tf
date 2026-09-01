@@ -3,6 +3,16 @@ variable "workspace" {
   type        = string
 }
 
+variable "cluster_name" {
+  description = "The name of the EKS cluster, used to tag the ALB backend security group."
+  type        = string
+}
+
+variable "vpc_id" {
+  description = "VPC ID for the ALB backend security group."
+  type        = string
+}
+
 variable "domain" {
   description = "The root domain used for the microservices."
   type        = string

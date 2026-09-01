@@ -302,6 +302,7 @@ resource "helm_release" "ingress" {
   # preferred on-demand placement and preferred per-host spread.
   values = [yamlencode({
     configureDefaultAffinity = false
+    backendSecurityGroup     = var.alb_backend_security_group_id
     podAnnotations = {
       "cluster-autoscaler.kubernetes.io/safe-to-evict" = "false"
       "karpenter.sh/do-not-disrupt"                    = "true"

@@ -122,6 +122,11 @@ variable "certificate" {
   type        = string
 }
 
+variable "alb_backend_security_group_id" {
+  description = "Existing security group the AWS Load Balancer Controller should attach to the ALB as its backend SG."
+  type        = string
+}
+
 variable "microservices" {
   description = "The microservices running within the system."
   type = map(object({

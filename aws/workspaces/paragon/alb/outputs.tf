@@ -12,3 +12,8 @@ output "alb_arn" {
   description = "The ARN of the application load balancer."
   value       = data.aws_lb.load_balancer.arn
 }
+
+output "backend_security_group_id" {
+  description = "Security group used as the AWS Load Balancer Controller backend SG and as the source of worker target-port safeguards."
+  value       = aws_security_group.alb_backend.id
+}
