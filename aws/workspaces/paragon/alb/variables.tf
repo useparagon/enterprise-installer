@@ -22,6 +22,13 @@ variable "public_microservices" {
   }))
 }
 
+variable "microservices" {
+  description = "The microservices running within the system, including those only reachable internally"
+  type = map(object({
+    port = number
+  }))
+}
+
 variable "public_monitors" {
   description = "The monitors running within the system exposed to the load balancer"
   type = map(object({
@@ -36,6 +43,11 @@ variable "release_ingress" {
 
 variable "release_paragon_on_prem" {
   description = "The helm release for the Paragon microservices."
+}
+
+variable "worker_security_group_ids" {
+  description = "Security groups attached to EKS worker nodes."
+  type        = list(string)
 }
 
 variable "dns_provider" {

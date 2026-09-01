@@ -81,6 +81,11 @@ output "enable_legacy_mng_pools" {
   value       = module.cluster.enable_legacy_mng_pools
 }
 
+output "worker_security_group_ids" {
+  description = "Security groups attached to EKS worker nodes. Consumed by the paragon workspace for ALB-to-pod ingress safeguards."
+  value       = module.cluster.worker_security_group_ids
+}
+
 output "karpenter" {
   description = "AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace."
   value       = module.cluster.karpenter

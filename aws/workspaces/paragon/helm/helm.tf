@@ -261,8 +261,8 @@ resource "kubernetes_secret" "docker_login" {
 # CRD apply is safe while v2.x controller is still running; skip risks v3.4 crash-loop.
 #
 # Scheduling: prefer on-demand nodes but allow spot when the on-demand pool is small.
-# Pod anti-affinity (preferred) spreads replicas across hosts. PDB + safe-to-evict: false
-# protect against cluster-autoscaler disruption regardless of node pool.
+# Pod anti-affinity (preferred) spreads replicas across hosts. PDB and disruption
+# annotations protect against autoscaler disruption regardless of node pool.
 resource "helm_release" "ingress" {
   name        = "ingress"
   description = "AWS Ingress Controller"
@@ -304,6 +304,7 @@ resource "helm_release" "ingress" {
     configureDefaultAffinity = false
     podAnnotations = {
       "cluster-autoscaler.kubernetes.io/safe-to-evict" = "false"
+      "karpenter.sh/do-not-disrupt"                    = "true"
     }
     affinity = {
       nodeAffinity = {

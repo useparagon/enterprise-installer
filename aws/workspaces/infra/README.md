@@ -148,6 +148,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="output_secrets_manager_env_secret"></a> [secrets\_manager\_env\_secret](#output\_secrets\_manager\_env\_secret) | Name of the Secrets Manager secret containing Paragon env config. |
 | <a name="output_secrets_manager_secret_arns"></a> [secrets\_manager\_secret\_arns](#output\_secrets\_manager\_secret\_arns) | ARNs of application Secrets Manager secrets. |
 | <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. S3 access uses EKS Pod Identity (role\_arn); static access keys are no longer provisioned. |
+| <a name="output_worker_security_group_ids"></a> [worker\_security\_group\_ids](#output\_worker\_security\_group\_ids) | Security groups attached to EKS worker nodes. Consumed by the paragon workspace for ALB-to-pod ingress safeguards. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->
 

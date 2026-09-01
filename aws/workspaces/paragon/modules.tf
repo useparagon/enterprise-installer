@@ -22,11 +22,17 @@ module "alb" {
   cloudflare_zone_id       = var.cloudflare_zone_id
   dns_provider             = var.dns_provider
   domain                   = var.domain
+  microservices            = local.microservices
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
   release_ingress          = module.helm.release_ingress
   release_paragon_on_prem  = module.helm.release_paragon_on_prem
-  workspace                = local.workspace
+  worker_security_group_ids = coalescelist(
+    try(compact(local.infra_vars.worker_security_group_ids.value), []),
+    try(compact(local.infra_vars.karpenter.value.security_group_ids), []),
+    [data.aws_eks_cluster.cluster.vpc_config[0].cluster_security_group_id],
+  )
+  workspace = local.workspace
 }
 
 module "helm" {

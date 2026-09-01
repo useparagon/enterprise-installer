@@ -42,17 +42,18 @@ locals {
 
   provider_infra_vars = merge(
     {
-      workspace               = { value = local.workspace }
-      cluster_name            = { value = try(local.provider_cluster.cluster_name, local.cluster_name) }
-      logs_bucket             = { value = local.logs_bucket }
-      auditlogs_bucket        = { value = local.auditlogs_bucket }
-      postgres                = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_postgres[0].secret_string) }
-      redis                   = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_redis[0].secret_string) }
-      storage                 = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_storage[0].secret_string) }
-      enable_karpenter        = { value = try(local.provider_cluster.enable_karpenter, false) }
-      enable_legacy_mng_pools = { value = try(local.provider_cluster.enable_legacy_mng_pools, true) }
-      k8s_version             = { value = try(local.provider_cluster.k8s_version, var.k8s_version) }
-      karpenter               = { value = try(local.provider_cluster.karpenter, null) }
+      workspace                 = { value = local.workspace }
+      cluster_name              = { value = try(local.provider_cluster.cluster_name, local.cluster_name) }
+      logs_bucket               = { value = local.logs_bucket }
+      auditlogs_bucket          = { value = local.auditlogs_bucket }
+      postgres                  = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_postgres[0].secret_string) }
+      redis                     = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_redis[0].secret_string) }
+      storage                   = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_storage[0].secret_string) }
+      enable_karpenter          = { value = try(local.provider_cluster.enable_karpenter, false) }
+      enable_legacy_mng_pools   = { value = try(local.provider_cluster.enable_legacy_mng_pools, true) }
+      k8s_version               = { value = try(local.provider_cluster.k8s_version, var.k8s_version) }
+      worker_security_group_ids = { value = try(local.provider_cluster.worker_security_group_ids, null) }
+      karpenter                 = { value = try(local.provider_cluster.karpenter, null) }
     },
     var.managed_sync_enabled ? {
       kafka = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_kafka[0].secret_string) }
