@@ -23,6 +23,30 @@ resource "helm_release" "external_secrets" {
     name  = "serviceAccount.name"
     value = "external-secrets"
   }
+
+  set {
+    name  = "serviceAccount.annotations.azure\\.workload\\.identity/client-id"
+    value = var.external_secrets_client_id
+  }
+
+  set {
+    name  = "serviceAccount.annotations.azure\\.workload\\.identity/tenant-id"
+    value = var.external_secrets_tenant_id
+  }
+
+  # Kubernetes label and annotation values must be strings. The default "auto"
+  # typing coerces "true" to a bool, which the API server rejects on patch.
+  set {
+    name  = "podLabels.azure\\.workload\\.identity/use"
+    value = "true"
+    type  = "string"
+  }
+
+  set {
+    name  = "podAnnotations.useparagon\\.com/workload-identity-ready"
+    value = var.external_secrets_workload_identity_ready
+    type  = "string"
+  }
 }
 
 resource "helm_release" "reloader" {
@@ -36,15 +60,35 @@ resource "helm_release" "reloader" {
   cleanup_on_fail  = true
 }
 
+moved {
+  from = kubernetes_secret.external_secrets_azure_auth
+  to   = kubernetes_secret.external_secrets_azure_auth[0]
+}
+
+locals {
+  # coalesce(null, "") errors because coalesce skips empty strings as well as null.
+  legacy_external_secrets_client_id     = trimspace(var.legacy_external_secrets_client_id != null ? var.legacy_external_secrets_client_id : "")
+  legacy_external_secrets_client_secret = trimspace(var.legacy_external_secrets_client_secret != null ? var.legacy_external_secrets_client_secret : "")
+}
+
+# Keep the existing credential secret during the cutover apply so ESO can
+# switch to workload identity without an authentication gap. Once the service-
+# principal variables are omitted, the already-unused secret is removed on the
+# next apply.
 resource "kubernetes_secret" "external_secrets_azure_auth" {
+  count = (
+    local.legacy_external_secrets_client_id != "" &&
+    local.legacy_external_secrets_client_secret != ""
+  ) ? 1 : 0
+
   metadata {
     name      = "external-secrets-azure-auth"
     namespace = kubernetes_namespace.paragon.id
   }
 
   data = {
-    ClientID     = var.external_secrets_client_id
-    ClientSecret = var.external_secrets_client_secret
+    ClientID     = var.legacy_external_secrets_client_id
+    ClientSecret = var.legacy_external_secrets_client_secret
   }
 }
 
@@ -59,19 +103,9 @@ locals {
     spec = {
       provider = {
         azurekv = {
-          authType = "ServicePrincipal"
+          authType = "WorkloadIdentity"
           tenantId = var.external_secrets_tenant_id
           vaultUrl = "https://${var.key_vault_name}.vault.azure.net"
-          authSecretRef = {
-            clientId = {
-              name = kubernetes_secret.external_secrets_azure_auth.metadata[0].name
-              key  = "ClientID"
-            }
-            clientSecret = {
-              name = kubernetes_secret.external_secrets_azure_auth.metadata[0].name
-              key  = "ClientSecret"
-            }
-          }
         }
       }
     }
@@ -188,7 +222,7 @@ locals {
 
 resource "kubectl_manifest" "secret_store" {
   yaml_body  = local.secret_store_yaml
-  depends_on = [helm_release.external_secrets, kubernetes_secret.external_secrets_azure_auth]
+  depends_on = [helm_release.external_secrets]
 }
 
 resource "kubectl_manifest" "external_secret_paragon" {

@@ -12,10 +12,7 @@ module "bastion" {
   count  = var.bastion_enabled ? 1 : 0
   source = "./bastion"
 
-  azure_client_id       = var.azure_client_id
-  azure_client_secret   = var.azure_client_secret
   azure_subscription_id = var.azure_subscription_id
-  azure_tenant_id       = var.azure_tenant_id
 
   bastion_vm_size                = var.bastion_vm_size
   cloudflare_api_token           = var.cloudflare_api_token
@@ -25,6 +22,7 @@ module "bastion" {
   cloudflare_tunnel_subdomain    = var.cloudflare_tunnel_subdomain
   cloudflare_tunnel_zone_id      = var.cloudflare_tunnel_zone_id
 
+  cluster_id     = module.cluster.kubernetes.id
   cluster_name   = module.cluster.kubernetes.name
   k8s_version    = var.k8s_version
   private_subnet = module.network.private_subnet

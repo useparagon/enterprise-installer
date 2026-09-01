@@ -20,12 +20,9 @@ ROLES=(
   "Azure Kubernetes Service Cluster User Role"
 )
 
-# Optional: assign to the bastion / diagnostics identity (NOT required for Terraform apply).
-# Useful for az/kubectl CLI troubleshooting from the bastion without granting Contributor.
-# DIAGNOSTIC_ROLES=(
-#   "Reader"
-#   "Azure Kubernetes Service Cluster User Role"
-# )
+# The bastion does not use this subscription-level role list. Infra Terraform
+# assigns its managed identity Azure Kubernetes Service Cluster Admin Role at
+# the individual cluster scope.
 
 # Alternative: If you want to use more granular permissions instead of Contributor,
 # you would need the following roles (but Contributor is simpler and sufficient):
@@ -77,6 +74,5 @@ echo ""
 echo "If the customer refuses User Access Administrator, they must run equivalent scoped"
 echo "az role assignment create commands themselves before/during infra apply."
 echo ""
-echo "Bastion CLI diagnostics (Reader + Cluster User) should use a separate role assignment"
-echo "on the bastion identity — see DIAGNOSTIC_ROLES in this script. Do not conflate them"
-echo "with the Terraform principal policy."
+echo "The bastion managed identity receives Cluster Admin at cluster scope from infra Terraform."
+echo "It is separate from this Terraform principal policy."
