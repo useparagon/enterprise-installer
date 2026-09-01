@@ -8,6 +8,17 @@ locals {
 
   postgres_runtime = var.postgres_enabled ? module.postgres[0].postgres : null
   redis_runtime    = var.redis_enabled ? module.redis.redis : null
+
+  # Static map key "terraform" so a moved block can keep the existing singleton
+  # policy in state. Extra principals are keyed by object id.
+  key_vault_access_policies = merge(
+    { terraform = data.azurerm_client_config.current.object_id },
+    {
+      for id in distinct(compact(var.key_vault_access_object_ids)) :
+      id => id
+      if id != data.azurerm_client_config.current.object_id
+    },
+  )
 }
 
 resource "azurerm_key_vault" "paragon" {
@@ -21,9 +32,11 @@ resource "azurerm_key_vault" "paragon" {
 }
 
 resource "azurerm_key_vault_access_policy" "terraform" {
+  for_each = local.key_vault_access_policies
+
   key_vault_id = azurerm_key_vault.paragon.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = data.azurerm_client_config.current.object_id
+  object_id    = each.value
 
   secret_permissions = [
     "Delete",
@@ -33,6 +46,11 @@ resource "azurerm_key_vault_access_policy" "terraform" {
     "Recover",
     "Set",
   ]
+}
+
+moved {
+  from = azurerm_key_vault_access_policy.terraform
+  to   = azurerm_key_vault_access_policy.terraform["terraform"]
 }
 
 resource "azurerm_key_vault_secret" "runtime_postgres" {

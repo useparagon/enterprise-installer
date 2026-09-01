@@ -1,21 +1,26 @@
 module "helm" {
   source = "./helm"
 
-  cluster_name                   = local.cluster_name
-  docker_cfg_secret_name         = var.create_docker_pull_secret && length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].name : null
-  docker_email                   = var.docker_email
-  docker_password                = var.docker_password
-  docker_registry_server         = var.docker_registry_server
-  docker_pull_secret_name        = var.docker_pull_secret_name
-  create_docker_pull_secret      = var.create_docker_pull_secret
-  docker_username                = var.docker_username
-  env_secret_name                = azurerm_key_vault_secret.env.name
-  external_secrets_client_id     = var.azure_client_id
-  external_secrets_client_secret = var.azure_client_secret
-  external_secrets_tenant_id     = var.azure_tenant_id
-  feature_flags_content          = local.feature_flags_content
-  flipt_options                  = local.flipt_options
-  helm_values                    = local.helm_values_public
+  cluster_name               = local.cluster_name
+  docker_cfg_secret_name     = var.create_docker_pull_secret && length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].name : null
+  docker_email               = var.docker_email
+  docker_password            = var.docker_password
+  docker_registry_server     = var.docker_registry_server
+  docker_pull_secret_name    = var.docker_pull_secret_name
+  create_docker_pull_secret  = var.create_docker_pull_secret
+  docker_username            = var.docker_username
+  env_secret_name            = azurerm_key_vault_secret.env.name
+  external_secrets_client_id = azurerm_user_assigned_identity.external_secrets.client_id
+  external_secrets_tenant_id = data.azurerm_client_config.current.tenant_id
+  external_secrets_workload_identity_ready = sha256(join(":", [
+    azurerm_key_vault_access_policy.external_secrets.id,
+    time_sleep.external_secrets_federation.id,
+  ]))
+  legacy_external_secrets_client_id     = var.azure_client_id
+  legacy_external_secrets_client_secret = var.azure_client_secret
+  feature_flags_content                 = local.feature_flags_content
+  flipt_options                         = local.flipt_options
+  helm_values                           = local.helm_values_public
   secrets_revision = sha256(jsonencode({
     env          = azurerm_key_vault_secret.env.version
     docker_cfg   = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
@@ -73,7 +78,7 @@ module "hoop" {
   hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   azure_subscription_id         = var.azure_subscription_id
-  azure_tenant_id               = var.azure_tenant_id
+  azure_tenant_id               = coalesce(var.azure_tenant_id, data.azurerm_client_config.current.tenant_id)
   oidc_issuer_url               = try(data.azurerm_kubernetes_cluster.cluster.oidc_issuer_url, "")
   resource_group = {
     name     = local.infra_vars.resource_group.value.name

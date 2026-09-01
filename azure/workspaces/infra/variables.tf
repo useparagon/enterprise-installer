@@ -1,14 +1,18 @@
 # credentials
 variable "azure_client_id" {
-  description = "Azure client ID"
+  description = "Optional Azure client ID. Leave null to use environment-provided credentials such as ARM_*."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_client_secret" {
-  description = "Azure client secret"
+  description = "Optional Azure client secret. Leave null to use short-lived environment-provided credentials."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_subscription_id" {
@@ -18,9 +22,11 @@ variable "azure_subscription_id" {
 }
 
 variable "azure_tenant_id" {
-  description = "Azure tenant ID"
+  description = "Optional Azure tenant ID. Leave null to use the tenant from environment-provided credentials."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 # account
@@ -93,6 +99,12 @@ variable "key_vault_purge_protection_enabled" {
   description = "Enable purge protection on the Paragon Key Vault. Required by some Azure org policies (e.g. Enforce-GR-KeyVault). Cannot be disabled after creation."
   type        = bool
   default     = false
+}
+
+variable "key_vault_access_object_ids" {
+  description = "Entra object IDs granted secret access on the Paragon Key Vault in addition to the Terraform caller. Subscription roles are management plane only, so an incoming CI/CD principal must be listed here and applied with the outgoing credentials before a credential cutover; otherwise its first plan cannot read existing secrets."
+  type        = list(string)
+  default     = []
 }
 
 # cloudflare
