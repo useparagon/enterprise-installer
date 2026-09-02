@@ -26,6 +26,11 @@ output "enable_legacy_mng_pools" {
   value       = var.enable_karpenter ? var.enable_legacy_mng_pools : true
 }
 
+output "worker_security_group_ids" {
+  description = "Security groups attached to EKS worker nodes. Consumed by the paragon workspace for ALB-to-pod ingress safeguards."
+  value       = local.eks_worker_security_group_ids
+}
+
 output "karpenter" {
   description = "AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace."
   value = var.enable_karpenter ? {
