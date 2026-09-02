@@ -302,10 +302,15 @@ resource "helm_release" "ingress" {
   # preferred on-demand placement and preferred per-host spread.
   values = [yamlencode({
     configureDefaultAffinity = false
-    # Attach the Terraform backend SG to every ALB. Worker ingress from that SG
-    # is owned by Terraform; Ingresses disable controller-managed backend rules
-    # so the two never share one AWS SG permission.
-    backendSecurityGroup = var.alb_backend_security_group_id
+    # Shared backend SG on every ALB so Terraform worker rules match ENI traffic.
+    # Auto-generated frontend SGs ignore manage-backend-security-group-rules, so
+    # the controller still authorizes worker access. disableRestrictedSecurityGroupRules
+    # makes that permission 0-65535 instead of the coalesced target-port range Terraform
+    # owns, so a controller revoke cannot delete the safeguard (and apply cannot
+    # DuplicatePermission). Helm applies this with the controller, before app Ingresses.
+    backendSecurityGroup                  = var.alb_backend_security_group_id
+    enableManageBackendSecurityGroupRules = false
+    disableRestrictedSecurityGroupRules   = true
     podAnnotations = {
       "cluster-autoscaler.kubernetes.io/safe-to-evict" = "false"
       "karpenter.sh/do-not-disrupt"                    = "true"

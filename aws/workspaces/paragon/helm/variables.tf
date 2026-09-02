@@ -123,7 +123,7 @@ variable "certificate" {
 }
 
 variable "alb_backend_security_group_id" {
-  description = "Existing security group attached to the ALB as the controller backend SG. Worker ingress from this SG is managed by Terraform, not the controller."
+  description = "Existing security group attached to the ALB as the controller backend SG and used as the source of Terraform worker target-port rules."
   type        = string
 }
 

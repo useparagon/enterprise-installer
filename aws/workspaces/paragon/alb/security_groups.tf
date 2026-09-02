@@ -11,9 +11,10 @@ locals {
 # this resource), unlike data.aws_lb.security_groups which is deferred whenever
 # the Helm releases this module depends_on change. The controller attaches this
 # SG to the ALB via --backend-security-group so ENI traffic matches the rules.
-# Ingresses set manage-backend-security-group-rules=false so the controller does
-# not also authorize the same coalesced permission (AWS merges SG rules by
-# protocol/port/source; a controller revoke would delete this Terraform rule).
+# Auto-generated frontend SGs ignore manage-backend-security-group-rules, so the
+# controller still authorizes worker access from this SG. Helm sets
+# disableRestrictedSecurityGroupRules so that permission is 0-65535, not this
+# coalesced target-port range (AWS merges identical protocol/port/source rules).
 resource "aws_security_group" "alb_backend" {
   name        = "${var.workspace}-alb-backend"
   description = "Source SG for Paragon ALB-to-worker target-port safeguards"
@@ -34,8 +35,8 @@ resource "aws_vpc_security_group_egress_rule" "alb_backend" {
 }
 
 # Durable ALB-to-pod access for every target port. One coalesced range avoids
-# consuming a per-port rule out of the security group quota. The controller is
-# told not to manage this permission (see helm ingress annotations).
+# consuming a per-port rule out of the security group quota. Distinct from the
+# controller's 0-65535 backend rule so neither revoke nor DuplicatePermission.
 resource "aws_vpc_security_group_ingress_rule" "alb_target_safeguard" {
   for_each = toset(var.worker_security_group_ids)
 
