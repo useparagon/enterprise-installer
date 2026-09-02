@@ -302,7 +302,10 @@ resource "helm_release" "ingress" {
   # preferred on-demand placement and preferred per-host spread.
   values = [yamlencode({
     configureDefaultAffinity = false
-    backendSecurityGroup     = var.alb_backend_security_group_id
+    # Attach the Terraform backend SG to every ALB. Worker ingress from that SG
+    # is owned by Terraform; Ingresses disable controller-managed backend rules
+    # so the two never share one AWS SG permission.
+    backendSecurityGroup = var.alb_backend_security_group_id
     podAnnotations = {
       "cluster-autoscaler.kubernetes.io/safe-to-evict" = "false"
       "karpenter.sh/do-not-disrupt"                    = "true"

@@ -123,7 +123,7 @@ variable "certificate" {
 }
 
 variable "alb_backend_security_group_id" {
-  description = "Existing security group the AWS Load Balancer Controller should attach to the ALB as its backend SG."
+  description = "Existing security group attached to the ALB as the controller backend SG. Worker ingress from this SG is managed by Terraform, not the controller."
   type        = string
 }
 

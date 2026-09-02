@@ -34,11 +34,16 @@ data "aws_secretsmanager_secret_version" "infra_cluster" {
 }
 
 locals {
-  provider_cluster = local.use_legacy_infra_json ? {} : jsondecode(
-    # Cluster metadata (role names, SGs, flags) is not secret; nonsensitive avoids
-    # Terraform rejecting sensitive nulls against object-typed module variables.
-    nonsensitive(data.aws_secretsmanager_secret_version.infra_cluster[0].secret_string)
+  # Branch on the raw JSON, not the decoded object: conditional results are unified,
+  # and an empty object forces conversion to a map, which fails because the cluster
+  # payload mixes bools, strings, lists and objects.
+  # Cluster metadata (role names, SGs, flags) is not secret; nonsensitive avoids
+  # Terraform rejecting sensitive nulls against object-typed module variables.
+  provider_cluster_json = local.use_legacy_infra_json ? "{}" : nonsensitive(
+    data.aws_secretsmanager_secret_version.infra_cluster[0].secret_string
   )
+
+  provider_cluster = jsondecode(local.provider_cluster_json)
 
   provider_infra_vars = merge(
     {
