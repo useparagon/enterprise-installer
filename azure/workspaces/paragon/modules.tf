@@ -78,7 +78,7 @@ module "hoop" {
   hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   azure_subscription_id         = var.azure_subscription_id
-  azure_tenant_id               = var.azure_tenant_id
+  azure_tenant_id               = coalesce(var.azure_tenant_id, data.azurerm_client_config.current.tenant_id)
   oidc_issuer_url               = try(data.azurerm_kubernetes_cluster.cluster.oidc_issuer_url, "")
   resource_group = {
     name     = local.infra_vars.resource_group.value.name

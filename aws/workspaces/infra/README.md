@@ -95,7 +95,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_enable_karpenter"></a> [enable\_karpenter](#input\_enable\_karpenter) | Enable Karpenter autoscaling (SQS, IAM, Helm controller, EC2NodeClass, NodePools). | `bool` | `false` | no |
 | <a name="input_enable_legacy_mng_pools"></a> [enable\_legacy\_mng\_pools](#input\_enable\_legacy\_mng\_pools) | Keep legacy on-demand and spot EKS managed node groups during Karpenter migration. | `bool` | `true` | no |
 | <a name="input_env_overrides"></a> [env\_overrides](#input\_env\_overrides) | Optional overrides for any infra-derived env key written to Secrets Manager (e.g. PARAGON\_DOMAIN, ACCOUNT\_PUBLIC\_URL, CERBERUS\_POSTGRES\_PORT). Merged on top of computed defaults; app\_secrets wins if the same key is set in both. Domain and *\_PUBLIC\_URL chart envKeys are owned by the paragon workspace `domain` variable — seed them here only for GitOps-only flows that read Secrets Manager without that workspace. | `map(string)` | `null` | no |
-| <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.34"` | no |
+| <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. Supported: 1.34, 1.35. | `string` | `"1.34"` | no |
 | <a name="input_karpenter_chart_version"></a> [karpenter\_chart\_version](#input\_karpenter\_chart\_version) | Karpenter Helm chart version (OCI public.ecr.aws/karpenter/karpenter). | `string` | `"1.13.0"` | no |
 | <a name="input_karpenter_iam_names"></a> [karpenter\_iam\_names](#input\_karpenter\_iam\_names) | Optional override for Karpenter IAM role names. | <pre>object({<br/>    controller_role_name = optional(string)<br/>    node_role_name       = optional(string)<br/>  })</pre> | `{}` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
@@ -148,6 +148,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="output_secrets_manager_env_secret"></a> [secrets\_manager\_env\_secret](#output\_secrets\_manager\_env\_secret) | Name of the Secrets Manager secret containing Paragon env config. |
 | <a name="output_secrets_manager_secret_arns"></a> [secrets\_manager\_secret\_arns](#output\_secrets\_manager\_secret\_arns) | ARNs of application Secrets Manager secrets. |
 | <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. S3 access uses EKS Pod Identity (role\_arn); static access keys are no longer provisioned. |
+| <a name="output_worker_security_group_ids"></a> [worker\_security\_group\_ids](#output\_worker\_security\_group\_ids) | Security groups attached to EKS worker nodes. Consumed by the paragon workspace for ALB-to-pod ingress safeguards. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->
 

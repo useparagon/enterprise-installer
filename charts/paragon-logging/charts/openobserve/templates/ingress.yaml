@@ -16,6 +16,7 @@ metadata:
     alb.ingress.kubernetes.io/scheme: {{ .Values.ingress.scheme | default "internet-facing" }}
     alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
     alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: "false"
   {{- else if eq .Values.global.env.HOST_ENV "AZURE_K8" }}
   annotations:
     kubernetes.io/ingress.class: nginx

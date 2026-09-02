@@ -48,10 +48,12 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
 
-  dns_prefix                = local.cluster_name
-  kubernetes_version        = var.k8s_version
-  node_resource_group       = "${local.cluster_name}-nodes"
-  sku_tier                  = var.k8s_sku_tier
+  dns_prefix          = local.cluster_name
+  kubernetes_version  = var.k8s_version
+  node_resource_group = "${local.cluster_name}-nodes"
+  sku_tier            = var.k8s_sku_tier
+
+  # Required for Hoop (and other pods) to federate a Kubernetes SA to Azure RBAC.
   oidc_issuer_enabled       = true
   workload_identity_enabled = true
 
@@ -92,10 +94,6 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   identity {
     type = "SystemAssigned"
   }
-
-  # Required for Hoop (and other pods) to federate a Kubernetes SA to Azure RBAC.
-  oidc_issuer_enabled       = true
-  workload_identity_enabled = true
 
   depends_on = [terraform_data.nat_gateway_ready]
 

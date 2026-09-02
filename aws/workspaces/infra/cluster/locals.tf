@@ -162,47 +162,30 @@ locals {
 
   cluster_autoscaler_enabled = length(local.cluster_autoscaler_node_groups) > 0
 
-  cluster_addons_legacy = {
-    aws-ebs-csi-driver = {
-      version = "v1.55.0-eksbuild.2"
+  # kube-proxy / CoreDNS are Kubernetes-minor-locked. VPC CNI, EBS CSI, and Pod
+  # Identity Agent are shared across minors when AWS lists the same latest.
+  # 1.34 keeps the pins already running in this repo. 1.35 uses AWS add-on docs:
+  # https://docs.aws.amazon.com/eks/latest/userguide/managing-kube-proxy.html
+  # https://docs.aws.amazon.com/eks/latest/userguide/managing-coredns.html
+  # https://docs.aws.amazon.com/eks/latest/userguide/managing-vpc-cni.html
+  eks_addon_versions_by_k8s = {
+    "1.34" = {
+      aws-ebs-csi-driver     = "v1.55.0-eksbuild.2"
+      coredns                = "v1.13.2-eksbuild.11"
+      eks-pod-identity-agent = "v1.3.10-eksbuild.3"
+      kube-proxy             = "v1.34.6-eksbuild.13"
+      vpc-cni                = "v1.21.1-eksbuild.3"
     }
-    coredns = {
-      version = "v1.13.2-eksbuild.11"
-    }
-    kube-proxy = {
-      version = "v1.34.6-eksbuild.13"
-    }
-    vpc-cni = {
-      version = "v1.21.1-eksbuild.3"
-    }
-  }
-
-  cluster_addons = local.cluster_addons_legacy
-
-  cluster_addons_karpenter = {
-    vpc-cni = {
-      version = "v1.21.1-eksbuild.3"
-    }
-    eks-pod-identity-agent = {
-      version = "v1.3.10-eksbuild.3"
-    }
-    kube-proxy = {
-      version = "v1.34.6-eksbuild.13"
-    }
-    coredns = {
-      version = "v1.13.2-eksbuild.11"
-    }
-    aws-ebs-csi-driver = {
-      version = "v1.55.0-eksbuild.2"
+    "1.35" = {
+      aws-ebs-csi-driver     = "v1.59.0-eksbuild.1"
+      coredns                = "v1.14.3-eksbuild.14"
+      eks-pod-identity-agent = "v1.3.10-eksbuild.3"
+      kube-proxy             = "v1.35.3-eksbuild.21"
+      vpc-cni                = "v1.22.4-eksbuild.3"
     }
   }
 
-  eks_addon_versions = merge(
-    { for name, cfg in local.cluster_addons_legacy : name => cfg.version },
-    {
-      "eks-pod-identity-agent" = local.cluster_addons_karpenter["eks-pod-identity-agent"].version
-    },
-  )
+  eks_addon_versions = local.eks_addon_versions_by_k8s[var.k8s_version]
 
   eks_addon_resolve_conflicts = {
     resolve_conflicts_on_create = "OVERWRITE"

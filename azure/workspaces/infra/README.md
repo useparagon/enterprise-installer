@@ -18,7 +18,9 @@ creates its federated identity.
 The first transition apply may replace or reimage the bastion scale set because
 its startup data changes from service-principal login to managed-identity login.
 Expect brief bastion unavailability; startup retries Azure identity and cluster
-credential propagation before reporting success.
+credential propagation before reporting success. The bastion identity is only
+assigned on the cluster, so startup tolerates a login with no subscription
+listed and reads the admin kubeconfig from the cluster resource in that case.
 
 Do not commit real credentials to git.
 
