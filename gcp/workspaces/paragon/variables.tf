@@ -1170,17 +1170,20 @@ locals {
     try(local.redis_instance_urls["cache"], local.infra_vars.redis.value.cache.connection_string, "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}")
   )
 
+  # Iterate the instances infra actually created. redis_multiple_instances=false
+  # emits only `cache`, and naming queue/system directly errors the whole
+  # expression, so the CA bundle silently stayed unmounted and every TLS Redis
+  # connection failed with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+  redis_ca_cert_enabled = length(compact([
+    for name, r in try(local.infra_vars.redis.value, {}) : try(r.ca_certificate, "")
+  ])) > 0
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       # Redis CA certificate configuration
       # Enable if any Redis instance has a CA certificate
       redisCaCert = {
-        enabled = try(
-          local.infra_vars.redis.value.cache.ca_certificate != null ||
-          local.infra_vars.redis.value.queue.ca_certificate != null ||
-          local.infra_vars.redis.value.system.ca_certificate != null,
-          false
-        )
+        enabled    = local.redis_ca_cert_enabled
         secretName = "redis-ca-cert"
       },
       env = merge({

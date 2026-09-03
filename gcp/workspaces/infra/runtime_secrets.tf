@@ -45,11 +45,11 @@ resource "google_secret_manager_secret_version" "runtime_storage" {
     logs_bucket         = module.storage.storage.logs_bucket
     auditlogs_bucket    = module.storage.storage.auditlogs_bucket
     # GCS (no MinIO): microservice creds are the same SA key as root.
-    microservice_user   = module.storage.storage.project_id
-    microservice_pass   = module.storage.storage.private_key
-    root_user           = module.storage.storage.project_id
-    root_password       = module.storage.storage.private_key
-    service_account     = module.storage.storage.service_account
+    microservice_user = module.storage.storage.project_id
+    microservice_pass = module.storage.storage.private_key
+    root_user         = module.storage.storage.project_id
+    root_password     = module.storage.storage.private_key
+    service_account   = module.storage.storage.service_account
   })
 }
 
@@ -87,10 +87,10 @@ resource "google_secret_manager_secret" "runtime_redis_ca_cert" {
 resource "google_secret_manager_secret_version" "runtime_redis_ca_cert" {
   secret = google_secret_manager_secret.runtime_redis_ca_cert.id
   secret_data = jsonencode({
+    # Bundle every instance the redis module created; the set depends on
+    # redis_multiple_instances and managed_sync_enabled.
     "server-ca.pem" = join("\n", compact([
-      try(module.redis.redis.cache.ca_certificate, null),
-      try(module.redis.redis.queue.ca_certificate, null),
-      try(module.redis.redis.system.ca_certificate, null),
+      for name, instance in module.redis.redis : try(instance.ca_certificate, "")
     ]))
   })
 }
