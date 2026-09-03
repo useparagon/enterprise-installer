@@ -20,6 +20,10 @@ terraform {
 }
 
 provider "helm" {
+  # Connect Gateway enforces a per-minute request quota. Helm discovery creates
+  # a new client for each release, so cap each client's initial request burst.
+  burst_limit = 20
+
   kubernetes {
     host  = local.cluster.host
     token = local.cluster.token

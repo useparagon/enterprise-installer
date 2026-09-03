@@ -39,6 +39,8 @@ resource "helm_release" "reloader" {
   create_namespace = false
   atomic           = true
   cleanup_on_fail  = true
+
+  depends_on = [helm_release.external_secrets]
 }
 
 locals {
@@ -238,7 +240,7 @@ locals {
 
 resource "kubectl_manifest" "secret_store" {
   yaml_body  = local.secret_store_yaml
-  depends_on = [helm_release.external_secrets, kubernetes_namespace_v1.paragon]
+  depends_on = [helm_release.reloader, kubernetes_namespace_v1.paragon]
 }
 
 resource "kubectl_manifest" "external_secret_paragon" {
