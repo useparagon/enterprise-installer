@@ -909,6 +909,15 @@ locals {
   # output; null-safe when neither is present.
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
+  # The storage service account email is an identity, not a credential, but on the Secret
+  # Manager path it inherits the sensitivity of the secret payload it was decoded from.
+  # Downstream modules key `for_each` off it, which Terraform rejects for sensitive values.
+  storage_service_account = (
+    local.use_legacy_infra_json
+    ? try(local.storage_output.service_account, null)
+    : try(nonsensitive(local.storage_output.service_account), null)
+  )
+
   workspace                = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
   gke_connect_gateway_host = "https://connectgateway.googleapis.com/v1/projects/${data.google_project.paragon.number}/locations/global/gkeMemberships/${local.workspace}-fleet"
   # Prefer infra GSM handoff (actual GKE name may be -private or -cluster).

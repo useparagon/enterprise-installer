@@ -89,7 +89,7 @@ module "helm" {
   public_services             = local.public_services
   redis_ca_cert_secret_name   = local.infra_secret_names.redis_ca_cert
   region                      = var.region
-  storage_service_account     = try(local.storage_output.service_account, null)
+  storage_service_account     = local.storage_service_account
   infra_vars                  = local.infra_vars
   waf_security_policy_name    = local.waf_active ? module.waf[0].security_policy_name : ""
   waf_logs_sample_rate        = var.waf_logs_sample_rate
