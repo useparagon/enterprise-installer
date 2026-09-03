@@ -26,8 +26,7 @@ module "alb" {
   microservices            = local.microservices
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
-  release_ingress          = module.helm.release_ingress
-  release_paragon_on_prem  = module.helm.release_paragon_on_prem
+  alb_lookup_gate          = module.helm.alb_lookup_gate
   vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
   worker_security_group_ids = coalescelist(
     try(compact(local.infra_vars.worker_security_group_ids.value), []),

@@ -1,10 +1,10 @@
 data "aws_lb" "load_balancer" {
   name = var.workspace
 
-  depends_on = [
-    var.release_ingress,
-    var.release_paragon_on_prem,
-  ]
+  # Gate is created after the Helm releases that provision the ALB, then stays
+  # unchanged. Depending on the helm_release objects themselves defers this
+  # lookup on every chart/values change and makes Route53 records look like drift.
+  depends_on = [var.alb_lookup_gate]
 }
 
 resource "aws_route53_zone" "paragon" {

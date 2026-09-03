@@ -47,12 +47,8 @@ variable "public_monitors" {
   }))
 }
 
-variable "release_ingress" {
-  description = "The helm release for the ingress."
-}
-
-variable "release_paragon_on_prem" {
-  description = "The helm release for the Paragon microservices."
+variable "alb_lookup_gate" {
+  description = "Stable apply-time gate from the Helm module. Used so the ALB data source waits for first-time Ingress creation without deferring on later Helm upgrades."
 }
 
 variable "worker_security_group_ids" {
