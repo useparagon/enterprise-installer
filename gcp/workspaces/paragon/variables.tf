@@ -1121,6 +1121,10 @@ locals {
       "port"       = 9121
       "public_url" = null
     }
+    "redis-streams-exporter" = {
+      "port"       = 9124
+      "public_url" = null
+    }
     "redis-insight" = {
       "port"       = 8500
       "public_url" = null
@@ -1384,6 +1388,8 @@ locals {
         MONITOR_QUEUE_REDIS_TARGET              = try(local.infra_vars.redis.value.queue.host, local.infra_vars.redis.value.cache.host)
         MONITOR_REDIS_EXPORTER_HOST             = "http://redis-exporter"
         MONITOR_REDIS_EXPORTER_PORT             = try(local.monitors["redis-exporter"].port, null)
+        MONITOR_REDIS_STREAMS_EXPORTER_HOST     = "http://redis-streams-exporter"
+        MONITOR_REDIS_STREAMS_EXPORTER_PORT     = try(local.monitors["redis-streams-exporter"].port, null)
         MONITOR_REDIS_INSIGHT_HOST              = "http://redis-insight"
         MONITOR_REDIS_INSIGHT_PORT              = try(local.monitors["redis-insight"].port, null)
         }, {
