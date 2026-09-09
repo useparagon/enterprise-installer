@@ -211,7 +211,7 @@ locals {
             "envvar:REMOTE_URL"           = try(conn_config.remote_url, "https://kubernetes.default.svc.cluster.local")
             "envvar:INSECURE"             = try(conn_config.insecure, "true")
             "envvar:KUBECTL_NAMESPACE"    = try(conn_config.namespace, "paragon")
-            "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret.hoop_cluster_admin_token[0].data["token"], "")}"
+            "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret_v1.hoop_cluster_admin_token[0].data["token"], "")}"
           },
           local.irsa_env,
           try(conn_config.secrets, {})
@@ -244,7 +244,7 @@ locals {
           "envvar:REMOTE_URL"           = "https://kubernetes.default.svc.cluster.local"
           "envvar:INSECURE"             = "true"
           "envvar:KUBECTL_NAMESPACE"    = "paragon"
-          "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret.hoop_cluster_admin_token[0].data["token"], "")}"
+          "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret_v1.hoop_cluster_admin_token[0].data["token"], "")}"
           }, local.irsa_env
         )
         access_mode_runbooks = "enabled"

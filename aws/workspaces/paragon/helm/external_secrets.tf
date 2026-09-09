@@ -1,4 +1,4 @@
-resource "kubernetes_namespace" "external_secrets" {
+resource "kubernetes_namespace_v1" "external_secrets" {
   count = var.install_external_secrets ? 1 : 0
 
   metadata {
@@ -10,7 +10,7 @@ resource "helm_release" "external_secrets" {
   count = var.install_external_secrets ? 1 : 0
 
   name             = "external-secrets"
-  namespace        = kubernetes_namespace.external_secrets[0].id
+  namespace        = kubernetes_namespace_v1.external_secrets[0].id
   repository       = "https://charts.external-secrets.io"
   chart            = "external-secrets"
   version          = "0.14.4"

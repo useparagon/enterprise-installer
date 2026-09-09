@@ -308,9 +308,9 @@ resource "helm_release" "paragon_on_prem" {
   ]
 
   depends_on = [
-    data.kubernetes_secret.paragon_secrets,
-    data.kubernetes_secret.docker_cfg,
-    data.kubernetes_secret.redis_ca,
+    data.kubernetes_secret_v1.paragon_secrets,
+    data.kubernetes_secret_v1.docker_cfg,
+    data.kubernetes_secret_v1.redis_ca,
     kubernetes_config_map_v1.feature_flag_content,
     kubectl_manifest.waf_backendconfig,
   ]
@@ -366,11 +366,11 @@ resource "helm_release" "paragon_logging" {
   }
 
   depends_on = [
-    data.kubernetes_secret.paragon_secrets,
-    data.kubernetes_secret.docker_cfg,
-    data.kubernetes_secret.openobserve_credentials,
-    data.kubernetes_secret.openobserve_gcs,
-    data.kubernetes_secret.redis_ca,
+    data.kubernetes_secret_v1.paragon_secrets,
+    data.kubernetes_secret_v1.docker_cfg,
+    data.kubernetes_secret_v1.openobserve_credentials,
+    data.kubernetes_secret_v1.openobserve_gcs,
+    data.kubernetes_secret_v1.redis_ca,
   ]
 }
 
@@ -402,8 +402,8 @@ resource "helm_release" "paragon_monitoring" {
 
   depends_on = [
     helm_release.paragon_on_prem,
-    data.kubernetes_secret.paragon_secrets,
-    data.kubernetes_secret.docker_cfg,
+    data.kubernetes_secret_v1.paragon_secrets,
+    data.kubernetes_secret_v1.docker_cfg,
     kubectl_manifest.grafana_backendconfig,
     kubectl_manifest.waf_backendconfig
   ]

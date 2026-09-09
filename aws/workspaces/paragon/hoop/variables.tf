@@ -164,7 +164,7 @@ variable "eks_oidc_issuer_url" {
 }
 
 variable "namespace_paragon" {
-  description = "Reference to kubernetes_namespace.paragon from helm module."
+  description = "Reference to kubernetes_namespace_v1.paragon from helm module."
   type        = any
 }
 

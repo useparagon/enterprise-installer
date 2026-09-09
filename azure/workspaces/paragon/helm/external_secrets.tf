@@ -1,4 +1,4 @@
-resource "kubernetes_namespace" "external_secrets" {
+resource "kubernetes_namespace_v1" "external_secrets" {
   metadata {
     name = "external-secrets"
   }
@@ -6,7 +6,7 @@ resource "kubernetes_namespace" "external_secrets" {
 
 resource "helm_release" "external_secrets" {
   name             = "external-secrets"
-  namespace        = kubernetes_namespace.external_secrets.id
+  namespace        = kubernetes_namespace_v1.external_secrets.id
   repository       = "https://charts.external-secrets.io"
   chart            = "external-secrets"
   version          = "0.14.4"
@@ -51,7 +51,7 @@ resource "helm_release" "external_secrets" {
 
 resource "helm_release" "reloader" {
   name             = "reloader"
-  namespace        = kubernetes_namespace.external_secrets.id
+  namespace        = kubernetes_namespace_v1.external_secrets.id
   repository       = "https://stakater.github.io/stakater-charts"
   chart            = "reloader"
   version          = "2.2.11"
@@ -61,8 +61,8 @@ resource "helm_release" "reloader" {
 }
 
 moved {
-  from = kubernetes_secret.external_secrets_azure_auth
-  to   = kubernetes_secret.external_secrets_azure_auth[0]
+  from = kubernetes_secret_v1.external_secrets_azure_auth
+  to   = kubernetes_secret_v1.external_secrets_azure_auth[0]
 }
 
 locals {
@@ -75,7 +75,7 @@ locals {
 # switch to workload identity without an authentication gap. Once the service-
 # principal variables are omitted, the already-unused secret is removed on the
 # next apply.
-resource "kubernetes_secret" "external_secrets_azure_auth" {
+resource "kubernetes_secret_v1" "external_secrets_azure_auth" {
   count = (
     local.legacy_external_secrets_client_id != "" &&
     local.legacy_external_secrets_client_secret != ""
@@ -83,7 +83,7 @@ resource "kubernetes_secret" "external_secrets_azure_auth" {
 
   metadata {
     name      = "external-secrets-azure-auth"
-    namespace = kubernetes_namespace.paragon.id
+    namespace = kubernetes_namespace_v1.paragon.id
   }
 
   data = {
@@ -98,7 +98,7 @@ locals {
     kind       = "SecretStore"
     metadata = {
       name      = "azure-key-vault"
-      namespace = kubernetes_namespace.paragon.id
+      namespace = kubernetes_namespace_v1.paragon.id
     }
     spec = {
       provider = {
@@ -116,7 +116,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "paragon-secrets"
-      namespace = kubernetes_namespace.paragon.id
+      namespace = kubernetes_namespace_v1.paragon.id
     }
     spec = {
       refreshInterval = "5m"
@@ -141,7 +141,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = var.docker_pull_secret_name
-      namespace = kubernetes_namespace.paragon.id
+      namespace = kubernetes_namespace_v1.paragon.id
     }
     spec = {
       refreshInterval = "1h"
@@ -174,7 +174,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "paragon-managed-sync-secrets"
-      namespace = kubernetes_namespace.paragon.id
+      namespace = kubernetes_namespace_v1.paragon.id
     }
     spec = {
       refreshInterval = "5m"
@@ -199,7 +199,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "openobserve-credentials"
-      namespace = kubernetes_namespace.paragon.id
+      namespace = kubernetes_namespace_v1.paragon.id
     }
     spec = {
       refreshInterval = "5m"
@@ -232,7 +232,7 @@ resource "kubectl_manifest" "external_secret_paragon" {
 
 resource "kubectl_manifest" "external_secret_docker" {
   # Gate on the known inputs, not yamlencode(...) != null. The YAML includes
-  # kubernetes_namespace.paragon.id, which is unknown on first apply, so using
+  # kubernetes_namespace_v1.paragon.id, which is unknown on first apply, so using
   # the encoded document for count makes Terraform refuse to plan.
   count = var.create_docker_pull_secret && var.docker_cfg_secret_name != null ? 1 : 0
 
