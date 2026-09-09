@@ -1,27 +1,60 @@
 module "helm" {
   source = "./helm"
 
-  cluster_name           = local.cluster_name
-  docker_email           = var.docker_email
-  docker_password        = var.docker_password
-  docker_registry_server = var.docker_registry_server
-  docker_username        = var.docker_username
-  feature_flags_content  = local.feature_flags_content
-  flipt_options          = local.flipt_options
-  helm_values            = local.helm_values
-  ingress_scheme         = var.ingress_scheme
-  k8s_version            = var.k8s_version
-  logs_bucket            = local.logs_bucket
-  microservices          = local.microservices
-  monitor_version        = local.monitor_version
-  monitors               = local.monitors
-  monitors_enabled       = var.monitors_enabled
-  openobserve_email      = var.openobserve_email
-  openobserve_password   = var.openobserve_password
-  public_microservices   = local.public_microservices
-  public_monitors        = local.public_monitors
-  resource_group         = local.infra_vars.resource_group.value
-  workspace              = local.workspace
+  cluster_name               = local.cluster_name
+  docker_cfg_secret_name     = var.create_docker_pull_secret && length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].name : null
+  docker_email               = var.docker_email
+  docker_password            = var.docker_password
+  docker_registry_server     = var.docker_registry_server
+  docker_pull_secret_name    = var.docker_pull_secret_name
+  create_docker_pull_secret  = var.create_docker_pull_secret
+  docker_username            = var.docker_username
+  env_secret_name            = azurerm_key_vault_secret.env.name
+  external_secrets_client_id = azurerm_user_assigned_identity.external_secrets.client_id
+  external_secrets_tenant_id = data.azurerm_client_config.current.tenant_id
+  external_secrets_workload_identity_ready = sha256(join(":", [
+    azurerm_key_vault_access_policy.external_secrets.id,
+    time_sleep.external_secrets_federation.id,
+  ]))
+  legacy_external_secrets_client_id     = var.azure_client_id
+  legacy_external_secrets_client_secret = var.azure_client_secret
+  feature_flags_content                 = local.feature_flags_content
+  flipt_options                         = local.flipt_options
+  helm_values                           = local.helm_values_public
+  secrets_revision = sha256(jsonencode({
+    env          = azurerm_key_vault_secret.env.version
+    docker_cfg   = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
+    managed_sync = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
+    openobserve  = azurerm_key_vault_secret.openobserve[0].version
+  }))
+  ingress_scheme           = var.ingress_scheme
+  key_vault_name           = data.azurerm_key_vault.paragon.name
+  k8s_version              = var.k8s_version
+  logs_bucket              = local.logs_bucket
+  managed_sync_enabled     = var.managed_sync_enabled
+  managed_sync_secret_name = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
+  managed_sync_version     = var.managed_sync_version
+  microservices            = local.microservices
+  monitor_version          = local.monitor_version
+  monitors                 = local.monitors
+  monitors_enabled         = var.monitors_enabled
+  openobserve_email        = local.openobserve_email
+  openobserve_password     = local.openobserve_password
+  openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
+  public_microservices     = local.public_microservices
+  public_monitors          = local.public_monitors
+  resource_group           = local.infra_vars.resource_group.value
+  workspace                = local.workspace
+}
+
+module "managed_sync_config" {
+  source = "./helm-config"
+  count  = var.managed_sync_enabled ? 1 : 0
+
+  base_helm_values = local.helm_vars
+  infra_values     = local.infra_vars
+  domain           = var.domain
+  microservices    = local.microservices
 }
 
 module "hoop" {
@@ -29,6 +62,7 @@ module "hoop" {
 
   workspace                     = local.workspace
   organization                  = var.organization
+  hoop_agent_name               = var.hoop_agent_name
   hoop_enabled                  = var.hoop_enabled
   hoop_key                      = var.hoop_key
   hoop_agent_id                 = var.hoop_agent_id
@@ -41,12 +75,21 @@ module "hoop" {
   hoop_postgres_guardrail_rules = var.hoop_postgres_guardrail_rules
   hoop_redis_guardrail_rules    = var.hoop_redis_guardrail_rules
   customer_facing               = var.customer_facing
+  hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
-  custom_connections            = var.hoop_custom_connections
-  k8s_connections               = var.hoop_k8s_connections
+  azure_subscription_id         = var.azure_subscription_id
+  azure_tenant_id               = coalesce(var.azure_tenant_id, data.azurerm_client_config.current.tenant_id)
+  oidc_issuer_url               = try(data.azurerm_kubernetes_cluster.cluster.oidc_issuer_url, "")
+  resource_group = {
+    name     = local.infra_vars.resource_group.value.name
+    location = local.infra_vars.resource_group.value.location
+  }
+  custom_connections = var.hoop_custom_connections
+  k8s_connections    = var.hoop_k8s_connections
   infra_vars = {
-    postgres = try(local.infra_vars.postgres, null)
-    redis    = try(local.infra_vars.redis, null)
+    postgres      = try(local.infra_vars.postgres, null)
+    redis         = try(local.infra_vars.redis, null)
+    redis_managed = try(local.infra_vars.redis_managed, null)
   }
 }
 

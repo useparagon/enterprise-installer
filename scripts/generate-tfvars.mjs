@@ -4,9 +4,21 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { basename } from "path";
 
 const SCRIPT_NAME = basename(process.argv[1]);
-const USAGE = `Usage: node ${SCRIPT_NAME} <variables.tf> <output.tfvars>\n` +
+const USAGE = `Usage: node ${SCRIPT_NAME} <variables.tf> <output.tfvars> [provider]\n` +
   "  <variables.tf>    Path to a Terraform variables file.\n" +
-  "  <output.tfvars>   Path to write generated vars.auto.tfvars.\n";
+  "  <output.tfvars>   Path to write generated vars.auto.tfvars.\n" +
+  "  [provider]        Optional cloud provider (aws, azure, gcp, k8s).\n";
+
+const AZURE_INFRA_RECOMMENDATIONS = [
+  "",
+  "# PostgreSQL per-instance config (recommended for production).",
+  "# Requires General Purpose or Memory Optimized SKUs for zone-redundant HA (not Burstable).",
+  "# Remove or comment out if not required.",
+  "postgres_instances = {",
+  '  hermes = { sku = "GP_Standard_D2ds_v5", redundant = true }',
+  "}",
+  "",
+].join("\n");
 
 function exitWithError(message) {
   console.error(message);
@@ -18,14 +30,14 @@ function exitWithUsageError(message) {
 }
 
 function verifyArgs() {
-  const [varsPath, outPath] = process.argv.slice(2);
+  const [varsPath, outPath, provider = ""] = process.argv.slice(2);
   if (!varsPath || !outPath) {
     exitWithUsageError("Missing required arguments.");
   }
   if (!existsSync(varsPath)) {
     exitWithUsageError(`Variables file does not exist: ${varsPath}`);
   }
-  return { varsPath, outPath };
+  return { varsPath, outPath, provider };
 }
 
 function countBraces(line) {
@@ -131,9 +143,14 @@ function generateTfvars(varsText) {
 }
 
 function main() {
-  const { varsPath, outPath } = verifyArgs();
+  const { varsPath, outPath, provider } = verifyArgs();
   const varsText = readFileSync(varsPath, "utf-8");
-  const output = generateTfvars(varsText);
+  let output = generateTfvars(varsText);
+
+  if (provider === "azure" && outPath.includes("/infra/")) {
+    output += AZURE_INFRA_RECOMMENDATIONS;
+  }
+
   writeFileSync(outPath, output);
 }
 

@@ -3,6 +3,11 @@ variable "workspace" {
   type        = string
 }
 
+variable "aws_region" {
+  description = "AWS region for regional resources (Karpenter IAM, SQS)."
+  type        = string
+}
+
 variable "vpc_id" {
   description = "The ID of VPC to create resources in."
   type        = string
@@ -14,18 +19,22 @@ variable "private_subnet_ids" {
 }
 
 variable "eks_admin_arns" {
-  description = "Array of ARNs for IAM users, groups or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard."
+  description = "Array of ARNs for IAM users, groups or roles that should have admin access to cluster. Includes the Terraform caller."
   type        = list(string)
-  default     = []
 }
 
 variable "k8s_version" {
-  description = "The version of Kubernetes to run in the cluster."
+  description = "The version of Kubernetes to run in the cluster. Supported: 1.34, 1.35."
   type        = string
+
+  validation {
+    condition     = contains(["1.34", "1.35"], var.k8s_version)
+    error_message = "k8s_version must be 1.34 or 1.35; EKS add-on pins are defined for those versions only."
+  }
 }
 
 variable "eks_ondemand_node_instance_type" {
-  description = "The compute instance type to use for Kubernetes nodes."
+  description = "The compute instance type to use for Kubernetes on-demand nodes."
   type        = list(string)
 }
 
@@ -55,112 +64,92 @@ variable "kms_admin_role" {
   default     = null
 }
 
+variable "bastion_enabled" {
+  description = "Whether the bastion host is enabled."
+  type        = bool
+}
+
 variable "bastion_role_arn" {
   description = "ARN of IAM role associated with Bastion."
   type        = string
+  default     = null
 }
 
 variable "bastion_security_group_id" {
   description = "Security Group ID associated with Bastion."
   type        = string
+  default     = null
+}
+
+variable "create_autoscaling_linked_role" {
+  description = "Whether or not to create an IAM role for autoscaling."
+  type        = bool
+}
+
+variable "enable_karpenter" {
+  description = "Enable Karpenter autoscaling (SQS, IAM, Helm controller, EC2NodeClass, NodePools)."
+  type        = bool
+}
+
+variable "enable_legacy_mng_pools" {
+  description = "Keep legacy on-demand and spot EKS managed node groups (migration mode). Requires enable_karpenter or this flag for worker capacity."
+  type        = bool
+
+  validation {
+    condition     = var.enable_karpenter || var.enable_legacy_mng_pools
+    error_message = "At least one worker capacity source must be enabled: enable_karpenter or enable_legacy_mng_pools."
+  }
+}
+
+variable "karpenter_chart_version" {
+  description = "Karpenter Helm chart version (OCI public.ecr.aws/karpenter/karpenter)."
+  type        = string
+}
+
+variable "karpenter_iam_names" {
+  description = "Optional override for Karpenter IAM role names."
+  type = object({
+    controller_role_name = optional(string)
+    node_role_name       = optional(string)
+  })
+}
+
+variable "eks_system_managed_node_group" {
+  description = "System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default)."
+  type = object({
+    map_key         = optional(string, "node-default")
+    name            = optional(string)
+    use_name_prefix = optional(bool, false)
+    ec2_name_tag    = optional(string)
+    instance_types  = optional(list(string))
+    min_size        = optional(number, 2)
+    max_size        = optional(number, 3)
+    desired_size    = optional(number, 2)
+    labels          = optional(map(string), { "karpenter.sh/controller" = "true" })
+  })
+}
+
+variable "ami_release_version" {
+  description = "Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2023 legacy coexistence, use ami_release_versions instead."
+  type        = string
+  default     = null
+}
+
+variable "ami_release_versions" {
+  description = "Optional map of managed node group key (system, ondemand, spot) to AMI release version pin. When non-empty, overrides ami_release_version and pins only the listed groups."
+  type        = map(string)
+  default     = {}
+}
+
+variable "use_latest_ami_release_version" {
+  description = "When true, resolve the latest AMI release version per node group ami_type for the cluster Kubernetes version at plan/apply."
+  type        = bool
+  default     = false
+}
+
+variable "egress_ready" {
+  description = "Set when private egress routing is ready. Implicit apply-order dependency for internet-bootstrapping workloads."
+  type        = string
 }
 
 data "aws_caller_identity" "current" {}
-
-locals {
-  node_volume_size = 50
-
-  nodes = {
-    for key, value in {
-      ondemand = var.eks_spot_instance_percent == 100 ? null : {
-        min_count      = ceil(var.eks_min_node_count * (1 - (var.eks_spot_instance_percent / 100)))
-        max_count      = ceil(var.eks_max_node_count * (1 - (var.eks_spot_instance_percent / 100)))
-        instance_types = var.eks_ondemand_node_instance_type
-        capacity       = "ON_DEMAND"
-      }
-      spot = var.eks_spot_instance_percent == 0 ? null : {
-        min_count      = floor(var.eks_min_node_count * (var.eks_spot_instance_percent / 100))
-        max_count      = ceil(var.eks_max_node_count * (var.eks_spot_instance_percent / 100))
-        instance_types = var.eks_spot_node_instance_type
-        capacity       = "SPOT"
-      }
-    } : key => value
-    if value != null
-  }
-
-  cluster_addons = {
-    aws-ebs-csi-driver = {
-      version = "v1.54.0-eksbuild.1"
-    }
-    coredns = {
-      version = "v1.11.4-eksbuild.14"
-    }
-    kube-proxy = {
-      version = "v1.31.10-eksbuild.2"
-    }
-    vpc-cni = {
-      version = "v1.19.6-eksbuild.7"
-    }
-  }
-
-  # We need to lookup K8s taint effect from the AWS API value
-  taint_effects = {
-    NO_SCHEDULE        = "NoSchedule"
-    NO_EXECUTE         = "NoExecute"
-    PREFER_NO_SCHEDULE = "PreferNoSchedule"
-  }
-
-  cluster_autoscaler_label_tags = merge([
-    for name, group in module.eks.eks_managed_node_groups : {
-      for label_name, label_value in coalesce(group.node_group_labels, {}) : "${name}|label|${label_name}" => {
-        autoscaling_group = group.node_group_autoscaling_group_names[0],
-        key               = "k8s.io/cluster-autoscaler/node-template/label/${label_name}",
-        value             = label_value,
-      }
-    }
-  ]...)
-
-  cluster_autoscaler_taint_tags = merge([
-    for name, group in module.eks.eks_managed_node_groups : {
-      for taint in coalesce(group.node_group_taints, []) : "${name}|taint|${taint.key}" => {
-        autoscaling_group = group.node_group_autoscaling_group_names[0],
-        key               = "k8s.io/cluster-autoscaler/node-template/taint/${taint.key}"
-        value             = "${taint.value}:${local.taint_effects[taint.effect]}"
-      }
-    }
-  ]...)
-
-  cluster_autoscaler_asg_tags = merge(local.cluster_autoscaler_label_tags, local.cluster_autoscaler_taint_tags)
-
-  metadata_options = {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = 2
-  }
-
-  # when using an assumed role the role itself must be used instead of the current identity arn
-  # so convert identity arn (e.g. arn:aws:sts::123456789:assumed-role/ParagonAssumedRole/SessionName)
-  # to role arn (e.g. arn:aws:iam::123456789:role/ParagonAssumedRole)
-  is_assumed_role = can(regex("assumed-role", data.aws_caller_identity.current.arn))
-  assumed_role_parts = split(
-    "/",
-    replace(
-      replace(
-        data.aws_caller_identity.current.arn,
-        ":sts:",
-        ":iam:"
-      ),
-      ":assumed-role/",
-      # in the case of AWS SSO, the arn is in the format of arn:aws:sts::123456789:assumed-role/ParagonAssumedRole/SessionName
-      # but we need to convert it to arn:aws:iam::123456789:role/aws-reserved/sso.amazonaws.com/ParagonAssumedRole
-      local.is_assumed_role && strcontains(data.aws_caller_identity.current.arn, ":assumed-role/AWSReservedSSO") ? ":role__TEMPORARY_DIVIDER__aws-reserved__TEMPORARY_DIVIDER__sso.amazonaws.com/" : ":role/"
-    )
-  )
-  caller_arn = local.is_assumed_role ? replace(format("%s/%s", local.assumed_role_parts[0], local.assumed_role_parts[1]), "__TEMPORARY_DIVIDER__", "/") : data.aws_caller_identity.current.arn
-
-  # include current user as EKS admin
-  eks_admin_arns = distinct(compact(concat(
-    var.eks_admin_arns,
-    [local.caller_arn]
-  )))
-}

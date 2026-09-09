@@ -1,5 +1,5 @@
 provider "google" {
-  credentials    = var.gcp_assume_role ? null : local.gcp_creds
+  credentials    = var.gcp_assume_role ? null : local.gcp_provider_credentials
   default_labels = local.default_labels
   project        = local.gcp_project_id
   region         = var.region
@@ -7,7 +7,7 @@ provider "google" {
 }
 
 provider "google-beta" {
-  credentials    = var.gcp_assume_role ? null : local.gcp_creds
+  credentials    = var.gcp_assume_role ? null : local.gcp_provider_credentials
   default_labels = local.default_labels
   project        = local.gcp_project_id
   region         = var.region
@@ -26,6 +26,13 @@ provider "helm" {
     token                  = data.google_client_config.paragon.access_token
     cluster_ca_certificate = base64decode(data.google_container_cluster.cluster.master_auth[0].cluster_ca_certificate)
   }
+}
+
+provider "kubectl" {
+  host                   = "https://${data.google_container_cluster.cluster.endpoint}"
+  token                  = data.google_client_config.paragon.access_token
+  cluster_ca_certificate = base64decode(data.google_container_cluster.cluster.master_auth[0].cluster_ca_certificate)
+  load_config_file       = false
 }
 
 provider "hoop" {

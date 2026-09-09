@@ -6,6 +6,22 @@ Call with: include "migration.standard" (dict "root" $ "imageName" "postgres-zeu
 {{- $root := .root -}}
 {{- $imageName := .imageName -}}
 {{- $name := $root.Chart.Name -}}
+{{- $podAnnotations := dict -}}
+{{- if and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "podAnnotations") (kindIs "map" $root.Values.global.podAnnotations) -}}
+{{- $podAnnotations = merge $podAnnotations $root.Values.global.podAnnotations -}}
+{{- end -}}
+{{- if $root.Values.podAnnotations -}}
+{{- $podAnnotations = merge $podAnnotations $root.Values.podAnnotations -}}
+{{- end -}}
+{{- $migration := dict "activeDeadlineSeconds" 600 "queryTimeoutMillis" 600000 -}}
+{{- if kindIs "map" $root.Values.global -}}
+{{- if kindIs "map" (get $root.Values.global "migration") -}}
+{{- $migration = merge (deepCopy $root.Values.global.migration) $migration -}}
+{{- end -}}
+{{- end -}}
+{{- if kindIs "map" (get $root.Values "migration") -}}
+{{- $migration = merge (deepCopy $root.Values.migration) $migration -}}
+{{- end -}}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -14,20 +30,31 @@ metadata:
   annotations:
     "helm.sh/hook": "pre-install,pre-upgrade"
     "helm.sh/hook-weight": "-1"
-    "helm.sh/hook-delete-policy": hook-succeeded
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
+  # Failed jobs are kept for debugging and removed by before-hook-creation on the next upgrade.
+  # backoffLimit is left at the Kubernetes default (6) unless overridden via values.migration /
+  # global.migration — useful for transient DB errors; long CREATE INDEX work is bounded by
+  # activeDeadlineSeconds / POSTGRES_QUERY_TIMEOUT_MILLIS instead.
+  {{- if hasKey $migration "backoffLimit" }}
+  backoffLimit: {{ $migration.backoffLimit }}
+  {{- end }}
+  {{- if $migration.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ $migration.activeDeadlineSeconds }}
+  {{- end }}
   template:
     metadata:
-      {{- with $root.Values.podAnnotations }}
+      {{- if $podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $podAnnotations | nindent 8 }}
       {{- end }}
       labels:
         {{- include (printf "%s.selectorLabels" $name) $root | nindent 8 }}
     spec:
-      {{- with $root.Values.imagePullSecrets }}
+      {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" $root) -}}
+      {{- if $pullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        {{- $pullSecrets | nindent 8 }}
       {{- end }}
       serviceAccountName: default
       securityContext:
@@ -36,12 +63,15 @@ spec:
         - name: {{ $imageName | quote }}
           securityContext:
             {{- toYaml $root.Values.securityContext | nindent 12 }}
-          image: "useparagon/{{ $imageName }}:{{ $root.Values.global.paragon_version | default $root.Values.global.env.VERSION }}"
-          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          image: {{ include "paragon.image" (dict "root" $root "repository" (printf "useparagon/%s" $imageName) "tag" ($root.Values.global.paragon_version | default $root.Values.global.env.VERSION) "useMigrationRegistry" true) | quote }}
+          imagePullPolicy: {{ include "paragon.imagePullPolicy" (dict "root" $root) }}
           resources:
             {{- toYaml $root.Values.resources | nindent 12 }}
           env:
             {{- include "env.standard" $root | nindent 12 }}
+            # Override after env.standard so migrations can run longer than runtime query limits.
+            - name: POSTGRES_QUERY_TIMEOUT_MILLIS
+              value: {{ $migration.queryTimeoutMillis | quote }}
       restartPolicy: Never
       {{- with $root.Values.nodeSelector }}
       nodeSelector:

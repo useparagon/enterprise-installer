@@ -1,4 +1,35 @@
 locals {
+  version = var.helm_values.global.env["VERSION"]
+
+  # coalesce(null, "") errors because coalesce skips empty strings as well as null.
+  docker_username = trimspace(var.docker_username != null ? var.docker_username : "")
+  docker_password = trimspace(var.docker_password != null ? var.docker_password : "")
+
+  # Blank credentials produce a well-formed but unusable pull secret
+  # (auth = base64(":")), which fails image pulls with insufficient_scope
+  # instead of failing the apply, so blank is treated the same as unset.
+  docker_credentials_set = local.docker_username != "" && local.docker_password != ""
+
+  helm_values_yaml = yamlencode(nonsensitive(var.helm_values))
+
+  subchart_values = yamlencode({
+    subchart = merge(
+      merge(
+        {
+          for microservice in keys(var.microservices) : microservice => {
+            enabled = true
+          }
+        },
+        {
+          kafka-exporter = {
+            enabled = var.managed_sync_enabled
+          }
+        }
+      ),
+      try(nonsensitive(var.helm_values.subchart), {})
+    )
+  })
+
   flipt_values = yamlencode({
     flipt = {
       flipt = {
@@ -31,87 +62,131 @@ locals {
     }
   })
 
-  global_values = yamlencode(merge(
-    nonsensitive(var.helm_values),
-    {
-      global = merge(
-        nonsensitive(var.helm_values.global),
+  microservice_values = yamlencode({
+    for microservice_name, microservice_config in var.microservices : microservice_name => {
+      env = {
+        SERVICE = microservice_name
+      }
+    }
+  })
+
+  public_microservice_values = yamlencode({
+    for microservice_name, microservice_config in var.public_microservices : microservice_name => {
+      ingress = merge(
         {
-          env = merge(
-            nonsensitive(var.helm_values.global.env),
-            {
-              k8s_version = var.k8s_version
-              secretName  = "paragon-secrets"
-            }
-          ),
-          paragon_version = var.helm_values.global.env["VERSION"]
-        }
+          className          = "alb"
+          host               = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
+          scheme             = var.ingress_scheme
+          certificate        = var.certificate
+          load_balancer_name = var.workspace
+          logs_bucket        = var.logs_bucket
+        },
+        var.waf_web_acl_arn != "" ? { wafv2_acl_arn = var.waf_web_acl_arn } : {}
       )
     }
-  ))
+  })
+
+  monitor_values = yamlencode({
+    for monitor_name, monitor_config in var.monitors : monitor_name => {
+      image = {
+        tag = var.monitor_version
+      }
+      ingress = {
+        logs_bucket = var.logs_bucket
+      }
+    }
+  })
+
+  public_monitor_values = yamlencode({
+    for monitor_name, monitor_config in var.public_monitors : monitor_name => {
+      ingress = merge(
+        {
+          className          = "alb"
+          host               = replace(replace(monitor_config.public_url, "https://", ""), "http://", "")
+          scheme             = var.ingress_scheme
+          certificate        = var.certificate
+          load_balancer_name = var.workspace
+        },
+        var.waf_web_acl_arn != "" ? { wafv2_acl_arn = var.waf_web_acl_arn } : {}
+      )
+    }
+  })
+
+  docker_pull_secret_global_values = var.create_docker_pull_secret ? {
+    imagePullSecrets = concat(
+      try(nonsensitive(var.helm_values.global.imagePullSecrets), []),
+      [{ name = var.docker_pull_secret_name }]
+    )
+  } : {}
+
+  global_values = yamlencode({
+    global = merge(
+      nonsensitive(var.helm_values.global),
+      {
+        podAnnotations = merge(
+          try(nonsensitive(var.helm_values.global).podAnnotations, {}),
+          {
+            "reloader.stakater.com/auto" = "true"
+          }
+        )
+        env = merge(
+          nonsensitive(var.helm_values.global.env),
+          {
+            k8s_version = var.k8s_version
+            secretName  = "paragon-secrets"
+          }
+        ),
+        paragon_version = local.version
+      },
+      local.docker_pull_secret_global_values
+    )
+  })
+
+  runtime_secret_values = yamlencode({
+    fluent-bit = {
+      envFrom = [
+        {
+          secretRef = {
+            name = "openobserve-credentials"
+          }
+        }
+      ]
+      podAnnotations = {
+        "reloader.stakater.com/auto" = "true"
+      }
+    }
+    openobserve = {
+      credsSecretName = ""
+      secretName      = "openobserve-credentials"
+    }
+  })
 
   global_values_minus_env = yamlencode(merge(
     nonsensitive(var.helm_values),
     {
-      global = merge(nonsensitive(var.helm_values).global, { env = {
-        HOST_ENV = "AWS_K8"
-      } })
+      global = merge(
+        nonsensitive(var.helm_values).global,
+        {
+          podAnnotations = merge(
+            try(nonsensitive(var.helm_values).global.podAnnotations, {}),
+            { "reloader.stakater.com/auto" = "true" }
+          )
+          env = {
+            HOST_ENV = "AWS_K8"
+          }
+        },
+        local.docker_pull_secret_global_values
+      )
     }
   ))
 
-  supported_microservices_values = <<EOF
-subchart:
-  account:
-    enabled: ${contains(keys(var.microservices), "account")}
-  cache-replay:
-    enabled: ${contains(keys(var.microservices), "cache-replay")}
-  cerberus:
-    enabled: ${contains(keys(var.microservices), "cerberus")}
-  connect:
-    enabled: ${contains(keys(var.microservices), "connect")}
-  dashboard:
-    enabled: ${contains(keys(var.microservices), "dashboard")}
-  flipt:
-    enabled: ${contains(keys(var.microservices), "flipt")}
-  hades:
-    enabled: ${contains(keys(var.microservices), "hades")}
-  hermes:
-    enabled: ${contains(keys(var.microservices), "hermes")}
-  minio:
-    enabled: ${contains(keys(var.microservices), "minio")}
-  passport:
-    enabled: ${contains(keys(var.microservices), "passport")}
-  pheme:
-    enabled: ${contains(keys(var.microservices), "pheme")}
-  release:
-    enabled: ${contains(keys(var.microservices), "release")}
-  zeus:
-    enabled: ${contains(keys(var.microservices), "zeus")}
-  worker-actionkit:
-    enabled: ${contains(keys(var.microservices), "worker-actionkit")}
-  worker-actions:
-    enabled: ${contains(keys(var.microservices), "worker-actions")}
-  worker-auditlogs:
-    enabled: ${contains(keys(var.microservices), "worker-auditlogs")}
-  worker-credentials:
-    enabled: ${contains(keys(var.microservices), "worker-credentials")}
-  worker-crons:
-    enabled: ${contains(keys(var.microservices), "worker-crons")}
-  worker-deployments:
-    enabled: ${contains(keys(var.microservices), "worker-deployments")}
-  worker-eventlogs:
-    enabled: ${contains(keys(var.microservices), "worker-eventlogs")}
-  worker-proxy:
-    enabled: ${contains(keys(var.microservices), "worker-proxy")}
-  worker-triggers:
-    enabled: ${contains(keys(var.microservices), "worker-triggers")}
-  worker-workflows:
-    enabled: ${contains(keys(var.microservices), "worker-workflows")}
-EOF
-
-  # changes to secrets should trigger redeploy
+  # Force Helm upgrades when public values or ESO-backed cloud secrets change.
+  # helm_values is public-only; secrets_revision tracks Secrets Manager versions.
   secret_hash = yamlencode({
-    secret_hash = sha256(jsonencode(nonsensitive(var.helm_values)))
+    secret_hash = sha256(jsonencode({
+      values  = nonsensitive(var.helm_values)
+      secrets = var.secrets_revision
+    }))
   })
 }
 
@@ -123,7 +198,15 @@ resource "kubernetes_namespace_v1" "paragon" {
     annotations = {
       name = "paragon"
     }
+
+    labels = {
+      "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
+    }
   }
+}
+
+locals {
+  paragon_namespace = kubernetes_namespace_v1.paragon.metadata[0].name
 }
 
 resource "kubernetes_config_map_v1" "feature_flag_content" {
@@ -131,7 +214,7 @@ resource "kubernetes_config_map_v1" "feature_flag_content" {
 
   metadata {
     name      = "feature-flags-content"
-    namespace = kubernetes_namespace_v1.paragon.id
+    namespace = local.paragon_namespace
   }
 
   data = {
@@ -139,11 +222,19 @@ resource "kubernetes_config_map_v1" "feature_flag_content" {
   }
 }
 
-# kubernetes secret to pull docker image from docker hub
+# kubernetes secret to pull container images from a registry (Docker Hub, Artifactory, etc.)
+# When install_external_secrets is true, ESO syncs this secret instead (see external_secrets.tf).
+# When create_docker_pull_secret is false, callers pre-provision the secret (Artifactory/proxy).
 resource "kubernetes_secret_v1" "docker_login" {
+  count = (
+    var.create_docker_pull_secret &&
+    !var.install_external_secrets &&
+    local.docker_credentials_set
+  ) ? 1 : 0
+
   metadata {
-    name      = "docker-cfg"
-    namespace = kubernetes_namespace_v1.paragon.id
+    name      = var.docker_pull_secret_name
+    namespace = local.paragon_namespace
   }
 
   type = "kubernetes.io/dockerconfigjson"
@@ -152,53 +243,39 @@ resource "kubernetes_secret_v1" "docker_login" {
     ".dockerconfigjson" = jsonencode({
       auths = {
         "${var.docker_registry_server}" = {
-          "username" = var.docker_username
-          "password" = var.docker_password
-          "email"    = var.docker_email
-          "auth"     = base64encode("${var.docker_username}:${var.docker_password}")
+          "username" = local.docker_username
+          "password" = local.docker_password
+          "email"    = var.docker_email != null ? var.docker_email : ""
+          "auth"     = base64encode("${local.docker_username}:${local.docker_password}")
         }
       }
     })
   }
 }
 
-# shared secrets
-resource "kubernetes_secret_v1" "paragon_secrets" {
-  for_each = toset(
-    var.managed_sync_enabled ? [
-      "paragon-secrets",
-      "paragon-managed-sync-secrets"
-      ] : [
-      "paragon-secrets"
-    ]
-  )
-  metadata {
-    name      = each.value
-    namespace = kubernetes_namespace_v1.paragon.id
-  }
-
-  type = "Opaque"
-
-  data = {
-    # Map global.env from helm_values into secret data
-    for key, value in nonsensitive(var.helm_values.global.env) :
-    key => value
-  }
-}
-
 # ingress controller; provisions load balancer
+#
+# Upgrade order (per cluster, before paragon terraform apply):
+#   1. kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+#   2. terraform apply (paragon workspace)
+# CRD apply is safe while v2.x controller is still running; skip risks v3.4 crash-loop.
+#
+# Scheduling: prefer on-demand nodes but allow spot when the on-demand pool is small.
+# Pod anti-affinity (preferred) spreads replicas across hosts. PDB and disruption
+# annotations protect against autoscaler disruption regardless of node pool.
 resource "helm_release" "ingress" {
   name        = "ingress"
   description = "AWS Ingress Controller"
 
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
-  version    = "1.9.1"
+  version    = "3.4.0"
 
+  namespace        = local.paragon_namespace
   atomic           = true
   cleanup_on_fail  = true
   create_namespace = false
-  namespace        = kubernetes_namespace_v1.paragon.id
+  force_update     = true
   verify           = false
 
   set {
@@ -207,9 +284,69 @@ resource "helm_release" "ingress" {
   }
 
   set {
+    name  = "region"
+    value = var.aws_region
+  }
+
+  set {
     name  = "replicaCount"
     value = "3"
   }
+
+  set {
+    name  = "podDisruptionBudget.maxUnavailable"
+    value = "1"
+  }
+
+  # Custom affinity replaces chart default (configureDefaultAffinity); include both
+  # preferred on-demand placement and preferred per-host spread.
+  values = [yamlencode({
+    configureDefaultAffinity = false
+    # Shared backend SG on every ALB so Terraform worker rules match ENI traffic.
+    # Auto-generated frontend SGs ignore manage-backend-security-group-rules, so
+    # the controller still authorizes worker access. disableRestrictedSecurityGroupRules
+    # makes that permission 0-65535 instead of the coalesced target-port range Terraform
+    # owns, so a controller revoke cannot delete the safeguard (and apply cannot
+    # DuplicatePermission). Helm applies this with the controller, before app Ingresses.
+    backendSecurityGroup                  = var.alb_backend_security_group_id
+    enableManageBackendSecurityGroupRules = false
+    disableRestrictedSecurityGroupRules   = true
+    podAnnotations = {
+      "cluster-autoscaler.kubernetes.io/safe-to-evict" = "false"
+      "karpenter.sh/do-not-disrupt"                    = "true"
+    }
+    affinity = {
+      nodeAffinity = {
+        preferredDuringSchedulingIgnoredDuringExecution = [{
+          weight = 100
+          preference = {
+            matchExpressions = [{
+              key      = "useparagon.com/capacityType"
+              operator = "In"
+              values   = ["ondemand"]
+            }]
+          }
+        }]
+      }
+      podAntiAffinity = {
+        preferredDuringSchedulingIgnoredDuringExecution = [{
+          weight = 100
+          podAffinityTerm = {
+            labelSelector = {
+              matchExpressions = [{
+                key      = "app.kubernetes.io/name"
+                operator = "In"
+                values   = ["aws-load-balancer-controller"]
+              }]
+            }
+            topologyKey = "kubernetes.io/hostname"
+          }
+        }]
+      }
+    }
+  })]
+
+  depends_on = [module.karpenter]
 }
 
 # metrics server for hpa
@@ -217,145 +354,123 @@ resource "helm_release" "metricsserver" {
   name        = "metricsserver"
   description = "AWS Metrics Server"
 
-  repository       = "https://kubernetes-sigs.github.io/metrics-server/"
-  chart            = "metrics-server"
-  namespace        = kubernetes_namespace_v1.paragon.id
-  create_namespace = false
-  cleanup_on_fail  = true
+  repository = "https://kubernetes-sigs.github.io/metrics-server/"
+  chart      = "metrics-server"
+
+  namespace        = local.paragon_namespace
   atomic           = true
+  cleanup_on_fail  = true
+  create_namespace = false
+  force_update     = true
   verify           = false
 
   depends_on = [
-    helm_release.ingress
+    module.karpenter,
+    helm_release.ingress,
   ]
 }
 
-# graceful handling of spot evictions
-module "aws_node_termination_handler" {
-  source  = "qvest-digital/aws-node-termination-handler/kubernetes"
-  version = "4.0.0"
+# graceful handling of spot evictions on legacy managed node groups
+resource "helm_release" "node_termination_handler" {
+  count = var.enable_legacy_mng_pools ? 1 : 0
 
-  json_logging = true
+  name        = "nth"
+  description = "AWS Node Termination Handler"
+
+  repository = "oci://public.ecr.aws/aws-ec2/helm"
+  chart      = "aws-node-termination-handler"
+  version    = "0.27.6"
+
+  namespace        = "kube-system"
+  atomic           = true
+  cleanup_on_fail  = true
+  create_namespace = false
+  force_update     = true
+  verify           = false
+
+  values = [yamlencode({
+    jsonLogging = true
+
+    # Chart default is true; keep it off to match the DaemonSet being replaced. Draining on
+    # scheduled maintenance events is a separate behavior change, not part of this fix.
+    enableScheduledEventDraining = false
+
+    # Chart ships resources empty, which would leave the pod BestEffort.
+    resources = {
+      requests = {
+        cpu    = "50m"
+        memory = "64Mi"
+      }
+      limits = {
+        cpu    = "100m"
+        memory = "128Mi"
+      }
+    }
+
+    # Spot nodes are labeled in infra (cluster.tf); avoid legacy lifecycle=Ec2Spot default.
+    daemonsetNodeSelector = {
+      "useparagon.com/capacityType" = "spot"
+    }
+  })]
 }
 
 # microservices deployment
 resource "helm_release" "paragon_on_prem" {
-  name              = "paragon-on-prem"
-  description       = "Paragon microservices"
-  chart             = "./charts/paragon-onprem"
-  version           = "${var.helm_values.global.env["VERSION"]}-${local.chart_hashes["paragon-onprem"]}"
-  namespace         = kubernetes_namespace_v1.paragon.id
-  create_namespace  = false
-  cleanup_on_fail   = true
+  name        = "paragon-on-prem"
+  description = "Paragon microservices"
+  chart       = "./charts/paragon-onprem"
+  version     = "${local.version}-${local.chart_hashes["paragon-onprem"]}"
+
+  namespace         = local.paragon_namespace
   atomic            = true
-  verify            = false
-  timeout           = 900 # 15 minutes
+  cleanup_on_fail   = true
+  create_namespace  = false
   dependency_update = true
+  force_update      = false
+  timeout           = 900 # 15 minutes
+  verify            = false
 
   values = [
-    local.supported_microservices_values,
-    local.flipt_values,
+    local.helm_values_yaml,
+    local.subchart_values,
     local.global_values,
+    local.flipt_values,
+    local.microservice_values,
+    local.public_microservice_values,
     local.secret_hash
   ]
 
-  dynamic "set" {
-    for_each = var.microservices
-
-    content {
-      name  = "${set.key}.env.SERVICE"
-      value = set.key
-    }
-  }
-
-  # used to set map the ingress to the public url of each microservice
-  dynamic "set" {
-    for_each = var.public_microservices
-
-    content {
-      name  = "${set.key}.ingress.host"
-      value = replace(replace(set.value.public_url, "https://", ""), "http://", "")
-    }
-  }
-
-  # configures whether the load balancer is 'internet-facing' (public) or 'internal' (private)
-  dynamic "set" {
-    for_each = var.public_microservices
-
-    content {
-      name  = "${set.key}.ingress.scheme"
-      value = var.ingress_scheme
-    }
-  }
-
-  # configures the ssl cert to the load balancer
-  dynamic "set" {
-    for_each = var.public_microservices
-
-    content {
-      name  = "${set.key}.ingress.certificate"
-      value = var.certificate
-    }
-  }
-
-  # configures the load balancer name
-  dynamic "set" {
-    for_each = var.public_microservices
-
-    content {
-      name  = "${set.key}.ingress.load_balancer_name"
-      value = var.workspace
-    }
-  }
-
-  # configures load balancer bucket for logging
-  dynamic "set" {
-    for_each = var.public_microservices
-
-    content {
-      name  = "${set.key}.ingress.logs_bucket"
-      value = var.logs_bucket
-    }
-  }
-
-  # configures load balancer className
-  dynamic "set" {
-    for_each = var.public_microservices
-
-    content {
-      name  = "${set.key}.ingress.className"
-      value = "alb"
-    }
-  }
-
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
+    data.kubernetes_secret_v1.paragon_secrets,
+    data.kubernetes_secret_v1.docker_cfg,
     kubernetes_secret_v1.docker_login,
-    kubernetes_secret_v1.paragon_secrets,
     kubernetes_storage_class_v1.gp3_encrypted,
-    kubernetes_config_map_v1.feature_flag_content
+    kubernetes_config_map_v1.feature_flag_content,
   ]
 }
 
 # paragon logging stack fluent bit and openobserve
 resource "helm_release" "paragon_logging" {
-  name              = "paragon-logging"
-  description       = "Paragon logging services"
-  chart             = "./charts/paragon-logging"
-  version           = "${var.helm_values.global.env["VERSION"]}-${local.chart_hashes["paragon-logging"]}"
-  namespace         = kubernetes_namespace_v1.paragon.id
-  create_namespace  = false
-  cleanup_on_fail   = true
-  atomic            = true
-  verify            = false
-  timeout           = 900 # 15 minutes
-  dependency_update = true
+  name        = "paragon-logging"
+  description = "Paragon logging services"
+  chart       = "./charts/paragon-logging"
+  version     = "${local.version}-${local.chart_hashes["paragon-logging"]}"
 
-  values = fileexists("${path.root}/../.secure/values.yaml") ? [
+  namespace         = local.paragon_namespace
+  atomic            = true
+  cleanup_on_fail   = true
+  create_namespace  = false
+  dependency_update = true
+  force_update      = true
+  timeout           = 900 # 15 minutes
+  verify            = false
+
+  values = [
+    local.helm_values_yaml,
     local.global_values,
-    file("${path.root}/../.secure/values.yaml")
-    ] : [
-    local.global_values
+    local.runtime_secret_values
   ]
 
   set {
@@ -373,31 +488,13 @@ resource "helm_release" "paragon_logging" {
     value = var.aws_region
   }
 
-  set_sensitive {
-    name  = "fluent-bit.secrets.ZO_ROOT_USER_EMAIL"
-    value = local.openobserve_email
-  }
-
-  set_sensitive {
-    name  = "fluent-bit.secrets.ZO_ROOT_USER_PASSWORD"
-    value = local.openobserve_password
-  }
-
-  set_sensitive {
-    name  = "openobserve.secrets.ZO_ROOT_USER_EMAIL"
-    value = local.openobserve_email
-  }
-
-  set_sensitive {
-    name  = "openobserve.secrets.ZO_ROOT_USER_PASSWORD"
-    value = local.openobserve_password
-  }
-
-
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
+    data.kubernetes_secret_v1.docker_cfg,
+    data.kubernetes_secret_v1.openobserve_credentials,
     kubernetes_secret_v1.docker_login,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }
 
@@ -405,92 +502,28 @@ resource "helm_release" "paragon_logging" {
 resource "helm_release" "paragon_monitoring" {
   count = var.monitors_enabled ? 1 : 0
 
-  name              = "paragon-monitoring"
-  description       = "Paragon monitors"
-  chart             = "./charts/paragon-monitoring"
-  version           = "${var.monitor_version}-${local.chart_hashes["paragon-monitoring"]}"
-  namespace         = "paragon"
+  name        = "paragon-monitoring"
+  description = "Paragon monitors"
+  chart       = "./charts/paragon-monitoring"
+  version     = "${var.monitor_version}-${local.chart_hashes["paragon-monitoring"]}"
+
+  namespace         = local.paragon_namespace
+  atomic            = true
   cleanup_on_fail   = true
   create_namespace  = false
-  atomic            = true
-  verify            = false
-  timeout           = 900 # 15 minutes
   dependency_update = true
+  force_update      = true
+  timeout           = 900 # 15 minutes
+  verify            = false
 
   values = [
+    local.helm_values_yaml,
+    local.subchart_values,
     local.global_values,
+    local.monitor_values,
+    local.public_monitor_values,
     local.secret_hash
   ]
-
-  # set image tag to pull
-  dynamic "set" {
-    for_each = var.monitors
-
-    content {
-      name  = "${set.key}.image.tag"
-      value = var.monitor_version
-    }
-  }
-
-  # used to set map the ingress to the public url of each microservice
-  dynamic "set" {
-    for_each = var.public_monitors
-
-    content {
-      name  = "${set.key}.ingress.host"
-      value = replace(replace(set.value.public_url, "https://", ""), "http://", "")
-    }
-  }
-
-  # configures whether the load balancer is 'internet-facing' (public) or 'internal' (private)
-  dynamic "set" {
-    for_each = var.public_monitors
-
-    content {
-      name  = "${set.key}.ingress.scheme"
-      value = var.ingress_scheme
-    }
-  }
-
-  # configures the ssl cert to the load balancer
-  dynamic "set" {
-    for_each = var.public_monitors
-
-    content {
-      name  = "${set.key}.ingress.certificate"
-      value = var.certificate
-    }
-  }
-
-  # configures the load balancer name
-  dynamic "set" {
-    for_each = var.public_monitors
-
-    content {
-      name  = "${set.key}.ingress.load_balancer_name"
-      value = var.workspace
-    }
-  }
-
-  # configures load balancer bucket for logging
-  dynamic "set" {
-    for_each = var.monitors
-
-    content {
-      name  = "${set.key}.ingress.logs_bucket"
-      value = var.logs_bucket
-    }
-  }
-
-  # configures load balancer className
-  dynamic "set" {
-    for_each = var.public_monitors
-
-    content {
-      name  = "${set.key}.ingress.className"
-      value = "alb"
-    }
-  }
 
   set {
     name  = "global.env.k8s_version"
@@ -498,14 +531,17 @@ resource "helm_release" "paragon_monitoring" {
   }
 
   set {
-    name  = "global.env.MONITOR_GRAFANA_ALB_ARN"
+    name  = "grafana.secrets.MONITOR_GRAFANA_ALB_ARN"
     value = data.aws_lb.load_balancer.arn_suffix
   }
 
   depends_on = [
+    module.karpenter,
     helm_release.ingress,
     helm_release.paragon_on_prem,
+    data.kubernetes_secret_v1.paragon_secrets,
+    data.kubernetes_secret_v1.docker_cfg,
     kubernetes_secret_v1.docker_login,
-    kubernetes_storage_class_v1.gp3_encrypted
+    kubernetes_storage_class_v1.gp3_encrypted,
   ]
 }

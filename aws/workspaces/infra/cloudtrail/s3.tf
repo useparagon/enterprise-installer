@@ -69,15 +69,6 @@ resource "aws_s3_bucket_versioning" "cloudtrail" {
   }
 }
 
-resource "aws_s3_bucket_acl" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail.id
-  acl    = "private"
-
-  depends_on = [
-    aws_s3_bucket_ownership_controls.cloudtrail
-  ]
-}
-
 resource "aws_s3_bucket_policy" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
   policy = <<POLICY
@@ -160,7 +151,6 @@ POLICY
 
   depends_on = [
     aws_s3_bucket_ownership_controls.cloudtrail,
-    aws_s3_bucket_acl.cloudtrail,
   ]
 }
 
@@ -180,6 +170,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
     id     = "abort-incomplete"
     status = "Enabled"
 
+    filter {}
+
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
     }
@@ -188,6 +180,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
   rule {
     id     = "transition-to-glacier"
     status = "Enabled"
+
+    filter {}
 
     transition {
       days          = 7
@@ -198,6 +192,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
   rule {
     id     = "expire"
     status = "Enabled"
+
+    filter {}
 
     expiration {
       days = 365

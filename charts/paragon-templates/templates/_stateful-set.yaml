@@ -1,6 +1,6 @@
 {{/*
 Standard StatefulSet for services requiring persistent storage.
-Call with: include "statefulset.standard" (dict "root" $ "volumeName" "minio" "mountPath" "/var/paragon" "storageSize" "500M")
+Call with: include "statefulset.standard" (dict "root" $ "volumeName" "grafana" "mountPath" "/var/lib/grafana" "storageSize" "5Gi")
 */}}
 {{- define "statefulset.standard" -}}
 {{- $root := .root -}}
@@ -9,6 +9,13 @@ Call with: include "statefulset.standard" (dict "root" $ "volumeName" "minio" "m
 {{- $storageSize := .storageSize | default "5Gi" -}}
 {{- $name := $root.Chart.Name -}}
 {{- $command := .command | default "" -}}
+{{- $podAnnotations := dict -}}
+{{- if and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "podAnnotations") (kindIs "map" $root.Values.global.podAnnotations) -}}
+{{- $podAnnotations = merge $podAnnotations $root.Values.global.podAnnotations -}}
+{{- end -}}
+{{- if $root.Values.podAnnotations -}}
+{{- $podAnnotations = merge $podAnnotations $root.Values.podAnnotations -}}
+{{- end -}}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -26,16 +33,18 @@ spec:
   serviceName: {{ include (printf "%s.fullname" $name) $root }}
   template:
     metadata:
-      {{- with $root.Values.podAnnotations }}
+      {{- if $podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $podAnnotations | nindent 8 }}
       {{- end }}
       labels:
         {{- include (printf "%s.selectorLabels" $name) $root | nindent 8 }}
     spec:
-      {{- with $root.Values.imagePullSecrets }}
+      terminationGracePeriodSeconds: 65
+      {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" $root) -}}
+      {{- if $pullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        {{- $pullSecrets | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include (printf "%s.serviceAccountName" $name) $root }}
       securityContext:
@@ -44,11 +53,11 @@ spec:
         - name: {{ $name }}
           securityContext:
             {{- toYaml $root.Values.securityContext | nindent 12 }}
-          image: "{{ $root.Values.image.repository }}:{{ $root.Values.global.paragon_version | default $root.Values.image.tag | default $root.Values.global.env.VERSION }}"
+          image: {{ include "paragon.containerImage" (dict "root" $root "tag" ($root.Values.global.paragon_version | default $root.Values.image.tag | default $root.Values.global.env.VERSION)) | quote }}
           {{- if $command }}
           command: [{{ $command | quote }}]
           {{- end }}
-          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          imagePullPolicy: {{ include "paragon.imagePullPolicy" (dict "root" $root) }}
           ports:
             - name: http
               containerPort: {{ $root.Values.service.port }}
@@ -63,26 +72,11 @@ spec:
                   - -c
                   - sleep 35
           livenessProbe:
-            httpGet:
-              path: {{ $root.Values.ingress.healthcheck_path | default "/healthz" }}
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
+            {{- include "probes.httpGet" (dict "root" $root "type" "liveness") | nindent 12 }}
           readinessProbe:
-            httpGet:
-              path: {{ $root.Values.ingress.readycheck_path | default $root.Values.ingress.healthcheck_path | default "/healthz" }}
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
+            {{- include "probes.httpGet" (dict "root" $root "type" "readiness") | nindent 12 }}
           startupProbe:
-            httpGet:
-              path: {{ $root.Values.ingress.healthcheck_path | default "/healthz" }}
-              port: http
-            failureThreshold: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
+            {{- include "probes.httpGet" (dict "root" $root "type" "startup") | nindent 12 }}
           resources:
             {{- toYaml $root.Values.resources | nindent 12 }}
           env:
@@ -90,6 +84,21 @@ spec:
           volumeMounts:
             - name: {{ $volumeName }}
               mountPath: {{ $mountPath }}
+      {{- $tsEnabled := true -}}
+      {{- if $root.Values.topologySpread -}}
+      {{- if hasKey $root.Values.topologySpread "enabled" -}}
+      {{- $tsEnabled = $root.Values.topologySpread.enabled -}}
+      {{- end -}}
+      {{- end -}}
+      {{- if $tsEnabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ if and $root.Values.topologySpread (hasKey $root.Values.topologySpread "maxSkew") }}{{ $root.Values.topologySpread.maxSkew }}{{ else }}1{{ end }}
+          topologyKey: {{ if $root.Values.topologySpread }}{{ $root.Values.topologySpread.topologyKey | default "kubernetes.io/hostname" }}{{ else }}kubernetes.io/hostname{{ end }}
+          labelSelector:
+            matchLabels:
+              {{- include (printf "%s.selectorLabels" $name) $root | nindent 14 }}
+          whenUnsatisfiable: {{ if $root.Values.topologySpread }}{{ $root.Values.topologySpread.whenUnsatisfiable | default "ScheduleAnyway" }}{{ else }}ScheduleAnyway{{ end }}
+      {{- end }}
       {{- with $root.Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

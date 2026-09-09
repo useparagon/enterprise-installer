@@ -79,3 +79,13 @@ resource "azurerm_postgresql_flexible_server_database" "paragon" {
 
   depends_on = [azurerm_postgresql_flexible_server_configuration.extensions]
 }
+
+
+resource "azurerm_management_lock" "postgres" {
+  for_each = var.postgres_management_lock_enabled ? local.postgres_instances : {}
+
+  name       = "${each.value.name}-can-not-delete"
+  scope      = azurerm_postgresql_flexible_server.postgres[each.key].id
+  lock_level = "CanNotDelete"
+  notes      = "Protect Postgres Flexible Server from accidental deletion."
+}

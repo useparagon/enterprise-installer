@@ -7,15 +7,22 @@
 SUBSCRIPTION_ID="your-azure-subscription-id"
 PRINCIPAL_ID="your-service-principal-object-id-or-user-object-id"
 
-# List of roles to assign at subscription level
-# Note: Contributor role is sufficient for most operations, but we document specific roles
-# for better security and compliance with least privilege principle.
-
+# Roles required for Terraform (infra + paragon)
+# Key Vault uses the access-policy model (not RBAC) by default: Contributor can create the vault
+# and access policies. Do not require Key Vault Administrator unless the vault is switched to RBAC.
 ROLES=(
-  # Contributor role - provides full access to manage all resources except grant access to others
-  # This is the minimum role needed for Terraform to create and manage Azure resources
+  # Create/manage RGs, networking, AKS, Postgres, Redis, Storage, Key Vault, Public IPs, bastion VMSS, Event Hubs
   "Contributor"
+  # Microsoft.Authorization/roleAssignments/write — AKS Network Contributor on subnet/NSG,
+  # Managed Redis export storage RBAC. Without this, infra apply fails with 403.
+  "User Access Administrator"
+  # listClusterUserCredential for Helm / Kubernetes providers in the paragon workspace
+  "Azure Kubernetes Service Cluster User Role"
 )
+
+# The bastion does not use this subscription-level role list. Infra Terraform
+# assigns its managed identity Azure Kubernetes Service Cluster Admin Role at
+# the individual cluster scope.
 
 # Alternative: If you want to use more granular permissions instead of Contributor,
 # you would need the following roles (but Contributor is simpler and sufficient):
@@ -28,11 +35,11 @@ ROLES=(
 #   "Storage Account Contributor"      # For Storage Accounts
 #   "Kubernetes Cluster Contributor"   # For AKS Clusters
 #   "Virtual Machine Contributor"      # For VM Scale Sets (bastion)
-#   "Key Vault Contributor"            # For Key Vaults
-#   "User Access Administrator"        # For Key Vault Access Policies (role assignments)
+#   "Key Vault Contributor"            # For Key Vaults (management plane)
+#   "User Access Administrator"        # For role assignments (RBAC)
+#   "Azure Kubernetes Service Cluster User Role"
 # )
 
-# Assign Contributor role at subscription level
 for ROLE in "${ROLES[@]}"; do
   echo "Assigning role '$ROLE' to principal $PRINCIPAL_ID..."
   az role assignment create \
@@ -49,11 +56,23 @@ echo "  - Create and manage Resource Groups"
 echo "  - Create and manage Virtual Networks, Subnets, and Network Security Groups"
 echo "  - Create and manage Private DNS Zones and Private Endpoints"
 echo "  - Create and manage PostgreSQL Flexible Servers"
-echo "  - Create and manage Redis Caches"
+echo "  - Create and manage Redis Caches / Managed Redis"
 echo "  - Create and manage Storage Accounts and Containers"
 echo "  - Create and manage AKS Clusters and Node Pools"
 echo "  - Create and manage Virtual Machine Scale Sets"
-echo "  - Create and manage Key Vaults and Access Policies"
+echo "  - Create and manage Key Vaults + access policies (default permission model)"
+echo "  - Create and manage Event Hubs (managed sync / Kafka protocol)"
 echo "  - Create and manage Public IPs"
 echo ""
-echo "The Contributor role is sufficient for running both infra and paragon workspaces."
+echo "User Access Administrator is required so Terraform can assign:"
+echo "  - Network Contributor to the AKS MI on the private subnet and aks-nsg"
+echo "  - Storage Blob Data Contributor to Managed Redis export storage (when enabled)"
+echo ""
+echo "Azure Kubernetes Service Cluster User Role is required for the paragon workspace"
+echo "to authenticate to the AKS API for Helm installs."
+echo ""
+echo "If the customer refuses User Access Administrator, they must run equivalent scoped"
+echo "az role assignment create commands themselves before/during infra apply."
+echo ""
+echo "The bastion managed identity receives Cluster Admin at cluster scope from infra Terraform."
+echo "It is separate from this Terraform principal policy."

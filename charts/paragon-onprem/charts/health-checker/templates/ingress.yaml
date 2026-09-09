@@ -28,9 +28,13 @@ metadata:
     alb.ingress.kubernetes.io/success-codes: '200'
     alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
     alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/manage-backend-security-group-rules: "false"
     alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
     {{- if hasKey .Values.ingress "ip_whitelist" }}
     alb.ingress.kubernetes.io/inbound-cidrs: {{ .Values.ingress.ip_whitelist }}
+    {{- end }}
+    {{- if and .Values.ingress.wafv2_acl_arn (ne .Values.ingress.wafv2_acl_arn "none") }}
+    alb.ingress.kubernetes.io/wafv2-acl-arn: {{ .Values.ingress.wafv2_acl_arn }}
     {{- end }}
     {{- else if eq .Values.global.env.HOST_ENV "AZURE_K8" }}
     kubernetes.io/ingress.class: nginx

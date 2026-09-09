@@ -1,0 +1,79 @@
+{{- if .Values.uds.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "openobserve.fullname" . }}-uds-apply
+  labels:
+    {{- include "openobserve.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    # No hook-succeeded: the Job is kept so `kubectl logs` can show what was
+    # applied. before-hook-creation removes it at the start of the next upgrade.
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: {{ .Values.uds.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.uds.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "openobserve.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: uds-apply
+    spec:
+      restartPolicy: Never
+      {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+      {{- if $pullSecrets }}
+      imagePullSecrets:
+        {{- $pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: uds-apply
+          image: {{ include "paragon.image" (dict "root" . "repository" .Values.uds.image.repository "tag" .Values.uds.image.tag) | quote }}
+          imagePullPolicy: {{ .Values.uds.image.pullPolicy | default .Values.global.pullPolicy | default "IfNotPresent" }}
+          command:
+            - node
+            - /uds/apply-uds.mjs
+          env:
+            - name: O2_HOST
+              value: "http://{{ include "openobserve.fullname" . }}:{{ .Values.service.port }}"
+            - name: DESIRED_SCHEMA_FILE
+              value: /uds/openobserve-uds-schema.json
+            - name: HEALTH_WAIT_SECONDS
+              value: {{ .Values.uds.healthWaitSeconds | quote }}
+            - name: STREAM_WAIT_SECONDS
+              value: {{ .Values.uds.streamWaitSeconds | quote }}
+            - name: REQUEST_TIMEOUT_SECONDS
+              value: {{ .Values.uds.requestTimeoutSeconds | quote }}
+            - name: APPLY_ATTEMPTS
+              value: {{ .Values.uds.applyAttempts | quote }}
+            # Finish before activeDeadlineSeconds and helm_release timeout
+            # (900s). A deadline kill marks the Job failed and rolls back.
+            - name: TOTAL_BUDGET_SECONDS
+              value: {{ sub (int .Values.uds.activeDeadlineSeconds) 120 | quote }}
+            - name: ZO_ROOT_USER_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if and .Values.secrets (kindIs "map" .Values.secrets) (hasKey .Values.secrets "ZO_ROOT_USER_EMAIL") }}{{ .Values.secretName }}-{{ .Chart.Name }}{{ else }}{{ .Values.secretName }}{{ end }}
+                  key: ZO_ROOT_USER_EMAIL
+            - name: ZO_ROOT_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if and .Values.secrets (kindIs "map" .Values.secrets) (hasKey .Values.secrets "ZO_ROOT_USER_PASSWORD") }}{{ .Values.secretName }}-{{ .Chart.Name }}{{ else }}{{ .Values.secretName }}{{ end }}
+                  key: ZO_ROOT_USER_PASSWORD
+          volumeMounts:
+            - name: uds-files
+              mountPath: /uds
+              readOnly: true
+          resources:
+            {{- toYaml .Values.uds.resources | nindent 12 }}
+      volumes:
+        - name: uds-files
+          configMap:
+            name: {{ include "openobserve.fullname" . }}-uds
+            defaultMode: 0555
+            items:
+              - key: openobserve-uds-schema.json
+                path: openobserve-uds-schema.json
+              - key: apply-uds.mjs
+                path: apply-uds.mjs
+{{- end }}

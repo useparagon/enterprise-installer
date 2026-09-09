@@ -18,26 +18,25 @@ resources:
   limits:
     memory: 512Mi
   requests:
-    cpu: 0.25
+    cpu: 250m
     memory: 512Mi
 
 autoscaling:
   enabled: true
   minReplicas: 2
-  maxReplicas: 2
-  targetCPUUtilizationPercentage: 70
-  targetMemoryUtilizationPercentage: 70
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 75
 
 secretName: "paragon-secrets"
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: 'dashboard'
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -69,6 +68,10 @@ ingress:
   className: ''
   host: '' # When empty, will use chart name + domain
   healthcheck_path: /healthz
+
+probes:
+  liveness:
+    failureThreshold: 12
 
 nodeSelector: {}
 

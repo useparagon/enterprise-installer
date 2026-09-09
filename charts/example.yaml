@@ -207,13 +207,32 @@ global:
     MONITOR_PGADMIN_SSL_MODE: disable
     MONITOR_POSTGRES_EXPORTER_HOST: http://postgres-exporter
     MONITOR_POSTGRES_EXPORTER_PORT: 9187
-    MONITOR_POSTGRES_EXPORTER_SSL_MODE: disable
+    MONITOR_POSTGRES_EXPORTER_SSL_MODE: require
     MONITOR_PROMETHEUS_HOST: http://prometheus
     MONITOR_PROMETHEUS_PORT: 9090
     MONITOR_REDIS_EXPORTER_HOST: http://redis-exporter
     MONITOR_REDIS_EXPORTER_PORT: 9121
     MONITOR_REDIS_INSIGHT_HOST: http://redis-insight
     MONITOR_REDIS_INSIGHT_PORT: 8500
+
+# Optional: paragon-onprem subchart overrides (PDB and topology spread).
+# Services use template defaults; only set these when you want to override or disable.
+# Uncomment and customize per service (account, zeus, connect, etc.) as needed.
+#
+# subchart:
+#   account:
+#     pdb:
+#       enabled: true
+#       maxUnavailable: 1    # default; use 0 for no disruption, or omit to use default
+#     topologySpread:
+#       enabled: true
+#       maxSkew: 1           # default; use 0 for strict balance; omit to use default
+#       topologyKey: kubernetes.io/hostname
+#       whenUnsatisfiable: ScheduleAnyway
+#   # Disable PDB for a service:
+#   flipt:
+#     pdb:
+#       enabled: false
 
 # Secrets - Replace all values with your actual secrets
 secrets: 
@@ -274,12 +293,11 @@ secrets:
   ZEUS_POSTGRES_USERNAME: "your-zeus-db-username"
   
   # Cloud Storage
-  CLOUD_STORAGE_MICROSERVICE_PASS: "your-s3-secret-key"
-  CLOUD_STORAGE_MICROSERVICE_USER: "your-s3-access-key"
+  # On AWS, S3 auth uses EKS Pod Identity — do not set CLOUD_STORAGE_MICROSERVICE_USER/PASS.
+  # CLOUD_STORAGE_MICROSERVICE_PASS: "your-s3-secret-key"   # legacy / MinIO only
+  # CLOUD_STORAGE_MICROSERVICE_USER: "your-s3-access-key"   # legacy / MinIO only
   
   # Monitoring
-  MONITOR_GRAFANA_AWS_ACCESS_ID: "your-grafana-aws-access-key"
-  MONITOR_GRAFANA_AWS_SECRET_KEY: "your-grafana-aws-secret-key"
   MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD: "your-grafana-admin-password"
   MONITOR_GRAFANA_SECURITY_ADMIN_USER: "your-grafana-admin-email@example.com"
   MONITOR_PGADMIN_EMAIL: "your-pgadmin-email@example.com"

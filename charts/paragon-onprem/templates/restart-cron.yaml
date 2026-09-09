@@ -1,25 +1,46 @@
 {{- if .Values.restart.enabled }}
+{{- $seed := .Values.global.env.PARAGON_DOMAIN | default .Release.Name | toString }}
+{{- /* hasKey so an explicit 0 is honored; Sprig default treats 0 as empty. max 1 avoids mod-by-zero. */}}
+{{- $windowMinutes := max 1 (ternary (int .Values.restart.windowMinutes) 180 (hasKey .Values.restart "windowMinutes")) }}
+{{- $offsetMinutes := mod (adler32sum $seed) $windowMinutes }}
+{{- $baseTotalMinutes := add (mul (int .Values.restart.hour) 60) (int .Values.restart.minute) }}
+{{- $scheduledTotalMinutes := add $baseTotalMinutes $offsetMinutes }}
+{{- $scheduleMinute := mod $scheduledTotalMinutes 60 }}
+{{- $scheduleHour := mod (div $scheduledTotalMinutes 60) 24 }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: restart-paragon-pods-cronjob
+  annotations:
+    paragon.useparagon.com/restart-window-minutes: {{ $windowMinutes | quote }}
+    paragon.useparagon.com/restart-offset-minutes: {{ $offsetMinutes | quote }}
 spec:
-  schedule: "{{ .Values.restart.schedule }}"
+  schedule: "{{ $scheduleMinute }} {{ $scheduleHour }} * * *"
   jobTemplate:
     spec:
       template:
         spec:
           serviceAccountName: paragon-restart-manager
+          {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+          {{- if $pullSecrets }}
+          imagePullSecrets:
+            {{- $pullSecrets | nindent 12 }}
+          {{- end }}
           containers:
           - name: restart-pods
-            image: alpine/kubectl:1.33.4
+            image: {{ include "paragon.kubectlImage" (dict "root" .) | quote }}
             command:
             - /bin/sh
             - -c
-            - >
-              kubectl get deployments -n paragon -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.annotations}{"\n"}{end}' | grep paragon-on-prem | awk '{print $1}' | xargs -I {} kubectl rollout restart deployment/{} -n paragon;
-              kubectl get statefulsets -n paragon -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.annotations}{"\n"}{end}' | grep paragon-on-prem | awk '{print $1}' | xargs -I {} kubectl rollout restart statefulset/{} -n paragon;
-              kubectl get deployments -n paragon -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.annotations}{"\n"}{end}' | grep paragon-monitoring | awk '{print $1}' | xargs -I {} kubectl rollout restart deployment/{} -n paragon;
-              kubectl get statefulsets -n paragon -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.annotations}{"\n"}{end}' | grep paragon-monitoring | awk '{print $1}' | xargs -I {} kubectl rollout restart statefulset/{} -n paragon;
+            - |
+              for kind in deployment statefulset; do
+                for filter in paragon-on-prem paragon-monitoring; do
+                  for name in $(kubectl get $kind -n paragon -l app.kubernetes.io/instance=$filter -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}'); do
+                    echo "Restarting $kind/$name"
+                    kubectl rollout restart "$kind/$name" -n paragon
+                    kubectl rollout status "$kind/$name" -n paragon --timeout=300s      
+                  done
+                done
+              done
           restartPolicy: OnFailure
 {{- end }}

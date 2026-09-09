@@ -1,0 +1,30 @@
+{{/*
+Standard helm test connection pod.
+Call with: include "test-connection.standard" (dict "root" $)
+Optional: "tag" for test image tag override (e.g. flipt test.tag).
+*/}}
+{{- define "test-connection.standard" -}}
+{{- $root := .root -}}
+{{- $tag := .tag | default "" -}}
+{{- $port := .port | default $root.Values.service.port -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include (printf "%s.fullname" $root.Chart.Name) $root }}-test-connection"
+  labels:
+    {{- include (printf "%s.labels" $root.Chart.Name) $root | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" $root) -}}
+  {{- if $pullSecrets }}
+  imagePullSecrets:
+    {{- $pullSecrets | nindent 4 }}
+  {{- end }}
+  containers:
+    - name: wget
+      image: {{ include "paragon.testImage" (dict "root" $root "tag" $tag) | quote }}
+      command: ['wget']
+      args: ['{{ include (printf "%s.fullname" $root.Chart.Name) $root }}:{{ $port }}']
+  restartPolicy: Never
+{{- end -}}

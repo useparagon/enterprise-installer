@@ -7,8 +7,7 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 
 nameOverride: ""
 fullnameOverride: "flipt"
@@ -97,18 +96,18 @@ ingress:
   #      - chart-example.local
 
 resources:
-  requests:
-    cpu: 500m
-    memory: 512Mi
   limits:
-    memory: 512Mi
+    memory: 200Mi
+  requests:
+    cpu: 100m
+    memory: 200Mi
 
 autoscaling:
   enabled: true
   minReplicas: 1
-  maxReplicas: 4
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 75
 
 pdb:
   enabled: false

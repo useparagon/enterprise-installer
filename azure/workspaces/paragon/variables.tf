@@ -1,14 +1,18 @@
 # credentials
 variable "azure_client_id" {
-  description = "Azure client ID"
+  description = "Optional Azure client ID. Leave null to use environment-provided credentials such as ARM_*."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_client_secret" {
-  description = "Azure client secret"
+  description = "Optional Azure client secret. Leave null to use short-lived environment-provided credentials."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_subscription_id" {
@@ -18,9 +22,11 @@ variable "azure_subscription_id" {
 }
 
 variable "azure_tenant_id" {
-  description = "Azure tenant ID"
+  description = "Optional Azure tenant ID. Leave null to use the tenant from environment-provided credentials."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 # account
@@ -35,24 +41,40 @@ variable "domain" {
 }
 
 variable "docker_registry_server" {
-  description = "Docker container registry server."
+  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
   default     = "docker.io"
 }
 
-variable "docker_username" {
-  description = "Docker username to pull images."
+variable "docker_pull_secret_name" {
+  description = "Kubernetes secret name for registry pull credentials."
   type        = string
+  default     = "docker-cfg"
+}
+
+variable "create_docker_pull_secret" {
+  description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
+  type        = bool
+  default     = true
+}
+
+variable "docker_username" {
+  description = "Docker username to pull images. Null when using a pre-provisioned pull secret (create_docker_pull_secret=false)."
+  type        = string
+  default     = null
 }
 
 variable "docker_password" {
-  description = "Docker password to pull images."
+  description = "Docker password to pull images. Null when using a pre-provisioned pull secret (create_docker_pull_secret=false)."
   type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+  default     = null
 }
 
 variable "monitors_enabled" {
@@ -222,6 +244,12 @@ variable "hoop_enabled" {
   default     = true
 }
 
+variable "hoop_grafana_connection" {
+  description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
+  type        = bool
+  default     = false
+}
+
 variable "hoop_k8s_connections" {
   description = "Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created."
   type = map(object({
@@ -257,10 +285,16 @@ variable "hoop_restricted_access_groups" {
   default     = ["dev-team-oncall", "dev-team-managers", "admin"]
 }
 
+variable "hoop_agent_name" {
+  description = "Override Hoop agent name in HOOP_KEY when organization does not identify the client (e.g. when organization is a region code like 'us', set to a client-identifying value such as 'client-us')."
+  type        = string
+  default     = null
+}
+
 variable "hoop_reviewers_access_groups" {
   description = "Reviewer groups required for customer-facing app connections."
   type        = list(string)
-  default     = ["dev-team-managers", "admin"]
+  default     = ["dev-team-managers"]
 }
 
 variable "customer_facing" {
@@ -270,13 +304,13 @@ variable "customer_facing" {
 }
 
 variable "infra_json_path" {
-  description = "Path to `infra` workspace output JSON file."
+  description = "Deprecated legacy path to an `infra` workspace output JSON file. Prefer Key Vault handoff secrets (PARA-21726)."
   type        = string
-  default     = ".secure/infra-output.json"
+  default     = null
 }
 
 variable "infra_json" {
-  description = "JSON string of `infra` workspace variables to use instead of `infra_json_path`"
+  description = "Deprecated legacy JSON string of `infra` workspace variables."
   type        = string
   default     = null
 }
@@ -293,27 +327,45 @@ variable "helm_yaml" {
   default     = null
 }
 
+variable "managed_sync_enabled" {
+  description = "Whether to enable managed sync."
+  type        = bool
+  default     = false
+}
+
+variable "managed_sync_version" {
+  description = "The version of the Managed Sync helm chart to install."
+  type        = string
+  default     = "latest"
+}
+
 locals {
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
-  hash      = substr(sha256(var.azure_subscription_id), 0, 8)
-  workspace = nonsensitive("paragon-${var.organization}-${local.hash}")
+  hash                  = substr(sha256(var.azure_subscription_id), 0, 8)
+  infra_json_path       = var.infra_json_path != null ? abspath(var.infra_json_path) : null
+  use_legacy_infra_json = var.infra_json != null || var.infra_json_path != null
+  legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
+  workspace             = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}") : "paragon-${var.organization}-${local.hash}")
 
-  dns_enabled = var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
+  dns_enabled = nonsensitive(var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null)
 
-  infra_json_path = abspath(var.infra_json_path)
-  infra_vars      = jsondecode(fileexists(local.infra_json_path) && var.infra_json == null ? file(local.infra_json_path) : var.infra_json)
+  resource_group_name = local.use_legacy_infra_json ? try(local.legacy_infra_vars.resource_group.value.name, "${local.workspace}-resources") : "${local.workspace}-resources"
+  cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, "${local.workspace}-cluster") : "${local.workspace}-cluster"
+  logs_bucket         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
+  auditlogs_bucket    = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
-  # use default where standard value can be determined
-  cluster_name     = try(local.infra_vars.cluster_name.value, local.workspace)
-  logs_bucket      = try(local.infra_vars.logs_bucket.value, "${local.workspace}-logs")
-  auditlogs_bucket = try(local.infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs")
+  # `local.infra_vars` is resolved in infra_secrets.tf (legacy infra.json when provided,
+  # otherwise infra secrets sourced from Key Vault). Backward compatible with infra
+  # workspaces that still emit the legacy "minio" output instead of the renamed "storage"
+  # output; null-safe when neither is present.
+  storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "AZURE")
 
-  all_microservices = {
+  monorepo_microservices = {
     "account" = {
       "healthcheck_path" = "/healthz"
       "port"             = try(local.helm_vars.global.env["ACCOUNT_PORT"], 1708)
@@ -363,11 +415,6 @@ locals {
       "healthcheck_path" = "/healthz"
       "port"             = try(local.helm_vars.global.env["HERMES_PORT"], 1702)
       "public_url"       = try(local.helm_vars.global.env["HERMES_PUBLIC_URL"], "https://hermes.${var.domain}")
-    }
-    "minio" = {
-      "healthcheck_path" = "/minio/health/live"
-      "port"             = try(local.helm_vars.global.env["MINIO_PORT"], 9000)
-      "public_url"       = try(local.helm_vars.global.env["MINIO_PUBLIC_URL"], "https://minio.${var.domain}")
     }
     "passport" = {
       "healthcheck_path" = "/healthz"
@@ -446,10 +493,35 @@ locals {
     }
   }
 
+  managed_sync_microservices = {
+    "api-sync" = {
+      "healthcheck_path" = "/healthz"
+      "port"             = try(local.helm_vars.global.env["API_SYNC_HTTP_PORT"], 1800)
+      "public_url"       = try(local.helm_vars.global.env["API_SYNC_PUBLIC_URL"], "https://sync.${var.domain}")
+    }
+    "api-project" = {
+      "healthcheck_path" = "/healthz"
+      "port"             = try(local.helm_vars.global.env["API_PROJECT_HTTP_PORT"], 1804)
+      "public_url"       = null
+    }
+    "worker-sync" = {
+      "healthcheck_path" = "/healthz"
+      "port"             = try(local.helm_vars.global.env["WORKER_SYNC_HTTP_PORT"], 1802)
+      "public_url"       = null
+    }
+    "queue-exporter" = {
+      "healthcheck_path" = "/healthz"
+      "port"             = try(local.helm_vars.global.env["MONITOR_QUEUE_EXPORTER_HTTP_PORT"], 1806)
+      "public_url"       = null
+    }
+  }
+
+  all_microservices = merge(local.monorepo_microservices, var.managed_sync_enabled ? local.managed_sync_microservices : {})
+
   microservices = {
     for microservice, config in local.all_microservices :
     microservice => config
-    if !contains(var.excluded_microservices, microservice) && !(microservice == "minio" && local.cloud_storage_type == "AZURE")
+    if !contains(var.excluded_microservices, microservice)
   }
 
   public_microservices = {
@@ -501,6 +573,10 @@ locals {
       "port"       = 8500
       "public_url" = null
     }
+    "monitor-queue-exporter" = {
+      "port"       = 1806
+      "public_url" = null
+    }
   }
 
   public_monitors = var.monitors_enabled ? {
@@ -533,11 +609,47 @@ locals {
     "true"
   )
 
-  default_redis_url = try(
-    local.helm_vars.global.env["REDIS_URL"],
-    "${local.helm_vars.global.env["REDIS_HOST"]}:${local.helm_vars.global.env["REDIS_PORT"]}",
-    local.infra_vars.redis.value.cache.connection_string,
-    "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
+  # Rebuild scheme-prefixed Redis URLs from host/password/port (same as GCP).
+  # Do not prefix Azure connection_string: classic Cache keys are unencoded
+  # (:password@host:port), and Managed Redis already urlencodes the password in
+  # connection_string — encoding the whole string would double-encode (%3D → %253D).
+  # Premium Cache with authentication_enabled=false emits passwordless
+  # connection_string (host:port) while still exporting primary_access_key as
+  # password — only include userinfo when connection_string has "@" (or is absent).
+  redis_instance_urls = {
+    for name, r in coalesce(local.infra_vars.redis.value, {}) : name => (
+      startswith(try(r.connection_string, ""), "redis://") || startswith(try(r.connection_string, ""), "rediss://")
+      ? r.connection_string
+      : format(
+        "%s://%s%s:%s",
+        contains(["true", "1", "yes"], lower(tostring(try(r.ssl, true)))) ? "rediss" : "redis",
+        (
+          try(r.password, null) != null && strcontains(try(r.connection_string, "@"), "@")
+          ? ":${urlencode(r.password)}@"
+          : ""
+        ),
+        r.host,
+        r.port
+      )
+    )
+  }
+
+  # Prefer an explicitly schemed helm REDIS_URL; otherwise use rebuilt cache URL.
+  default_redis_url = (
+    try(
+      startswith(local.helm_vars.global.env["REDIS_URL"], "redis://") || startswith(local.helm_vars.global.env["REDIS_URL"], "rediss://"),
+      false
+    )
+    ? local.helm_vars.global.env["REDIS_URL"]
+    : try(
+      local.redis_instance_urls["cache"],
+      format(
+        "%s://%s:%s",
+        contains(["true", "1", "yes"], lower(tostring(local.default_redis_ssl))) ? "rediss" : "redis",
+        local.helm_vars.global.env["REDIS_HOST"],
+        local.helm_vars.global.env["REDIS_PORT"]
+      )
+    )
   )
 
   helm_values = merge(local.helm_vars, {
@@ -562,7 +674,6 @@ locals {
         HADES_PORT              = try(local.microservices.hades.port, null)
         HEALTH_CHECKER_PORT     = try(local.microservices["health-checker"].port, null)
         HERMES_PORT             = try(local.microservices.hermes.port, null)
-        MINIO_PORT              = try(local.microservices.minio.port, null)
         PASSPORT_PORT           = try(local.microservices.passport.port, null)
         PHEME_PORT              = try(local.microservices.pheme.port, null)
         RELEASE_PORT            = try(local.microservices.release.port, null)
@@ -589,7 +700,6 @@ locals {
         HADES_PRIVATE_URL              = try("http://hades:${local.microservices.hades.port}", null)
         HERMES_PRIVATE_URL             = try("http://hermes:${local.microservices.hermes.port}", null)
         HEALTH_CHECKER_PRIVATE_URL     = try("http://health-checker:${local.microservices["health-checker"].port}", null)
-        MINIO_PRIVATE_URL              = try("http://minio:${local.microservices.minio.port}", null)
         PASSPORT_PRIVATE_URL           = try("http://passport:${local.microservices.passport.port}", null)
         PHEME_PRIVATE_URL              = try("http://pheme:${local.microservices.pheme.port}", null)
         RELEASE_PRIVATE_URL            = try("http://release:${local.microservices.release.port}", null)
@@ -615,9 +725,9 @@ locals {
         HADES_PUBLIC_URL              = try(local.microservices.hades.public_url, null)
         HEALTH_CHECKER_PUBLIC_URL     = try(local.microservices["health-checker"].public_url, null)
         HERMES_PUBLIC_URL             = try(local.microservices.hermes.public_url, null)
-        MINIO_PUBLIC_URL              = try(local.microservices.minio.public_url, null)
         PASSPORT_PUBLIC_URL           = try(local.microservices.passport.public_url, null)
         PHEME_PUBLIC_URL              = try(local.microservices.pheme.public_url, null)
+        PUBLIC_UPLOAD_PROXY_BASE_URL  = try("${local.microservices.zeus.public_url}/public-upload-proxy", null)
         RELEASE_PUBLIC_URL            = try(local.microservices.release.public_url, null)
         WORKER_ACTIONKIT_PUBLIC_URL   = try(local.microservices["worker-actionkit"].public_url, null)
         WORKER_ACTIONS_PUBLIC_URL     = try(local.microservices["worker-actions"].public_url, null)
@@ -637,8 +747,8 @@ locals {
         WORKER_WORKFLOWS_MINIMUM_TEST_WORKFLOW_QUEUE_COUNT    = 1
 
         # Authentication
-        ADMIN_BASIC_AUTH_USERNAME = local.helm_vars.global.env["LICENSE"]
-        ADMIN_BASIC_AUTH_PASSWORD = local.helm_vars.global.env["LICENSE"]
+        ADMIN_BASIC_AUTH_USERNAME = try(local.helm_vars.global.env["LICENSE"], null)
+        ADMIN_BASIC_AUTH_PASSWORD = try(local.helm_vars.global.env["LICENSE"], null)
 
         # Feature flags
         FEATURE_FLAG_PLATFORM_ENABLED  = "true"
@@ -679,88 +789,114 @@ locals {
         ZEUS_POSTGRES_DATABASE          = try(local.infra_vars.postgres.value.zeus.database, local.infra_vars.postgres.value.paragon.database)
 
         # Redis configurations
-        REDIS_URL = local.default_redis_url
+        REDIS_URL = try(local.redis_instance_urls["cache"], local.default_redis_url)
 
         CACHE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
         CACHE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
-        CACHE_REDIS_URL                = try(local.infra_vars.redis.value.cache.connection_string, local.default_redis_url)
+        CACHE_REDIS_URL                = try(local.redis_instance_urls["cache"], local.default_redis_url)
         QUEUE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.queue.cluster, local.default_redis_cluster)
         QUEUE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.queue.ssl, local.default_redis_ssl)
-        QUEUE_REDIS_URL                = try(local.infra_vars.redis.value.queue.connection_string, local.default_redis_url)
+        QUEUE_REDIS_URL                = try(local.redis_instance_urls["queue"], local.default_redis_url)
         SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
         SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
-        SYSTEM_REDIS_URL               = try(local.infra_vars.redis.value.system.connection_string, local.default_redis_url)
+        SYSTEM_REDIS_URL               = try(local.redis_instance_urls["system"], local.default_redis_url)
         WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.default_redis_cluster)
         WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.default_redis_ssl)
-        WORKFLOW_REDIS_URL             = try(local.infra_vars.redis.value.workflow.connection_string, local.default_redis_url)
+        # No dedicated workflow Redis on Azure — fall back to cache (matches secrets.tf / monorepo chart).
+        WORKFLOW_REDIS_URL = try(local.redis_instance_urls["workflow"], local.redis_instance_urls["cache"], local.default_redis_url)
 
         # Cloud Storage configurations
-        CLOUD_STORAGE_MICROSERVICE_PASS = local.cloud_storage_type == "AZURE" ? local.infra_vars.minio.value.root_password : local.infra_vars.minio.value.microservice_pass
-        CLOUD_STORAGE_MICROSERVICE_USER = local.cloud_storage_type == "AZURE" ? local.infra_vars.minio.value.root_user : local.infra_vars.minio.value.microservice_user
-        CLOUD_STORAGE_PUBLIC_BUCKET     = try(local.infra_vars.minio.value.public_bucket, "${local.workspace}-cdn")
-        CLOUD_STORAGE_SYSTEM_BUCKET     = try(local.infra_vars.minio.value.private_bucket, "${local.workspace}-app")
+        CLOUD_STORAGE_MICROSERVICE_PASS = local.storage_output.root_password
+        CLOUD_STORAGE_MICROSERVICE_USER = local.storage_output.root_user
+        CLOUD_STORAGE_PUBLIC_BUCKET     = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
+        CLOUD_STORAGE_SYSTEM_BUCKET     = try(local.storage_output.private_bucket, "${local.workspace}-app")
         CLOUD_STORAGE_TYPE              = local.cloud_storage_type
 
         # OpenObserve Azure Storage credentials (for Azure Blob Storage)
-        AZURE_STORAGE_ACCOUNT_NAME = try(local.infra_vars.minio.value.root_user, null)
-        AZURE_STORAGE_ACCOUNT_KEY  = try(local.infra_vars.minio.value.root_password, null)
+        AZURE_STORAGE_ACCOUNT_NAME = try(local.storage_output.root_user, null)
+        AZURE_STORAGE_ACCOUNT_KEY  = try(local.storage_output.root_password, null)
 
         CLOUD_STORAGE_PUBLIC_URL = coalesce(
           try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
-          local.cloud_storage_type == "AZURE" ? "https://${local.infra_vars.minio.value.root_user}.blob.core.windows.net" : null,
-          try(local.microservices.minio.public_url, null), null
+          local.cloud_storage_type == "AZURE" ? "https://${local.storage_output.root_user}.blob.core.windows.net" : null,
         )
         # TODO: In the future, we should use a private link to access the storage account so traffic stays within the VPC. This affects costs and performance.
         CLOUD_STORAGE_PRIVATE_URL = coalesce(
           try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
-          local.cloud_storage_type == "AZURE" ? "https://${local.infra_vars.minio.value.root_user}.blob.core.windows.net" : null,
-          try(local.microservices.minio.public_url, null), null
+          local.cloud_storage_type == "AZURE" ? "https://${local.storage_output.root_user}.blob.core.windows.net" : null,
         )
 
-        # MinIO configurations
-        MINIO_BROWSER           = "off"
-        MINIO_INSTANCE_COUNT    = "1"
-        MINIO_MICROSERVICE_PASS = local.infra_vars.minio.value.microservice_pass
-        MINIO_MICROSERVICE_USER = local.infra_vars.minio.value.microservice_user
-        MINIO_MODE              = "gateway-azure"
-        MINIO_NGINX_PROXY       = "on"
-        MINIO_PUBLIC_BUCKET     = try(local.infra_vars.minio.value.public_bucket, "${local.workspace}-cdn")
-        MINIO_ROOT_PASSWORD     = local.infra_vars.minio.value.root_password
-        MINIO_ROOT_USER         = local.infra_vars.minio.value.root_user
-        MINIO_SYSTEM_BUCKET     = try(local.infra_vars.minio.value.private_bucket, "${local.workspace}-app")
-
         # Monitor configurations
-        MONITOR_BULL_EXPORTER_HOST              = "http://bull-exporter"
-        MONITOR_BULL_EXPORTER_PORT              = try(local.monitors["bull-exporter"].port, null)
-        MONITOR_GRAFANA_HOST                    = "http://grafana"
-        MONITOR_GRAFANA_PORT                    = try(local.monitors["grafana"].port, null)
-        MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD = var.monitors_enabled ? module.monitors[0].grafana_admin_password : null
-        MONITOR_GRAFANA_SECURITY_ADMIN_USER     = var.monitors_enabled ? module.monitors[0].grafana_admin_email : null
-        MONITOR_GRAFANA_SERVER_DOMAIN           = try(local.monitors["grafana"].public_url, null)
-        MONITOR_GRAFANA_UPTIME_WEBHOOK_URL      = module.uptime.webhook
-        MONITOR_KAFKA_EXPORTER_HOST             = "http://kafka-exporter"
-        MONITOR_KAFKA_EXPORTER_PORT             = try(local.monitors["kafka-exporter"].port, null)
-        MONITOR_KUBE_STATE_METRICS_HOST         = "http://kube-state-metrics"
-        MONITOR_KUBE_STATE_METRICS_PORT         = try(local.monitors["kube-state-metrics"].port, null)
-        MONITOR_PGADMIN_EMAIL                   = var.monitors_enabled ? module.monitors[0].pgadmin_admin_email : null
-        MONITOR_PGADMIN_HOST                    = "http://pgadmin"
-        MONITOR_PGADMIN_PASSWORD                = var.monitors_enabled ? module.monitors[0].pgadmin_admin_password : null
-        MONITOR_PGADMIN_PORT                    = try(local.monitors["pgadmin"].port, null)
-        MONITOR_PGADMIN_SSL_MODE                = "require"
-        MONITOR_POSTGRES_EXPORTER_HOST          = "http://postgres-exporter"
-        MONITOR_POSTGRES_EXPORTER_PORT          = try(local.monitors["postgres-exporter"].port, null)
-        MONITOR_POSTGRES_EXPORTER_SSL_MODE      = "require"
-        MONITOR_PROMETHEUS_HOST                 = "http://prometheus"
-        MONITOR_PROMETHEUS_PORT                 = try(local.monitors["prometheus"].port, null)
-        MONITOR_QUEUE_REDIS_TARGET              = try(local.infra_vars.redis.value.queue.host, local.infra_vars.redis.value.cache.host)
-        MONITOR_REDIS_EXPORTER_HOST             = "http://redis-exporter"
-        MONITOR_REDIS_EXPORTER_PORT             = try(local.monitors["redis-exporter"].port, null)
-        MONITOR_REDIS_INSIGHT_HOST              = "http://redis-insight"
-        MONITOR_REDIS_INSIGHT_PORT              = try(local.monitors["redis-insight"].port, null)
+        MONITOR_BULL_EXPORTER_HOST               = "http://bull-exporter"
+        MONITOR_BULL_EXPORTER_PORT               = try(local.monitors["bull-exporter"].port, null)
+        MONITOR_GRAFANA_HOST                     = "http://grafana"
+        MONITOR_GRAFANA_PORT                     = try(local.monitors["grafana"].port, null)
+        MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD  = var.monitors_enabled ? module.monitors[0].grafana_admin_password : null
+        MONITOR_GRAFANA_SECURITY_ADMIN_USER      = var.monitors_enabled ? module.monitors[0].grafana_admin_email : null
+        MONITOR_GRAFANA_SERVER_DOMAIN            = try(local.monitors["grafana"].public_url, null)
+        MONITOR_GRAFANA_UPTIME_WEBHOOK_URL       = module.uptime.webhook
+        MONITOR_KAFKA_EXPORTER_HOST              = "http://kafka-exporter"
+        MONITOR_KAFKA_EXPORTER_PORT              = try(local.monitors["kafka-exporter"].port, null)
+        MONITOR_KUBE_STATE_METRICS_HOST          = "http://kube-state-metrics"
+        MONITOR_KUBE_STATE_METRICS_PORT          = try(local.monitors["kube-state-metrics"].port, null)
+        MONITOR_PGADMIN_EMAIL                    = var.monitors_enabled ? module.monitors[0].pgadmin_admin_email : null
+        MONITOR_PGADMIN_HOST                     = "http://pgadmin"
+        MONITOR_PGADMIN_PASSWORD                 = var.monitors_enabled ? module.monitors[0].pgadmin_admin_password : null
+        MONITOR_PGADMIN_PORT                     = try(local.monitors["pgadmin"].port, null)
+        MONITOR_PGADMIN_SSL_MODE                 = "require"
+        MONITOR_POSTGRES_EXPORTER_HOST           = "http://postgres-exporter"
+        MONITOR_POSTGRES_EXPORTER_PORT           = try(local.monitors["postgres-exporter"].port, null)
+        MONITOR_POSTGRES_EXPORTER_SSL_MODE       = "require"
+        MONITOR_PROMETHEUS_HOST                  = "http://prometheus"
+        MONITOR_PROMETHEUS_PORT                  = try(local.monitors["prometheus"].port, null)
+        MONITOR_QUEUE_REDIS_TARGET               = try(local.infra_vars.redis.value.queue.host, local.infra_vars.redis.value.cache.host)
+        MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HOST = "http://monitor-queue-exporter"
+        MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_PORT = try(local.monitors["monitor-queue-exporter"].port, null)
+        MONITOR_REDIS_EXPORTER_HOST              = "http://redis-exporter"
+        MONITOR_REDIS_EXPORTER_PORT              = try(local.monitors["redis-exporter"].port, null)
+        MONITOR_REDIS_INSIGHT_HOST               = "http://redis-insight"
+        MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
         }, {
         for key, value in local.helm_vars.global.env :
         key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
-      })
+        },
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+      )
+    })
+  })
+
+  # Split env by prepared chart service-inputs.json (./prepare.sh):
+  # - envKeys → Helm global.env (plain `value:` on pods)
+  # - secretKeys (and not also envKeys) → Key Vault for secretKeyRef
+  # Azure has no infra flat-env secret (unlike AWS); secretKeys are taken from
+  # helm_values that already embed postgres/redis/storage from nested infra JSON.
+  chart_service_input_files = fileset("${path.root}/charts", "**/files/service-inputs.json")
+  chart_service_inputs = [
+    for f in local.chart_service_input_files :
+    jsondecode(file("${path.root}/charts/${f}"))
+  ]
+  chart_env_keys = toset(flatten([
+    for s in local.chart_service_inputs : try(s.envKeys, [])
+  ]))
+  chart_secret_keys = toset(flatten([
+    for s in local.chart_service_inputs : try(s.secretKeys, [])
+  ]))
+  helm_is_secret_env_key = {
+    for key, _ in local.helm_values.global.env :
+    key => contains(local.chart_secret_keys, key) && !contains(local.chart_env_keys, key)
+  }
+  helm_secret_values = {
+    for key, value in local.helm_values.global.env :
+    key => tostring(value)
+    if value != null && tostring(value) != "" && local.helm_is_secret_env_key[key]
+  }
+  helm_values_public = merge(local.helm_values, {
+    global = merge(local.helm_values.global, {
+      env = {
+        for key, value in local.helm_values.global.env :
+        key => value
+        if value != null && !local.helm_is_secret_env_key[key]
+      }
     })
   })
 

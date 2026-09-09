@@ -1,7 +1,17 @@
 locals {
-  detected_cloud = "aws"
+  detected_cloud    = "aws"
+  connection_prefix = coalesce(var.hoop_agent_name, var.organization)
 
   connection_environment = var.customer_facing ? "prod" : "staging"
+
+  # Hoop exec starts the shell with a clean environment, so the ServiceAccount's IRSA
+  # variables never reach the session and the AWS SDK falls back to the node instance
+  # role. Injecting them per connection is the only way the agent assumes hoop-support.
+  irsa_env = try(aws_iam_role.hoop_support[0].arn, null) != null ? {
+    "envvar:AWS_ROLE_ARN"                = aws_iam_role.hoop_support[0].arn
+    "envvar:AWS_WEB_IDENTITY_TOKEN_FILE" = "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+  } : {}
+
   slack_enabled = (
     var.hoop_enabled &&
     try(var.hoop_slack_bot_token, null) != null && var.hoop_slack_bot_token != "" &&
@@ -12,7 +22,7 @@ locals {
   postgres_connections = try(var.infra_vars.postgres.value, null) != null ? {
     for db_schema, db_config in var.infra_vars.postgres.value :
     "postgres-${db_schema}" => {
-      name    = length(keys(var.infra_vars.postgres.value)) == 1 ? "${var.organization}-postgres-db" : "${var.organization}-${db_schema}-db"
+      name    = length(keys(var.infra_vars.postgres.value)) == 1 ? "${local.connection_prefix}-postgres-db" : "${local.connection_prefix}-${db_schema}-db"
       type    = "database"
       subtype = "postgres"
       command = null
@@ -48,10 +58,10 @@ locals {
     try(var.infra_vars.redis.value, null) != null ? {
       for instance_name, instance_config in var.infra_vars.redis.value :
       "redis-${instance_name}" => {
-        name    = "${var.organization}-redis-${instance_name}"
+        name    = "${local.connection_prefix}-redis-${instance_name}"
         type    = "custom"
         subtype = "redis"
-        command = ["redis-cli", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"]
+        command = ["redis-cli", "-c", "-h", "$HOST", "-p", "$PORT", "-n", "$DB_NUMBER"]
         secrets = merge(
           {
             "envvar:HOST"      = instance_config.host
@@ -59,7 +69,10 @@ locals {
             "envvar:DB_NUMBER" = tostring(try(instance_config.db_number, 0))
           },
           try(instance_config.ssl, false) == true ? { "envvar:REDIS_TLS" = "1" } : {},
-          try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {}
+          try(instance_config.ca_certificate, null) != null && try(instance_config.ca_certificate, "") != "" ? { "envvar:REDIS_CA_CERT" = instance_config.ca_certificate } : {},
+          try(instance_config.password, null) != null && try(instance_config.password, "") != "" ? {
+            "envvar:PASS" = instance_config.password
+          } : {},
         )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"
@@ -82,7 +95,7 @@ locals {
     # pgadmin
     try(var.infra_vars.postgres.value, null) != null ? {
       "pgadmin" = {
-        name    = "${var.organization}-pgadmin"
+        name    = "${local.connection_prefix}-pgadmin"
         type    = "application"
         subtype = "tcp"
         command = ["bash"]
@@ -109,7 +122,7 @@ locals {
     # openobserve
     {
       "openobserve" = {
-        name    = "${var.organization}-openobserve"
+        name    = "${local.connection_prefix}-openobserve"
         type    = "application"
         subtype = "tcp"
         command = ["bash"]
@@ -132,10 +145,36 @@ locals {
         }
       }
     },
+    # grafana (private monitoring UI; not exposed when listed in private_services)
+    var.hoop_grafana_connection ? {
+      "grafana" = {
+        name    = "${local.connection_prefix}-grafana"
+        type    = "application"
+        subtype = "tcp"
+        command = ["bash"]
+        secrets = {
+          "envvar:HOST" = "grafana.paragon"
+          "envvar:PORT" = "4500"
+        }
+        access_mode_runbooks = "enabled"
+        access_mode_exec     = "enabled"
+        access_mode_connect  = "enabled"
+        access_schema        = "disabled"
+        tags = {
+          environment     = local.connection_environment
+          customer_facing = var.customer_facing
+          criticality     = "normal"
+          access-level    = "private"
+          impact          = "low"
+          service-type    = "monitoring"
+          cloud           = local.detected_cloud
+        }
+      }
+    } : {},
     # redis-insight
     try(var.infra_vars.redis.value, null) != null ? {
       "redis-insight" = {
-        name    = "${var.organization}-redis-insight"
+        name    = "${local.connection_prefix}-redis-insight"
         type    = "application"
         subtype = "tcp"
         command = ["bash"]
@@ -163,7 +202,7 @@ locals {
     length(var.k8s_connections) > 0 ? {
       for conn_name, conn_config in var.k8s_connections :
       "k8s-${conn_name}" => {
-        name    = "${var.organization}-k8s-${conn_name}"
+        name    = "${local.connection_prefix}-k8s-${conn_name}"
         type    = try(conn_config.type, "custom")
         subtype = try(conn_config.subtype, null) != null && try(conn_config.subtype, null) != "" ? conn_config.subtype : null
         command = try(conn_config.command, ["bash"])
@@ -174,6 +213,7 @@ locals {
             "envvar:KUBECTL_NAMESPACE"    = try(conn_config.namespace, "paragon")
             "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret_v1.hoop_cluster_admin_token[0].data["token"], "")}"
           },
+          local.irsa_env,
           try(conn_config.secrets, {})
         )
         access_mode_runbooks = try(conn_config.access_mode_runbooks, "enabled")
@@ -196,16 +236,17 @@ locals {
       } : {
       # Default k8s-admin connection if no k8s_connections defined
       "k8s-admin" = {
-        name    = "${var.organization}-k8s-admin"
+        name    = "${local.connection_prefix}-k8s-admin"
         type    = "custom"
         subtype = null
         command = ["bash"]
-        secrets = {
+        secrets = merge({
           "envvar:REMOTE_URL"           = "https://kubernetes.default.svc.cluster.local"
           "envvar:INSECURE"             = "true"
           "envvar:KUBECTL_NAMESPACE"    = "paragon"
           "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret_v1.hoop_cluster_admin_token[0].data["token"], "")}"
-        }
+          }, local.irsa_env
+        )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"
         access_mode_connect  = "enabled"
@@ -228,7 +269,7 @@ locals {
     try(var.custom_connections, {}) != {} ? {
       for conn_name, conn_config in var.custom_connections :
       "custom-${conn_name}" => {
-        name                 = "${var.organization}-${conn_name}"
+        name                 = "${local.connection_prefix}-${conn_name}"
         type                 = conn_config.type
         subtype              = try(conn_config.subtype, null) != null && try(conn_config.subtype, null) != "" ? conn_config.subtype : null
         command              = try(conn_config.command, null)
@@ -284,4 +325,37 @@ locals {
   }
 
   all_connections = local.connections_merge
+
+  # Non-secret fields only (infra_vars is sensitive; keeps plan output readable)
+  all_connections_config = {
+    for k, v in local.all_connections : k => {
+      name                 = nonsensitive(v.name)
+      type                 = nonsensitive(v.type)
+      subtype              = nonsensitive(v.subtype)
+      command              = nonsensitive(v.command)
+      access_mode_runbooks = nonsensitive(v.access_mode_runbooks)
+      access_mode_exec     = nonsensitive(v.access_mode_exec)
+      access_mode_connect  = nonsensitive(v.access_mode_connect)
+      access_schema        = nonsensitive(v.access_schema)
+      guardrail_rules      = try(v.guardrail_rules, null) != null && length(coalesce(try(v.guardrail_rules, null), [])) > 0 ? nonsensitive(v.guardrail_rules) : null
+      reviewers            = try(v.reviewers, null) != null && length(coalesce(try(v.reviewers, null), [])) > 0 ? nonsensitive(v.reviewers) : null
+      tags                 = nonsensitive(v.tags)
+    }
+  }
+
+  postgres_connections_config = {
+    for k, v in local.postgres_connections : k => {
+      name                 = nonsensitive(v.name)
+      type                 = nonsensitive(v.type)
+      subtype              = nonsensitive(v.subtype)
+      command              = nonsensitive(v.command)
+      access_mode_runbooks = nonsensitive(v.access_mode_runbooks)
+      access_mode_exec     = nonsensitive(v.access_mode_exec)
+      access_mode_connect  = nonsensitive(v.access_mode_connect)
+      access_schema        = nonsensitive(v.access_schema)
+      guardrail_rules      = try(v.guardrail_rules, null) != null && length(coalesce(try(v.guardrail_rules, null), [])) > 0 ? nonsensitive(v.guardrail_rules) : null
+      reviewers            = try(v.reviewers, null) != null && length(coalesce(try(v.reviewers, null), [])) > 0 ? nonsensitive(v.reviewers) : null
+      tags                 = nonsensitive(v.tags)
+    }
+  }
 }

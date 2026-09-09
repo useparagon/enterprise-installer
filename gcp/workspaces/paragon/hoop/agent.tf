@@ -16,11 +16,29 @@ resource "helm_release" "hoopagent" {
 
   set {
     name  = "config.HOOP_KEY"
-    value = "grpcs://${var.organization}:${var.hoop_key}@${var.hoop_server}?mode=standard"
+    value = "grpcs://${coalesce(var.hoop_agent_name, var.organization)}:${var.hoop_key}@${var.hoop_server}?mode=standard"
+  }
+
+  set {
+    name  = "image.repository"
+    value = var.hoop_image_repository
   }
 
   set {
     name  = "image.tag"
-    value = var.hoop_version
+    value = var.hoop_image_tag
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = "true"
+  }
+
+  dynamic "set" {
+    for_each = try(google_service_account.hoop_agent[0].email, null) != null ? [1] : []
+    content {
+      name  = "serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account"
+      value = google_service_account.hoop_agent[0].email
+    }
   }
 }

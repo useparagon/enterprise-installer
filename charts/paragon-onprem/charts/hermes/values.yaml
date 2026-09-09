@@ -16,18 +16,17 @@ service:
 
 resources:
   limits:
-    cpu: 1
-    memory: 2048Mi
+    memory: 900Mi
   requests:
-    cpu: 0.5
-    memory: 2048Mi
+    cpu: 200m
+    memory: 900Mi
 
 autoscaling:
   enabled: true
   minReplicas: 2
-  maxReplicas: 10
+  maxReplicas: 20
   targetCPUUtilizationPercentage: 75
-  targetMemoryUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 30
@@ -47,14 +46,13 @@ autoscaling:
 
 secretName: "paragon-secrets"
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: 'hermes'
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -87,6 +85,10 @@ ingress:
   host: '' # When empty, will use chart name + domain
   healthcheck_path: /healthz
   group_order: '-10'
+
+probes:
+  liveness:
+    failureThreshold: 12
 
 nodeSelector: {}
 

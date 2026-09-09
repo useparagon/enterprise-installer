@@ -21,3 +21,23 @@ output "postgres_subnet" {
 output "redis_subnet" {
   value = azurerm_subnet.redis
 }
+
+output "nat_gateway_public_ip" {
+  description = "Static public IP used for outbound SNAT from the private subnet."
+  value       = azurerm_public_ip.nat.ip_address
+}
+
+output "private_subnet_nat_gateway_id" {
+  description = "ID of the private subnet NAT gateway association. Used to order AKS outbound_type updates after the association exists."
+  value       = azurerm_subnet_nat_gateway_association.private.id
+}
+
+output "aks_nsg_id" {
+  description = "NSG attached to the public and private (AKS) subnets."
+  value       = azurerm_network_security_group.aks.id
+}
+
+output "default_closed_nsg_id" {
+  description = "NSG attached to the redis subnet (baseline + Premium Redis VNet ports)."
+  value       = azurerm_network_security_group.default_closed.id
+}

@@ -16,28 +16,27 @@ service:
 
 resources:
   limits:
-    memory: 4096Mi
+    memory: 3300Mi
   requests:
-    cpu: 2
-    memory: 4096Mi
+    cpu: 800m
+    memory: 3300Mi
 
 autoscaling:
   enabled: false
-  minReplicas: 4
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
+  # minReplicas: 4
+  # maxReplicas: 20
+  # targetCPUUtilizationPercentage: 75
+  # targetMemoryUtilizationPercentage: 75
 
 secretName: "paragon-secrets"
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: 'worker-workflows'
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -77,7 +76,11 @@ ingress:
   enabled: true
   className: ''
   host: '' # When empty, will use chart name + domain
-  healthcheck_path: /healthz
+  healthcheck_path: "/healthz?isLite=true"
+
+probes:
+  liveness:
+    failureThreshold: 12
 
 nodeSelector: {}
 

@@ -21,8 +21,7 @@ testFramework:
     tag: latest
     digest:
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 
 nameOverride: "fluent-bit"
 fullnameOverride: "fluent-bit"
@@ -187,22 +186,38 @@ lifecycle: {}
 #     exec:
 #       command: ["/bin/sh", "-c", "sleep 20"]
 
+# kubelet holds liveness/readiness until startup succeeds (cold start on node join).
+startupProbe:
+  httpGet:
+    path: /api/v1/health
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 18
+
 livenessProbe:
   httpGet:
     path: /
     port: http
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 
 readinessProbe:
   httpGet:
     path: /api/v1/health
     port: http
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 
 resources:
   limits:
-    cpu: 0.5
-    memory: 256Mi
+    memory: 100Mi
   requests:
-    cpu: 0.2
+    cpu: 100m
     memory: 100Mi
 
 ## only available if kind is Deployment
@@ -283,7 +298,8 @@ podDisruptionBudget:
 
 nodeSelector: {}
 
-tolerations: []
+tolerations:
+  - operator: Exists
 
 affinity: {}
 
@@ -303,13 +319,9 @@ minReadySeconds:
 ##
 terminationGracePeriodSeconds:
 
-priorityClassName: "paragon-node-high"
-
 priorityClass:
   create: true
-  name: "paragon-node-high"
-  value: 1000000
-  description: "High priority for node-level Paragon services like logging and metrics"
+  name: "paragon-fluent-bit-high"
 
 secrets: {}
 
@@ -439,8 +451,8 @@ config:
         Retry_Limit 10
         Path /api/default
         Suppress_Type_Name On
-        HTTP_User {{ .Values.secrets.ZO_ROOT_USER_EMAIL }}
-        HTTP_Passwd {{ .Values.secrets.ZO_ROOT_USER_PASSWORD }}
+        HTTP_User ${ZO_ROOT_USER_EMAIL}
+        HTTP_Passwd ${ZO_ROOT_USER_PASSWORD}
         Buffer_Size 1MB
 
   ## https://docs.fluentbit.io/manual/administration/configuring-fluent-bit/classic-mode/upstream-servers
@@ -513,7 +525,7 @@ initContainers: []
 # Array mode
 # initContainers:
 #   - name: do-something
-#     image: alpine/kubectl:1.33.4
+#     image: alpine/kubectl:1.36.2
 #     command: ['kubectl', 'version']
 
 # String mode

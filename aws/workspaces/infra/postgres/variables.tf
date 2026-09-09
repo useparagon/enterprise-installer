@@ -33,6 +33,35 @@ variable "rds_instance_class" {
   description = "The RDS instance class type used for Postgres."
 }
 
+variable "rds_managed_sync_instance_class" {
+  description = "The RDS instance class type used for the managed sync Postgres instance."
+  type        = string
+}
+
+variable "rds_gp3_iops" {
+  description = "gp3 provisioned IOPS for all RDS instances. Null uses size-based baseline (3000 below 400 GiB, 12000 at/above)."
+  type        = number
+  default     = null
+  nullable    = true
+}
+
+variable "rds_gp3_storage_throughput" {
+  description = "gp3 throughput (MiB/s). Null uses size-based baseline (125 below 400 GiB, 500 at/above). Must form a valid pair with rds_gp3_iops when overriding."
+  type        = number
+  default     = null
+  nullable    = true
+}
+
+variable "rds_allocated_storage" {
+  description = "Initial allocated storage (GiB) for each Postgres RDS instance."
+  type        = number
+}
+
+variable "rds_max_allocated_storage" {
+  description = "Maximum storage (GiB) for autoscaling on each Postgres RDS instance."
+  type        = number
+}
+
 variable "disable_deletion_protection" {
   description = "Whether to disable deletion protection."
   type        = bool
@@ -99,7 +128,7 @@ locals {
     }, var.managed_sync_enabled ? {
     managed_sync = {
       name = "${var.workspace}-managed-sync"
-      size = "db.t4g.small"
+      size = var.rds_managed_sync_instance_class
       db   = "managed_sync"
     }
     } : {}) : {

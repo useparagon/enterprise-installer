@@ -16,29 +16,27 @@ service:
 
 resources:
   limits:
-    cpu: 1
     memory: 2048Mi
   requests:
-    cpu: 0.5
+    cpu: 500m
     memory: 2048Mi
 
 autoscaling:
   enabled: false
-  minReplicas: 0
-  maxReplicas: 0
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
+  # minReplicas: 0
+  # maxReplicas: 0
+  # targetCPUUtilizationPercentage: 75
+  # targetMemoryUtilizationPercentage: 75
 
 secretName: "paragon-secrets"
 
-imagePullSecrets:
-  - name: docker-cfg
+imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: 'cache-replay'
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.

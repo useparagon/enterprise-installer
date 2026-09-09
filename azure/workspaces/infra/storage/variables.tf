@@ -17,6 +17,11 @@ variable "tags" {
   type        = map(string)
 }
 
+variable "managed_sync_enabled" {
+  description = "Whether to enable managed sync."
+  type        = bool
+}
+
 variable "auditlogs_retention_days" {
   description = "The number of days to retain audit logs before deletion."
   type        = number
@@ -25,4 +30,10 @@ variable "auditlogs_retention_days" {
 variable "auditlogs_lock_enabled" {
   description = "Whether to lock the audit logs container immutability policy."
   type        = bool
+}
+
+variable "storage_account_tier" {
+  description = "Storage account tier. Use \"Standard\" for new deployments that need public CDN container access (Premium BlockBlobStorage does not support it)."
+  type        = string
+  default     = "Premium"
 }

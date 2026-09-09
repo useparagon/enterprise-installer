@@ -1,11 +1,12 @@
 {{- define "fluent-bit.pod" -}}
 serviceAccountName: {{ include "fluent-bit.serviceAccountName" . }}
-{{- with .Values.imagePullSecrets }}
+{{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+{{- if $pullSecrets }}
 imagePullSecrets:
-  {{- toYaml . | nindent 2 }}
+  {{- $pullSecrets | nindent 2 }}
 {{- end }}
-{{- if .Values.priorityClassName }}
-priorityClassName: {{ .Values.priorityClassName }}
+{{- if .Values.priorityClass.name }}
+priorityClassName: {{ .Values.priorityClass.name }}
 {{- end }}
 {{- with .Values.podSecurityContext }}
 securityContext:
@@ -38,7 +39,7 @@ containers:
     securityContext:
       {{- toYaml . | nindent 6 }}
   {{- end }}
-    image: {{ include "fluent-bit.image" (merge .Values.image (dict "tag" (default .Chart.AppVersion .Values.image.tag))) | quote }}
+    image: {{ include "fluent-bit.image" (merge (deepCopy .Values.image) (dict "tag" (default .Chart.AppVersion .Values.image.tag) "root" .)) | quote }}
     imagePullPolicy: {{ .Values.image.pullPolicy }}
   {{- if or .Values.env .Values.envWithTpl }}
     env:
@@ -80,6 +81,10 @@ containers:
     lifecycle:
       {{- toYaml . | nindent 6 }}
   {{- end }}
+    {{- with .Values.startupProbe }}
+    startupProbe:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     livenessProbe:
       {{- toYaml .Values.livenessProbe | nindent 6 }}
     readinessProbe:
@@ -103,7 +108,7 @@ containers:
     {{- end }}
 {{- if .Values.hotReload.enabled }}
   - name: reloader
-    image: {{ include "fluent-bit.image" .Values.hotReload.image }}
+    image: {{ include "fluent-bit.image" (merge (deepCopy .Values.hotReload.image) (dict "root" .)) | quote }}
     args:
       - {{ printf "-webhook-url=http://localhost:%s/api/v2/reload" (toString .Values.metricsPort) }}
       - -volume-dir=/watch/config

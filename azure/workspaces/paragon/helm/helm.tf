@@ -1,10 +1,24 @@
 locals {
+  version = var.helm_values.global.env["VERSION"]
+
+  helm_values_yaml = yamlencode(nonsensitive(var.helm_values))
+
   subchart_values = yamlencode({
-    subchart = {
-      for microservice in keys(var.microservices) : microservice => {
-        enabled = true
-      }
-    }
+    subchart = merge(
+      merge(
+        {
+          for microservice in keys(var.microservices) : microservice => {
+            enabled = true
+          }
+        },
+        {
+          kafka-exporter = {
+            enabled = var.managed_sync_enabled
+          }
+        }
+      ),
+      try(nonsensitive(var.helm_values.subchart), {})
+    )
   })
 
   microservice_values = yamlencode({
@@ -15,9 +29,16 @@ locals {
     }
   })
 
+  # managed-sync chart (useparagon-internal/managed-sync) shared ingress requires root-level
+  # tlsSecret on Azure; see k8s/charts/managed-sync/templates/ingress/ingress.yaml
+  managed_sync_values = yamlencode({
+    tlsSecret = "api-sync-secret"
+  })
+
   public_microservice_values = yamlencode({
     for microservice_name, microservice_config in var.public_microservices : microservice_name => {
       ingress = {
+        class     = "nginx" # used for managed sync
         className = "nginx"
         host      = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
         annotations = {
@@ -85,28 +106,81 @@ locals {
     }
   })
 
-  global_values = yamlencode(merge(
+  docker_pull_secret_global_values = var.create_docker_pull_secret ? {
+    imagePullSecrets = concat(
+      try(nonsensitive(var.helm_values.global.imagePullSecrets), []),
+      [{ name = var.docker_pull_secret_name }]
+    )
+  } : {}
+
+  global_values = yamlencode({
+    global = merge(
+      nonsensitive(var.helm_values.global),
+      {
+        podAnnotations = merge(
+          try(nonsensitive(var.helm_values.global).podAnnotations, {}),
+          {
+            "reloader.stakater.com/auto" = "true"
+          }
+        )
+        env = merge(
+          nonsensitive(var.helm_values.global.env),
+          {
+            k8s_version = var.k8s_version
+            secretName  = "paragon-secrets"
+          }
+        ),
+        paragon_version = local.version
+      },
+      local.docker_pull_secret_global_values
+    )
+  })
+
+  runtime_secret_values = yamlencode({
+    fluent-bit = {
+      envFrom = [
+        {
+          secretRef = {
+            name = "openobserve-credentials"
+          }
+        }
+      ]
+      podAnnotations = {
+        "reloader.stakater.com/auto" = "true"
+      }
+    }
+    openobserve = {
+      secretName = "openobserve-credentials"
+    }
+  })
+
+  global_values_minus_env = yamlencode(merge(
     nonsensitive(var.helm_values),
     {
       global = merge(
-        nonsensitive(var.helm_values.global),
+        nonsensitive(var.helm_values).global,
         {
-          env = merge(
-            nonsensitive(var.helm_values.global.env),
-            {
-              k8s_version = var.k8s_version
-              secretName  = "paragon-secrets"
-            }
-          ),
-          paragon_version = var.helm_values.global.env["VERSION"]
-        }
+          podAnnotations = merge(
+            try(nonsensitive(var.helm_values).global.podAnnotations, {}),
+            { "reloader.stakater.com/auto" = "true" }
+          )
+          env = {
+            HOST_ENV = "AZURE_K8"
+          }
+        },
+        local.docker_pull_secret_global_values
       )
     }
   ))
 
   # changes to secrets should trigger redeploy
+  # Force Helm upgrades when public values or ESO-backed cloud secrets change.
+  # helm_values is public-only; secrets_revision tracks Key Vault secret versions.
   secret_hash = yamlencode({
-    secret_hash = sha256(jsonencode(nonsensitive(var.helm_values)))
+    secret_hash = sha256(jsonencode({
+      values  = nonsensitive(var.helm_values)
+      secrets = var.secrets_revision
+    }))
   })
 }
 
@@ -134,60 +208,23 @@ resource "kubernetes_config_map_v1" "feature_flag_content" {
   }
 }
 
-# kubernetes secret to pull docker image from docker hub
-resource "kubernetes_secret_v1" "docker_login" {
-  metadata {
-    name      = "docker-cfg"
-    namespace = kubernetes_namespace_v1.paragon.id
-  }
-
-  type = "kubernetes.io/dockerconfigjson"
-
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "${var.docker_registry_server}" = {
-          "username" = var.docker_username
-          "password" = var.docker_password
-          "email"    = var.docker_email
-          "auth"     = base64encode("${var.docker_username}:${var.docker_password}")
-        }
-      }
-    })
-  }
-}
-
-# shared secrets
-resource "kubernetes_secret_v1" "paragon_secrets" {
-  metadata {
-    name      = "paragon-secrets"
-    namespace = kubernetes_namespace_v1.paragon.id
-  }
-
-  type = "Opaque"
-
-  data = {
-    # Map global.env from helm_values into secret data
-    for key, value in nonsensitive(var.helm_values.global.env) :
-    key => value
-  }
-}
-
 # microservices deployment
 resource "helm_release" "paragon_on_prem" {
   name              = "paragon-on-prem"
   description       = "Paragon microservices"
   chart             = "./charts/paragon-onprem"
-  version           = "${var.helm_values.global.env["VERSION"]}-${local.chart_hashes["paragon-onprem"]}"
+  version           = "${local.version}-${local.chart_hashes["paragon-onprem"]}"
   namespace         = kubernetes_namespace_v1.paragon.id
   create_namespace  = false
   cleanup_on_fail   = true
   atomic            = true
+  force_update      = false
   verify            = false
   timeout           = 900 # 15 minutes
   dependency_update = true
 
   values = [
+    local.helm_values_yaml,
     local.subchart_values,
     local.global_values,
     local.flipt_values,
@@ -198,8 +235,8 @@ resource "helm_release" "paragon_on_prem" {
 
   depends_on = [
     helm_release.ingress,
-    kubernetes_secret_v1.docker_login,
-    kubernetes_secret_v1.paragon_secrets,
+    data.kubernetes_secret_v1.paragon_secrets,
+    data.kubernetes_secret_v1.docker_cfg,
     kubernetes_config_map_v1.feature_flag_content
   ]
 }
@@ -209,20 +246,25 @@ resource "helm_release" "paragon_logging" {
   name              = "paragon-logging"
   description       = "Paragon logging services"
   chart             = "./charts/paragon-logging"
-  version           = "${var.helm_values.global.env["VERSION"]}-${local.chart_hashes["paragon-logging"]}"
+  version           = "${local.version}-${local.chart_hashes["paragon-logging"]}"
   namespace         = kubernetes_namespace_v1.paragon.id
   create_namespace  = false
   cleanup_on_fail   = true
   atomic            = true
+  force_update      = true
   verify            = false
   timeout           = 900 # 15 minutes
   dependency_update = true
 
   values = fileexists("${path.root}/../.secure/values.yaml") ? [
+    local.helm_values_yaml,
     local.global_values,
+    local.runtime_secret_values,
     file("${path.root}/../.secure/values.yaml")
     ] : [
-    local.global_values
+    local.helm_values_yaml,
+    local.global_values,
+    local.runtime_secret_values
   ]
 
   set {
@@ -235,30 +277,10 @@ resource "helm_release" "paragon_logging" {
     value = var.logs_bucket
   }
 
-  set_sensitive {
-    name  = "fluent-bit.secrets.ZO_ROOT_USER_EMAIL"
-    value = local.openobserve_email
-  }
-
-  set_sensitive {
-    name  = "fluent-bit.secrets.ZO_ROOT_USER_PASSWORD"
-    value = local.openobserve_password
-  }
-
-  set_sensitive {
-    name  = "openobserve.secrets.ZO_ROOT_USER_EMAIL"
-    value = local.openobserve_email
-  }
-
-  set_sensitive {
-    name  = "openobserve.secrets.ZO_ROOT_USER_PASSWORD"
-    value = local.openobserve_password
-  }
-
-
   depends_on = [
     helm_release.ingress,
-    kubernetes_secret_v1.docker_login
+    data.kubernetes_secret_v1.docker_cfg,
+    data.kubernetes_secret_v1.openobserve_credentials
   ]
 }
 
@@ -270,15 +292,18 @@ resource "helm_release" "paragon_monitoring" {
   description       = "Paragon monitors"
   chart             = "./charts/paragon-monitoring"
   version           = "${var.monitor_version}-${local.chart_hashes["paragon-monitoring"]}"
-  namespace         = "paragon"
+  namespace         = kubernetes_namespace_v1.paragon.id
   cleanup_on_fail   = true
   create_namespace  = false
   atomic            = true
+  force_update      = true
   verify            = false
   timeout           = 900 # 15 minutes
   dependency_update = true
 
   values = [
+    local.helm_values_yaml,
+    local.subchart_values,
     local.global_values,
     local.monitor_values,
     local.public_monitor_values,
@@ -288,6 +313,7 @@ resource "helm_release" "paragon_monitoring" {
   depends_on = [
     helm_release.ingress,
     helm_release.paragon_on_prem,
-    kubernetes_secret_v1.docker_login
+    data.kubernetes_secret_v1.paragon_secrets,
+    data.kubernetes_secret_v1.docker_cfg
   ]
 }

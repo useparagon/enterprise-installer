@@ -1,0 +1,148 @@
+locals {
+  eso_sync_triggers = join(",", compact([
+    try(kubectl_manifest.external_secret_paragon.uid, null),
+    var.docker_cfg_secret_name != null ? try(kubectl_manifest.external_secret_docker[0].uid, null) : null,
+    var.openobserve_secret_name != null ? try(kubectl_manifest.external_secret_openobserve.uid, null) : null,
+    var.openobserve_gcs_secret_name != null ? try(kubectl_manifest.external_secret_openobserve_gcs[0].uid, null) : null,
+    var.redis_ca_cert_secret_name != null ? try(kubectl_manifest.external_secret_redis_ca[0].uid, null) : null,
+    var.managed_sync_secret_name != null ? try(kubectl_manifest.external_secret_managed_sync[0].uid, null) : null,
+  ]))
+}
+
+resource "time_sleep" "wait_for_eso_core_secrets" {
+  # First apply: ESO webhook/controller + GSM sync often exceeds 90s on private GKE.
+  create_duration = "180s"
+
+  depends_on = [
+    kubectl_manifest.external_secret_paragon,
+    kubectl_manifest.external_secret_docker,
+  ]
+
+  triggers = {
+    external_secrets = local.eso_sync_triggers
+  }
+}
+
+resource "time_sleep" "wait_for_eso_openobserve" {
+  count = var.openobserve_secret_name != null ? 1 : 0
+
+  create_duration = "30s"
+
+  depends_on = [kubectl_manifest.external_secret_openobserve]
+
+  triggers = {
+    external_secret = try(kubectl_manifest.external_secret_openobserve.uid, null)
+  }
+}
+
+resource "time_sleep" "wait_for_eso_openobserve_gcs" {
+  count = var.openobserve_gcs_secret_name != null ? 1 : 0
+
+  create_duration = "30s"
+
+  depends_on = [kubectl_manifest.external_secret_openobserve_gcs[0]]
+
+  triggers = {
+    external_secret = try(kubectl_manifest.external_secret_openobserve_gcs[0].uid, null)
+  }
+}
+
+resource "time_sleep" "wait_for_eso_redis_ca" {
+  count = var.redis_ca_cert_secret_name != null ? 1 : 0
+
+  create_duration = "30s"
+
+  depends_on = [kubectl_manifest.external_secret_redis_ca[0]]
+
+  triggers = {
+    external_secret = try(kubectl_manifest.external_secret_redis_ca[0].uid, null)
+  }
+}
+
+resource "time_sleep" "wait_for_eso_managed_sync" {
+  count = var.managed_sync_secret_name != null ? 1 : 0
+
+  create_duration = "30s"
+
+  depends_on = [kubectl_manifest.external_secret_managed_sync[0]]
+
+  triggers = {
+    external_secret = try(kubectl_manifest.external_secret_managed_sync[0].uid, null)
+  }
+}
+
+resource "terraform_data" "eso_secrets_gate" {
+  input = local.eso_sync_triggers
+
+  depends_on = [
+    time_sleep.wait_for_eso_core_secrets,
+    time_sleep.wait_for_eso_openobserve,
+    time_sleep.wait_for_eso_openobserve_gcs,
+    time_sleep.wait_for_eso_redis_ca,
+    time_sleep.wait_for_eso_managed_sync,
+  ]
+}
+
+data "kubernetes_secret_v1" "paragon_secrets" {
+  metadata {
+    name      = "paragon-secrets"
+    namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret_v1" "docker_cfg" {
+  count = var.docker_cfg_secret_name != null ? 1 : 0
+
+  metadata {
+    name      = var.docker_pull_secret_name
+    namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret_v1" "openobserve_credentials" {
+  count = var.openobserve_secret_name != null ? 1 : 0
+
+  metadata {
+    name      = "openobserve-credentials"
+    namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret_v1" "managed_sync_secrets" {
+  count = var.managed_sync_secret_name != null ? 1 : 0
+
+  metadata {
+    name      = "paragon-managed-sync-secrets"
+    namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret_v1" "openobserve_gcs" {
+  count = var.openobserve_gcs_secret_name != null ? 1 : 0
+
+  metadata {
+    name      = "openobserve-creds"
+    namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret_v1" "redis_ca" {
+  count = var.redis_ca_cert_secret_name != null ? 1 : 0
+
+  metadata {
+    name      = "redis-ca-cert"
+    namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}

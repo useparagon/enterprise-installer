@@ -1,0 +1,25 @@
+# Stub so workflow_dispatch appears on main before the full pipeline lands.
+# Replace this file with the real stage-charts workflow in a follow-up PR.
+name: Stage Charts
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Git tag (reserved for the full workflow; unused in this stub)."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  stage-charts:
+    name: Stub (no-op)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: |
+          echo "stage-charts: no-op stub on main."
+          echo "version input: ${{ inputs.version }}"
+          echo "Run the full workflow from a branch that includes the chart packaging implementation."

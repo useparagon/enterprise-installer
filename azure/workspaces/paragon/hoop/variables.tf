@@ -8,6 +8,12 @@ variable "organization" {
   type        = string
 }
 
+variable "hoop_agent_name" {
+  description = "Override for the Hoop agent name in HOOP_KEY when organization does not identify the client (e.g. when organization is a region code like 'us', set hoop_agent_name to a client-identifying value such as 'client-us')."
+  type        = string
+  default     = null
+}
+
 variable "hoop_agent_id" {
   description = "Hoop agent ID for connections. Only used if hoop_enabled is true."
   type        = string
@@ -34,9 +40,21 @@ variable "hoop_server" {
 }
 
 variable "hoop_version" {
-  description = "The version of Hoop agent to install."
+  description = "Hoopagent Helm chart version."
   type        = string
   default     = "1.49.4"
+}
+
+variable "hoop_image_repository" {
+  description = "Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets."
+  type        = string
+  default     = "useparagon/hoop-agent-tools"
+}
+
+variable "hoop_image_tag" {
+  description = "Container image tag for the Hoop agent."
+  type        = string
+  default     = "1.0.2"
 }
 
 variable "hoop_postgres_guardrail_rules" {
@@ -49,6 +67,12 @@ variable "hoop_redis_guardrail_rules" {
   description = "Guardrail rule IDs for Redis connections."
   type        = list(string)
   default     = ["182f59b2-5d5d-4ab8-978e-94472b3915fc"]
+}
+
+variable "hoop_grafana_connection" {
+  description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
+  type        = bool
+  default     = false
 }
 
 variable "customer_facing" {
@@ -72,7 +96,7 @@ variable "restricted_access_groups" {
 variable "reviewers_access_groups" {
   description = "Reviewer groups required for customer-facing app connections."
   type        = list(string)
-  default     = ["dev-team-managers", "admin"]
+  default     = ["dev-team-managers"]
 }
 
 variable "hoop_slack_bot_token" {
@@ -97,6 +121,7 @@ variable "hoop_slack_channel_ids" {
 
 variable "infra_vars" {
   description = "Infrastructure variables from infra-output.json."
+  sensitive   = true
   type = object({
     postgres = optional(object({
       value = optional(map(object({
@@ -114,19 +139,60 @@ variable "infra_vars" {
         port           = number
         db_number      = optional(number, 0)
         ssl            = optional(bool, false)
+        cluster        = optional(bool, false)
         ca_certificate = optional(string, null)
+        password       = optional(string)
+        user           = optional(string)
+      })), {})
+    }))
+    redis_managed = optional(object({
+      value = optional(map(object({
+        host           = string
+        port           = number
+        db_number      = optional(number, 0)
+        ssl            = optional(bool, false)
+        cluster        = optional(bool, false)
+        ca_certificate = optional(string, null)
+        password       = optional(string)
+        user           = optional(string)
       })), {})
     }))
   })
   default = {
-    postgres = null
-    redis    = null
+    postgres      = null
+    redis         = null
+    redis_managed = null
   }
 }
 
 variable "namespace_paragon" {
   description = "Reference to kubernetes_namespace_v1.paragon from helm module."
   type        = any
+}
+
+variable "azure_tenant_id" {
+  description = "Azure tenant ID used by az in Hoop sessions via workload identity."
+  type        = string
+  default     = null
+}
+
+variable "azure_subscription_id" {
+  description = "Azure subscription ID for the Hoop support Reader role assignment."
+  type        = string
+}
+
+variable "oidc_issuer_url" {
+  description = "AKS OIDC issuer URL for workload identity federation. Empty until oidc_issuer_enabled is set on the cluster."
+  type        = string
+  default     = ""
+}
+
+variable "resource_group" {
+  description = "Azure resource group for the Hoop support managed identity."
+  type = object({
+    name     = string
+    location = string
+  })
 }
 
 variable "custom_connections" {

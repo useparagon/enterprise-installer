@@ -7,8 +7,10 @@ replicaCount: 1
 image:
   repository: public.ecr.aws/zinclabs/openobserve
   pullPolicy: IfNotPresent
-  tag: v0.20.1
-  # tag: v0.20.1-debug
+  tag: v0.91.0
+  # tag: v0.91.0-debug
+
+imagePullSecrets: []
 
 service:
   type: ClusterIP
@@ -16,10 +18,9 @@ service:
 
 resources:
   limits:
-    cpu: 1
     memory: 6Gi
   requests:
-    cpu: 0.5
+    cpu: 400m
     memory: 6Gi
 
 nameOverride: ""
@@ -34,8 +35,11 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ''
 
-# used to store GCP JSON creds as ConfigMap
+# GCP service-account JSON for ZO_S3 (base64). Used only when credsSecretName is empty.
 credsJson: ""
+
+# Existing Secret (e.g. ESO-synced) mounted at /creds. Takes precedence over credsJson.
+credsSecretName: ""
 
 ingress:
   enabled: false
@@ -108,3 +112,32 @@ persistence:
   size: 5Gi
 
 secrets: {}
+
+# Post-install/upgrade hook to apply user-defined schema (PARA-20444).
+# Uses the same paragon-secrets credentials as the OpenObserve StatefulSet.
+uds:
+  enabled: true
+  image:
+    repository: node
+    tag: "22-alpine"
+    pullPolicy: IfNotPresent
+  # The script retries internally; this only covers pod-level failures
+  # (image pull, eviction, OOM).
+  backoffLimit: 2
+  # Must stay below helm_release.paragon_logging timeout (900s, atomic). Helm
+  # waits for the StatefulSet first, then this hook; a Job that outlives Helm
+  # is killed as failed and rolls the release back.
+  activeDeadlineSeconds: 480
+  healthWaitSeconds: 60
+  streamWaitSeconds: 180
+  # List API is small; 600s was for GET /schema and exceeded the Job deadline.
+  requestTimeoutSeconds: 60
+  # Each attempt creates the columns, then selects them as the schema.
+  applyAttempts: 3
+  resources:
+    limits:
+      cpu: 200m
+      memory: 1Gi
+    requests:
+      cpu: 50m
+      memory: 128Mi

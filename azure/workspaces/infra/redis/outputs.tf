@@ -8,13 +8,18 @@ output "redis" {
       password = azurerm_redis_cache.redis[key].primary_access_key
       ssl      = !azurerm_redis_cache.redis[key].non_ssl_port_enabled
       cluster  = value.sku == "Premium" && value.cluster
-      connection_string = (value.sku == "Premium" && azurerm_redis_cache.redis[key].non_ssl_port_enabled
+      connection_string = azurerm_redis_cache.redis[key].non_ssl_port_enabled ? (
+        value.sku == "Premium"
         ?
-        # Premium SKU supports non-SSL port when in private subnet
+        # Premium in private subnet: non-SSL port, auth disabled in redis_configuration
         "${azurerm_redis_cache.redis[key].hostname}:${azurerm_redis_cache.redis[key].port}"
         :
-        # SSL port enabled and optional private DNS endpoint (required for Standard SKU)
-      ":${azurerm_redis_cache.redis[key].primary_access_key}@${try(trim(azurerm_private_dns_a_record.redis[key].fqdn, "."), azurerm_redis_cache.redis[key].hostname)}:${azurerm_redis_cache.redis[key].ssl_port}")
+        # Standard via private endpoint: non-SSL port with access key
+        ":${azurerm_redis_cache.redis[key].primary_access_key}@${try(trim(azurerm_private_dns_a_record.redis[key].fqdn, "."), azurerm_redis_cache.redis[key].hostname)}:${azurerm_redis_cache.redis[key].port}"
+        ) : (
+        # TLS-only: SSL port with access key
+        ":${azurerm_redis_cache.redis[key].primary_access_key}@${try(trim(azurerm_private_dns_a_record.redis[key].fqdn, "."), azurerm_redis_cache.redis[key].hostname)}:${azurerm_redis_cache.redis[key].ssl_port}"
+      )
     }
   }
   sensitive = true

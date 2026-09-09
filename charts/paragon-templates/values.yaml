@@ -1,0 +1,7 @@
+# Library chart: not installed alone. Documents Values keys referenced by templates
+# (real defaults are set in paragon-onprem subcharts passed as include "root").
+
+ingress:
+  healthcheck_path: /healthz
+
+probes: {}

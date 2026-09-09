@@ -13,23 +13,79 @@ variable "cluster_name" {
 }
 
 variable "docker_registry_server" {
-  description = "Docker container registry server."
+  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
+}
+
+variable "docker_cfg_secret_name" {
+  description = "Key Vault secret name for docker credentials. Null when unused (e.g. pre-provisioned Artifactory pull secret)."
+  type        = string
+  default     = null
+}
+
+variable "docker_pull_secret_name" {
+  description = "Kubernetes secret name for registry pull credentials."
+  type        = string
+  default     = "docker-cfg"
+}
+
+variable "create_docker_pull_secret" {
+  description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
+  type        = bool
+  default     = true
 }
 
 variable "docker_username" {
   description = "Docker username to pull images."
   type        = string
+  default     = null
 }
 
 variable "docker_password" {
   description = "Docker password to pull images."
   type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "docker_email" {
   description = "Docker email to pull images."
   type        = string
+  default     = null
+}
+
+variable "env_secret_name" {
+  description = "Key Vault secret name for shared Paragon application secrets."
+  type        = string
+}
+
+variable "external_secrets_client_id" {
+  description = "Client ID of the user-assigned identity used by External Secrets Operator."
+  type        = string
+}
+
+variable "external_secrets_tenant_id" {
+  description = "Azure tenant ID used for External Secrets workload identity."
+  type        = string
+}
+
+variable "external_secrets_workload_identity_ready" {
+  description = "Opaque revision proving the federated credential and Key Vault policy exist before the operator is installed."
+  type        = string
+}
+
+variable "legacy_external_secrets_client_id" {
+  description = "Legacy Azure client ID retained only during the pre-migration workload-identity cutover."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "legacy_external_secrets_client_secret" {
+  description = "Legacy Azure client secret retained only during the pre-migration workload-identity cutover."
+  type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "openobserve_email" {
@@ -53,6 +109,12 @@ variable "helm_values" {
   description = "Object containing values to pass to the helm chart."
   type        = any
   sensitive   = true
+}
+
+variable "secrets_revision" {
+  description = "Opaque revision of cloud-store secrets synced via ESO. Included in secret_hash so secret-only changes still force Helm upgrades (Reloader remains the runtime path)."
+  type        = string
+  default     = ""
 }
 
 variable "feature_flags_content" {
@@ -119,6 +181,33 @@ variable "ingress_scheme" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
+}
+
+variable "managed_sync_enabled" {
+  description = "Whether to enable managed sync."
+  type        = bool
+}
+
+variable "managed_sync_version" {
+  description = "The version of the Managed Sync helm chart to install."
+  type        = string
+}
+
+variable "key_vault_name" {
+  description = "Key Vault name that stores Paragon runtime secrets."
+  type        = string
+}
+
+variable "managed_sync_secret_name" {
+  description = "Key Vault secret name for managed-sync secrets."
+  type        = string
+  default     = null
+}
+
+variable "openobserve_secret_name" {
+  description = "Key Vault secret name for OpenObserve credentials."
+  type        = string
+  default     = null
 }
 
 locals {

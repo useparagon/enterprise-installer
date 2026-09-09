@@ -3,6 +3,8 @@ image:
   pullPolicy: IfNotPresent
   tag: 'latest'
 
+imagePullSecrets: []
+
 fullnameOverride: 'node-exporter'
 
 service:
@@ -18,17 +20,12 @@ tolerations:
 nodeSelector: {}
 
 resources:
+  limits:
+    memory: 100Mi
   requests:
     cpu: 100m
-    memory: 64Mi
-  limits:
-    cpu: 200m
-    memory: 128Mi
-
-priorityClassName: "paragon-node-high"
+    memory: 100Mi
 
 priorityClass:
   create: true
-  name: "paragon-node-high"
-  value: 1000000
-  description: "High priority for node-level Paragon services like logging and metrics"
+  name: "paragon-node-exporter-high"

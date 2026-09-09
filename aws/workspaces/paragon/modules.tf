@@ -1,45 +1,102 @@
+module "waf" {
+  source = "./waf"
+  count  = local.waf_active ? 1 : 0
+
+  aws_region                       = var.aws_region
+  workspace                        = local.workspace
+  waf_logs_retention_days          = var.waf_logs_retention_days
+  waf_ip_whitelist                 = var.waf_ip_whitelist
+  waf_ip_blacklist                 = var.waf_ip_blacklist
+  waf_rate_limit_global            = var.waf_rate_limit_global
+  waf_rate_limit_global_window_sec = var.waf_rate_limit_global_window_sec
+  waf_rate_limit_paths             = var.waf_rate_limit_paths
+  waf_rate_limit_path_window_sec   = var.waf_rate_limit_path_window_sec
+  waf_managed_rule_groups          = var.waf_managed_rule_groups
+}
+
 module "alb" {
   source = "./alb"
 
   certificate              = var.certificate
+  cluster_name             = local.cluster_name
   cloudflare_dns_api_token = var.cloudflare_dns_api_token
   cloudflare_zone_id       = var.cloudflare_zone_id
   dns_provider             = var.dns_provider
   domain                   = var.domain
+  microservices            = local.microservices
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
   release_ingress          = module.helm.release_ingress
   release_paragon_on_prem  = module.helm.release_paragon_on_prem
-  workspace                = local.workspace
+  vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
+  worker_security_group_ids = coalescelist(
+    try(compact(local.infra_vars.worker_security_group_ids.value), []),
+    try(compact(local.infra_vars.karpenter.value.security_group_ids), []),
+    [data.aws_eks_cluster.cluster.vpc_config[0].cluster_security_group_id],
+  )
+  workspace = local.workspace
 }
 
 module "helm" {
   source = "./helm"
 
-  certificate            = module.alb.certificate
-  aws_region             = var.aws_region
-  cluster_name           = local.cluster_name
-  docker_email           = var.docker_email
-  docker_password        = var.docker_password
-  docker_registry_server = var.docker_registry_server
-  docker_username        = var.docker_username
-  feature_flags_content  = local.feature_flags_content
-  flipt_options          = local.flipt_options
-  helm_values            = local.helm_values
-  ingress_scheme         = var.ingress_scheme
-  k8s_version            = var.k8s_version
-  logs_bucket            = local.logs_bucket
-  managed_sync_enabled   = var.managed_sync_enabled
-  managed_sync_version   = var.managed_sync_version
-  microservices          = local.microservices
-  monitor_version        = local.monitor_version
-  monitors               = local.monitors
-  monitors_enabled       = var.monitors_enabled
-  openobserve_email      = var.openobserve_email
-  openobserve_password   = var.openobserve_password
-  public_microservices   = local.public_microservices
-  public_monitors        = local.public_monitors
-  workspace              = local.workspace
+  certificate                   = module.alb.certificate
+  alb_backend_security_group_id = module.alb.backend_security_group_id
+  aws_region                    = var.aws_region
+  aws_access_key_id             = var.aws_access_key_id
+  aws_secret_access_key         = var.aws_secret_access_key
+  aws_session_token             = var.aws_session_token
+  aws_assume_role_arn           = var.aws_assume_role_arn
+  cluster_name                  = local.cluster_name
+  docker_cfg_secret_name        = local.runtime_docker_cfg_secret_name
+  docker_email                  = var.docker_email
+  docker_password               = var.docker_password
+  docker_registry_server        = var.docker_registry_server
+  docker_pull_secret_name       = var.docker_pull_secret_name
+  create_docker_pull_secret     = var.create_docker_pull_secret
+  docker_username               = var.docker_username
+  env_secret_name               = local.runtime_env_secret_name
+  eso_role_arn                  = local.eso_role_arn
+  feature_flags_content         = local.feature_flags_content
+  flipt_options                 = local.flipt_options
+  helm_values                   = local.helm_values_public
+  ingress_scheme                = var.ingress_scheme
+  install_external_secrets      = true
+  k8s_version                   = var.k8s_version
+  cluster_k8s_version           = local.cluster_k8s_version
+  logs_bucket                   = local.logs_bucket
+  managed_sync_enabled          = var.managed_sync_enabled
+  managed_sync_secret_name      = local.runtime_managed_sync_secret_name
+  managed_sync_version          = var.managed_sync_version
+  microservices                 = local.microservices
+  monitor_version               = local.monitor_version
+  monitors                      = local.monitors
+  monitors_enabled              = var.monitors_enabled
+  openobserve_email             = local.openobserve_email
+  openobserve_password          = local.openobserve_password
+  openobserve_secret_name       = local.runtime_openobserve_secret_name
+  public_microservices          = local.public_microservices
+  public_monitors               = local.public_monitors
+  waf_web_acl_arn               = local.waf_active ? module.waf[0].web_acl_arn : ""
+  enable_legacy_mng_pools       = try(local.infra_vars.enable_legacy_mng_pools.value, true)
+  karpenter_enabled             = try(local.infra_vars.enable_karpenter.value, false)
+  karpenter_aws = (
+    try(local.infra_vars.enable_karpenter.value, false) &&
+    try(local.infra_vars.karpenter.value, null) != null
+    ) ? {
+    node_role_name     = local.infra_vars.karpenter.value.node_role_name
+    security_group_ids = local.infra_vars.karpenter.value.security_group_ids
+    ebs_kms_key_arn    = local.infra_vars.karpenter.value.ebs_kms_key_arn
+  } : null
+  karpenter_node_os_volume_size_gib = var.karpenter_node_os_volume_size_gib
+  karpenter_node_volume_size_gib    = var.karpenter_node_volume_size_gib
+  karpenter_node_pools              = var.karpenter_node_pools
+  karpenter_defaults                = var.karpenter_defaults
+  workspace                         = local.workspace
+
+  runtime_secrets_ready = terraform_data.runtime_secrets_populated.id
+  # Hash SM version IDs (not terraform_data.id, which is stable across input updates).
+  secrets_revision = sha256(jsonencode(terraform_data.runtime_secrets_populated.output))
 }
 
 module "managed_sync_config" {
@@ -53,17 +110,32 @@ module "managed_sync_config" {
   microservices    = local.microservices
 }
 
+# EKS Pod Identity: associate every Paragon onprem ServiceAccount with the S3 role.
+# CLOUD_STORAGE_* is injected globally, so associations match that (no curated subset).
+module "pod_identity" {
+  source = "./pod-identity"
+  count  = try(local.storage_output.role_arn, null) != null ? 1 : 0
+
+  cluster_name = local.cluster_name
+  namespace    = module.helm.namespace_paragon.id
+  s3_role_arn  = local.storage_output.role_arn
+  service_accounts = setunion(
+    toset(keys(local.monorepo_microservices)),
+    var.managed_sync_enabled ? toset(["managed-sync-service-account"]) : toset([]),
+  )
+}
+
 module "monitors" {
   source = "./monitors"
   count  = var.monitors_enabled ? 1 : 0
 
-  grafana_admin_email           = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_USER"], null)
-  grafana_admin_password        = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
-  grafana_aws_access_key_id     = try(local.helm_vars.global.env["MONITOR_GRAFANA_AWS_ACCESS_ID"], null)
-  grafana_aws_secret_access_key = try(local.helm_vars.global.env["MONITOR_GRAFANA_AWS_SECRET_KEY"], null)
-  pgadmin_admin_email           = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
-  pgadmin_admin_password        = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
-  workspace                     = local.workspace
+  grafana_admin_email    = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_USER"], null)
+  grafana_admin_password = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
+  pgadmin_admin_email    = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
+  pgadmin_admin_password = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
+  workspace              = local.workspace
+  cluster_name           = local.cluster_name
+  namespace              = module.helm.namespace_paragon.id
 }
 
 module "uptime" {
@@ -79,6 +151,7 @@ module "hoop" {
 
   workspace                     = local.workspace
   organization                  = var.organization
+  hoop_agent_name               = var.hoop_agent_name
   hoop_enabled                  = var.hoop_enabled
   hoop_key                      = var.hoop_key
   hoop_agent_id                 = var.hoop_agent_id
@@ -91,9 +164,12 @@ module "hoop" {
   hoop_postgres_guardrail_rules = var.hoop_postgres_guardrail_rules
   hoop_redis_guardrail_rules    = var.hoop_redis_guardrail_rules
   customer_facing               = var.customer_facing
+  hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections
+  eks_oidc_issuer_url           = try(data.aws_eks_cluster.cluster.identity[0].oidc[0].issuer, null)
+  eks_oidc_provider_arn         = try("arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(data.aws_eks_cluster.cluster.identity[0].oidc[0].issuer, "https://", "")}", null)
   infra_vars = {
     postgres = try(local.infra_vars.postgres, null)
     redis    = try(local.infra_vars.redis, null)

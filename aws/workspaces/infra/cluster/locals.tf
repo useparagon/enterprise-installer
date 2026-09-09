@@ -1,0 +1,235 @@
+locals {
+  node_volume_size = 50
+
+  # Explicit so use_latest_ami_release_version can resolve SSM paths (upstream requires ami_type).
+  # AL2023 matches the EKS default on Kubernetes 1.30+; AL2 is unsupported on current k8s_version.
+  legacy_node_ami_type = "AL2023_x86_64_STANDARD"
+
+  system_node_group_map_key = coalesce(var.eks_system_managed_node_group.map_key, "node-default")
+  system_node_group_name = coalesce(
+    var.eks_system_managed_node_group.name,
+    "${var.workspace}-${local.system_node_group_map_key}",
+  )
+
+  karpenter_controller_taint = {
+    key    = "karpenter.sh/controller"
+    value  = "true"
+    effect = "NO_SCHEDULE"
+  }
+
+  system_node_os_volume_size_gib   = 15
+  system_node_data_volume_size_gib = 50
+
+  bottlerocket_system_block_device_mappings = {
+    xvda = {
+      device_name = "/dev/xvda"
+      ebs = {
+        volume_size           = local.system_node_os_volume_size_gib
+        volume_type           = "gp3"
+        iops                  = 3000
+        throughput            = 125
+        encrypted             = true
+        kms_key_id            = module.ebs_kms_key.key_arn
+        delete_on_termination = true
+      }
+    }
+    xvdb = {
+      device_name = "/dev/xvdb"
+      ebs = {
+        volume_size           = local.system_node_data_volume_size_gib
+        volume_type           = "gp3"
+        iops                  = 3000
+        throughput            = 125
+        encrypted             = true
+        kms_key_id            = module.ebs_kms_key.key_arn
+        delete_on_termination = true
+      }
+    }
+  }
+
+  default_block_device_mappings = {
+    xvda = {
+      device_name = "/dev/xvda"
+      ebs = {
+        volume_size           = local.node_volume_size
+        volume_type           = "gp3"
+        iops                  = 3000
+        throughput            = 125
+        encrypted             = true
+        kms_key_id            = module.ebs_kms_key.key_arn
+        delete_on_termination = true
+      }
+    }
+  }
+
+  taint_effects = {
+    NO_SCHEDULE        = "NoSchedule"
+    NO_EXECUTE         = "NoExecute"
+    PREFER_NO_SCHEDULE = "PreferNoSchedule"
+  }
+
+  # System MNG is tainted for Karpenter; core add-on controllers must tolerate it until worker NodePools scale.
+  karpenter_system_addon_tolerations = [
+    {
+      key      = "CriticalAddonsOnly"
+      operator = "Exists"
+    },
+    {
+      operator = "Exists"
+      effect   = "NoExecute"
+    },
+    {
+      key      = local.karpenter_controller_taint.key
+      operator = "Equal"
+      value    = local.karpenter_controller_taint.value
+      effect   = local.taint_effects[local.karpenter_controller_taint.effect]
+    },
+  ]
+
+  coredns_addon_configuration_values = var.enable_karpenter ? jsonencode({
+    tolerations = local.karpenter_system_addon_tolerations
+  }) : null
+
+  ebs_csi_addon_configuration_values = var.enable_karpenter ? jsonencode({
+    controller = {
+      tolerations = local.karpenter_system_addon_tolerations
+    }
+  }) : null
+
+  # x86 only: t4g is Graviton/ARM and would require BOTTLEROCKET_ARM_64 and a Karpenter architectures change.
+  system_node_instance_types = [
+    "t3a.medium",
+    "t3a.large",
+    "t3a.xlarge",
+    "t3.medium",
+    "t3.large",
+    "t3.xlarge",
+  ]
+
+  legacy_node_groups = {
+    for key, value in {
+      ondemand = var.eks_spot_instance_percent == 100 ? null : {
+        min_count      = ceil(var.eks_min_node_count * (1 - (var.eks_spot_instance_percent / 100)))
+        max_count      = ceil(var.eks_max_node_count * (1 - (var.eks_spot_instance_percent / 100)))
+        instance_types = var.eks_ondemand_node_instance_type
+        capacity       = "ON_DEMAND"
+        ami_type       = local.legacy_node_ami_type
+        labels = {
+          "useparagon.com/capacityType" = "ondemand"
+        }
+      }
+      spot = var.eks_spot_instance_percent == 0 ? null : {
+        min_count      = floor(var.eks_min_node_count * (var.eks_spot_instance_percent / 100))
+        max_count      = ceil(var.eks_max_node_count * (var.eks_spot_instance_percent / 100))
+        instance_types = var.eks_spot_node_instance_type
+        capacity       = "SPOT"
+        ami_type       = local.legacy_node_ami_type
+        labels = {
+          "useparagon.com/capacityType" = "spot"
+        }
+      }
+    } : key => value
+    if value != null
+  }
+
+  system_node_group = {
+    min_count    = var.eks_system_managed_node_group.min_size
+    max_count    = var.eks_system_managed_node_group.max_size
+    desired_size = var.eks_system_managed_node_group.desired_size
+    instance_types = coalesce(
+      try(var.eks_system_managed_node_group.instance_types, null),
+      local.system_node_instance_types,
+    )
+    capacity        = "ON_DEMAND"
+    ami_type        = "BOTTLEROCKET_x86_64"
+    labels          = var.eks_system_managed_node_group.labels
+    use_name_prefix = coalesce(var.eks_system_managed_node_group.use_name_prefix, false)
+    taints          = [local.karpenter_controller_taint]
+  }
+
+  # Karpenter on → dedicated system MNG. Legacy pools are independent (migration coexistence).
+  managed_node_groups = merge(
+    var.enable_karpenter ? { system = local.system_node_group } : {},
+    var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
+  )
+
+  # Release-version pins are AMI-family-specific (Bottlerocket vs AL2023).
+  managed_node_group_ami_types = distinct([
+    for _, v in local.managed_node_groups : coalesce(try(v.ami_type, null), local.legacy_node_ami_type)
+  ])
+
+  cluster_autoscaler_node_groups = var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {}
+
+  cluster_autoscaler_enabled = length(local.cluster_autoscaler_node_groups) > 0
+
+  # kube-proxy / CoreDNS are Kubernetes-minor-locked. VPC CNI, EBS CSI, and Pod
+  # Identity Agent are shared across minors when AWS lists the same latest.
+  # 1.34 keeps the pins already running in this repo. 1.35 uses AWS add-on docs:
+  # https://docs.aws.amazon.com/eks/latest/userguide/managing-kube-proxy.html
+  # https://docs.aws.amazon.com/eks/latest/userguide/managing-coredns.html
+  # https://docs.aws.amazon.com/eks/latest/userguide/managing-vpc-cni.html
+  eks_addon_versions_by_k8s = {
+    "1.34" = {
+      aws-ebs-csi-driver     = "v1.55.0-eksbuild.2"
+      coredns                = "v1.13.2-eksbuild.11"
+      eks-pod-identity-agent = "v1.3.10-eksbuild.3"
+      kube-proxy             = "v1.34.6-eksbuild.13"
+      vpc-cni                = "v1.21.1-eksbuild.3"
+    }
+    "1.35" = {
+      aws-ebs-csi-driver     = "v1.59.0-eksbuild.1"
+      coredns                = "v1.14.3-eksbuild.14"
+      eks-pod-identity-agent = "v1.3.10-eksbuild.3"
+      kube-proxy             = "v1.35.3-eksbuild.21"
+      vpc-cni                = "v1.22.4-eksbuild.3"
+    }
+  }
+
+  eks_addon_versions = local.eks_addon_versions_by_k8s[var.k8s_version]
+
+  eks_addon_resolve_conflicts = {
+    resolve_conflicts_on_create = "OVERWRITE"
+    resolve_conflicts_on_update = "PRESERVE"
+  }
+
+  karpenter_controller_role_name = coalesce(var.karpenter_iam_names.controller_role_name, "${var.workspace}-karpenter-controller")
+  karpenter_node_role_name       = coalesce(var.karpenter_iam_names.node_role_name, "${var.workspace}-karpenter-node")
+
+  # Must match eks_managed_node_group in cluster.tf (cluster primary + cluster SG).
+  # Do not use node_security_group_id alone — that SG is not attached to MNG workers.
+  eks_worker_security_group_ids = compact([
+    module.eks.cluster_primary_security_group_id,
+    module.eks.cluster_security_group_id,
+  ])
+
+  karpenter_node_iam_additional_policies = {
+    custom_worker = aws_iam_policy.eks_worker_policy.arn
+    ssm           = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  }
+
+  metadata_options = {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
+  is_assumed_role = can(regex("assumed-role", data.aws_caller_identity.current.arn))
+  assumed_role_parts = split(
+    "/",
+    replace(
+      replace(
+        data.aws_caller_identity.current.arn,
+        ":sts:",
+        ":iam:"
+      ),
+      ":assumed-role/",
+      local.is_assumed_role && strcontains(data.aws_caller_identity.current.arn, ":assumed-role/AWSReservedSSO") ? ":role__TEMPORARY_DIVIDER__aws-reserved__TEMPORARY_DIVIDER__sso.amazonaws.com/" : ":role/"
+    )
+  )
+  caller_arn = local.is_assumed_role ? replace(format("%s/%s", local.assumed_role_parts[0], local.assumed_role_parts[1]), "__TEMPORARY_DIVIDER__", "/") : data.aws_caller_identity.current.arn
+
+  eks_admin_arns = distinct(compact(concat(
+    var.eks_admin_arns,
+    [local.caller_arn]
+  )))
+}
