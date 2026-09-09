@@ -3,6 +3,15 @@ locals {
   connection_prefix = coalesce(var.hoop_agent_name, var.organization)
 
   connection_environment = var.customer_facing ? "prod" : "staging"
+
+  # Hoop exec starts the shell with a clean environment, so the ServiceAccount's IRSA
+  # variables never reach the session and the AWS SDK falls back to the node instance
+  # role. Injecting them per connection is the only way the agent assumes hoop-support.
+  irsa_env = try(aws_iam_role.hoop_support[0].arn, null) != null ? {
+    "envvar:AWS_ROLE_ARN"                = aws_iam_role.hoop_support[0].arn
+    "envvar:AWS_WEB_IDENTITY_TOKEN_FILE" = "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+  } : {}
+
   slack_enabled = (
     var.hoop_enabled &&
     try(var.hoop_slack_bot_token, null) != null && var.hoop_slack_bot_token != "" &&
@@ -204,6 +213,7 @@ locals {
             "envvar:KUBECTL_NAMESPACE"    = try(conn_config.namespace, "paragon")
             "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret.hoop_cluster_admin_token[0].data["token"], "")}"
           },
+          local.irsa_env,
           try(conn_config.secrets, {})
         )
         access_mode_runbooks = try(conn_config.access_mode_runbooks, "enabled")
@@ -230,12 +240,13 @@ locals {
         type    = "custom"
         subtype = null
         command = ["bash"]
-        secrets = {
+        secrets = merge({
           "envvar:REMOTE_URL"           = "https://kubernetes.default.svc.cluster.local"
           "envvar:INSECURE"             = "true"
           "envvar:KUBECTL_NAMESPACE"    = "paragon"
           "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret.hoop_cluster_admin_token[0].data["token"], "")}"
-        }
+          }, local.irsa_env
+        )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"
         access_mode_connect  = "enabled"

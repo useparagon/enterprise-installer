@@ -3,6 +3,17 @@ locals {
   connection_prefix = coalesce(var.hoop_agent_name, var.organization)
 
   connection_environment = var.customer_facing ? "prod" : "staging"
+
+  # Hoop exec starts the shell with a clean environment, so the variables the
+  # workload identity webhook injects never reach the session and az falls back to
+  # the node identity. Injecting them per connection is what makes az use hoop-support.
+  workload_identity_env = try(azurerm_user_assigned_identity.hoop_support[0].client_id, null) != null ? {
+    "envvar:AZURE_CLIENT_ID"            = azurerm_user_assigned_identity.hoop_support[0].client_id
+    "envvar:AZURE_TENANT_ID"            = var.azure_tenant_id
+    "envvar:AZURE_AUTHORITY_HOST"       = "https://login.microsoftonline.com/"
+    "envvar:AZURE_FEDERATED_TOKEN_FILE" = "/var/run/secrets/azure/tokens/azure-identity-token"
+  } : {}
+
   slack_enabled = (
     var.hoop_enabled &&
     try(var.hoop_slack_bot_token, null) != null && var.hoop_slack_bot_token != "" &&
@@ -238,6 +249,7 @@ locals {
             "envvar:KUBECTL_NAMESPACE"    = try(conn_config.namespace, "paragon")
             "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret.hoop_cluster_admin_token[0].data["token"], "")}"
           },
+          local.workload_identity_env,
           try(conn_config.secrets, {})
         )
         access_mode_runbooks = try(conn_config.access_mode_runbooks, "enabled")
@@ -264,12 +276,13 @@ locals {
         type    = "custom"
         subtype = null
         command = ["bash"]
-        secrets = {
+        secrets = merge({
           "envvar:REMOTE_URL"           = "https://kubernetes.default.svc.cluster.local"
           "envvar:INSECURE"             = "true"
           "envvar:KUBECTL_NAMESPACE"    = "paragon"
           "envvar:HEADER_AUTHORIZATION" = "Bearer ${try(data.kubernetes_secret.hoop_cluster_admin_token[0].data["token"], "")}"
-        }
+          }, local.workload_identity_env
+        )
         access_mode_runbooks = "enabled"
         access_mode_exec     = "enabled"
         access_mode_connect  = "enabled"

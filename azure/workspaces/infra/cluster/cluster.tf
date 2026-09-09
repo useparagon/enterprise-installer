@@ -53,6 +53,10 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   node_resource_group = "${local.cluster_name}-nodes"
   sku_tier            = var.k8s_sku_tier
 
+  # Required for Hoop (and other pods) to federate a Kubernetes SA to Azure RBAC.
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
+
   # disable automatic upgrades - manual upgrades only
   node_os_upgrade_channel = "Unmanaged"
 

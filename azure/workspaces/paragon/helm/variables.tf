@@ -60,20 +60,31 @@ variable "env_secret_name" {
 }
 
 variable "external_secrets_client_id" {
-  description = "Azure client ID used by External Secrets Operator."
+  description = "Client ID of the user-assigned identity used by External Secrets Operator."
   type        = string
-  sensitive   = true
-}
-
-variable "external_secrets_client_secret" {
-  description = "Azure client secret used by External Secrets Operator."
-  type        = string
-  sensitive   = true
 }
 
 variable "external_secrets_tenant_id" {
-  description = "Azure tenant ID used by External Secrets Operator."
+  description = "Azure tenant ID used for External Secrets workload identity."
   type        = string
+}
+
+variable "external_secrets_workload_identity_ready" {
+  description = "Opaque revision proving the federated credential and Key Vault policy exist before the operator is installed."
+  type        = string
+}
+
+variable "legacy_external_secrets_client_id" {
+  description = "Legacy Azure client ID retained only during the pre-migration workload-identity cutover."
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "legacy_external_secrets_client_secret" {
+  description = "Legacy Azure client secret retained only during the pre-migration workload-identity cutover."
+  type        = string
+  default     = null
   sensitive   = true
 }
 

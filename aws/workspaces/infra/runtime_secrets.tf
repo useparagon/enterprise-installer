@@ -125,10 +125,11 @@ resource "aws_secretsmanager_secret" "runtime_cluster" {
 resource "aws_secretsmanager_secret_version" "runtime_cluster" {
   secret_id = aws_secretsmanager_secret.runtime_cluster.id
   secret_string = jsonencode({
-    enable_karpenter        = module.cluster.enable_karpenter
-    enable_legacy_mng_pools = module.cluster.enable_legacy_mng_pools
-    k8s_version             = module.cluster.k8s_version
-    karpenter               = module.cluster.karpenter
-    cluster_name            = module.cluster.eks_cluster.name
+    enable_karpenter          = module.cluster.enable_karpenter
+    enable_legacy_mng_pools   = module.cluster.enable_legacy_mng_pools
+    k8s_version               = module.cluster.k8s_version
+    worker_security_group_ids = module.cluster.worker_security_group_ids
+    karpenter                 = module.cluster.karpenter
+    cluster_name              = module.cluster.eks_cluster.name
   })
 }

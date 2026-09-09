@@ -261,8 +261,8 @@ resource "kubernetes_secret" "docker_login" {
 # CRD apply is safe while v2.x controller is still running; skip risks v3.4 crash-loop.
 #
 # Scheduling: prefer on-demand nodes but allow spot when the on-demand pool is small.
-# Pod anti-affinity (preferred) spreads replicas across hosts. PDB + safe-to-evict: false
-# protect against cluster-autoscaler disruption regardless of node pool.
+# Pod anti-affinity (preferred) spreads replicas across hosts. PDB and disruption
+# annotations protect against autoscaler disruption regardless of node pool.
 resource "helm_release" "ingress" {
   name        = "ingress"
   description = "AWS Ingress Controller"
@@ -302,8 +302,18 @@ resource "helm_release" "ingress" {
   # preferred on-demand placement and preferred per-host spread.
   values = [yamlencode({
     configureDefaultAffinity = false
+    # Shared backend SG on every ALB so Terraform worker rules match ENI traffic.
+    # Auto-generated frontend SGs ignore manage-backend-security-group-rules, so
+    # the controller still authorizes worker access. disableRestrictedSecurityGroupRules
+    # makes that permission 0-65535 instead of the coalesced target-port range Terraform
+    # owns, so a controller revoke cannot delete the safeguard (and apply cannot
+    # DuplicatePermission). Helm applies this with the controller, before app Ingresses.
+    backendSecurityGroup                  = var.alb_backend_security_group_id
+    enableManageBackendSecurityGroupRules = false
+    disableRestrictedSecurityGroupRules   = true
     podAnnotations = {
       "cluster-autoscaler.kubernetes.io/safe-to-evict" = "false"
+      "karpenter.sh/do-not-disrupt"                    = "true"
     }
     affinity = {
       nodeAffinity = {
