@@ -15,7 +15,7 @@ resource "cloudflare_record" "cname" {
   name = replace(replace(each.value.public_url, "https://", ""), ".${data.cloudflare_zone.zone[0].name}", "")
 
   content = var.ingress_loadbalancer
-  ttl     = 600
+  ttl     = var.ttl
   type    = local.is_ip ? "A" : "CNAME"
   zone_id = var.cloudflare_zone_id
 }
