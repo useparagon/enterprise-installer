@@ -65,11 +65,26 @@ output "cluster_name" {
   sensitive   = true
 }
 
+output "oidc_issuer_url" {
+  description = "AKS OIDC issuer URL for workload-identity federated credentials (AGC ALB controller)."
+  value       = module.cluster.oidc_issuer_url
+}
+
 output "resource_group" {
   description = "Resource Group that infrastructure was deployed to."
   value = {
     name     = module.network.resource_group.name
     location = module.network.resource_group.location
+  }
+}
+
+output "network" {
+  description = "Network identifiers for AGC association subnet and nginx internal LB wiring."
+  value = {
+    private_subnet_id   = module.network.private_subnet.id
+    private_subnet_cidr = module.network.private_subnet.address_prefixes[0]
+    agc_subnet_id       = var.agc_subnet_enabled ? module.network.agc_subnet.id : null
+    agc_subnet_cidr     = var.agc_subnet_enabled ? module.network.agc_subnet.address_prefixes[0] : null
   }
 }
 

@@ -32,3 +32,9 @@ variable "public_services" {
     public_url = string
   }))
 }
+
+variable "ttl" {
+  description = "TTL for Cloudflare DNS records."
+  type        = number
+  default     = 600
+}

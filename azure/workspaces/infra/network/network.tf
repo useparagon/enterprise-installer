@@ -66,6 +66,29 @@ resource "azurerm_subnet" "redis" {
   virtual_network_name = azurerm_virtual_network.main.name
 }
 
+# Dedicated /24 for AGC; delegated to Microsoft.ServiceNetworking/trafficControllers.
+# Uses 10.0.64.0/24 (index-4 /20 range after public/private/postgres/redis).
+resource "azurerm_subnet" "agc" {
+  count = var.agc_subnet_enabled ? 1 : 0
+
+  name                 = "${var.workspace}-agc-subnet"
+  address_prefixes     = [cidrsubnet(var.vpc_cidr, 8, 64)]
+  resource_group_name  = azurerm_resource_group.main.name
+  virtual_network_name = azurerm_virtual_network.main.name
+
+  delegation {
+    name = "agc"
+
+    service_delegation {
+      name = "Microsoft.ServiceNetworking/trafficControllers"
+
+      actions = [
+        "Microsoft.Network/virtualNetworks/subnets/join/action",
+      ]
+    }
+  }
+}
+
 # NAT Gateway provides scalable outbound SNAT for private subnet workloads (AKS nodes,
 # bastion). Without it, AKS defaults to load balancer outbound SNAT, which pre-allocates
 # ~1024 ports per node and exhausts under high connection counts.
