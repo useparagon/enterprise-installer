@@ -525,6 +525,24 @@ variable "agent_os_index_max_count" {
   default = 4
 }
 
+variable "agent_os_extract_vm_size" {
+  description = "Compute-optimized AMD VM size for the Agent OS extraction AKS node pool. Use Standard_F8as_v6 for staging and Standard_F16as_v6 for production."
+  type        = string
+  default     = "Standard_F16as_v6"
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction AKS node pool."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction AKS node pool. Use 3 for staging and 8 for production."
+  type        = number
+  default     = 8
+}
+
 variable "eventhub_namespace_sku" {
   description = "The SKU name for the Event Hubs namespace (Basic, Standard, Premium)."
   type        = string

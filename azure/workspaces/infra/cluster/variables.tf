@@ -87,6 +87,24 @@ variable "agent_os_index_max_count" {
   default = 4
 }
 
+variable "agent_os_extract_vm_size" {
+  description = "Compute-optimized AMD VM size for the Agent OS extraction node pool."
+  type        = string
+  default     = "Standard_F16as_v6"
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction node pool."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction node pool."
+  type        = number
+  default     = 8
+}
+
 variable "k8s_sku_tier" {
   description = "The SKU Tier of the AKS cluster (`Free`, `Standard` or `Premium`)."
   type        = string
