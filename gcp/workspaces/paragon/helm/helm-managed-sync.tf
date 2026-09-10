@@ -60,6 +60,12 @@ resource "helm_release" "managed_sync" {
     value = "paragon-managed-sync-secrets"
   }
 
+  # Same static IP as shared-ingress; GCP only allows one forwarding rule per IP:port.
+  set {
+    name  = "ingress.enabled"
+    value = "false"
+  }
+
   set {
     name  = "ingress.certificate"
     value = google_compute_managed_ssl_certificate.cert.name
