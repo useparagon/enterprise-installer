@@ -1,3 +1,17 @@
+output "agent_os" {
+  value = var.agent_os_enabled ? {
+    host    = local.agent_os_valkey_endpoint.ip_address
+    port    = local.agent_os_valkey_endpoint.port
+    ssl     = true
+    cluster = local.agent_os_valkey_config.cluster_enabled
+    ca_certificate = join("\n", flatten([
+      for chain in google_memorystore_instance.agent_os[0].managed_server_ca[0].ca_certs :
+      chain.certificates
+    ]))
+  } : null
+  sensitive = true
+}
+
 output "redis" {
   value = var.multi_redis ? {
     for key, value in local.redis_instances :

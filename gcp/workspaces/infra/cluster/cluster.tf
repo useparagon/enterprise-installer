@@ -82,6 +82,28 @@ module "gke" {
         preemptible          = false
         spot                 = true
     }] : [],
+
+    # Agent OS index workloads require dedicated on-demand, memory-optimized capacity.
+    var.agent_os_enabled ? [
+      {
+        name                 = "agent-os-index"
+        auto_repair          = true
+        auto_upgrade         = true
+        disk_size_gb         = 100
+        disk_type            = "pd-standard"
+        enable_gcfs          = false
+        enable_gvnic         = false
+        enable_private_nodes = true
+        image_type           = "COS_CONTAINERD"
+        initial_node_count   = var.agent_os_index_min_count
+        local_ssd_count      = 0
+        machine_type         = var.agent_os_index_machine_type
+        max_count            = var.agent_os_index_max_count
+        min_count            = var.agent_os_index_min_count
+        node_locations       = "${var.region_zone},${var.region_zone_backup}"
+        preemptible          = false
+        spot                 = false
+    }] : [],
   ])
 
   node_pools_oauth_scopes = {
@@ -102,6 +124,10 @@ module "gke" {
     spot-node-pool = {
       "useparagon.com/capacityType" = "spot"
     }
+    agent-os-index = {
+      "useparagon.com/workload"     = "agent-os-index"
+      "useparagon.com/capacityType" = "ondemand"
+    }
   }
 
   node_pools_metadata = {
@@ -116,6 +142,13 @@ module "gke" {
         key    = "ondemand-node-pool"
         value  = true
         effect = "PREFER_NO_SCHEDULE"
+      },
+    ]
+    agent-os-index = [
+      {
+        key    = "useparagon.com/workload"
+        value  = "agent-os-index"
+        effect = "NO_SCHEDULE"
       },
     ]
   }

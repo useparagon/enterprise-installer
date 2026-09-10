@@ -52,3 +52,15 @@ variable "gmk_sasl_mechanism" {
   }
 }
 
+variable "gmk_sasl_plain_key_file_path" {
+  description = "Optional path to your own Kafka SA key JSON for SASL/PLAIN. When empty, the module creates the key and outputs it in cluster_password."
+  type        = string
+  default     = ""
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create a dedicated Agent OS Kafka client service account."
+  type        = bool
+  default     = false
+}
+
