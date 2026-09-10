@@ -50,3 +50,21 @@ output "kafka_credentials" {
     mechanism = "scram-sha-512"
   }
 }
+
+output "agent_os_kafka_credentials" {
+  value = var.agent_os_enabled ? {
+    username  = random_string.msk_username_agent_os[0].result
+    password  = random_password.msk_password_agent_os[0].result
+    mechanism = "scram-sha-512"
+  } : null
+  sensitive = true
+}
+
+output "acl_admin_kafka_credentials" {
+  value = var.agent_os_enabled ? {
+    username  = random_string.msk_username_acl_admin[0].result
+    password  = random_password.msk_password_acl_admin[0].result
+    mechanism = "scram-sha-512"
+  } : null
+  sensitive = true
+}

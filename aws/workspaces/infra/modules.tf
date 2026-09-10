@@ -10,6 +10,8 @@ module "storage" {
   auditlogs_retention_days  = var.auditlogs_retention_days
   auditlogs_lock_enabled    = var.auditlogs_lock_enabled
   managed_sync_enabled      = var.managed_sync_enabled
+  agent_os_enabled          = var.agent_os_enabled
+  agent_os_kms_key_arn      = try(aws_kms_key.agent_os[0].arn, null)
   s3_kms_encryption_enabled = var.s3_kms_encryption_enabled
   s3_kms_key_arn            = var.s3_kms_key_arn
   admin_arns                = local.admin_arns
@@ -60,6 +62,9 @@ module "postgres" {
   rds_final_snapshot_enabled      = var.rds_final_snapshot_enabled
   disable_deletion_protection     = var.disable_deletion_protection
   managed_sync_enabled            = var.managed_sync_enabled
+  agent_os_enabled                = var.agent_os_enabled
+  agent_os_postgres               = var.agent_os_postgres
+  agent_os_kms_key_arn            = try(aws_kms_key.agent_os[0].arn, null)
   migrated_passwords              = var.migrated_passwords
 
   vpc                = module.network.vpc
@@ -77,6 +82,9 @@ module "redis" {
   elasticache_multi_az           = var.elasticache_multi_az
   elasticache_multiple_instances = var.elasticache_multiple_instances
   managed_sync_enabled           = var.managed_sync_enabled
+  agent_os_enabled               = var.agent_os_enabled
+  agent_os_valkey                = var.agent_os_valkey
+  agent_os_kms_key_arn           = try(aws_kms_key.agent_os[0].arn, null)
 
   vpc            = module.network.vpc
   public_subnet  = module.network.public_subnet
@@ -93,6 +101,7 @@ module "kafka" {
   msk_kafka_version          = var.msk_kafka_version
   msk_instance_type          = var.msk_instance_type
   msk_kafka_num_broker_nodes = var.msk_kafka_num_broker_nodes
+  agent_os_enabled           = var.agent_os_enabled
 
   private_subnet = module.network.private_subnet
   vpc_id         = module.network.vpc.id
@@ -154,6 +163,11 @@ module "cluster" {
   ami_release_versions           = var.ami_release_versions
   use_latest_ami_release_version = var.use_latest_ami_release_version
 
+  agent_os_enabled              = var.agent_os_enabled
+  agent_os_index_instance_types = var.agent_os_index_instance_types
+  agent_os_index_min_count      = var.agent_os_index_min_count
+  agent_os_index_max_count      = var.agent_os_index_max_count
+
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
 }
@@ -190,7 +204,79 @@ module "secrets" {
   }) : null
 
   managed_sync_config     = var.managed_sync_enabled ? coalesce(var.paragon_managed_sync_config, {}) : null
+  agent_os_enabled        = var.agent_os_enabled
+  agent_os_kms_key_arn    = try(aws_kms_key.agent_os[0].arn, null)
+  agent_os_app_config     = local.agent_os_app_config
+  agent_os_admin_config   = local.agent_os_admin_config
   create_openobserve      = true
   openobserve_email       = var.openobserve_email
   recovery_window_in_days = var.secrets_recovery_window_in_days
+}
+
+# Agent OS uses this dedicated key for its RDS, Valkey, logs, and S3 data.
+# The key remains cross-service, so it is owned by the infra workspace root.
+data "aws_iam_policy_document" "agent_os_kms" {
+  statement {
+    sid       = "RootAccount"
+    effect    = "Allow"
+    actions   = ["kms:*"]
+    resources = ["*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
+
+  statement {
+    sid    = "AWSServiceUse"
+    effect = "Allow"
+    actions = [
+      "kms:CreateGrant",
+      "kms:Decrypt",
+      "kms:DescribeKey",
+      "kms:Encrypt",
+      "kms:GenerateDataKey*",
+      "kms:ListGrants",
+      "kms:ReEncrypt*",
+      "kms:RevokeGrant",
+    ]
+    resources = ["*"]
+
+    principals {
+      type = "Service"
+      identifiers = [
+        "elasticache.amazonaws.com",
+        "logs.${var.aws_region}.amazonaws.com",
+        "rds.amazonaws.com",
+        "s3.amazonaws.com",
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_kms_key" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  description             = "Agent OS data encryption for ${local.workspace}"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.agent_os_kms.json
+
+  tags = {
+    Name = "${local.workspace}-agent-os"
+  }
+}
+
+resource "aws_kms_alias" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name          = "alias/${local.workspace}-agent-os"
+  target_key_id = aws_kms_key.agent_os[0].key_id
 }

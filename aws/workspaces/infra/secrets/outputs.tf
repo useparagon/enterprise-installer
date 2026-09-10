@@ -5,7 +5,19 @@ output "secret_arns" {
     aws_secretsmanager_secret.docker_cfg.arn,
     try(aws_secretsmanager_secret.managed_sync[0].arn, ""),
     try(aws_secretsmanager_secret.openobserve[0].arn, ""),
+    try(aws_secretsmanager_secret.agent_os_app[0].arn, ""),
+    try(aws_secretsmanager_secret.agent_os_admin[0].arn, ""),
+    try(aws_secretsmanager_secret.agent_os_vendor[0].arn, ""),
   ])
+}
+
+output "agent_os_secret_names" {
+  description = "Names of the Agent OS secrets in Secrets Manager (null when Agent OS is disabled)."
+  value = var.agent_os_enabled ? {
+    app    = aws_secretsmanager_secret.agent_os_app[0].name
+    admin  = try(aws_secretsmanager_secret.agent_os_admin[0].name, null)
+    vendor = aws_secretsmanager_secret.agent_os_vendor[0].name
+  } : null
 }
 
 output "env_secret_name" {

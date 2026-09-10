@@ -147,10 +147,33 @@ locals {
     taints          = [local.karpenter_controller_taint]
   }
 
+  # Agent OS index workloads require dedicated on-demand, memory-optimized capacity.
+  agent_os_index_node_group = {
+    min_count      = var.agent_os_index_min_count
+    max_count      = var.agent_os_index_max_count
+    instance_types = var.agent_os_index_instance_types
+    capacity       = "ON_DEMAND"
+    ami_type       = local.legacy_node_ami_type
+    labels = {
+      "useparagon.com/workload"     = "agent-os-index"
+      "useparagon.com/capacityType" = "ondemand"
+    }
+    taints = [
+      {
+        key    = "useparagon.com/workload"
+        value  = "agent-os-index"
+        effect = "NO_SCHEDULE"
+      }
+    ]
+  }
+
+  agent_os_mng_enabled = var.agent_os_enabled && (var.enable_legacy_mng_pools || !var.enable_karpenter)
+
   # Karpenter on → dedicated system MNG. Legacy pools are independent (migration coexistence).
   managed_node_groups = merge(
     var.enable_karpenter ? { system = local.system_node_group } : {},
     var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
+    local.agent_os_mng_enabled ? { "agent-os-index" = local.agent_os_index_node_group } : {},
   )
 
   # Release-version pins are AMI-family-specific (Bottlerocket vs AL2023).
@@ -158,7 +181,10 @@ locals {
     for _, v in local.managed_node_groups : coalesce(try(v.ami_type, null), local.legacy_node_ami_type)
   ])
 
-  cluster_autoscaler_node_groups = var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {}
+  cluster_autoscaler_node_groups = merge(
+    var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
+    local.agent_os_mng_enabled ? { "agent-os-index" = local.agent_os_index_node_group } : {},
+  )
 
   cluster_autoscaler_enabled = length(local.cluster_autoscaler_node_groups) > 0
 

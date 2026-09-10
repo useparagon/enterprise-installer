@@ -201,3 +201,154 @@ resource "aws_appautoscaling_policy" "cache_cpu" {
     }
   }
 }
+
+# Agent OS cache: dedicated ElastiCache Valkey 7.2 replication group, isolated from the
+# Paragon/Managed Sync Redis instances above. App env keys stay REDIS_* (Redis-compatible API).
+
+locals {
+  agent_os_valkey_config_defaults = {
+    node_type       = "cache.t4g.medium"
+    multi_az        = true
+    cluster_enabled = false
+  }
+
+  # Partial overrides set omitted attributes to null; drop them so defaults survive the merge.
+  agent_os_valkey_config = merge(
+    local.agent_os_valkey_config_defaults,
+    { for key, value in try(var.agent_os_valkey["cache"], {}) : key => value if value != null },
+  )
+
+  agent_os_valkey_version = "7.2"
+}
+
+data "aws_ec2_instance_type_offerings" "agent_os_cache_filter" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  filter {
+    name   = "instance-type"
+    values = [trimprefix(local.agent_os_valkey_config.node_type, "cache.")]
+  }
+
+  filter {
+    name   = "location"
+    values = var.private_subnet[*].availability_zone
+  }
+
+  location_type = "availability-zone"
+}
+
+locals {
+  agent_os_cache_subnet_ids = var.agent_os_enabled ? [
+    for subnet in var.private_subnet : subnet.id
+    if contains(data.aws_ec2_instance_type_offerings.agent_os_cache_filter[0].locations, subnet.availability_zone)
+  ] : []
+}
+
+resource "random_password" "agent_os_valkey_auth" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length           = 64
+  special          = true
+  override_special = "!&#$^<>-"
+}
+
+resource "aws_elasticache_subnet_group" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name       = "${var.workspace}-agent-os-valkey-subnet"
+  subnet_ids = local.agent_os_cache_subnet_ids
+}
+
+resource "aws_elasticache_parameter_group" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name   = "${var.workspace}-agent-os-valkey${split(".", local.agent_os_valkey_version)[0]}"
+  family = "valkey${split(".", local.agent_os_valkey_version)[0]}"
+
+  parameter {
+    name  = "maxmemory-policy"
+    value = "allkeys-lru"
+  }
+
+  parameter {
+    name  = "tcp-keepalive"
+    value = "30"
+  }
+
+  parameter {
+    name  = "timeout"
+    value = "120"
+  }
+
+  parameter {
+    name  = "cluster-enabled"
+    value = local.agent_os_valkey_config.cluster_enabled ? "yes" : "no"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name = "${var.workspace}-agent-os-valkey"
+  }
+}
+
+resource "aws_elasticache_replication_group" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  # Replication group IDs are capped at 40 characters.
+  replication_group_id = "${substr(replace("${var.workspace}-agent-os", "_", "-"), 0, 32)}-vk"
+  description          = "Agent OS Valkey cache."
+  apply_immediately    = true
+  node_type            = local.agent_os_valkey_config.node_type
+  engine               = "valkey"
+  engine_version       = local.agent_os_valkey_version
+  port                 = 6379
+  parameter_group_name = aws_elasticache_parameter_group.agent_os[0].name
+
+  snapshot_retention_limit = 5
+  snapshot_window          = "12:00-13:00"
+  maintenance_window       = "tue:16:00-tue:17:00"
+
+  subnet_group_name          = aws_elasticache_subnet_group.agent_os[0].name
+  security_group_ids         = [aws_security_group.agent_os[0].id]
+  multi_az_enabled           = local.agent_os_valkey_config.multi_az
+  automatic_failover_enabled = local.agent_os_valkey_config.multi_az
+
+  num_node_groups         = local.agent_os_valkey_config.cluster_enabled ? 1 : null
+  replicas_per_node_group = local.agent_os_valkey_config.cluster_enabled ? (local.agent_os_valkey_config.multi_az ? 1 : 0) : null
+  num_cache_clusters      = local.agent_os_valkey_config.cluster_enabled ? null : (local.agent_os_valkey_config.multi_az ? 2 : 1)
+
+  transit_encryption_enabled = true
+  at_rest_encryption_enabled = true
+  kms_key_id                 = var.agent_os_kms_key_arn
+  auth_token                 = random_password.agent_os_valkey_auth[0].result
+
+  log_delivery_configuration {
+    destination      = aws_cloudwatch_log_group.agent_os[0].name
+    destination_type = "cloudwatch-logs"
+    log_format       = "json"
+    log_type         = "slow-log"
+  }
+
+  log_delivery_configuration {
+    destination      = aws_cloudwatch_log_group.agent_os[0].name
+    destination_type = "cloudwatch-logs"
+    log_format       = "json"
+    log_type         = "engine-log"
+  }
+
+  tags = {
+    Name    = "${var.workspace}-agent-os-valkey"
+    Cluster = local.agent_os_valkey_config.cluster_enabled ? "true" : "false"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name              = "/aws/elasticache/${var.workspace}-agent-os"
+  retention_in_days = 365
+  kms_key_id        = var.agent_os_kms_key_arn
+}

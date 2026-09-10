@@ -131,7 +131,10 @@ resource "aws_eks_access_policy_association" "bastion" {
 }
 
 resource "random_string" "node_group" {
-  for_each = local.legacy_node_groups
+  for_each = merge(
+    local.legacy_node_groups,
+    local.agent_os_mng_enabled ? { "agent-os-index" = local.agent_os_index_node_group } : {},
+  )
 
   length  = 6
   special = false

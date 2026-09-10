@@ -6,6 +6,9 @@ locals {
     local.runtime_docker_cfg_sync_enabled ? data.aws_secretsmanager_secret.docker_cfg.arn : "",
     var.managed_sync_enabled ? data.aws_secretsmanager_secret.managed_sync[0].arn : "",
     data.aws_secretsmanager_secret.openobserve.arn,
+    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_app[0].arn : "",
+    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_admin[0].arn : "",
+    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_vendor[0].arn : "",
   ])
 }
 
@@ -47,6 +50,19 @@ data "aws_iam_policy_document" "eso_secrets" {
       "secretsmanager:ListSecretVersionIds",
     ]
     resources = local.eso_secret_arns
+  }
+
+  dynamic "statement" {
+    for_each = var.agent_os_enabled ? [1] : []
+
+    content {
+      effect = "Allow"
+      actions = [
+        "kms:Decrypt",
+        "kms:DescribeKey",
+      ]
+      resources = [local.agent_os_handoff.kms_key_arn]
+    }
   }
 }
 

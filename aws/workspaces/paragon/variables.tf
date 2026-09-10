@@ -449,6 +449,40 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "The version of the Agent OS helm chart to install."
+  type        = string
+  default     = "latest"
+}
+
+variable "agent_os_index_instance_types" {
+  description = "Memory-optimized EC2 instance types for the Agent OS Karpenter index pool."
+  type        = list(string)
+  default     = ["r6a.2xlarge", "r6i.2xlarge", "r5a.2xlarge"]
+}
+
+variable "agent_os_index_max_count" {
+  description = "Maximum nodes in the Agent OS Karpenter index pool. Karpenter intentionally scales the pool to zero when idle."
+  type        = number
+  default     = 4
+
+  validation {
+    condition     = var.agent_os_index_max_count >= 1
+    error_message = "agent_os_index_max_count must be at least 1."
+  }
+}
+
 variable "waf_enabled" {
   description = "Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf_managed_rule_groups, rate limits, or IP lists in tfvars."
   type        = bool
@@ -608,6 +642,32 @@ locals {
   workspace         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace
 
   waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
+
+  # Agent OS index workloads use a separate on-demand Karpenter pool.
+  karpenter_node_pools = merge(
+    var.karpenter_node_pools,
+    var.agent_os_enabled ? {
+      "agent-os-index" = {
+        capacity_types = ["on-demand"]
+        instance_types = var.agent_os_index_instance_types
+        cpu_limit      = "32"
+        memory_limit   = "256Gi"
+        nodes_limit    = var.agent_os_index_max_count
+        weight         = 10
+        labels = {
+          "useparagon.com/workload"     = "agent-os-index"
+          "useparagon.com/capacityType" = "ondemand"
+        }
+        taints = [
+          {
+            key    = "useparagon.com/workload"
+            value  = "agent-os-index"
+            effect = "NoSchedule"
+          }
+        ]
+      }
+    } : {},
+  )
 
   # use default where standard value can be determined
   cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
