@@ -60,10 +60,6 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   # disable automatic upgrades - manual upgrades only
   node_os_upgrade_channel = "Unmanaged"
 
-  # OIDC issuer + workload identity only when AGC subnet is enabled (ALB controller federated credential).
-  oidc_issuer_enabled       = var.agc_subnet_enabled
-  workload_identity_enabled = var.agc_subnet_enabled
-
   # NOTE: The configuration for the cluster can't change at all
   # We're intentionally setting very low settings.
   # This way, we can instead reconfigure the node pools using `azurerm_kubernetes_cluster_node_pool` resource.
@@ -171,6 +167,45 @@ resource "azurerm_kubernetes_cluster_node_pool" "pool" {
   # Ensure new nodes are created before old ones are destroyed
   lifecycle {
     create_before_destroy = true
+    ignore_changes = [
+      upgrade_settings
+    ]
+  }
+}
+
+# Agent OS index workloads require dedicated regular, memory-optimized capacity.
+resource "azurerm_kubernetes_cluster_node_pool" "agent_os_index" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                  = "aosindex"
+  auto_scaling_enabled  = true
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.cluster.id
+  max_count             = var.agent_os_index_max_count
+  min_count             = var.agent_os_index_min_count
+  orchestrator_version  = var.k8s_version
+  os_sku                = "Ubuntu"
+  os_type               = "Linux"
+  tags                  = merge(var.tags, { Name = "agent-os-index" })
+  vm_size               = var.agent_os_index_vm_size
+  vnet_subnet_id        = var.private_subnet.id
+  priority              = "Regular"
+  node_taints           = ["useparagon.com/workload=agent-os-index:NoSchedule"]
+
+  node_labels = {
+    "useparagon.com/workload"     = "agent-os-index"
+    "useparagon.com/capacityType" = "ondemand"
+  }
+
+  upgrade_settings {
+    max_surge = "1"
+  }
+
+  depends_on = [
+    azurerm_role_assignment.aks_network_contributor,
+    azurerm_role_assignment.aks_nsg_network_contributor,
+  ]
+
+  lifecycle {
     ignore_changes = [
       upgrade_settings
     ]

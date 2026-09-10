@@ -236,6 +236,44 @@ variable "managed_sync_version" {
   type        = string
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled."
+  type        = bool
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "The version of the Agent OS helm chart to install."
+  type        = string
+}
+
+# Agent OS cloud secret names and workload identity are supplied by the parent workspace.
+variable "agent_os_secret_names" {
+  description = "Key Vault secret names used to assemble Agent OS Kubernetes secrets."
+  type = object({
+    app    = string
+    admin  = string
+    vendor = string
+  })
+  default = null
+}
+
+variable "agent_os_workload_identity_client_id" {
+  description = "Client ID of the Agent OS user-assigned workload identity."
+  type        = string
+  default     = null
+}
+
+variable "agent_os_workload_identity_ready" {
+  description = "Opaque revision proving the Agent OS federation and blob role assignment exist."
+  type        = string
+  default     = null
+}
+
 variable "key_vault_name" {
   description = "Key Vault name that stores Paragon runtime secrets."
   type        = string

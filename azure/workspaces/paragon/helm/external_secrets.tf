@@ -4,6 +4,29 @@ resource "kubernetes_namespace" "external_secrets" {
   }
 }
 
+# Terraform owns the Agent OS namespace and workload-identity service account.
+resource "kubernetes_namespace" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  metadata {
+    name = "agent-os"
+  }
+}
+
+resource "kubernetes_service_account" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  metadata {
+    name      = "agent-os"
+    namespace = kubernetes_namespace.agent_os[0].metadata[0].name
+    annotations = {
+      "azure.workload.identity/client-id"      = var.agent_os_workload_identity_client_id
+      "azure.workload.identity/tenant-id"      = var.external_secrets_tenant_id
+      "useparagon.com/workload-identity-ready" = var.agent_os_workload_identity_ready
+    }
+  }
+}
+
 resource "helm_release" "external_secrets" {
   name             = "external-secrets"
   namespace        = kubernetes_namespace.external_secrets.id
@@ -110,6 +133,72 @@ locals {
       }
     }
   })
+
+  # Agent OS reuses the ESO identity and azure-key-vault store contract in its namespace.
+  agent_os_secret_store_yaml = var.agent_os_enabled ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "SecretStore"
+    metadata = {
+      name      = "azure-key-vault"
+      namespace = kubernetes_namespace.agent_os[0].metadata[0].name
+    }
+    spec = {
+      provider = {
+        azurekv = {
+          authType = "WorkloadIdentity"
+          tenantId = var.external_secrets_tenant_id
+          vaultUrl = "https://${var.key_vault_name}.vault.azure.net"
+        }
+      }
+    }
+  }) : null
+
+  agent_os_app_external_secret_yaml = var.agent_os_enabled ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "agent-os-app"
+      namespace = kubernetes_namespace.agent_os[0].metadata[0].name
+    }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef = {
+        name = "azure-key-vault"
+        kind = "SecretStore"
+      }
+      target = {
+        name           = "agent-os-app"
+        creationPolicy = "Owner"
+      }
+      dataFrom = [
+        { extract = { key = var.agent_os_secret_names.vendor } },
+        { extract = { key = var.agent_os_secret_names.app } },
+      ]
+    }
+  }) : null
+
+  agent_os_admin_external_secret_yaml = var.agent_os_enabled ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "agent-os-admin"
+      namespace = kubernetes_namespace.agent_os[0].metadata[0].name
+    }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef = {
+        name = "azure-key-vault"
+        kind = "SecretStore"
+      }
+      target = {
+        name           = "agent-os-admin"
+        creationPolicy = "Owner"
+      }
+      dataFrom = [
+        { extract = { key = var.agent_os_secret_names.admin } },
+      ]
+    }
+  }) : null
 
   external_secret_paragon_yaml = yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
@@ -223,6 +312,28 @@ locals {
 resource "kubectl_manifest" "secret_store" {
   yaml_body  = local.secret_store_yaml
   depends_on = [helm_release.external_secrets]
+}
+
+# Agent OS has exactly two ESO-managed Kubernetes Secrets; app merges vendor then app.
+resource "kubectl_manifest" "agent_os_secret_store" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  yaml_body  = local.agent_os_secret_store_yaml
+  depends_on = [helm_release.external_secrets]
+}
+
+resource "kubectl_manifest" "agent_os_app_external_secret" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  yaml_body  = local.agent_os_app_external_secret_yaml
+  depends_on = [kubectl_manifest.agent_os_secret_store]
+}
+
+resource "kubectl_manifest" "agent_os_admin_external_secret" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  yaml_body  = local.agent_os_admin_external_secret_yaml
+  depends_on = [kubectl_manifest.agent_os_secret_store]
 }
 
 resource "kubectl_manifest" "external_secret_paragon" {

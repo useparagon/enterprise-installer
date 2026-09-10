@@ -15,6 +15,12 @@ variable "workspace" {
   type        = string
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create a dedicated Agent OS Event Hubs authorization rule."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Default tags to apply to resources"
   type        = map(string)

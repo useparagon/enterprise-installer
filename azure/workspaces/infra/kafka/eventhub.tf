@@ -33,3 +33,16 @@ resource "azurerm_eventhub_namespace_authorization_rule" "kafka" {
   send   = true
   manage = true
 }
+
+# Agent OS uses a least-privilege identity on the shared Event Hubs namespace.
+resource "azurerm_eventhub_namespace_authorization_rule" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                = "${substr(var.workspace, 0, 30)}-${substr(md5(var.workspace), 0, 8)}-aos"
+  namespace_name      = azurerm_eventhub_namespace.kafka.name
+  resource_group_name = var.resource_group.name
+
+  listen = true
+  send   = true
+  manage = false
+}

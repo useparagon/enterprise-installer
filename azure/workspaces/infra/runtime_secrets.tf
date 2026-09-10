@@ -115,6 +115,60 @@ resource "azurerm_key_vault_secret" "runtime_storage" {
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
 
+# Agent OS secrets: app (mounted by every service), admin (migration Job only) and vendor
+# (operator-owned API keys; Terraform creates the entry and never manages its contents).
+resource "azurerm_key_vault_secret" "agent_os_app" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name         = "agent-os-app"
+  key_vault_id = azurerm_key_vault.paragon.id
+  value        = jsonencode(local.agent_os_app_config)
+
+  depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
+resource "azurerm_key_vault_secret" "agent_os_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name         = "agent-os-admin"
+  key_vault_id = azurerm_key_vault.paragon.id
+  value        = jsonencode(local.agent_os_admin_config)
+
+  depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
+resource "azurerm_key_vault_secret" "agent_os_vendor" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name         = "agent-os-vendor"
+  key_vault_id = azurerm_key_vault.paragon.id
+  value        = jsonencode({})
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+
+  depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
+resource "azurerm_key_vault_secret" "runtime_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name         = "agent-os"
+  key_vault_id = azurerm_key_vault.paragon.id
+  value = jsonencode({
+    app                = azurerm_key_vault_secret.agent_os_app[0].name
+    admin              = azurerm_key_vault_secret.agent_os_admin[0].name
+    vendor             = azurerm_key_vault_secret.agent_os_vendor[0].name
+    storage_account    = module.storage.blob.name
+    storage_account_id = module.storage.blob.id
+    container          = module.storage.blob.agent_os_container
+    container_id       = module.storage.blob.agent_os_container_id
+  })
+
+  depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
 resource "azurerm_key_vault_secret" "runtime_kafka" {
   count = var.managed_sync_enabled ? 1 : 0
 
@@ -159,4 +213,64 @@ resource "azurerm_key_vault_secret" "runtime_bastion" {
   })
 
   depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
+# Agent OS app/admin secret payloads, composed from the postgres, redis-managed, storage and
+# kafka modules and stored in Key Vault. Service pods only ever receive the app payload.
+
+locals {
+  agent_os_db    = try(one(module.postgres).agent_os, null)
+  agent_os_cache = try(one(module.redis_managed).redis["agent_os"], null)
+  agent_os_kafka = one(module.kafka)
+
+  agent_os_cache_scheme = try(local.agent_os_cache.ssl, false) ? "rediss" : "redis"
+
+  agent_os_app_config = var.agent_os_enabled ? {
+    CONTEXT_POSTGRES_HOST        = local.agent_os_db.host
+    CONTEXT_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    CONTEXT_POSTGRES_DATABASE    = local.agent_os_db.databases.context.database
+    CONTEXT_POSTGRES_USERNAME    = local.agent_os_db.databases.context.user
+    CONTEXT_POSTGRES_PASSWORD    = local.agent_os_db.databases.context.password
+    CONTEXT_POSTGRES_SSL_ENABLED = "true"
+    CONTEXT_POSTGRES_SSL_CA      = ""
+
+    TOOLS_POSTGRES_HOST        = local.agent_os_db.host
+    TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    TOOLS_POSTGRES_DATABASE    = local.agent_os_db.databases.tools.database
+    TOOLS_POSTGRES_USERNAME    = local.agent_os_db.databases.tools.user
+    TOOLS_POSTGRES_PASSWORD    = local.agent_os_db.databases.tools.password
+    TOOLS_POSTGRES_SSL_ENABLED = "true"
+    TOOLS_POSTGRES_SSL_CA      = ""
+
+    REDIS_HOST            = local.agent_os_cache.host
+    REDIS_PORT            = tostring(local.agent_os_cache.port)
+    REDIS_URL             = "${local.agent_os_cache_scheme}://:${urlencode(local.agent_os_cache.password)}@${local.agent_os_cache.host}:${local.agent_os_cache.port}"
+    REDIS_PASSWORD        = local.agent_os_cache.password
+    REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
+    REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
+
+    KAFKA_BROKER_URLS    = local.agent_os_kafka.bootstrap_servers
+    KAFKA_SASL_USERNAME  = local.agent_os_kafka.agent_os_kafka_credentials.username
+    KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_kafka_credentials.password
+    KAFKA_SASL_MECHANISM = local.agent_os_kafka.agent_os_kafka_credentials.mechanism
+    KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.tls_enabled)
+
+    # Blob container, addressed through the S3_* keys the Agent OS config slices expect.
+    AZURE_STORAGE_ACCOUNT = module.storage.blob.name
+    S3_BUCKET             = module.storage.blob.agent_os_container
+    S3_PARSED_BUCKET      = module.storage.blob.agent_os_container
+    S3_PARSED_PREFIX      = "parsed/"
+    S3_INDEX_BUCKET       = module.storage.blob.agent_os_container
+    S3_INDEX_AZ_ID        = ""
+  } : null
+
+  agent_os_admin_config = var.agent_os_enabled ? {
+    ADMIN_POSTGRES_HOST        = local.agent_os_db.host
+    ADMIN_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    ADMIN_POSTGRES_DATABASE    = local.agent_os_db.admin_database
+    ADMIN_POSTGRES_USERNAME    = local.agent_os_db.admin_user
+    ADMIN_POSTGRES_PASSWORD    = local.agent_os_db.admin_password
+    ADMIN_POSTGRES_SSL_ENABLED = "true"
+    ADMIN_POSTGRES_SSL_CA      = ""
+  } : null
 }
