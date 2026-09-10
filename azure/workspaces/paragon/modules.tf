@@ -34,6 +34,18 @@ module "helm" {
   managed_sync_enabled     = var.managed_sync_enabled
   managed_sync_secret_name = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
   managed_sync_version     = var.managed_sync_version
+  agent_os_enabled         = var.agent_os_enabled
+  agent_os_version         = var.agent_os_version
+  agent_os_secret_names = var.agent_os_enabled ? {
+    app    = local.agent_os_handoff.app
+    admin  = local.agent_os_handoff.admin
+    vendor = local.agent_os_handoff.vendor
+  } : null
+  agent_os_workload_identity_client_id = var.agent_os_enabled ? azurerm_user_assigned_identity.agent_os[0].client_id : null
+  agent_os_workload_identity_ready = var.agent_os_enabled ? sha256(join(":", [
+    azurerm_federated_identity_credential.agent_os[0].id,
+    azurerm_role_assignment.agent_os_storage[0].id,
+  ])) : null
   paragon_helm_repository  = var.paragon_helm_repository
   microservices            = local.microservices
   monitor_version          = local.monitor_version
