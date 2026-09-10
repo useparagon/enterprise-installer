@@ -79,3 +79,23 @@ variable "k8s_master_authorized_networks" {
   }))
   default = []
 }
+
+variable "agent_os_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "agent_os_index_machine_type" {
+  type    = string
+  default = "n2-highmem-8"
+}
+
+variable "agent_os_index_min_count" {
+  type    = number
+  default = 2
+}
+
+variable "agent_os_index_max_count" {
+  type    = number
+  default = 4
+}

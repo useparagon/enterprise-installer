@@ -75,6 +75,12 @@ module "helm" {
   managed_sync_enabled        = var.managed_sync_enabled
   managed_sync_secret_name    = var.managed_sync_enabled ? google_secret_manager_secret.managed_sync[0].secret_id : null
   managed_sync_version        = var.managed_sync_version
+  agent_os_enabled            = var.agent_os_enabled
+  agent_os_version            = var.agent_os_version
+  agent_os_app_secret_name    = local.agent_os_app_secret_name
+  agent_os_admin_secret_name  = local.agent_os_admin_secret_name
+  agent_os_vendor_secret_name = local.agent_os_vendor_secret_name
+  agent_os_service_account    = local.agent_os_service_account
   microservices               = local.microservices
   monitor_version             = local.monitor_version
   monitors                    = local.monitors

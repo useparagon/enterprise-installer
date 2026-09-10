@@ -37,3 +37,9 @@ variable "managed_sync_enabled" {
   type        = bool
   default     = false
 }
+
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS GCS bucket."
+  type        = bool
+  default     = false
+}
