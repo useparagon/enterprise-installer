@@ -104,6 +104,28 @@ module "gke" {
         preemptible          = false
         spot                 = false
     }] : [],
+
+    # Agent OS extraction workloads require dedicated on-demand, compute-optimized AMD capacity.
+    var.agent_os_enabled ? [
+      {
+        name                 = "agent-os-extract"
+        auto_repair          = true
+        auto_upgrade         = true
+        disk_size_gb         = 100
+        disk_type            = "pd-standard"
+        enable_gcfs          = false
+        enable_gvnic         = false
+        enable_private_nodes = true
+        image_type           = "COS_CONTAINERD"
+        initial_node_count   = var.agent_os_extract_min_count
+        local_ssd_count      = 0
+        machine_type         = var.agent_os_extract_machine_type
+        max_count            = var.agent_os_extract_max_count
+        min_count            = var.agent_os_extract_min_count
+        node_locations       = "${var.region_zone},${var.region_zone_backup}"
+        preemptible          = false
+        spot                 = false
+    }] : [],
   ])
 
   node_pools_oauth_scopes = {
@@ -128,6 +150,10 @@ module "gke" {
       "useparagon.com/workload"     = "agent-os-index"
       "useparagon.com/capacityType" = "ondemand"
     }
+    agent-os-extract = {
+      "useparagon.com/workload"     = "agent-os-extract"
+      "useparagon.com/capacityType" = "ondemand"
+    }
   }
 
   node_pools_metadata = {
@@ -148,6 +174,13 @@ module "gke" {
       {
         key    = "useparagon.com/workload"
         value  = "agent-os-index"
+        effect = "NO_SCHEDULE"
+      },
+    ]
+    agent-os-extract = [
+      {
+        key    = "useparagon.com/workload"
+        value  = "agent-os-extract"
         effect = "NO_SCHEDULE"
       },
     ]
