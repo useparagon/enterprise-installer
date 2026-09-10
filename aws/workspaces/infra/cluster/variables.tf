@@ -169,6 +169,24 @@ variable "agent_os_index_max_count" {
   default = 4
 }
 
+variable "agent_os_extract_instance_types" {
+  description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group."
+  type        = list(string)
+  default     = ["c6a.4xlarge"]
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction managed node group."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction managed node group."
+  type        = number
+  default     = 8
+}
+
 variable "egress_ready" {
   description = "Set when private egress routing is ready. Implicit apply-order dependency for internet-bootstrapping workloads."
   type        = string

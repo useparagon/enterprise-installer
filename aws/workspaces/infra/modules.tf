@@ -163,10 +163,13 @@ module "cluster" {
   ami_release_versions           = var.ami_release_versions
   use_latest_ami_release_version = var.use_latest_ami_release_version
 
-  agent_os_enabled              = var.agent_os_enabled
-  agent_os_index_instance_types = var.agent_os_index_instance_types
-  agent_os_index_min_count      = var.agent_os_index_min_count
-  agent_os_index_max_count      = var.agent_os_index_max_count
+  agent_os_enabled                = var.agent_os_enabled
+  agent_os_index_instance_types   = var.agent_os_index_instance_types
+  agent_os_index_min_count        = var.agent_os_index_min_count
+  agent_os_index_max_count        = var.agent_os_index_max_count
+  agent_os_extract_instance_types = var.agent_os_extract_instance_types
+  agent_os_extract_min_count      = var.agent_os_extract_min_count
+  agent_os_extract_max_count      = var.agent_os_extract_max_count
 
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
