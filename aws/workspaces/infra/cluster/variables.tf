@@ -147,6 +147,28 @@ variable "use_latest_ami_release_version" {
   default     = false
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS index managed node group."
+  type        = bool
+  default     = false
+}
+
+variable "agent_os_index_instance_types" {
+  description = "Instance types for the Agent OS index managed node group."
+  type        = list(string)
+  default     = ["r6a.2xlarge", "r6i.2xlarge", "r5a.2xlarge"]
+}
+
+variable "agent_os_index_min_count" {
+  type    = number
+  default = 2
+}
+
+variable "agent_os_index_max_count" {
+  type    = number
+  default = 4
+}
+
 variable "egress_ready" {
   description = "Set when private egress routing is ready. Implicit apply-order dependency for internet-bootstrapping workloads."
   type        = string

@@ -114,3 +114,77 @@ locals {
     if value != null && tostring(value) != ""
   }
 }
+
+# Agent OS app/admin secret payloads, composed from the postgres, redis, storage and kafka
+# modules and written by module.secrets. Service pods only ever receive the app payload.
+
+locals {
+  agent_os_db    = module.postgres.agent_os
+  agent_os_cache = module.redis.agent_os
+  agent_os_kafka = one(module.kafka)
+
+  agent_os_s3_parsed_prefix = "parsed/"
+
+  agent_os_app_config = var.agent_os_enabled ? {
+    CONTEXT_POSTGRES_HOST        = local.agent_os_db.host
+    CONTEXT_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    CONTEXT_POSTGRES_DATABASE    = local.agent_os_db.databases.context.database
+    CONTEXT_POSTGRES_USERNAME    = local.agent_os_db.databases.context.user
+    CONTEXT_POSTGRES_PASSWORD    = local.agent_os_db.databases.context.password
+    CONTEXT_POSTGRES_SSL_ENABLED = "true"
+    CONTEXT_POSTGRES_SSL_CA      = ""
+
+    TOOLS_POSTGRES_HOST        = local.agent_os_db.host
+    TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    TOOLS_POSTGRES_DATABASE    = local.agent_os_db.databases.tools.database
+    TOOLS_POSTGRES_USERNAME    = local.agent_os_db.databases.tools.user
+    TOOLS_POSTGRES_PASSWORD    = local.agent_os_db.databases.tools.password
+    TOOLS_POSTGRES_SSL_ENABLED = "true"
+    TOOLS_POSTGRES_SSL_CA      = ""
+
+    REDIS_HOST            = local.agent_os_cache.host
+    REDIS_PORT            = tostring(local.agent_os_cache.port)
+    REDIS_URL             = "rediss://:${urlencode(local.agent_os_cache.password)}@${local.agent_os_cache.host}:${local.agent_os_cache.port}"
+    REDIS_PASSWORD        = local.agent_os_cache.password
+    REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
+    REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
+
+    KAFKA_BROKER_URLS    = local.agent_os_kafka.cluster_bootstrap_brokers_sasl_scram
+    KAFKA_SASL_USERNAME  = local.agent_os_kafka.agent_os_kafka_credentials.username
+    KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_kafka_credentials.password
+    KAFKA_SASL_MECHANISM = local.agent_os_kafka.agent_os_kafka_credentials.mechanism
+    KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.cluster_tls_enabled)
+
+    AWS_REGION       = var.aws_region
+    S3_BUCKET        = module.storage.s3.agent_os_bucket
+    S3_PARSED_BUCKET = module.storage.s3.agent_os_bucket
+    S3_PARSED_PREFIX = local.agent_os_s3_parsed_prefix
+    S3_INDEX_BUCKET  = module.storage.s3.agent_os_bucket
+    # S3 Express is not provisioned on enterprise, so the index bucket has no AZ affinity.
+    S3_INDEX_AZ_ID = ""
+  } : null
+
+  agent_os_admin_config = var.agent_os_enabled ? {
+    ADMIN_POSTGRES_HOST        = local.agent_os_db.host
+    ADMIN_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    ADMIN_POSTGRES_DATABASE    = local.agent_os_db.admin_database
+    ADMIN_POSTGRES_USERNAME    = local.agent_os_db.admin_user
+    ADMIN_POSTGRES_PASSWORD    = local.agent_os_db.admin_password
+    ADMIN_POSTGRES_SSL_ENABLED = "true"
+    ADMIN_POSTGRES_SSL_CA      = ""
+
+    ADMIN_KAFKA_BROKER_URLS    = local.agent_os_kafka.cluster_bootstrap_brokers_sasl_scram
+    ADMIN_KAFKA_SASL_USERNAME  = local.agent_os_kafka.acl_admin_kafka_credentials.username
+    ADMIN_KAFKA_SASL_PASSWORD  = local.agent_os_kafka.acl_admin_kafka_credentials.password
+    ADMIN_KAFKA_SASL_MECHANISM = local.agent_os_kafka.acl_admin_kafka_credentials.mechanism
+    ADMIN_KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.cluster_tls_enabled)
+
+    KAFKA_PRINCIPAL_ACL_ADMIN    = local.agent_os_kafka.acl_admin_kafka_credentials.username
+    KAFKA_PRINCIPAL_AGENT_OS     = local.agent_os_kafka.agent_os_kafka_credentials.username
+    KAFKA_PRINCIPAL_MANAGED_SYNC = local.agent_os_kafka.kafka_credentials.username
+
+    KAFKA_TOPIC_PARTITIONS          = "3"
+    KAFKA_TOPIC_REPLICATION_FACTOR  = tostring(ceil(var.msk_kafka_num_broker_nodes / 2))
+    KAFKA_TOPIC_MIN_INSYNC_REPLICAS = tostring(ceil(var.msk_kafka_num_broker_nodes / 2))
+  } : null
+}
