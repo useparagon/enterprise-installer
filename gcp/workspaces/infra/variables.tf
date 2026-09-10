@@ -257,6 +257,24 @@ variable "agent_os_index_max_count" {
   default = 4
 }
 
+variable "agent_os_extract_machine_type" {
+  description = "Compute-optimized AMD machine type for the Agent OS extraction GKE node pool. Use c2d-standard-8 for staging and c2d-standard-16 for production."
+  type        = string
+  default     = "c2d-standard-16"
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction GKE node pool."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction GKE node pool. Use 3 for staging and 8 for production."
+  type        = number
+  default     = 8
+}
+
 variable "gmk_kafka_version" {
   description = "Kafka version for the Google Managed Kafka cluster (version offered by the service)."
   type        = string

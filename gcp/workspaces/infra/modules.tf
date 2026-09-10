@@ -98,6 +98,9 @@ module "cluster" {
   agent_os_index_machine_type     = var.agent_os_index_machine_type
   agent_os_index_min_count        = var.agent_os_index_min_count
   agent_os_index_max_count        = var.agent_os_index_max_count
+  agent_os_extract_machine_type   = var.agent_os_extract_machine_type
+  agent_os_extract_min_count      = var.agent_os_extract_min_count
+  agent_os_extract_max_count      = var.agent_os_extract_max_count
 }
 
 module "bastion" {

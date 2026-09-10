@@ -99,3 +99,21 @@ variable "agent_os_index_max_count" {
   type    = number
   default = 4
 }
+
+variable "agent_os_extract_machine_type" {
+  description = "Compute-optimized AMD machine type for the Agent OS extraction node pool."
+  type        = string
+  default     = "c2d-standard-16"
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction node pool."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction node pool."
+  type        = number
+  default     = 8
+}
