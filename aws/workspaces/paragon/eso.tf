@@ -2,13 +2,13 @@ locals {
   eso_namespace = "external-secrets"
   eso_sa_name   = "external-secrets"
   eso_secret_arns = compact([
-    data.aws_secretsmanager_secret.env.arn,
+    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_admin[0].arn : "",
+    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_app[0].arn : "",
+    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_vendor[0].arn : "",
     local.runtime_docker_cfg_sync_enabled ? data.aws_secretsmanager_secret.docker_cfg.arn : "",
+    data.aws_secretsmanager_secret.env.arn,
     var.managed_sync_enabled ? data.aws_secretsmanager_secret.managed_sync[0].arn : "",
     data.aws_secretsmanager_secret.openobserve.arn,
-    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_app[0].arn : "",
-    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_admin[0].arn : "",
-    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_vendor[0].arn : "",
   ])
 }
 

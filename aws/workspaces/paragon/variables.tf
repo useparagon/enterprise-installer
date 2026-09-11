@@ -667,8 +667,8 @@ locals {
       "agent-os-index" = {
         capacity_types = ["on-demand"]
         instance_types = var.agent_os_index_instance_types
-        cpu_limit      = "32"
-        memory_limit   = "256Gi"
+        cpu_limit      = tostring(var.agent_os_index_max_count * 8)
+        memory_limit   = "${var.agent_os_index_max_count * 64}Gi"
         nodes_limit    = var.agent_os_index_max_count
         weight         = 10
         labels = {

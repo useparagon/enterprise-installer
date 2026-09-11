@@ -200,10 +200,10 @@ resource "aws_iam_role_policy" "app" {
           "Sid" : "AllowS3KMSEncryption",
           "Action" : [
             "kms:Decrypt",
+            "kms:DescribeKey",
             "kms:Encrypt",
             "kms:GenerateDataKey",
-            "kms:ReEncrypt*",
-            "kms:DescribeKey"
+            "kms:ReEncrypt*"
           ],
           "Effect" : "Allow",
           "Resource" : [local.s3_kms_key_arn]
