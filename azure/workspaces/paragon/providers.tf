@@ -4,6 +4,10 @@ provider "azurerm" {
   client_id                       = var.azure_client_id
   client_secret                   = var.azure_client_secret
   resource_provider_registrations = "none"
+
+  # AGC lives in Microsoft.ServiceNetworking, which is outside the default set.
+  resource_providers_to_register = var.agc_enabled ? ["Microsoft.ServiceNetworking"] : []
+
   features {}
 }
 

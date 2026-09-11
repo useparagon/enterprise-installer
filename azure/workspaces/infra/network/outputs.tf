@@ -22,6 +22,16 @@ output "redis_subnet" {
   value = azurerm_subnet.redis
 }
 
+output "agc_subnet" {
+  description = "Dedicated AGC association subnet (null when agc_subnet_enabled is false)."
+  value       = var.agc_subnet_enabled ? azurerm_subnet.agc[0] : null
+}
+
+output "agc_nsg_id" {
+  description = "NSG attached to the AGC association subnet (null when disabled)."
+  value       = var.agc_subnet_enabled ? azurerm_network_security_group.agc[0].id : null
+}
+
 output "nat_gateway_public_ip" {
   description = "Static public IP used for outbound SNAT from the private subnet."
   value       = azurerm_public_ip.nat.ip_address
