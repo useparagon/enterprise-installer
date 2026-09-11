@@ -194,9 +194,13 @@ Those role assignments are created by infra Terraform. `azure/scripts/setup-role
 grants **Role Based Access Control Administrator** only on the Paragon resource
 group, with an ABAC condition that limits Terraform to Network Contributor,
 AKS Cluster Admin, Storage Blob Data Contributor, Reader, AppGw for Containers
-Configuration Manager, and DNS Zone Contributor. It does not grant User Access
-Administrator. The script also registers installer resource providers
-(including Microsoft.ServiceNetworking); Terraform does not.
+Configuration Manager, and DNS Zone Contributor. It also grants **Locks
+Contributor** on that group so `postgres_management_lock_enabled` can manage
+`Microsoft.Authorization/locks/*`. It does not grant User Access Administrator.
+Custom role updates keep the existing definition Id and union this subscription
+into `AssignableScopes` so another subscription in the same tenant is not
+dropped. The script also registers installer resource providers (including
+Microsoft.ServiceNetworking); Terraform does not.
 
 Optional malicious-IP denylist (inbound and outbound) via `nsg_malicious_ips`. Empty by default (rules omitted). Azure allows at most 4000 prefixes per rule:
 
