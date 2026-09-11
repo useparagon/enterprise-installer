@@ -19,13 +19,13 @@ resource "azurerm_private_dns_zone_virtual_network_link" "redis" {
 resource "azurerm_private_endpoint" "redis" {
   for_each = local.redis_instances
 
-  name                = "${var.workspace}-${each.key}-redis-managed-pe"
+  name                = "${var.workspace}-${replace(each.key, "_", "-")}-redis-managed-pe"
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   subnet_id           = var.private_subnet.id
 
   private_service_connection {
-    name                           = "${var.workspace}-${each.key}-redis-managed-connection"
+    name                           = "${var.workspace}-${replace(each.key, "_", "-")}-redis-managed-connection"
     private_connection_resource_id = azurerm_managed_redis.redis[each.key].id
     subresource_names              = ["redisEnterprise"]
     is_manual_connection           = false
@@ -36,7 +36,7 @@ resource "azurerm_private_endpoint" "redis" {
     private_dns_zone_ids = [azurerm_private_dns_zone.redis[0].id]
   }
 
-  tags = merge(var.tags, { Name = "${var.workspace}-${each.key}-redis-managed-pe" })
+  tags = merge(var.tags, { Name = "${var.workspace}-${replace(each.key, "_", "-")}-redis-managed-pe" })
 
   depends_on = [azurerm_private_dns_zone_virtual_network_link.redis]
 }
