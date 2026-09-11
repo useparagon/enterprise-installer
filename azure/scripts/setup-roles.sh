@@ -44,6 +44,8 @@ NETWORK_CONTRIBUTOR_ROLE_ID="4d97b98b-1d4f-4787-a291-c67834d212e7"
 AKS_CLUSTER_ADMIN_ROLE_ID="0ab0b1a8-8aac-4efd-b8c2-3ee1fb270be8"
 STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID="ba92f5b4-2d11-453d-a403-e96b0029c9fe"
 READER_ROLE_ID="acdd72a7-3385-48ef-bd42-f606fba81ae7"
+AGC_CONFIG_MANAGER_ROLE_ID="fbc52c3f-28ad-4303-a892-8a056630b8f1"
+DNS_ZONE_CONTRIBUTOR_ROLE_ID="befefa01-2a29-4190-ada5-d38e61f00d8d"
 
 PUBLIC_IP_ROLE_NAME="Paragon AKS Node Resource Group Public IP Manager"
 BOOTSTRAP_ROLE_NAME="Paragon AKS Greenfield Bootstrap"
@@ -59,6 +61,7 @@ REQUIRED_PROVIDERS=(
   "Microsoft.ManagedIdentity"
   "Microsoft.Network"
   "Microsoft.OperationalInsights"
+  "Microsoft.ServiceNetworking"
   "Microsoft.Storage"
 )
 
@@ -114,6 +117,8 @@ az account set --subscription "${SUBSCRIPTION_ID}"
 
 # Terraform does not auto-register providers. Register only the namespaces used
 # by the Azure workspaces, using the customer administrator running this script.
+# Microsoft.ServiceNetworking is required for AGC subnet delegation
+# (agc_subnet_enabled) even before the paragon AGC module is turned on.
 for provider in "${REQUIRED_PROVIDERS[@]}"; do
   az provider register --namespace "${provider}" --wait
 done
@@ -175,7 +180,10 @@ ensure_role_assignment "${AKS_CLUSTER_USER_ROLE_ID}" "${RESOURCE_GROUP_SCOPE}"
 # Recreate the RBAC Administrator assignment to guarantee that it has the
 # current condition instead of inheriting a stale or unconstrained assignment.
 remove_role_assignment "${RBAC_ADMINISTRATOR_ROLE_ID}" "${RESOURCE_GROUP_SCOPE}"
-RBAC_CONDITION="((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${NETWORK_CONTRIBUTOR_ROLE_ID}, ${AKS_CLUSTER_ADMIN_ROLE_ID}, ${STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID}, ${READER_ROLE_ID}})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${NETWORK_CONTRIBUTOR_ROLE_ID}, ${AKS_CLUSTER_ADMIN_ROLE_ID}, ${STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID}, ${READER_ROLE_ID}}))"
+# Roles Terraform actually assigns in the Paragon resource group (including AGC
+# and Azure DNS). The SP cannot register providers; that is handled above.
+ASSIGNABLE_ROLE_IDS="${NETWORK_CONTRIBUTOR_ROLE_ID}, ${AKS_CLUSTER_ADMIN_ROLE_ID}, ${STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID}, ${READER_ROLE_ID}, ${AGC_CONFIG_MANAGER_ROLE_ID}, ${DNS_ZONE_CONTRIBUTOR_ROLE_ID}"
+RBAC_CONDITION="((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${ASSIGNABLE_ROLE_IDS}})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${ASSIGNABLE_ROLE_IDS}}))"
 az role assignment create \
   --assignee-object-id "${PRINCIPAL_ID}" \
   --assignee-principal-type ServicePrincipal \
@@ -245,4 +253,6 @@ Terraform may assign only these roles inside the main resource group:
   - Azure Kubernetes Service Cluster Admin Role
   - Storage Blob Data Contributor
   - Reader
+  - AppGw for Containers Configuration Manager (AGC)
+  - DNS Zone Contributor (dns_provider=azure_dns)
 EOF

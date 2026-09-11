@@ -1,13 +1,11 @@
 provider "azurerm" {
-  subscription_id                 = var.azure_subscription_id
-  tenant_id                       = var.azure_tenant_id
-  client_id                       = var.azure_client_id
-  client_secret                   = var.azure_client_secret
+  subscription_id = var.azure_subscription_id
+  tenant_id       = var.azure_tenant_id
+  client_id       = var.azure_client_id
+  client_secret   = var.azure_client_secret
+  # SP cannot register namespaces. setup-roles.sh registers them, including
+  # Microsoft.ServiceNetworking for AGC subnet delegation.
   resource_provider_registrations = "none"
-
-  # AGC lives in Microsoft.ServiceNetworking, which is outside the default set.
-  resource_providers_to_register = var.agc_enabled ? ["Microsoft.ServiceNetworking"] : []
-
   features {}
 }
 

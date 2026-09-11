@@ -192,8 +192,11 @@ AKS LoadBalancer provisioning needs the cluster identity to have **Network Contr
 
 Those role assignments are created by infra Terraform. `azure/scripts/setup-roles.sh`
 grants **Role Based Access Control Administrator** only on the Paragon resource
-group, with an ABAC condition that limits Terraform to the role definitions it
-actually emits. It does not grant User Access Administrator.
+group, with an ABAC condition that limits Terraform to Network Contributor,
+AKS Cluster Admin, Storage Blob Data Contributor, Reader, AppGw for Containers
+Configuration Manager, and DNS Zone Contributor. It does not grant User Access
+Administrator. The script also registers installer resource providers
+(including Microsoft.ServiceNetworking); Terraform does not.
 
 Optional malicious-IP denylist (inbound and outbound) via `nsg_malicious_ips`. Empty by default (rules omitted). Azure allows at most 4000 prefixes per rule:
 
