@@ -86,7 +86,10 @@ locals {
   # cluster mode, discovery), so the endpoint has to be selected by connection type.
   agent_os_valkey_connections = var.agent_os_enabled ? flatten([
     for endpoint in google_memorystore_instance.agent_os[0].endpoints :
-    [for connection in endpoint.connections : connection.psc_auto_connection]
+    flatten([
+      for connection in endpoint.connections :
+      connection.psc_auto_connection
+    ])
   ]) : []
 
   # Cluster clients bootstrap from the discovery endpoint; cluster-disabled ones use the primary.
