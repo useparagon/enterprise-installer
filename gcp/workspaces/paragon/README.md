@@ -20,7 +20,9 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | <a name="requirement_google-beta"></a> [google-beta](#requirement\_google-beta) | ~> 7.0 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
 | <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | >= 0.0.19 |
+| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 1.17.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 
 ## Providers
 
@@ -61,7 +63,8 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | [random_password.openobserve_password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.openobserve_email](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [google_client_config.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/client_config) | data source |
-| [google_container_cluster.cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/container_cluster) | data source |
+| [google_project.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/project) | data source |
+| [google_secret_manager_secret_version.infra_cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
 | [google_secret_manager_secret_version.infra_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
 | [google_secret_manager_secret_version.infra_postgres](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
 | [google_secret_manager_secret_version.infra_redis](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
@@ -105,6 +108,8 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | <a name="input_hoop_custom_connections"></a> [hoop\_custom\_connections](#input\_hoop\_custom\_connections) | Custom Hoop connections defined via tfvars. Map of connection names to their configuration. | <pre>map(object({<br/>    type                  = string<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "disabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string))<br/>    secrets               = map(string)<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_enabled"></a> [hoop\_enabled](#input\_hoop\_enabled) | Whether to enable Hoop agent. hoop\_key, hoop\_api\_key, and hoop\_agent\_id must be set if this is true. | `bool` | `true` | no |
 | <a name="input_hoop_grafana_connection"></a> [hoop\_grafana\_connection](#input\_hoop\_grafana\_connection) | Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500). | `bool` | `false` | no |
+| <a name="input_hoop_image_repository"></a> [hoop\_image\_repository](#input\_hoop\_image\_repository) | Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets. | `string` | `"useparagon/hoop-agent-tools"` | no |
+| <a name="input_hoop_image_tag"></a> [hoop\_image\_tag](#input\_hoop\_image\_tag) | Container image tag for the Hoop agent. | `string` | `"1.0.1"` | no |
 | <a name="input_hoop_k8s_connections"></a> [hoop\_k8s\_connections](#input\_hoop\_k8s\_connections) | Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created. | <pre>map(object({<br/>    type                  = optional(string, "custom")<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "enabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string), ["bash"])<br/>    remote_url            = optional(string, "https://kubernetes.default.svc.cluster.local")<br/>    insecure              = optional(string, "true")<br/>    namespace             = optional(string, "paragon")<br/>    secrets               = optional(map(string), {})<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_key"></a> [hoop\_key](#input\_hoop\_key) | Hoop agent key (token). Only used if hoop\_enabled is true. | `string` | `null` | no |
 | <a name="input_hoop_postgres_guardrail_rules"></a> [hoop\_postgres\_guardrail\_rules](#input\_hoop\_postgres\_guardrail\_rules) | Guardrail rule IDs for PostgreSQL connections. | `list(string)` | <pre>[<br/>  "a85115f6-5ef3-4618-b70c-f7cccdc62c5a"<br/>]</pre> | no |
@@ -114,6 +119,7 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | <a name="input_hoop_slack_app_token"></a> [hoop\_slack\_app\_token](#input\_hoop\_slack\_app\_token) | Slack app token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_bot_token"></a> [hoop\_slack\_bot\_token](#input\_hoop\_slack\_bot\_token) | Slack bot token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_channel_ids"></a> [hoop\_slack\_channel\_ids](#input\_hoop\_slack\_channel\_ids) | Slack channel IDs to notify for connections that require reviews. | `list(string)` | `[]` | no |
+| <a name="input_hoop_version"></a> [hoop\_version](#input\_hoop\_version) | Hoopagent Helm chart version. | `string` | `"1.49.4"` | no |
 | <a name="input_infra_json"></a> [infra\_json](#input\_infra\_json) | Deprecated legacy JSON string of `infra` workspace variables. | `string` | `null` | no |
 | <a name="input_infra_json_path"></a> [infra\_json\_path](#input\_infra\_json\_path) | Deprecated legacy path to an `infra` workspace output JSON file. Prefer Secret Manager handoff secrets (PARA-21726). | `string` | `null` | no |
 | <a name="input_ingress_scheme"></a> [ingress\_scheme](#input\_ingress\_scheme) | Whether the load balancer is 'external' (public) or 'internal' (private) | `string` | `"external"` | no |

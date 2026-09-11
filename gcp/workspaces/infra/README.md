@@ -31,7 +31,9 @@ private runner or public endpoint.
 
 ## Providers
 
-No providers.
+| Name | Version |
+| ---- | ------- |
+| <a name="provider_google"></a> [google](#provider\_google) | 7.33.0 |
 
 ## Modules
 
@@ -47,7 +49,23 @@ No providers.
 
 ## Resources
 
-No resources.
+| Name | Type |
+| ---- | ---- |
+| [google_gke_hub_membership.cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/gke_hub_membership) | resource |
+| [google_secret_manager_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.runtime_cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.runtime_redis_ca_cert](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret_version.runtime_bastion](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.runtime_cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.runtime_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.runtime_postgres](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.runtime_redis](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.runtime_redis_ca_cert](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.runtime_storage](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 
 ## Inputs
 

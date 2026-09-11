@@ -103,6 +103,9 @@ module "hoop" {
   organization                  = var.organization
   hoop_agent_name               = var.hoop_agent_name
   hoop_enabled                  = var.hoop_enabled
+  hoop_version                  = var.hoop_version
+  hoop_image_repository         = var.hoop_image_repository
+  hoop_image_tag                = var.hoop_image_tag
   hoop_key                      = var.hoop_key
   hoop_agent_id                 = var.hoop_agent_id
   hoop_slack_bot_token          = var.hoop_slack_bot_token
