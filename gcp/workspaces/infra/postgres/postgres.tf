@@ -299,10 +299,6 @@ resource "google_sql_database_instance" "agent_os_replica" {
   master_instance_name = google_sql_database_instance.agent_os[0].name
   deletion_protection  = !var.disable_deletion_protection
 
-  replica_configuration {
-    failover_target = false
-  }
-
   settings {
     tier      = local.agent_os_postgres_config.replica_instance_class
     disk_type = local.agent_os_postgres_config.storage_type
