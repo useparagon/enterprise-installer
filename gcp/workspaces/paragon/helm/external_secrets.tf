@@ -39,6 +39,8 @@ resource "helm_release" "reloader" {
   create_namespace = false
   atomic           = true
   cleanup_on_fail  = true
+
+  depends_on = [helm_release.external_secrets]
 }
 
 locals {
@@ -238,7 +240,7 @@ locals {
 
 resource "kubectl_manifest" "secret_store" {
   yaml_body  = local.secret_store_yaml
-  depends_on = [helm_release.external_secrets, kubernetes_namespace_v1.paragon]
+  depends_on = [helm_release.reloader, kubernetes_namespace_v1.paragon]
 }
 
 resource "kubectl_manifest" "external_secret_paragon" {
@@ -247,14 +249,17 @@ resource "kubectl_manifest" "external_secret_paragon" {
 }
 
 resource "kubectl_manifest" "external_secret_docker" {
-  count = local.external_secret_docker_yaml != null ? 1 : 0
+  # Gate on known inputs, not yamlencode(...) != null. The YAML includes
+  # kubernetes_namespace_v1.paragon.id, which is unknown on first apply, so using
+  # the encoded document for count makes Terraform refuse to plan.
+  count = var.create_docker_pull_secret && var.docker_cfg_secret_name != null ? 1 : 0
 
   yaml_body  = local.external_secret_docker_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
 
 resource "kubectl_manifest" "external_secret_managed_sync" {
-  count      = local.external_secret_managed_sync_yaml != null ? 1 : 0
+  count      = var.managed_sync_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_managed_sync_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
@@ -265,13 +270,13 @@ resource "kubectl_manifest" "external_secret_openobserve" {
 }
 
 resource "kubectl_manifest" "external_secret_openobserve_gcs" {
-  count      = local.external_secret_openobserve_gcs_yaml != null ? 1 : 0
+  count      = var.openobserve_gcs_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_openobserve_gcs_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
 
 resource "kubectl_manifest" "external_secret_redis_ca" {
-  count      = local.external_secret_redis_ca_yaml != null ? 1 : 0
+  count      = var.redis_ca_cert_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_redis_ca_yaml
   depends_on = [kubectl_manifest.secret_store]
 }

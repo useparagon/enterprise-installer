@@ -108,7 +108,7 @@ gcloud version
 writeLog "authenticating gcp cli"
 gcloud auth activate-service-account -q --key-file=/home/${admin_user}/auth_token.json
 gcloud config set project ${project} -q
-sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
+sudo apt-get install -y google-cloud-cli-gke-gcloud-auth-plugin
 
 # install kubectl
 KUBECTL_MINOR=${cluster_version}
@@ -128,7 +128,7 @@ sudo apt-get install -y helm
 helm version
 
 # install nodejs
-NODE_MAJOR=18
+NODE_MAJOR=22
 writeLog "installing node $NODE_MAJOR"
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
@@ -153,7 +153,7 @@ if [[ ! -z "${tfc_agent_token}" ]]; then
     sudo usermod -a -G docker ubuntu
     sudo systemctl enable docker
     sudo systemctl start docker
-    # Wait for Docker daemon to be ready
+    # wait for docker daemon to be ready
     sleep 2
 
     # install terraform agent
@@ -182,7 +182,7 @@ else
     writeLog "skipped docker and terraform agent installation"
 fi
 
-# Create and configure aliases file
+# create and configure aliases file
 writeLog "configuring aliases for ubuntu"
 cat > /home/ubuntu/.bash_aliases << 'EOF'
 # Kubernetes aliases
@@ -216,7 +216,7 @@ alias ll="ls -Ahl"
 alias hi="history | grep"
 EOF
 
-# Ensure proper permissions
+# ensure proper permissions
 chown ubuntu:ubuntu /home/ubuntu/.bash_aliases
 chmod 644 /home/ubuntu/.bash_aliases
 

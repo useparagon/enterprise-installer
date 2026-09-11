@@ -3,6 +3,11 @@ variable "workspace" {
   type        = string
 }
 
+variable "cluster_host" {
+  description = "Kubernetes API URL, including the scheme. Private GKE clusters use Connect Gateway."
+  type        = string
+}
+
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync (deploy managed-sync Helm chart)."
   type        = bool
@@ -265,8 +270,7 @@ locals {
   }
 
   cluster = {
-    host                   = "https://${data.google_container_cluster.cluster.endpoint}"
-    token                  = data.google_client_config.paragon.access_token
-    cluster_ca_certificate = base64decode(data.google_container_cluster.cluster.master_auth[0].cluster_ca_certificate)
+    host  = var.cluster_host
+    token = data.google_client_config.paragon.access_token
   }
 }

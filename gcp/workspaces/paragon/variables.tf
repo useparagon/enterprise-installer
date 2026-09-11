@@ -306,6 +306,24 @@ variable "hoop_enabled" {
   default     = true
 }
 
+variable "hoop_version" {
+  description = "Hoopagent Helm chart version."
+  type        = string
+  default     = "1.49.4"
+}
+
+variable "hoop_image_repository" {
+  description = "Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets."
+  type        = string
+  default     = "useparagon/hoop-agent-tools"
+}
+
+variable "hoop_image_tag" {
+  description = "Container image tag for the Hoop agent."
+  type        = string
+  default     = "1.0.1"
+}
+
 variable "hoop_grafana_connection" {
   description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
   type        = bool
@@ -909,7 +927,18 @@ locals {
   # output; null-safe when neither is present.
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
-  workspace = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
+  # The storage service account email is an identity, not a credential, but on the Secret
+  # Manager path it inherits the sensitivity of the secret payload it was decoded from.
+  # Downstream modules key `for_each` off it, which rejects sensitive values. Keep this a
+  # single flat `try` — a conditional would union the marks of both arms and re-taint it.
+  storage_service_account = try(
+    nonsensitive(local.storage_output.service_account),
+    local.storage_output.service_account,
+    null,
+  )
+
+  workspace                = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
+  gke_connect_gateway_host = "https://connectgateway.googleapis.com/v1/projects/${data.google_project.paragon.number}/locations/global/gkeMemberships/${local.workspace}-fleet"
   # Prefer infra GSM handoff (actual GKE name may be -private or -cluster).
   cluster_name = coalesce(
     var.cluster_name_override,
@@ -1173,17 +1202,20 @@ locals {
     try(local.redis_instance_urls["cache"], local.infra_vars.redis.value.cache.connection_string, "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}")
   )
 
+  # Iterate the instances infra actually created. redis_multiple_instances=false
+  # emits only `cache`, and naming queue/system directly errors the whole
+  # expression, so the CA bundle silently stayed unmounted and every TLS Redis
+  # connection failed with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+  redis_ca_cert_enabled = length(compact([
+    for name, r in try(local.infra_vars.redis.value, {}) : try(r.ca_certificate, "")
+  ])) > 0
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       # Redis CA certificate configuration
       # Enable if any Redis instance has a CA certificate
       redisCaCert = {
-        enabled = try(
-          local.infra_vars.redis.value.cache.ca_certificate != null ||
-          local.infra_vars.redis.value.queue.ca_certificate != null ||
-          local.infra_vars.redis.value.system.ca_certificate != null,
-          false
-        )
+        enabled    = local.redis_ca_cert_enabled
         secretName = "redis-ca-cert"
       },
       env = merge({

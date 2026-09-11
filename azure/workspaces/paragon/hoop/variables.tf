@@ -42,19 +42,16 @@ variable "hoop_server" {
 variable "hoop_version" {
   description = "Hoopagent Helm chart version."
   type        = string
-  default     = "1.49.4"
 }
 
 variable "hoop_image_repository" {
   description = "Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets."
   type        = string
-  default     = "useparagon/hoop-agent-tools"
 }
 
 variable "hoop_image_tag" {
   description = "Container image tag for the Hoop agent."
   type        = string
-  default     = "1.0.2"
 }
 
 variable "hoop_postgres_guardrail_rules" {
