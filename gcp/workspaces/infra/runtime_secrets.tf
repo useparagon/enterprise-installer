@@ -230,7 +230,9 @@ locals {
     REDIS_HOST = local.agent_os_cache.host
     REDIS_PORT = tostring(local.agent_os_cache.port)
     REDIS_URL  = "rediss://${local.agent_os_cache.host}:${local.agent_os_cache.port}"
-    # Memorystore for Valkey has no AUTH token; clients authenticate with IAM.
+    # IAM auth uses the workload GSA email as username. The short-lived access
+    # token must be minted from Workload Identity and refreshed by the client.
+    REDIS_USERNAME        = module.storage.storage.agent_os_service_account
     REDIS_PASSWORD        = ""
     REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
     REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)

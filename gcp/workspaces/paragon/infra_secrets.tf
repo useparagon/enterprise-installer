@@ -92,3 +92,24 @@ locals {
   agent_os_bucket             = try(nonsensitive(local.agent_os_handoff.bucket), null)
   agent_os_service_account    = try(nonsensitive(local.agent_os_handoff.service_account), null)
 }
+
+data "google_secret_manager_secret_version" "agent_os_app" {
+  count   = var.agent_os_enabled && local.agent_os_app_secret_name != null ? 1 : 0
+  project = local.gcp_project_id
+  secret  = local.agent_os_app_secret_name
+  version = "latest"
+}
+
+data "google_secret_manager_secret_version" "agent_os_admin" {
+  count   = var.agent_os_enabled && local.agent_os_admin_secret_name != null ? 1 : 0
+  project = local.gcp_project_id
+  secret  = local.agent_os_admin_secret_name
+  version = "latest"
+}
+
+data "google_secret_manager_secret_version" "agent_os_vendor" {
+  count   = var.agent_os_enabled && local.agent_os_vendor_secret_name != null ? 1 : 0
+  project = local.gcp_project_id
+  secret  = local.agent_os_vendor_secret_name
+  version = "latest"
+}

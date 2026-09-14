@@ -314,6 +314,11 @@ variable "gmk_sasl_mechanism" {
     condition     = contains(["oauthbearer", "plain"], var.gmk_sasl_mechanism)
     error_message = "gmk_sasl_mechanism must be \"oauthbearer\" or \"plain\"."
   }
+
+  validation {
+    condition     = !var.agent_os_enabled || var.gmk_sasl_mechanism == "plain"
+    error_message = "Agent OS currently requires gmk_sasl_mechanism = \"plain\"; its workload identity is assigned to the storage/Valkey service account, not the Kafka client service account."
+  }
 }
 
 variable "gmk_sasl_plain_key_file_path" {

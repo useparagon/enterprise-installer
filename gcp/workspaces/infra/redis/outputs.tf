@@ -1,7 +1,7 @@
 output "agent_os" {
   value = var.agent_os_enabled ? {
-    host    = local.agent_os_valkey_endpoint.ip_address
-    port    = local.agent_os_valkey_endpoint.port
+    host    = try(local.agent_os_valkey_endpoint.ip_address, null)
+    port    = try(local.agent_os_valkey_endpoint.port, null)
     ssl     = true
     cluster = local.agent_os_valkey_config.cluster_enabled
     ca_certificate = join("\n", flatten([
@@ -10,6 +10,11 @@ output "agent_os" {
     ]))
   } : null
   sensitive = true
+
+  precondition {
+    condition     = !var.agent_os_enabled || local.agent_os_valkey_endpoint != null
+    error_message = "Agent OS Valkey did not return the required primary/discovery PSC endpoint."
+  }
 }
 
 output "redis" {
