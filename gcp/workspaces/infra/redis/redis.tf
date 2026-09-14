@@ -95,14 +95,11 @@ locals {
   # Cluster clients bootstrap from the discovery endpoint; cluster-disabled ones use the primary.
   agent_os_valkey_connection_type = local.agent_os_valkey_config.cluster_enabled ? "CONNECTION_TYPE_DISCOVERY" : "CONNECTION_TYPE_PRIMARY"
 
-  # Connections of the preferred type first, then the rest as a fallback.
-  agent_os_valkey_candidates = concat(
-    [
-      for connection in local.agent_os_valkey_connections :
-      connection if connection.connection_type == local.agent_os_valkey_connection_type
-    ],
-    local.agent_os_valkey_connections,
-  )
+  # Never silently fall back to a reader endpoint: writes would fail at runtime.
+  agent_os_valkey_candidates = [
+    for connection in local.agent_os_valkey_connections :
+    connection if connection.connection_type == local.agent_os_valkey_connection_type
+  ]
 
   agent_os_valkey_endpoint = length(local.agent_os_valkey_candidates) > 0 ? local.agent_os_valkey_candidates[0] : null
 }
