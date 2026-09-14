@@ -21,10 +21,12 @@ variable "tags" {
 }
 
 variable "instances" {
-  description = "PostgreSQL instances to deploy. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon)."
+  description = "PostgreSQL instances to deploy. Each key is a logical name."
   type = map(object({
-    sku       = string
-    redundant = bool
+    sku        = string
+    redundant  = bool
+    storage_mb = optional(number)
+    version    = optional(string)
   }))
 }
 
@@ -54,6 +56,7 @@ locals {
     zeus         = "zeus"
     managed_sync = "managed_sync"
     paragon      = "postgres"
+    agent_os     = "postgres"
   }
 
   postgres_server_names = {
@@ -64,14 +67,17 @@ locals {
     zeus         = "${var.workspace}-zeus"
     managed_sync = "${var.workspace}-managed-sync"
     paragon      = var.workspace
+    agent_os     = "${var.workspace}-agent-os"
   }
 
   postgres_instances = {
     for name, cfg in var.instances : name => {
-      name = local.postgres_server_names[name]
-      db   = local.postgres_db_names[name]
-      ha   = cfg.redundant
-      sku  = cfg.sku
+      name       = local.postgres_server_names[name]
+      db         = local.postgres_db_names[name]
+      ha         = cfg.redundant
+      sku        = cfg.sku
+      storage_mb = cfg.storage_mb
+      version    = cfg.version
     }
   }
 }
