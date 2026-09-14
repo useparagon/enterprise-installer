@@ -187,7 +187,9 @@ locals {
     ]
   }
 
-  agent_os_mng_enabled = var.agent_os_enabled && (var.enable_legacy_mng_pools || !var.enable_karpenter)
+  # Do not duplicate Agent OS capacity during Karpenter migration coexistence.
+  # Karpenter owns these pools whenever it is enabled; MNGs are the fallback.
+  agent_os_mng_enabled = var.agent_os_enabled && !var.enable_karpenter
 
   # Karpenter on → dedicated system MNG. Legacy pools are independent (migration coexistence).
   managed_node_groups = merge(

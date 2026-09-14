@@ -250,7 +250,6 @@ data "aws_iam_policy_document" "agent_os_kms" {
       type = "Service"
       identifiers = [
         "elasticache.amazonaws.com",
-        "logs.${var.aws_region}.amazonaws.com",
         "rds.amazonaws.com",
         "s3.amazonaws.com",
       ]
@@ -260,6 +259,34 @@ data "aws_iam_policy_document" "agent_os_kms" {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
       values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  # CloudWatch Logs supplies the log group ARN as KMS encryption context. It
+  # does not authorize log-group encryption with aws:SourceAccount alone.
+  statement {
+    sid    = "CloudWatchLogsUse"
+    effect = "Allow"
+    actions = [
+      "kms:Decrypt",
+      "kms:DescribeKey",
+      "kms:Encrypt",
+      "kms:GenerateDataKey*",
+      "kms:ReEncrypt*",
+    ]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${var.aws_region}.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values = [
+        "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/elasticache/${local.workspace}-agent-os"
+      ]
     }
   }
 }

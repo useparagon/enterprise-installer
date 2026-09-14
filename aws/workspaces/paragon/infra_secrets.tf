@@ -94,3 +94,18 @@ data "aws_secretsmanager_secret" "agent_os_vendor" {
   count = var.agent_os_enabled ? 1 : 0
   name  = try(local.agent_os_handoff.vendor, null)
 }
+
+data "aws_secretsmanager_secret_version" "agent_os_app" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.agent_os_app[0].id
+}
+
+data "aws_secretsmanager_secret_version" "agent_os_admin" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.agent_os_admin[0].id
+}
+
+data "aws_secretsmanager_secret_version" "agent_os_vendor" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.agent_os_vendor[0].id
+}
