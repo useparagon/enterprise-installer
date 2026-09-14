@@ -133,3 +133,31 @@ resource "aws_secretsmanager_secret_version" "runtime_cluster" {
     cluster_name              = module.cluster.eks_cluster.name
   })
 }
+
+# Agent OS handoff exposes only resource names and ARNs to paragon.
+resource "aws_secretsmanager_secret" "runtime_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                    = "${local.runtime_secret_prefix}/agent-os"
+  description             = "Agent OS secret path handoff for ${var.organization}"
+  recovery_window_in_days = var.secrets_recovery_window_in_days
+
+  tags = {
+    Name         = "${local.runtime_secret_prefix}/agent-os"
+    Organization = var.organization
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "runtime_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.runtime_agent_os[0].id
+  secret_string = jsonencode({
+    app                   = module.secrets.agent_os_secret_names.app
+    admin                 = module.secrets.agent_os_secret_names.admin
+    vendor                = module.secrets.agent_os_secret_names.vendor
+    bucket                = module.storage.s3.agent_os_bucket
+    kms_key_arn           = module.storage.s3.agent_os_kms_key_arn
+    pod_identity_role_arn = module.storage.s3.agent_os_role_arn
+  })
+}

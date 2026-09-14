@@ -5,6 +5,7 @@ locals {
     storage  = "paragon/${local.workspace}/storage"
     kafka    = "paragon/${local.workspace}/kafka"
     cluster  = "paragon/${local.workspace}/cluster"
+    agent_os = "paragon/${local.workspace}/agent-os"
   }
 }
 
@@ -33,6 +34,11 @@ data "aws_secretsmanager_secret_version" "infra_cluster" {
   secret_id = local.infra_secret_names.cluster
 }
 
+data "aws_secretsmanager_secret_version" "infra_agent_os" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = local.infra_secret_names.agent_os
+}
+
 locals {
   # Branch on the raw JSON, not the decoded object: conditional results are unified,
   # and an empty object forces conversion to a map, which fails because the cluster
@@ -44,6 +50,12 @@ locals {
   )
 
   provider_cluster = jsondecode(local.provider_cluster_json)
+
+  # The handoff contains resource identifiers only; remove Secrets Manager's
+  # sensitivity wrapper before using those names and ARNs for IAM/Kubernetes wiring.
+  agent_os_handoff = var.agent_os_enabled ? jsondecode(nonsensitive(
+    data.aws_secretsmanager_secret_version.infra_agent_os[0].secret_string
+  )) : null
 
   provider_infra_vars = merge(
     {
@@ -66,4 +78,34 @@ locals {
   )
 
   infra_vars = local.use_legacy_infra_json ? local.legacy_infra_vars : local.provider_infra_vars
+}
+
+data "aws_secretsmanager_secret" "agent_os_app" {
+  count = var.agent_os_enabled ? 1 : 0
+  name  = try(local.agent_os_handoff.app, null)
+}
+
+data "aws_secretsmanager_secret" "agent_os_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+  name  = try(local.agent_os_handoff.admin, null)
+}
+
+data "aws_secretsmanager_secret" "agent_os_vendor" {
+  count = var.agent_os_enabled ? 1 : 0
+  name  = try(local.agent_os_handoff.vendor, null)
+}
+
+data "aws_secretsmanager_secret_version" "agent_os_app" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.agent_os_app[0].id
+}
+
+data "aws_secretsmanager_secret_version" "agent_os_admin" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.agent_os_admin[0].id
+}
+
+data "aws_secretsmanager_secret_version" "agent_os_vendor" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.agent_os_vendor[0].id
 }

@@ -144,9 +144,12 @@ locals {
 # Gate Helm/ESO until Secrets Manager values exist (not just secret metadata).
 resource "terraform_data" "runtime_secrets_populated" {
   input = {
-    env         = aws_secretsmanager_secret_version.env_paragon_overlay.version_id
-    docker_cfg  = local.runtime_docker_cfg_sync_enabled ? local.runtime_docker_cfg_version_id : null
-    openobserve = data.aws_secretsmanager_secret_version.openobserve.version_id
+    env             = aws_secretsmanager_secret_version.env_paragon_overlay.version_id
+    docker_cfg      = local.runtime_docker_cfg_sync_enabled ? local.runtime_docker_cfg_version_id : null
+    openobserve     = data.aws_secretsmanager_secret_version.openobserve.version_id
+    agent_os_app    = var.agent_os_enabled ? data.aws_secretsmanager_secret_version.agent_os_app[0].version_id : null
+    agent_os_admin  = var.agent_os_enabled ? data.aws_secretsmanager_secret_version.agent_os_admin[0].version_id : null
+    agent_os_vendor = var.agent_os_enabled ? data.aws_secretsmanager_secret_version.agent_os_vendor[0].version_id : null
     managed_sync = var.managed_sync_enabled ? (
       aws_secretsmanager_secret_version.managed_sync_paragon_overlay[0].version_id
     ) : null

@@ -92,6 +92,51 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create the dedicated Agent OS Postgres instance."
+  type        = bool
+  default     = false
+}
+
+variable "agent_os_kms_key_arn" {
+  description = "KMS key ARN used to encrypt the Agent OS Postgres instance."
+  type        = string
+  default     = null
+}
+
+variable "agent_os_postgres" {
+  description = "Optional Agent OS Postgres overrides keyed by instance name (agent_os). Null uses the defaults in rds-agent-os.tf."
+  type = map(object({
+    instance_class         = optional(string)
+    allocated_storage      = optional(number)
+    max_allocated_storage  = optional(number)
+    engine_version         = optional(string)
+    multi_az               = optional(bool)
+    read_replica           = optional(bool)
+    replica_instance_class = optional(string)
+    storage_type           = optional(string)
+  }))
+  default  = null
+  nullable = true
+
+  validation {
+    condition = var.agent_os_postgres == null ? true : alltrue([
+      for _, cfg in var.agent_os_postgres :
+      coalesce(cfg.max_allocated_storage, 1000) >= 100 &&
+      coalesce(cfg.max_allocated_storage, 1000) >= ceil(coalesce(cfg.allocated_storage, 100) * 1.1)
+    ])
+    error_message = "Agent OS Postgres max_allocated_storage must be at least 100 GiB and at least 10% greater than allocated_storage."
+  }
+
+  validation {
+    condition = var.agent_os_postgres == null ? true : alltrue([
+      for _, cfg in var.agent_os_postgres :
+      contains(["gp2", "gp3"], coalesce(cfg.storage_type, "gp3"))
+    ])
+    error_message = "Agent OS Postgres storage_type must be gp2 or gp3."
+  }
+}
+
 variable "migrated_passwords" {
   description = "Override credentials to preserve complexity conventions when migrating from legacy workspaces"
   type        = map(string)
