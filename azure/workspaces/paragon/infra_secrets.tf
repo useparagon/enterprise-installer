@@ -112,3 +112,21 @@ locals {
     } : {},
   )
 }
+
+data "azurerm_key_vault_secret" "agent_os_app" {
+  count        = var.agent_os_enabled ? 1 : 0
+  name         = local.agent_os_handoff.app
+  key_vault_id = data.azurerm_key_vault.paragon.id
+}
+
+data "azurerm_key_vault_secret" "agent_os_admin" {
+  count        = var.agent_os_enabled ? 1 : 0
+  name         = local.agent_os_handoff.admin
+  key_vault_id = data.azurerm_key_vault.paragon.id
+}
+
+data "azurerm_key_vault_secret" "agent_os_vendor" {
+  count        = var.agent_os_enabled ? 1 : 0
+  name         = local.agent_os_handoff.vendor
+  key_vault_id = data.azurerm_key_vault.paragon.id
+}

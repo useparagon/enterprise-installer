@@ -22,10 +22,13 @@ module "helm" {
   flipt_options                         = local.flipt_options
   helm_values                           = local.helm_values_public
   secrets_revision = sha256(jsonencode({
-    env          = azurerm_key_vault_secret.env.version
-    docker_cfg   = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
-    managed_sync = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
-    openobserve  = azurerm_key_vault_secret.openobserve[0].version
+    env             = azurerm_key_vault_secret.env.version
+    docker_cfg      = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
+    managed_sync    = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
+    openobserve     = azurerm_key_vault_secret.openobserve[0].version
+    agent_os_app    = var.agent_os_enabled ? data.azurerm_key_vault_secret.agent_os_app[0].version : null
+    agent_os_admin  = var.agent_os_enabled ? data.azurerm_key_vault_secret.agent_os_admin[0].version : null
+    agent_os_vendor = var.agent_os_enabled ? data.azurerm_key_vault_secret.agent_os_vendor[0].version : null
   }))
   ingress_scheme           = var.ingress_scheme
   nginx_public             = local.nginx_public
