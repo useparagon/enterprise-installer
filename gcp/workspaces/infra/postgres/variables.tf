@@ -52,6 +52,28 @@ variable "managed_sync_enabled" {
   default     = false
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create the dedicated Agent OS Cloud SQL instance."
+  type        = bool
+  default     = false
+}
+
+variable "agent_os_postgres" {
+  description = "Optional Agent OS Cloud SQL overrides keyed by instance name (agent_os). Null uses the defaults in postgres-agent-os.tf."
+  type = map(object({
+    instance_class         = optional(string)
+    allocated_storage      = optional(number)
+    max_allocated_storage  = optional(number)
+    engine_version         = optional(string)
+    multi_az               = optional(bool)
+    read_replica           = optional(bool)
+    replica_instance_class = optional(string)
+    storage_type           = optional(string)
+  }))
+  default  = null
+  nullable = true
+}
+
 locals {
   postgres_instances = var.postgres_multiple_instances ? merge({
     cerberus = {

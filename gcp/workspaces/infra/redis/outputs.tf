@@ -1,3 +1,22 @@
+output "agent_os" {
+  value = var.agent_os_enabled ? {
+    host    = try(local.agent_os_valkey_endpoint.ip_address, null)
+    port    = try(local.agent_os_valkey_endpoint.port, null)
+    ssl     = true
+    cluster = local.agent_os_valkey_config.cluster_enabled
+    ca_certificate = join("\n", flatten([
+      for chain in google_memorystore_instance.agent_os[0].managed_server_ca[0].ca_certs :
+      chain.certificates
+    ]))
+  } : null
+  sensitive = true
+
+  precondition {
+    condition     = !var.agent_os_enabled || local.agent_os_valkey_endpoint != null
+    error_message = "Agent OS Valkey did not return the required primary/discovery PSC endpoint."
+  }
+}
+
 output "redis" {
   value = var.multi_redis ? {
     for key, value in local.redis_instances :

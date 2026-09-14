@@ -68,6 +68,9 @@ module "helm" {
     managed_sync    = var.managed_sync_enabled ? google_secret_manager_secret_version.managed_sync[0].name : null
     openobserve     = google_secret_manager_secret_version.openobserve[0].name
     openobserve_gcs = local.gcp_creds != null ? google_secret_manager_secret_version.openobserve_gcs[0].name : null
+    agent_os_app    = length(data.google_secret_manager_secret_version.agent_os_app) > 0 ? data.google_secret_manager_secret_version.agent_os_app[0].name : null
+    agent_os_admin  = length(data.google_secret_manager_secret_version.agent_os_admin) > 0 ? data.google_secret_manager_secret_version.agent_os_admin[0].name : null
+    agent_os_vendor = length(data.google_secret_manager_secret_version.agent_os_vendor) > 0 ? data.google_secret_manager_secret_version.agent_os_vendor[0].name : null
   }))
   ingress_scheme              = var.ingress_scheme
   k8s_version                 = var.k8s_version
@@ -75,6 +78,12 @@ module "helm" {
   managed_sync_enabled        = var.managed_sync_enabled
   managed_sync_secret_name    = var.managed_sync_enabled ? google_secret_manager_secret.managed_sync[0].secret_id : null
   managed_sync_version        = var.managed_sync_version
+  agent_os_enabled            = var.agent_os_enabled
+  agent_os_version            = var.agent_os_version
+  agent_os_app_secret_name    = local.agent_os_app_secret_name
+  agent_os_admin_secret_name  = local.agent_os_admin_secret_name
+  agent_os_vendor_secret_name = local.agent_os_vendor_secret_name
+  agent_os_service_account    = local.agent_os_service_account
   microservices               = local.microservices
   monitor_version             = local.monitor_version
   monitors                    = local.monitors

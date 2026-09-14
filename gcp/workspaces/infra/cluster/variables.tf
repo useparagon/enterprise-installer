@@ -79,3 +79,41 @@ variable "k8s_master_authorized_networks" {
   }))
   default = []
 }
+
+variable "agent_os_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "agent_os_index_machine_type" {
+  type    = string
+  default = "n2-highmem-8"
+}
+
+variable "agent_os_index_min_count" {
+  type    = number
+  default = 2
+}
+
+variable "agent_os_index_max_count" {
+  type    = number
+  default = 4
+}
+
+variable "agent_os_extract_machine_type" {
+  description = "Compute-optimized AMD machine type for the Agent OS extraction node pool."
+  type        = string
+  default     = "c2d-standard-16"
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction node pool."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction node pool."
+  type        = number
+  default     = 8
+}

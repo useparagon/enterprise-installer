@@ -6,6 +6,8 @@ locals {
     var.openobserve_gcs_secret_name != null ? try(kubectl_manifest.external_secret_openobserve_gcs[0].uid, null) : null,
     var.redis_ca_cert_secret_name != null ? try(kubectl_manifest.external_secret_redis_ca[0].uid, null) : null,
     var.managed_sync_secret_name != null ? try(kubectl_manifest.external_secret_managed_sync[0].uid, null) : null,
+    local.external_secret_agent_os_app_yaml != null ? try(kubectl_manifest.external_secret_agent_os_app[0].uid, null) : null,
+    local.external_secret_agent_os_admin_yaml != null ? try(kubectl_manifest.external_secret_agent_os_admin[0].uid, null) : null,
   ]))
 }
 
@@ -71,6 +73,30 @@ resource "time_sleep" "wait_for_eso_managed_sync" {
   }
 }
 
+resource "time_sleep" "wait_for_eso_agent_os_app" {
+  count = local.external_secret_agent_os_app_yaml != null ? 1 : 0
+
+  create_duration = "30s"
+
+  depends_on = [kubectl_manifest.external_secret_agent_os_app[0]]
+
+  triggers = {
+    external_secret = try(kubectl_manifest.external_secret_agent_os_app[0].uid, null)
+  }
+}
+
+resource "time_sleep" "wait_for_eso_agent_os_admin" {
+  count = local.external_secret_agent_os_admin_yaml != null ? 1 : 0
+
+  create_duration = "30s"
+
+  depends_on = [kubectl_manifest.external_secret_agent_os_admin[0]]
+
+  triggers = {
+    external_secret = try(kubectl_manifest.external_secret_agent_os_admin[0].uid, null)
+  }
+}
+
 resource "terraform_data" "eso_secrets_gate" {
   input = local.eso_sync_triggers
 
@@ -80,6 +106,8 @@ resource "terraform_data" "eso_secrets_gate" {
     time_sleep.wait_for_eso_openobserve_gcs,
     time_sleep.wait_for_eso_redis_ca,
     time_sleep.wait_for_eso_managed_sync,
+    time_sleep.wait_for_eso_agent_os_app,
+    time_sleep.wait_for_eso_agent_os_admin,
   ]
 }
 
@@ -142,6 +170,28 @@ data "kubernetes_secret" "redis_ca" {
   metadata {
     name      = "redis-ca-cert"
     namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret" "agent_os_app" {
+  count = local.external_secret_agent_os_app_yaml != null ? 1 : 0
+
+  metadata {
+    name      = "agent-os-app"
+    namespace = kubernetes_namespace_v1.agent_os[0].id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret" "agent_os_admin" {
+  count = local.external_secret_agent_os_admin_yaml != null ? 1 : 0
+
+  metadata {
+    name      = "agent-os-admin"
+    namespace = kubernetes_namespace_v1.agent_os[0].id
   }
 
   depends_on = [terraform_data.eso_secrets_gate]
