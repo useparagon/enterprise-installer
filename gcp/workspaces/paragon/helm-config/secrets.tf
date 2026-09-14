@@ -38,11 +38,13 @@ locals {
     }
   }
 
+  kafka_sasl_mechanism = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_MECHANISM"], try(var.infra_values.kafka.value.cluster_mechanism, "plain"))
+
   kafka_config = {
     broker_urls    = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_BROKER_URLS"], try(var.infra_values.kafka.value.cluster_bootstrap_brokers, ""))
     sasl_username  = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_USERNAME"], try(var.infra_values.kafka.value.cluster_username, ""))
     sasl_password  = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_PASSWORD"], try(var.infra_values.kafka.value.cluster_password, ""))
-    sasl_mechanism = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_MECHANISM"], try(var.infra_values.kafka.value.cluster_mechanism, "plain"))
+    sasl_mechanism = local.kafka_sasl_mechanism
     ssl_enabled    = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SSL_ENABLED"], try(var.infra_values.kafka.value.cluster_tls_enabled, true))
   }
 

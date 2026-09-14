@@ -1178,11 +1178,12 @@ locals {
       # Redis CA certificate configuration
       # Enable if any Redis instance has a CA certificate
       redisCaCert = {
-        enabled = try(
-          local.infra_vars.redis.value.cache.ca_certificate != null ||
-          local.infra_vars.redis.value.queue.ca_certificate != null ||
-          local.infra_vars.redis.value.system.ca_certificate != null,
-          false
+        # Per-instance try(): a single || over missing queue/system keys fails the
+        # whole expression and try() returns false (single Memorystore = cache only).
+        enabled = (
+          try(local.infra_vars.redis.value.cache.ca_certificate, null) != null ||
+          try(local.infra_vars.redis.value.queue.ca_certificate, null) != null ||
+          try(local.infra_vars.redis.value.system.ca_certificate, null) != null
         )
         secretName = "redis-ca-cert"
       },

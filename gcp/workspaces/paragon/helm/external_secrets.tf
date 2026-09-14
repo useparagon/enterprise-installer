@@ -246,15 +246,17 @@ resource "kubectl_manifest" "external_secret_paragon" {
   depends_on = [kubectl_manifest.secret_store]
 }
 
+# The yaml locals embed the paragon namespace id, which is unknown until the
+# namespace is created, so count must come from the variables instead.
 resource "kubectl_manifest" "external_secret_docker" {
-  count = local.external_secret_docker_yaml != null ? 1 : 0
+  count = var.create_docker_pull_secret && var.docker_cfg_secret_name != null ? 1 : 0
 
   yaml_body  = local.external_secret_docker_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
 
 resource "kubectl_manifest" "external_secret_managed_sync" {
-  count      = local.external_secret_managed_sync_yaml != null ? 1 : 0
+  count      = var.managed_sync_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_managed_sync_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
@@ -265,13 +267,13 @@ resource "kubectl_manifest" "external_secret_openobserve" {
 }
 
 resource "kubectl_manifest" "external_secret_openobserve_gcs" {
-  count      = local.external_secret_openobserve_gcs_yaml != null ? 1 : 0
+  count      = var.openobserve_gcs_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_openobserve_gcs_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
 
 resource "kubectl_manifest" "external_secret_redis_ca" {
-  count      = local.external_secret_redis_ca_yaml != null ? 1 : 0
+  count      = var.redis_ca_cert_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_redis_ca_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
