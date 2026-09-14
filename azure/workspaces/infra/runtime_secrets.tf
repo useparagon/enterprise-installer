@@ -92,8 +92,12 @@ resource "azurerm_key_vault_secret" "runtime_redis_managed" {
 
   name         = "redis-managed"
   key_vault_id = azurerm_key_vault.paragon.id
-  # Always present so paragon KV handoff can resolve redis_managed (null when AMR disabled).
-  value = jsonencode(var.redis_managed_enabled ? module.redis_managed[0].redis : null)
+  # Agent OS credentials have a dedicated app secret and must not leak into the
+  # shared platform/Managed Sync handoff consumed by Helm and Hoop.
+  value = jsonencode(var.redis_managed_enabled ? {
+    for name, config in module.redis_managed[0].redis :
+    name => config if name != "agent_os"
+  } : null)
 
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
