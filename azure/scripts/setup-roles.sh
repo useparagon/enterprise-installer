@@ -105,10 +105,37 @@ remove_role_assignment() {
   fi
 }
 
+find_custom_role_json() {
+  local role_name="$1"
+  local json sub
+  json="$(az role definition list --name "${role_name}" --query '[0]' --output json)"
+  if [[ -n "${json}" && "${json}" != "null" ]]; then
+    printf '%s' "${json}"
+    return 0
+  fi
+  # Display names are tenant-unique, but list --name is subscription-scoped.
+  # Search other subscriptions the operator can read before creating a colliding name.
+  while IFS= read -r sub; do
+    [[ -n "${sub}" && "${sub}" != "${SUBSCRIPTION_ID}" ]] || continue
+    json="$(
+      az role definition list \
+        --subscription "${sub}" \
+        --name "${role_name}" \
+        --query '[0]' \
+        --output json 2>/dev/null || true
+    )"
+    if [[ -n "${json}" && "${json}" != "null" ]]; then
+      printf '%s' "${json}"
+      return 0
+    fi
+  done < <(az account list --query '[].id' --output tsv)
+  return 1
+}
+
 upsert_custom_role() {
   local definition_file="$1"
   local role_name="$2"
-  local existing_file existing_id
+  local existing_file existing_id existing_json
 
   command -v python3 >/dev/null 2>&1 || {
     echo "python3 is required to create or update custom Azure roles." >&2
@@ -116,15 +143,20 @@ upsert_custom_role() {
   }
 
   existing_file="${definition_file}.existing.json"
-  az role definition list --name "${role_name}" --query '[0]' --output json >"${existing_file}"
+  if existing_json="$(find_custom_role_json "${role_name}")"; then
+    printf '%s\n' "${existing_json}" >"${existing_file}"
+  else
+    printf 'null\n' >"${existing_file}"
+  fi
+
   existing_id="$(
     python3 -c '
 import json, sys
 raw = open(sys.argv[1], encoding="utf-8").read().strip()
-data = json.loads(raw) if raw else None
+data = json.loads(raw) if raw and raw != "null" else None
 print((data or {}).get("id") or "")
 ' "${existing_file}"
-  )
+  )"
 
   if [[ -n "${existing_id}" ]]; then
     # az role definition update requires Id. Union this subscription into
@@ -285,6 +317,11 @@ fi
 if [[ -n "${hoop_subscription_reader}" ]]; then
   echo "Leaving subscription User Access Administrator in place until Terraform"
   echo "moves the support identity Reader from the subscription to ${RESOURCE_GROUP}."
+  echo
+  echo "REQUIRED after the paragon workspace apply succeeds: run this script again"
+  echo "in the same subscription. The second run removes User Access Administrator"
+  echo "once the support identity Reader is only on ${RESOURCE_GROUP}."
+  echo "Until that rerun, the principal still holds subscription User Access Administrator."
 else
   remove_role_assignment "User Access Administrator" "${SUBSCRIPTION_SCOPE}"
 fi

@@ -199,8 +199,14 @@ Contributor** on that group so `postgres_management_lock_enabled` can manage
 `Microsoft.Authorization/locks/*`. It does not grant User Access Administrator.
 Custom role updates keep the existing definition Id and union this subscription
 into `AssignableScopes` so another subscription in the same tenant is not
-dropped. The script also registers installer resource providers (including
-Microsoft.ServiceNetworking); Terraform does not.
+dropped. Discovery searches every Azure CLI subscription the operator can read,
+because `az role definition list --name` only sees roles already assignable in
+the current subscription. The script also registers installer resource providers
+(including Microsoft.ServiceNetworking) with `az provider register --wait`;
+Terraform does not. If a subscription-scoped Reader still exists on the Hoop
+support identity, the script leaves User Access Administrator in place and
+prints a required post-paragon rerun: run `setup-roles.sh` again after that
+apply so the broad role is removed.
 
 Optional malicious-IP denylist (inbound and outbound) via `nsg_malicious_ips`. Empty by default (rules omitted). Azure allows at most 4000 prefixes per rule:
 
