@@ -1,8 +1,23 @@
 locals {
-  unique_domains = distinct([
-    for service in values(var.public_services) :
-    replace(replace(service.public_url, "https://", ""), "http://", "")
-  ])
+  managed_sync_host = "sync.${var.domain}"
+  managed_sync_routes = [
+    { path = "/api/sync-projects", service = "api-project", port = 1804 },
+    { path = "/api/catalog", service = "api-project", port = 1804 },
+    { path = "/api/syncs", service = "api-sync", port = 1800 },
+    { path = "/api/permissions", service = "api-sync", port = 1800 },
+    { path = "/api/webhooks", service = "api-webhook", port = 1809 },
+    { path = "/worker/sync", service = "worker-sync", port = 1802 },
+    { path = "/worker/history/sync", service = "worker-history-sync", port = 1807 },
+    { path = "/", service = "api-sync", port = 1800 },
+  ]
+
+  unique_domains = distinct(concat(
+    [
+      for service in values(var.public_services) :
+      replace(replace(service.public_url, "https://", ""), "http://", "")
+    ],
+    var.managed_sync_enabled ? [local.managed_sync_host] : []
+  ))
 
   # Create a hash of domains to version the certificate name
   # This allows create_before_destroy to work properly and avoid errors like:
@@ -83,32 +98,54 @@ resource "kubectl_manifest" "ingress" {
     spec = {
       ingressClassName = var.ingress_scheme == "internal" ? "gce-internal" : "gce"
       loadBalancerIP   = google_compute_global_address.loadbalancer.address
-      rules = [
-        for name, svc in var.public_services : {
-          host = replace(svc.public_url, "https://", "")
+      rules = concat(
+        [
+          for name, svc in var.public_services : {
+            host = replace(svc.public_url, "https://", "")
+            http = {
+              paths = [{
+                path     = "/"
+                pathType = "Prefix"
+                backend = {
+                  service = {
+                    name = name
+                    port = {
+                      number = svc.port
+                    }
+                  }
+                }
+              }]
+            }
+          }
+        ],
+        var.managed_sync_enabled ? [{
+          host = local.managed_sync_host
           http = {
-            paths = [{
-              path     = "/"
-              pathType = "Prefix"
-              backend = {
-                service = {
-                  name = name
-                  port = {
-                    number = svc.port
+            paths = [
+              for route in local.managed_sync_routes : {
+                path     = route.path
+                pathType = "Prefix"
+                backend = {
+                  service = {
+                    name = route.service
+                    port = {
+                      number = route.port
+                    }
                   }
                 }
               }
-            }]
+            ]
           }
-        }
-      ]
+        }] : []
+      )
     }
   })
 
   depends_on = [
     helm_release.paragon_on_prem,
     helm_release.paragon_monitoring,
-    helm_release.paragon_logging
+    helm_release.paragon_logging,
+    helm_release.managed_sync,
   ]
 }
 

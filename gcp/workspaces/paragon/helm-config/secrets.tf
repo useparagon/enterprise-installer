@@ -39,7 +39,6 @@ locals {
   }
 
   kafka_sasl_mechanism = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_MECHANISM"], try(var.infra_values.kafka.value.cluster_mechanism, "plain"))
-  kafka_oauthbearer    = local.kafka_sasl_mechanism == "oauthbearer"
 
   kafka_config = {
     broker_urls    = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_BROKER_URLS"], try(var.infra_values.kafka.value.cluster_bootstrap_brokers, ""))
@@ -47,13 +46,6 @@ locals {
     sasl_password  = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_PASSWORD"], try(var.infra_values.kafka.value.cluster_password, ""))
     sasl_mechanism = local.kafka_sasl_mechanism
     ssl_enabled    = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SSL_ENABLED"], try(var.infra_values.kafka.value.cluster_tls_enabled, true))
-    # PARA-26287 KafkaJS oauthBearerProvider. Do not also set MANAGED_SYNC_KAFKA_SASL_OAUTH_BEARER_TOKEN.
-    # GMK local auth server (googleapis/managedkafka) listens on 127.0.0.1:14293 and ignores id/secret.
-    oauth_token_url          = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_OAUTH_TOKEN_URL"], local.kafka_oauthbearer ? "http://127.0.0.1:14293" : "")
-    oauth_client_id          = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_OAUTH_CLIENT_ID"], local.kafka_oauthbearer ? "unused" : "")
-    oauth_client_secret      = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_OAUTH_CLIENT_SECRET"], local.kafka_oauthbearer ? "unused" : "")
-    oauth_client_auth_method = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_OAUTH_CLIENT_AUTH_METHOD"], "post")
-    oauth_scope              = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SASL_OAUTH_SCOPE"], "")
   }
 
   # Prefer infra Redis when present so TLS (ssl) and URL scheme come from infra (Memorystore → rediss://; else 0x15 error).
@@ -149,11 +141,6 @@ locals {
     MANAGED_SYNC_KAFKA_SASL_PASSWORD  = local.kafka_config.sasl_mechanism == "plain" ? base64encode(local.kafka_config.sasl_password) : local.kafka_config.sasl_password
     MANAGED_SYNC_KAFKA_SASL_MECHANISM = local.kafka_config.sasl_mechanism
     MANAGED_SYNC_KAFKA_SSL_ENABLED    = tostring(local.kafka_config.ssl_enabled)
-    MANAGED_SYNC_KAFKA_SASL_OAUTH_TOKEN_URL          = local.kafka_config.oauth_token_url
-    MANAGED_SYNC_KAFKA_SASL_OAUTH_CLIENT_ID          = local.kafka_config.oauth_client_id
-    MANAGED_SYNC_KAFKA_SASL_OAUTH_CLIENT_SECRET      = local.kafka_config.oauth_client_secret
-    MANAGED_SYNC_KAFKA_SASL_OAUTH_CLIENT_AUTH_METHOD = local.kafka_config.oauth_client_auth_method
-    MANAGED_SYNC_KAFKA_SASL_OAUTH_SCOPE              = local.kafka_config.oauth_scope
 
     # Redis from infra when present (TLS → rediss://; else 0x15). Do not override from base_helm_values so managed_sync always gets infra's scheme.
     MANAGED_SYNC_REDIS_URL             = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
@@ -213,11 +200,6 @@ locals {
     MONITOR_MANAGED_SYNC_KAFKA_SASL_PASSWORD  = local.kafka_config.sasl_mechanism == "plain" ? base64encode(local.kafka_config.sasl_password) : local.kafka_config.sasl_password
     MONITOR_MANAGED_SYNC_KAFKA_SASL_MECHANISM = local.kafka_config.sasl_mechanism
     MONITOR_MANAGED_SYNC_KAFKA_SSL_ENABLED    = tostring(local.kafka_config.ssl_enabled)
-    MONITOR_MANAGED_SYNC_KAFKA_SASL_OAUTH_TOKEN_URL          = local.kafka_config.oauth_token_url
-    MONITOR_MANAGED_SYNC_KAFKA_SASL_OAUTH_CLIENT_ID          = local.kafka_config.oauth_client_id
-    MONITOR_MANAGED_SYNC_KAFKA_SASL_OAUTH_CLIENT_SECRET      = local.kafka_config.oauth_client_secret
-    MONITOR_MANAGED_SYNC_KAFKA_SASL_OAUTH_CLIENT_AUTH_METHOD = local.kafka_config.oauth_client_auth_method
-    MONITOR_MANAGED_SYNC_KAFKA_SASL_OAUTH_SCOPE              = local.kafka_config.oauth_scope
 
     MONITOR_QUEUE_EXPORTER_PRIVATE_URL = try(
       var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_PRIVATE_URL"],
