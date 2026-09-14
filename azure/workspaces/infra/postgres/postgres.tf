@@ -56,6 +56,9 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   lifecycle {
     ignore_changes = [
       high_availability[0].standby_availability_zone,
+      # Azure can increase storage automatically, but cannot shrink it. Keep later
+      # applies from attempting to restore the configured initial size.
+      storage_mb,
       zone
     ]
   }
