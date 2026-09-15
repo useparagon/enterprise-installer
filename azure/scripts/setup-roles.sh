@@ -18,6 +18,17 @@ if [[ "${SUBSCRIPTION_ID}" == your-* || "${PRINCIPAL_ID}" == your-* || "${LOCATI
   exit 1
 fi
 
+for required_command in az python3; do
+  if ! command -v "${required_command}" >/dev/null 2>&1; then
+    echo "${required_command} is required." >&2
+    exit 1
+  fi
+done
+if ! command -v shasum >/dev/null 2>&1 && ! command -v sha256sum >/dev/null 2>&1; then
+  echo "shasum or sha256sum is required to derive the workspace name." >&2
+  exit 1
+fi
+
 # Terraform derives the workspace name, and therefore every resource-group name
 # this script scopes to, as paragon-<organization>-<first 8 of the subscription
 # ID SHA-256>. Both inputs are known before the first apply, so the names are
@@ -36,6 +47,7 @@ RESOURCE_GROUP="${WORKSPACE}-resources"
 RESOURCE_GROUP_SCOPE="${SUBSCRIPTION_SCOPE}/resourceGroups/${RESOURCE_GROUP}"
 NODE_RESOURCE_GROUP="${WORKSPACE}-cluster-nodes"
 NODE_RESOURCE_GROUP_SCOPE="${SUBSCRIPTION_SCOPE}/resourceGroups/${NODE_RESOURCE_GROUP}"
+ROLE_NAME_SUBSCRIPTION_ID="$(printf '%s' "${SUBSCRIPTION_ID}" | tr '[:upper:]' '[:lower:]')"
 
 CONTRIBUTOR_ROLE_ID="b24988ac-6180-42a0-ab88-20f7382dd24c"
 RBAC_ADMINISTRATOR_ROLE_ID="f58310d9-a9f6-439a-9e8d-f62e7b41a168"
@@ -45,13 +57,20 @@ AKS_CLUSTER_ADMIN_ROLE_ID="0ab0b1a8-8aac-4efd-b8c2-3ee1fb270be8"
 STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID="ba92f5b4-2d11-453d-a403-e96b0029c9fe"
 READER_ROLE_ID="acdd72a7-3385-48ef-bd42-f606fba81ae7"
 AGC_CONFIG_MANAGER_ROLE_ID="fbc52c3f-28ad-4303-a892-8a056630b8f1"
-DNS_ZONE_CONTRIBUTOR_ROLE_ID="befefa01-2a29-4190-ada5-d38e61f00d8d"
+DNS_ZONE_CONTRIBUTOR_ROLE_ID="befefa01-2a29-4197-83a8-272ff33ce314"
 # Built-in Locks Contributor — Contributor and RBAC Administrator do not
 # include Microsoft.Authorization/locks/*, which postgres_management_lock_enabled needs.
 LOCKS_CONTRIBUTOR_ROLE_ID="28bf596f-4eb7-45ce-b5bc-6cf482fec137"
 
-PUBLIC_IP_ROLE_NAME="Paragon AKS Node Resource Group Public IP Manager"
-BOOTSTRAP_ROLE_NAME="Paragon AKS Greenfield Bootstrap"
+# Custom-role display names must be unique across the Entra tenant. Keep each
+# definition subscription-specific so an administrator never needs
+# roleDefinitions/write on another subscription's AssignableScopes.
+PUBLIC_IP_ROLE_NAME="Paragon AKS Node Resource Group Public IP Manager (${ROLE_NAME_SUBSCRIPTION_ID})"
+BOOTSTRAP_ROLE_NAME="Paragon AKS Greenfield Bootstrap (${ROLE_NAME_SUBSCRIPTION_ID})"
+# Remove assignments created by pre-subscription-specific revisions, but leave
+# those shared definitions in place because another subscription may use them.
+LEGACY_PUBLIC_IP_ROLE_NAME="Paragon AKS Node Resource Group Public IP Manager"
+LEGACY_BOOTSTRAP_ROLE_NAME="Paragon AKS Greenfield Bootstrap"
 
 REQUIRED_PROVIDERS=(
   "Microsoft.Cache"
@@ -68,24 +87,51 @@ REQUIRED_PROVIDERS=(
   "Microsoft.Storage"
 )
 
+list_role_assignments() {
+  local principal_id="$1"
+  shift
+  local assignee_flag="--assignee"
+  local role_list_help
+
+  # --assignee-object-id avoids Microsoft Graph lookup but was added to `list`
+  # only in Azure CLI 2.73. Prefer it when available and retain compatibility
+  # with older customer environments.
+  role_list_help="$(az role assignment list --help 2>&1 || true)"
+  if [[ "${role_list_help}" == *"--assignee-object-id"* ]]; then
+    assignee_flag="--assignee-object-id"
+  fi
+  az role assignment list "${assignee_flag}" "${principal_id}" "$@"
+}
+
 role_assignment_id() {
   local role="$1"
   local scope="$2"
 
-  az role assignment list \
-    --assignee "${PRINCIPAL_ID}" \
+  list_role_assignments "${PRINCIPAL_ID}" \
     --role "${role}" \
     --scope "${scope}" \
     --query '[0].id' \
     --output tsv
 }
 
+role_assignment_ids() {
+  local role="$1"
+  local scope="$2"
+
+  list_role_assignments "${PRINCIPAL_ID}" \
+    --role "${role}" \
+    --scope "${scope}" \
+    --query '[].id' \
+    --output tsv
+}
+
 ensure_role_assignment() {
   local role="$1"
   local scope="$2"
-  local attempt
+  local attempt assignment_id
 
-  if [[ -z "$(role_assignment_id "${role}" "${scope}")" ]]; then
+  assignment_id="$(role_assignment_id "${role}" "${scope}")"
+  if [[ -z "${assignment_id}" ]]; then
     # A newly created custom role can take time to become assignable. Retry the
     # assignment so a greenfield run does not fail between role creation and
     # Azure's authorization-plane propagation.
@@ -100,7 +146,8 @@ ensure_role_assignment() {
       fi
       # The create request may have succeeded even if the CLI lost the final
       # response. Avoid retrying an assignment Azure already persisted.
-      if [[ -n "$(role_assignment_id "${role}" "${scope}")" ]]; then
+      if assignment_id="$(role_assignment_id "${role}" "${scope}")" \
+        && [[ -n "${assignment_id}" ]]; then
         return 0
       fi
       if ((attempt == 12)); then
@@ -116,39 +163,32 @@ ensure_role_assignment() {
 remove_role_assignment() {
   local role="$1"
   local scope="$2"
-  local assignment_id
+  local assignment_id assignment_ids
 
-  assignment_id="$(role_assignment_id "${role}" "${scope}")"
-  if [[ -n "${assignment_id}" ]]; then
+  assignment_ids="$(role_assignment_ids "${role}" "${scope}")"
+  while IFS= read -r assignment_id; do
+    [[ -n "${assignment_id}" ]] || continue
     az role assignment delete --ids "${assignment_id}"
-  fi
+  done <<<"${assignment_ids}"
 }
 
-find_custom_role_json() {
+remove_role_assignment_if_defined() {
   local role_name="$1"
-  local json sub
-  json="$(az role definition list --name "${role_name}" --query '[0]' --output json)"
-  if [[ -n "${json}" && "${json}" != "null" ]]; then
-    printf '%s' "${json}"
-    return 0
+  local scope="$2"
+  local role_definition_id
+
+  if ! role_definition_id="$(
+    az role definition list \
+      --name "${role_name}" \
+      --query '[0].id' \
+      --output tsv
+  )"; then
+    echo "Unable to look up optional legacy role ${role_name}." >&2
+    return 1
   fi
-  # Display names are tenant-unique, but list --name is subscription-scoped.
-  # Search other subscriptions the operator can read before creating a colliding name.
-  while IFS= read -r sub; do
-    [[ -n "${sub}" && "${sub}" != "${SUBSCRIPTION_ID}" ]] || continue
-    json="$(
-      az role definition list \
-        --subscription "${sub}" \
-        --name "${role_name}" \
-        --query '[0]' \
-        --output json 2>/dev/null || true
-    )"
-    if [[ -n "${json}" && "${json}" != "null" ]]; then
-      printf '%s' "${json}"
-      return 0
-    fi
-  done < <(az account list --query '[].id' --output tsv)
-  return 1
+  if [[ -n "${role_definition_id}" ]]; then
+    remove_role_assignment "${role_name}" "${scope}"
+  fi
 }
 
 upsert_custom_role() {
@@ -156,13 +196,9 @@ upsert_custom_role() {
   local role_name="$2"
   local existing_file existing_id existing_json
 
-  command -v python3 >/dev/null 2>&1 || {
-    echo "python3 is required to create or update custom Azure roles." >&2
-    exit 1
-  }
-
   existing_file="${definition_file}.existing.json"
-  if existing_json="$(find_custom_role_json "${role_name}")"; then
+  existing_json="$(az role definition list --name "${role_name}" --query '[0]' --output json)"
+  if [[ -n "${existing_json}" && "${existing_json}" != "null" ]]; then
     printf '%s\n' "${existing_json}" >"${existing_file}"
   else
     printf 'null\n' >"${existing_file}"
@@ -178,9 +214,8 @@ print((data or {}).get("id") or "")
   )"
 
   if [[ -n "${existing_id}" ]]; then
-    # az role definition update requires Id. Union this subscription into
-    # AssignableScopes so a later run cannot drop another subscription that
-    # already uses the same tenant-unique custom role name.
+    # az role definition update requires Id. This definition's display name is
+    # subscription-specific, so its only AssignableScope is this subscription.
     python3 - "${definition_file}" "${existing_file}" "${SUBSCRIPTION_SCOPE}" <<'PY'
 import json
 import sys
@@ -191,8 +226,6 @@ with open(path, encoding="utf-8") as handle:
 with open(existing_path, encoding="utf-8") as handle:
     existing = json.load(handle)
 
-scopes = {scope for scope in (existing.get("assignableScopes") or []) if scope}
-scopes.add(current_scope)
 payload = {
     "Id": existing["id"],
     "Name": create["Name"],
@@ -202,7 +235,7 @@ payload = {
     "NotActions": create.get("NotActions") or [],
     "DataActions": create.get("DataActions") or [],
     "NotDataActions": create.get("NotDataActions") or [],
-    "AssignableScopes": sorted(scopes),
+    "AssignableScopes": [current_scope],
 }
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(payload, handle, indent=2)
@@ -224,12 +257,27 @@ for provider in "${REQUIRED_PROVIDERS[@]}"; do
   az provider register --namespace "${provider}" --wait
 done
 
-# Pre-create the deterministic main resource group. Terraform imports it
-# declaratively on a greenfield run and continues managing it afterward.
-az group create \
-  --name "${RESOURCE_GROUP}" \
-  --location "${LOCATION}" \
-  --output none
+# Pre-create the deterministic main resource group only on greenfield. `az
+# group create` is an ARM create-or-update operation: rerunning it against a
+# live group can rewrite omitted properties such as tags, and a mismatched
+# location fails because resource-group location is immutable.
+if ! resource_group_exists="$(
+  az group exists --name "${RESOURCE_GROUP}" --output tsv
+)"; then
+  echo "Unable to determine whether resource group ${RESOURCE_GROUP} exists." >&2
+  exit 1
+fi
+if [[ "${resource_group_exists}" == "true" ]]; then
+  echo "Resource group ${RESOURCE_GROUP} already exists; leaving it untouched."
+elif [[ "${resource_group_exists}" == "false" ]]; then
+  az group create \
+    --name "${RESOURCE_GROUP}" \
+    --location "${LOCATION}" \
+    --output none
+else
+  echo "Unexpected az group exists output for ${RESOURCE_GROUP}: ${resource_group_exists}" >&2
+  exit 1
+fi
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
@@ -295,16 +343,28 @@ az role assignment create \
   --condition-version "2.0" \
   --output none
 
-if [[ "$(az group exists --name "${NODE_RESOURCE_GROUP}" --output tsv)" == "true" ]]; then
+if ! node_resource_group_exists="$(
+  az group exists --name "${NODE_RESOURCE_GROUP}" --output tsv
+)"; then
+  echo "Unable to determine whether node resource group ${NODE_RESOURCE_GROUP} exists." >&2
+  exit 1
+fi
+if [[ "${node_resource_group_exists}" == "true" ]]; then
   ensure_role_assignment "${PUBLIC_IP_ROLE_NAME}" "${NODE_RESOURCE_GROUP_SCOPE}"
-  remove_role_assignment "${BOOTSTRAP_ROLE_NAME}" "${SUBSCRIPTION_SCOPE}"
+  remove_role_assignment_if_defined "${BOOTSTRAP_ROLE_NAME}" "${SUBSCRIPTION_SCOPE}"
+  remove_role_assignment_if_defined "${LEGACY_PUBLIC_IP_ROLE_NAME}" "${NODE_RESOURCE_GROUP_SCOPE}"
+  remove_role_assignment_if_defined "${LEGACY_BOOTSTRAP_ROLE_NAME}" "${SUBSCRIPTION_SCOPE}"
   echo "Scoped public-IP access to ${NODE_RESOURCE_GROUP}; no bootstrap subscription assignment remains."
-else
+elif [[ "${node_resource_group_exists}" == "false" ]]; then
   upsert_custom_role "${tmp_dir}/bootstrap-role.json" "${BOOTSTRAP_ROLE_NAME}"
   ensure_role_assignment "${BOOTSTRAP_ROLE_NAME}" "${SUBSCRIPTION_SCOPE}"
+  remove_role_assignment_if_defined "${LEGACY_BOOTSTRAP_ROLE_NAME}" "${SUBSCRIPTION_SCOPE}"
   echo "The AKS node resource group does not exist yet."
   echo "A minimal temporary subscription role was assigned for greenfield creation."
   echo "Run this script again after the infra workspace succeeds to replace it with node-resource-group scope."
+else
+  echo "Unexpected az group exists output for ${NODE_RESOURCE_GROUP}: ${node_resource_group_exists}" >&2
+  exit 1
 fi
 
 # Remove the former broad assignments after the scoped replacements exist.
@@ -324,8 +384,7 @@ if hoop_support_principal="$(
     --output tsv 2>/dev/null
 )" && [[ -n "${hoop_support_principal}" ]]; then
   hoop_subscription_reader="$(
-    az role assignment list \
-      --assignee "${hoop_support_principal}" \
+    list_role_assignments "${hoop_support_principal}" \
       --role "${READER_ROLE_ID}" \
       --scope "${SUBSCRIPTION_SCOPE}" \
       --query '[0].id' \

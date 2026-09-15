@@ -197,11 +197,11 @@ AKS Cluster Admin, Storage Blob Data Contributor, Reader, AppGw for Containers
 Configuration Manager, and DNS Zone Contributor. It also grants **Locks
 Contributor** on that group so `postgres_management_lock_enabled` can manage
 `Microsoft.Authorization/locks/*`. It does not grant User Access Administrator.
-Custom role updates keep the existing definition Id and union this subscription
-into `AssignableScopes` so another subscription in the same tenant is not
-dropped. Discovery searches every Azure CLI subscription the operator can read,
-because `az role definition list --name` only sees roles already assignable in
-the current subscription. The script also registers installer resource providers
+Custom-role display names include the subscription ID and each definition has
+only that subscription in `AssignableScopes`. Azure requires
+`roleDefinitions/write` on every assignable scope when updating a custom role,
+so this avoids requiring one subscription administrator to control another
+subscription in the same tenant. The script also registers installer resource providers
 (including Microsoft.ServiceNetworking) with `az provider register --wait`;
 Terraform does not. If a subscription-scoped Reader still exists on the Hoop
 support identity, the script leaves User Access Administrator in place and
