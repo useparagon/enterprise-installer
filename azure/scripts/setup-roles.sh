@@ -83,14 +83,33 @@ role_assignment_id() {
 ensure_role_assignment() {
   local role="$1"
   local scope="$2"
+  local attempt
 
   if [[ -z "$(role_assignment_id "${role}" "${scope}")" ]]; then
-    az role assignment create \
-      --assignee-object-id "${PRINCIPAL_ID}" \
-      --assignee-principal-type ServicePrincipal \
-      --role "${role}" \
-      --scope "${scope}" \
-      --output none
+    # A newly created custom role can take time to become assignable. Retry the
+    # assignment so a greenfield run does not fail between role creation and
+    # Azure's authorization-plane propagation.
+    for attempt in {1..12}; do
+      if az role assignment create \
+        --assignee-object-id "${PRINCIPAL_ID}" \
+        --assignee-principal-type ServicePrincipal \
+        --role "${role}" \
+        --scope "${scope}" \
+        --output none; then
+        return 0
+      fi
+      # The create request may have succeeded even if the CLI lost the final
+      # response. Avoid retrying an assignment Azure already persisted.
+      if [[ -n "$(role_assignment_id "${role}" "${scope}")" ]]; then
+        return 0
+      fi
+      if ((attempt == 12)); then
+        echo "Failed to assign ${role} at ${scope} after ${attempt} attempts." >&2
+        return 1
+      fi
+      echo "Role ${role} is not assignable yet; retrying in 5 seconds..." >&2
+      sleep 5
+    done
   fi
 }
 
@@ -276,7 +295,7 @@ az role assignment create \
   --condition-version "2.0" \
   --output none
 
-if az group exists --name "${NODE_RESOURCE_GROUP}" | grep -q true; then
+if [[ "$(az group exists --name "${NODE_RESOURCE_GROUP}" --output tsv)" == "true" ]]; then
   ensure_role_assignment "${PUBLIC_IP_ROLE_NAME}" "${NODE_RESOURCE_GROUP_SCOPE}"
   remove_role_assignment "${BOOTSTRAP_ROLE_NAME}" "${SUBSCRIPTION_SCOPE}"
   echo "Scoped public-IP access to ${NODE_RESOURCE_GROUP}; no bootstrap subscription assignment remains."
@@ -306,7 +325,7 @@ if hoop_support_principal="$(
 )" && [[ -n "${hoop_support_principal}" ]]; then
   hoop_subscription_reader="$(
     az role assignment list \
-      --assignee-object-id "${hoop_support_principal}" \
+      --assignee "${hoop_support_principal}" \
       --role "${READER_ROLE_ID}" \
       --scope "${SUBSCRIPTION_SCOPE}" \
       --query '[0].id' \
