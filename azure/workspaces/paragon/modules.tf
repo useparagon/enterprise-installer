@@ -164,7 +164,7 @@ module "dns_zone" {
   workspace            = local.workspace
   resource_group_name  = local.infra_vars.resource_group.value.name
   domain               = var.domain
-  dns_provider         = var.cloudflare_api_token != null && var.cloudflare_zone_id != null ? "cloudflare" : "none"
+  dns_provider         = local.has_cloudflare_credentials ? "cloudflare" : "none"
   cloudflare_api_token = var.cloudflare_api_token
   cloudflare_zone_id   = var.cloudflare_zone_id
 }
