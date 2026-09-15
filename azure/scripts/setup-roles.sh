@@ -125,38 +125,49 @@ role_assignment_ids() {
     --output tsv
 }
 
+# A newly created custom role can take time to become assignable, and a deleted
+# assignment can take time to disappear. Retry so a run does not fail between the
+# write and Azure's authorization-plane propagation. Extra arguments are passed
+# through to `az role assignment create`.
+create_role_assignment() {
+  local role="$1"
+  local scope="$2"
+  shift 2
+  local attempt assignment_id
+
+  for attempt in {1..12}; do
+    if az role assignment create \
+      --assignee-object-id "${PRINCIPAL_ID}" \
+      --assignee-principal-type ServicePrincipal \
+      --role "${role}" \
+      --scope "${scope}" \
+      "$@" \
+      --output none; then
+      return 0
+    fi
+    # The create request may have succeeded even if the CLI lost the final
+    # response. Avoid retrying an assignment Azure already persisted.
+    if assignment_id="$(role_assignment_id "${role}" "${scope}")" \
+      && [[ -n "${assignment_id}" ]]; then
+      return 0
+    fi
+    if ((attempt == 12)); then
+      echo "Failed to assign ${role} at ${scope} after ${attempt} attempts." >&2
+      return 1
+    fi
+    echo "Role ${role} is not assignable yet; retrying in 5 seconds..." >&2
+    sleep 5
+  done
+}
+
 ensure_role_assignment() {
   local role="$1"
   local scope="$2"
-  local attempt assignment_id
+  local assignment_id
 
   assignment_id="$(role_assignment_id "${role}" "${scope}")"
   if [[ -z "${assignment_id}" ]]; then
-    # A newly created custom role can take time to become assignable. Retry the
-    # assignment so a greenfield run does not fail between role creation and
-    # Azure's authorization-plane propagation.
-    for attempt in {1..12}; do
-      if az role assignment create \
-        --assignee-object-id "${PRINCIPAL_ID}" \
-        --assignee-principal-type ServicePrincipal \
-        --role "${role}" \
-        --scope "${scope}" \
-        --output none; then
-        return 0
-      fi
-      # The create request may have succeeded even if the CLI lost the final
-      # response. Avoid retrying an assignment Azure already persisted.
-      if assignment_id="$(role_assignment_id "${role}" "${scope}")" \
-        && [[ -n "${assignment_id}" ]]; then
-        return 0
-      fi
-      if ((attempt == 12)); then
-        echo "Failed to assign ${role} at ${scope} after ${attempt} attempts." >&2
-        return 1
-      fi
-      echo "Role ${role} is not assignable yet; retrying in 5 seconds..." >&2
-      sleep 5
-    done
+    create_role_assignment "${role}" "${scope}"
   fi
 }
 
@@ -334,14 +345,9 @@ remove_role_assignment "${RBAC_ADMINISTRATOR_ROLE_ID}" "${RESOURCE_GROUP_SCOPE}"
 # and Azure DNS). The SP cannot register providers; that is handled above.
 ASSIGNABLE_ROLE_IDS="${NETWORK_CONTRIBUTOR_ROLE_ID}, ${AKS_CLUSTER_ADMIN_ROLE_ID}, ${STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID}, ${READER_ROLE_ID}, ${AGC_CONFIG_MANAGER_ROLE_ID}, ${DNS_ZONE_CONTRIBUTOR_ROLE_ID}"
 RBAC_CONDITION="((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${ASSIGNABLE_ROLE_IDS}})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${ASSIGNABLE_ROLE_IDS}}))"
-az role assignment create \
-  --assignee-object-id "${PRINCIPAL_ID}" \
-  --assignee-principal-type ServicePrincipal \
-  --role "${RBAC_ADMINISTRATOR_ROLE_ID}" \
-  --scope "${RESOURCE_GROUP_SCOPE}" \
+create_role_assignment "${RBAC_ADMINISTRATOR_ROLE_ID}" "${RESOURCE_GROUP_SCOPE}" \
   --condition "${RBAC_CONDITION}" \
-  --condition-version "2.0" \
-  --output none
+  --condition-version "2.0"
 
 if ! node_resource_group_exists="$(
   az group exists --name "${NODE_RESOURCE_GROUP}" --output tsv
