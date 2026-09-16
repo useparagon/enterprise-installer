@@ -8,7 +8,8 @@
 # for the Terraform installer SA roles.
 #
 # Enable required APIs in the console (or via gcloud) before apply — this repo does not
-# enable APIs during Terraform. See gcp/workspaces/infra/README.md.
+# enable APIs during Terraform. See gcp/workspaces/infra/README.md (includes GKE Hub,
+# GKE Connect, and Connect Gateway for private-cluster Fleet access).
 
 # Define the project ID and service account email
 PROJECT_ID="your-gcp-project-id"

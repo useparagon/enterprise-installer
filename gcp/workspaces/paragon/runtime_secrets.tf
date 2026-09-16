@@ -7,10 +7,11 @@ locals {
     openobserve_gcs = "${local.workspace}-openobserve-gcs"
   }
 
-  # Plan-known: WIF always has the infra storage SA key; static creds always have
-  # provider JSON. Do not gate count on decoded GSM payload (`local.gcp_creds != null`),
-  # which is unknown until apply when infra-output.json is not supplied.
-  openobserve_gcs_enabled = var.gcp_assume_role || local.gcp_provider_credentials != ""
+  # Plan-known storage auth mode. Do not gate count on decoded GSM payload
+  # (`local.gcp_creds != null`), which is unknown until apply when
+  # infra-output.json is not supplied. WIF only has a storage SA key when
+  # infra set use_storage_account_key; static JSON creds always supply HMAC-style JSON.
+  openobserve_gcs_enabled = var.use_storage_account_key || !var.gcp_assume_role
 }
 
 resource "google_secret_manager_secret" "env" {
@@ -112,4 +113,11 @@ resource "google_secret_manager_secret_version" "openobserve_gcs" {
   count       = local.openobserve_gcs_enabled ? 1 : 0
   secret      = google_secret_manager_secret.openobserve_gcs[0].id
   secret_data = jsonencode({ "creds.json" = local.gcp_creds })
+
+  lifecycle {
+    precondition {
+      condition     = local.gcp_creds != null && local.gcp_creds != ""
+      error_message = "OpenObserve GCS credentials are enabled but the storage key is missing. Set use_storage_account_key=true in both the infra and paragon workspaces so infra mints the storage SA key, or leave it false under WIF so OpenObserve uses Workload Identity instead of ZO_S3_ACCESS_KEY."
+    }
+  }
 }

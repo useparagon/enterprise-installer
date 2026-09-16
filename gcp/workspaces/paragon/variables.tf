@@ -58,6 +58,12 @@ variable "gcp_assume_role" {
   default     = false
 }
 
+variable "use_storage_account_key" {
+  description = "Whether infra minted a storage service-account private key (must match the infra workspace). When false under WIF, OpenObserve uses Workload Identity instead of HMAC-style GCS credentials."
+  type        = bool
+  default     = false
+}
+
 # account
 variable "organization" {
   description = "Name of organization to include in resource names."

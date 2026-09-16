@@ -11,6 +11,7 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 - Secret Manager API
 - Kubernetes Engine API
 - GKE Hub API
+- GKE Connect API
 - Connect Gateway API
 - Managed Service for Apache Kafka API (when managed sync / GMK is enabled)
 

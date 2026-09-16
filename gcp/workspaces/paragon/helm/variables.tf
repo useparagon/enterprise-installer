@@ -98,8 +98,9 @@ variable "gcp_project_id" {
 }
 
 variable "gcp_creds" {
-  description = "GCP credentials for logging bucket access."
+  description = "GCP credentials for logging bucket access. Null when OpenObserve uses Workload Identity instead of HMAC-style GCS credentials."
   type        = string
+  default     = null
 }
 
 variable "openobserve_email" {
