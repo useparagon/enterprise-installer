@@ -21,21 +21,18 @@ terraform {
 
 provider "helm" {
   kubernetes {
-    host                   = local.cluster.host
-    token                  = local.cluster.token
-    cluster_ca_certificate = local.cluster.cluster_ca_certificate
+    host  = local.cluster.host
+    token = local.cluster.token
   }
 }
 
 provider "kubernetes" {
-  host                   = local.cluster.host
-  token                  = local.cluster.token
-  cluster_ca_certificate = local.cluster.cluster_ca_certificate
+  host  = local.cluster.host
+  token = local.cluster.token
 }
 
 provider "kubectl" {
-  host                   = local.cluster.host
-  token                  = local.cluster.token
-  cluster_ca_certificate = local.cluster.cluster_ca_certificate
-  load_config_file       = false
+  host             = local.cluster.host
+  token            = local.cluster.token
+  load_config_file = false
 }

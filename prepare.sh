@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # version of charts, must be semver and doesn't have to match Paragon appVersion
-version="2026.09.11"
+version="2026.09.16"
 
 # defaults
 provider="aws"

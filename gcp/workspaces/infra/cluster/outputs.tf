@@ -7,3 +7,8 @@ output "kubernetes" {
   }
   sensitive = true
 }
+
+output "cluster_id" {
+  value       = module.gke.cluster_id
+  description = "Full GKE cluster resource ID used to register the cluster with Fleet."
+}
