@@ -18,6 +18,13 @@ output "postgres" {
   sensitive   = true
 }
 
+output "monitoring" {
+  description = "Non-sensitive monitoring settings (includes pg_config.max_storage_bytes for Grafana storage alerts)."
+  value = {
+    pg_config = module.postgres.pg_config
+  }
+}
+
 output "logs_container" {
   description = "The bucket used to store system logs."
   value       = module.storage.storage.logs_bucket

@@ -406,22 +406,25 @@ variable "k8s_network_plugin" {
 }
 
 variable "k8s_network_plugin_mode" {
-  description = "Azure CNI mode. `overlay` assigns pod IPs from k8s_pod_cidr (default, IP-efficient). Set to null for legacy node-subnet mode (pod IPs from the VNet)."
+  description = "Azure CNI mode. `overlay` assigns pod IPs from k8s_pod_cidr (default, IP-efficient). Set to null, `\"\"` or `\"null\"` for legacy node-subnet mode (pod IPs from the VNet)."
   type        = string
   default     = "overlay"
   validation {
-    condition     = var.k8s_network_plugin_mode == null || var.k8s_network_plugin_mode == "overlay"
-    error_message = "k8s_network_plugin_mode must be null or `overlay`."
+    condition     = contains(["", "null", "overlay"], lower(trimspace(coalesce(var.k8s_network_plugin_mode, "null"))))
+    error_message = "k8s_network_plugin_mode must be `overlay`, or null / `\"\"` / `\"null\"` for legacy node-subnet mode."
   }
 }
 
 variable "k8s_pod_cidr" {
-  description = "Pod overlay CIDR (RFC 1918 private). Used when k8s_network_plugin_mode is `overlay` or k8s_network_plugin is `kubenet`. Must not overlap vpc_cidr or k8s_service_cidr."
+  description = "Pod overlay CIDR (RFC 1918 private). Used when k8s_network_plugin_mode is `overlay` or k8s_network_plugin is `kubenet`. Must not overlap vpc_cidr or k8s_service_cidr. Set to null, `\"\"` or `\"null\"` when unused."
   type        = string
   default     = "192.168.0.0/16"
 
   validation {
-    condition     = (var.k8s_network_plugin != "kubenet" && var.k8s_network_plugin_mode != "overlay") || var.k8s_pod_cidr != null
+    condition = (
+      var.k8s_network_plugin != "kubenet" &&
+      lower(trimspace(coalesce(var.k8s_network_plugin_mode, "null"))) != "overlay"
+    ) || !contains(["", "null"], lower(trimspace(coalesce(var.k8s_pod_cidr, "null"))))
     error_message = "k8s_pod_cidr is required when k8s_network_plugin_mode is overlay or k8s_network_plugin is kubenet."
   }
 }
@@ -513,6 +516,12 @@ variable "eventhub_maximum_throughput_units" {
 }
 
 locals {
+  # Spacelift can only pass TF_VAR_* as environment variables, which Terraform reads
+  # literally for string variables, so `""` and `"null"` are the only ways a context
+  # can spell a null. Collapse them here; the cluster module sees a real null.
+  k8s_network_plugin_mode = contains(["", "null"], lower(trimspace(coalesce(var.k8s_network_plugin_mode, "null")))) ? null : var.k8s_network_plugin_mode
+  k8s_pod_cidr            = contains(["", "null"], lower(trimspace(coalesce(var.k8s_pod_cidr, "null")))) ? null : var.k8s_pod_cidr
+
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
   hash      = substr(sha256(var.azure_subscription_id), 0, 8)
   workspace = nonsensitive("paragon-${var.organization}-${local.hash}")

@@ -58,6 +58,12 @@ variable "gcp_assume_role" {
   default     = false
 }
 
+variable "use_storage_account_key" {
+  description = "Whether infra minted a storage service-account private key (must match the infra workspace). When false under WIF, OpenObserve uses Workload Identity instead of HMAC-style GCS credentials."
+  type        = bool
+  default     = false
+}
+
 # account
 variable "organization" {
   description = "Name of organization to include in resource names."
@@ -321,6 +327,24 @@ variable "hoop_enabled" {
   description = "Whether to enable Hoop agent. hoop_key, hoop_api_key, and hoop_agent_id must be set if this is true."
   type        = bool
   default     = true
+}
+
+variable "hoop_version" {
+  description = "Hoopagent Helm chart version."
+  type        = string
+  default     = "1.49.4"
+}
+
+variable "hoop_image_repository" {
+  description = "Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets."
+  type        = string
+  default     = "useparagon/hoop-agent-tools"
+}
+
+variable "hoop_image_tag" {
+  description = "Container image tag for the Hoop agent."
+  type        = string
+  default     = "1.0.1"
 }
 
 variable "hoop_grafana_connection" {
@@ -926,7 +950,18 @@ locals {
   # output; null-safe when neither is present.
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
-  workspace = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
+  # The storage service account email is an identity, not a credential, but on the Secret
+  # Manager path it inherits the sensitivity of the secret payload it was decoded from.
+  # Downstream modules key `for_each` off it, which rejects sensitive values. Keep this a
+  # single flat `try` — a conditional would union the marks of both arms and re-taint it.
+  storage_service_account = try(
+    nonsensitive(local.storage_output.service_account),
+    local.storage_output.service_account,
+    null,
+  )
+
+  workspace                = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace)
+  gke_connect_gateway_host = "https://connectgateway.googleapis.com/v1/projects/${data.google_project.paragon.number}/locations/global/gkeMemberships/${local.workspace}-fleet"
   # Prefer infra GSM handoff (actual GKE name may be -private or -cluster).
   cluster_name = coalesce(
     var.cluster_name_override,
@@ -1138,6 +1173,10 @@ locals {
       "port"       = 9121
       "public_url" = null
     }
+    "redis-streams-exporter" = {
+      "port"       = 9124
+      "public_url" = null
+    }
     "redis-insight" = {
       "port"       = 8500
       "public_url" = null
@@ -1186,17 +1225,40 @@ locals {
     try(local.redis_instance_urls["cache"], local.infra_vars.redis.value.cache.connection_string, "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}")
   )
 
+  # Iterate the instances infra actually created. redis_multiple_instances=false
+  # emits only `cache`, and naming queue/system directly errors the whole
+  # expression, so the CA bundle silently stayed unmounted and every TLS Redis
+  # connection failed with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+  redis_ca_cert_enabled = length(compact([
+    for name, r in try(local.infra_vars.redis.value, {}) : try(r.ca_certificate, "")
+  ])) > 0
+
+  # Cloud SQL 0/null = unlimited. Grafana 0 = disable alerts, unset = 1000 GiB default.
+  # Only inject ${DB}_POSTGRES_MAX_STORAGE_BYTES when the autoresize cap is a positive byte value.
+  pg_config = try(local.infra_vars.monitoring.value.pg_config, {})
+  postgres_max_storage_bytes = try(
+    local.pg_config.hermes.max_storage_bytes,
+    local.pg_config.paragon.max_storage_bytes,
+    null
+  )
+  # `try` only catches errors, not nulls, and HCL evaluates both sides of `&&`,
+  # so the null case has to be folded into the value before the comparison.
+  postgres_max_storage_limit_is_set = coalesce(local.postgres_max_storage_bytes, 0) > 0
+  postgres_max_storage_env = local.postgres_max_storage_limit_is_set ? {
+    CERBERUS_POSTGRES_MAX_STORAGE_BYTES   = tostring(try(local.pg_config.cerberus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    EVENT_LOGS_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.pg_config.eventlogs.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    HERMES_POSTGRES_MAX_STORAGE_BYTES     = tostring(try(local.pg_config.hermes.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    PHEME_POSTGRES_MAX_STORAGE_BYTES      = tostring(try(local.pg_config.hermes.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    TRIGGERKIT_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.pg_config.triggerkit.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+    ZEUS_POSTGRES_MAX_STORAGE_BYTES       = tostring(try(local.pg_config.zeus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
+  } : {}
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       # Redis CA certificate configuration
       # Enable if any Redis instance has a CA certificate
       redisCaCert = {
-        enabled = try(
-          local.infra_vars.redis.value.cache.ca_certificate != null ||
-          local.infra_vars.redis.value.queue.ca_certificate != null ||
-          local.infra_vars.redis.value.system.ca_certificate != null,
-          false
-        )
+        enabled    = local.redis_ca_cert_enabled
         secretName = "redis-ca-cert"
       },
       env = merge({
@@ -1401,12 +1463,18 @@ locals {
         MONITOR_QUEUE_REDIS_TARGET              = try(local.infra_vars.redis.value.queue.host, local.infra_vars.redis.value.cache.host)
         MONITOR_REDIS_EXPORTER_HOST             = "http://redis-exporter"
         MONITOR_REDIS_EXPORTER_PORT             = try(local.monitors["redis-exporter"].port, null)
+        MONITOR_REDIS_STREAMS_EXPORTER_HOST     = "http://redis-streams-exporter"
+        MONITOR_REDIS_STREAMS_EXPORTER_PORT     = try(local.monitors["redis-streams-exporter"].port, null)
         MONITOR_REDIS_INSIGHT_HOST              = "http://redis-insight"
         MONITOR_REDIS_INSIGHT_PORT              = try(local.monitors["redis-insight"].port, null)
-        }, {
-        for key, value in local.helm_vars.global.env :
-        key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
-      }, var.managed_sync_enabled ? module.managed_sync_config[0].config : {})
+        },
+        local.postgres_max_storage_env,
+        {
+          for key, value in local.helm_vars.global.env :
+          key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+        },
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+      )
     })
   })
 

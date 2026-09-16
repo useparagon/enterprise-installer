@@ -15,6 +15,21 @@ resource "google_secret_manager_secret_version" "runtime_postgres" {
   secret_data = jsonencode(module.postgres.postgres)
 }
 
+resource "google_secret_manager_secret" "runtime_monitoring" {
+  secret_id = "${local.runtime_secret_prefix}-monitoring"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "runtime_monitoring" {
+  secret      = google_secret_manager_secret.runtime_monitoring.id
+  secret_data = jsonencode({
+    pg_config = module.postgres.pg_config
+  })
+}
+
 resource "google_secret_manager_secret" "runtime_redis" {
   secret_id = "${local.runtime_secret_prefix}-redis"
 
@@ -87,10 +102,10 @@ resource "google_secret_manager_secret" "runtime_redis_ca_cert" {
 resource "google_secret_manager_secret_version" "runtime_redis_ca_cert" {
   secret = google_secret_manager_secret.runtime_redis_ca_cert.id
   secret_data = jsonencode({
+    # Bundle every instance the redis module created; the set depends on
+    # redis_multiple_instances and managed_sync_enabled.
     "server-ca.pem" = join("\n", compact([
-      try(module.redis.redis.cache.ca_certificate, null),
-      try(module.redis.redis.queue.ca_certificate, null),
-      try(module.redis.redis.system.ca_certificate, null),
+      for name, instance in module.redis.redis : try(instance.ca_certificate, "")
     ]))
   })
 }

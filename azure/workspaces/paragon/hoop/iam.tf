@@ -2,7 +2,8 @@ locals {
   hoop_workload_identity_enabled = var.hoop_enabled && trimspace(var.oidc_issuer_url) != ""
 }
 
-# User-assigned identity for Hoop agent with subscription Reader (az CLI troubleshooting).
+# User-assigned identity for Hoop agent with Reader on the Paragon resource group
+# (az CLI troubleshooting without visibility into the rest of the subscription).
 resource "azurerm_user_assigned_identity" "hoop_support" {
   count = local.hoop_workload_identity_enabled ? 1 : 0
 
@@ -14,18 +15,17 @@ resource "azurerm_user_assigned_identity" "hoop_support" {
 resource "azurerm_federated_identity_credential" "hoop_support" {
   count = local.hoop_workload_identity_enabled ? 1 : 0
 
-  name                = "${var.workspace}-hoop-support"
-  resource_group_name = var.resource_group.name
-  parent_id           = azurerm_user_assigned_identity.hoop_support[0].id
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = var.oidc_issuer_url
-  subject             = "system:serviceaccount:${var.namespace_paragon.id}:hoopagent"
+  name                      = "${var.workspace}-hoop-support"
+  user_assigned_identity_id = azurerm_user_assigned_identity.hoop_support[0].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = var.oidc_issuer_url
+  subject                   = "system:serviceaccount:${var.namespace_paragon.id}:hoopagent"
 }
 
 resource "azurerm_role_assignment" "hoop_support" {
   count = local.hoop_workload_identity_enabled ? 1 : 0
 
-  scope                            = "/subscriptions/${var.azure_subscription_id}"
+  scope                            = "/subscriptions/${var.azure_subscription_id}/resourceGroups/${var.resource_group.name}"
   role_definition_name             = "Reader"
   principal_id                     = azurerm_user_assigned_identity.hoop_support[0].principal_id
   skip_service_principal_aad_check = true
