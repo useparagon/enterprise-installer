@@ -9,6 +9,13 @@ output "postgres" {
   sensitive   = true
 }
 
+output "monitoring" {
+  description = "Non-sensitive monitoring settings (includes pg_config.max_storage_bytes for Grafana storage alerts)."
+  value = {
+    pg_config = module.postgres.pg_config
+  }
+}
+
 output "redis" {
   description = "Connection information for Redis."
   value       = module.redis.elasticache

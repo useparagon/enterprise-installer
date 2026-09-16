@@ -158,6 +158,15 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | <a name="output_waf_security_policy_name"></a> [waf\_security\_policy\_name](#output\_waf\_security\_policy\_name) | Name of the Cloud Armor security policy when WAF is enabled, otherwise null. |
 <!-- END_TF_DOCS -->
 
+
+## Postgres storage alerts (Grafana)
+
+Paragon Grafana reads `${DB}_POSTGRES_MAX_STORAGE_BYTES` for each named database (`DB` is HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, or TRIGGERKIT).
+
+This workspace injects those env vars only when the infra `monitoring.pg_config` value `max_storage_bytes` is a **positive** number (`postgres_disk_autoresize_limit` in GB, converted to bytes). Null or `0` means Cloud SQL unlimited autoresize, which is not a useful alert cap; Grafana then uses its 1000 GiB default. Set `${DB}_POSTGRES_MAX_STORAGE_BYTES` to `0` in Helm `global.env` to disable storage alerts.
+
+PHEME shares the hermes/paragon host, so PHEME bytes use the hermes cap when injection runs.
+
 ## Updates
 
 This Terraform documentation can be automatically regenerated with:
