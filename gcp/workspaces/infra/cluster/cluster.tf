@@ -98,8 +98,8 @@ module "gke" {
         initial_node_count   = var.agent_os_index_min_count
         local_ssd_count      = 0
         machine_type         = var.agent_os_index_machine_type
-        max_count            = var.agent_os_index_max_count
-        min_count            = var.agent_os_index_min_count
+        total_max_count      = var.agent_os_index_max_count
+        total_min_count      = var.agent_os_index_min_count
         node_locations       = "${var.region_zone},${var.region_zone_backup}"
         preemptible          = false
         spot                 = false
@@ -120,8 +120,8 @@ module "gke" {
         initial_node_count   = var.agent_os_extract_min_count
         local_ssd_count      = 0
         machine_type         = var.agent_os_extract_machine_type
-        max_count            = var.agent_os_extract_max_count
-        min_count            = var.agent_os_extract_min_count
+        total_max_count      = var.agent_os_extract_max_count
+        total_min_count      = var.agent_os_extract_min_count
         node_locations       = "${var.region_zone},${var.region_zone_backup}"
         preemptible          = false
         spot                 = false
