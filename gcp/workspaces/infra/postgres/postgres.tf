@@ -212,57 +212,37 @@ resource "google_sql_user" "sync_instance" {
 }
 
 
-# Agent OS Postgres. Dedicated Cloud SQL instance so the Paragon/Managed Sync instance map above
-# keeps its resource addresses; hosts the `context` and `tools` logical databases.
-
+# Agent OS Cloud SQL instances are driven by the workspace-level map so each physical
+# instance can be sized and changed independently from Paragon/Managed Sync.
 locals {
-  agent_os_postgres_config_defaults = {
-    instance_class         = "db-custom-2-4096"
-    allocated_storage      = 100
-    max_allocated_storage  = 1000
-    engine_version         = "POSTGRES_16"
-    multi_az               = true
-    read_replica           = false
-    replica_instance_class = "db-custom-1-3840"
-    storage_type           = "PD_SSD"
+  agent_os_postgres_instances = var.agent_os_enabled ? var.agent_os_postgres : {}
+
+  agent_os_postgres_names = {
+    for key, _ in local.agent_os_postgres_instances :
+    key => key == "agent_os" ? "${var.workspace}-agent-os" : "${var.workspace}-agent-os-${replace(key, "_", "-")}"
   }
 
-  # Partial overrides set omitted attributes to null; drop them so defaults survive the merge.
-  agent_os_postgres_config = merge(
-    local.agent_os_postgres_config_defaults,
-    { for key, value in try(var.agent_os_postgres["agent_os"], {}) : key => value if value != null },
-  )
-
-  agent_os_postgres_name = "${var.workspace}-agent-os"
-  agent_os_databases     = var.agent_os_enabled ? toset(["context", "tools"]) : toset([])
-}
-
-check "agent_os_postgres_storage" {
-  assert {
-    condition = (
-      local.agent_os_postgres_config.max_allocated_storage >= 100 &&
-      local.agent_os_postgres_config.max_allocated_storage >= local.agent_os_postgres_config.allocated_storage
-    )
-    error_message = "Agent OS Postgres max_allocated_storage must be at least 100 GiB and >= allocated_storage."
-  }
+  # `context` and `tools` are logical Agent OS databases on the primary `agent_os`
+  # physical instance. Additional map entries are independent Cloud SQL servers.
+  agent_os_databases = var.agent_os_enabled && contains(keys(local.agent_os_postgres_instances), "agent_os") ? toset(["context", "tools"]) : toset([])
 }
 
 resource "google_sql_database_instance" "agent_os" {
-  count = var.agent_os_enabled ? 1 : 0
+  for_each = local.agent_os_postgres_instances
 
-  name                = local.agent_os_postgres_name
+  name                = local.agent_os_postgres_names[each.key]
   project             = var.gcp_project_id
   region              = var.region
-  database_version    = local.agent_os_postgres_config.engine_version
+  database_version    = each.value.engine_version
   deletion_protection = !var.disable_deletion_protection
 
   settings {
-    tier                  = local.agent_os_postgres_config.instance_class
-    availability_type     = local.agent_os_postgres_config.multi_az ? "REGIONAL" : "ZONAL"
-    disk_size             = local.agent_os_postgres_config.allocated_storage
+    tier                  = each.value.instance_class
+    availability_type     = each.value.multi_az ? "REGIONAL" : "ZONAL"
+    disk_size             = each.value.allocated_storage
     disk_autoresize       = true
-    disk_autoresize_limit = local.agent_os_postgres_config.max_allocated_storage
-    disk_type             = local.agent_os_postgres_config.storage_type
+    disk_autoresize_limit = each.value.max_allocated_storage
+    disk_type             = each.value.storage_type
 
     backup_configuration {
       enabled    = true
@@ -290,18 +270,21 @@ resource "google_sql_database_instance" "agent_os" {
 }
 
 resource "google_sql_database_instance" "agent_os_replica" {
-  count = var.agent_os_enabled && local.agent_os_postgres_config.read_replica ? 1 : 0
+  for_each = {
+    for key, cfg in local.agent_os_postgres_instances : key => cfg
+    if cfg.read_replica
+  }
 
-  name                 = "${local.agent_os_postgres_name}-replica"
+  name                 = "${local.agent_os_postgres_names[each.key]}-replica"
   project              = var.gcp_project_id
   region               = var.region
-  database_version     = local.agent_os_postgres_config.engine_version
-  master_instance_name = google_sql_database_instance.agent_os[0].name
+  database_version     = each.value.engine_version
+  master_instance_name = google_sql_database_instance.agent_os[each.key].name
   deletion_protection  = !var.disable_deletion_protection
 
   settings {
-    tier      = local.agent_os_postgres_config.replica_instance_class
-    disk_type = local.agent_os_postgres_config.storage_type
+    tier      = each.value.replica_instance_class
+    disk_type = each.value.storage_type
 
     ip_configuration {
       ipv4_enabled    = false
@@ -312,7 +295,7 @@ resource "google_sql_database_instance" "agent_os_replica" {
 }
 
 resource "random_string" "agent_os_root_username" {
-  count = var.agent_os_enabled ? 1 : 0
+  for_each = local.agent_os_postgres_instances
 
   length  = 16
   lower   = true
@@ -322,7 +305,7 @@ resource "random_string" "agent_os_root_username" {
 }
 
 resource "random_password" "agent_os_root_password" {
-  count = var.agent_os_enabled ? 1 : 0
+  for_each = local.agent_os_postgres_instances
 
   length  = 32
   lower   = true
@@ -332,11 +315,11 @@ resource "random_password" "agent_os_root_password" {
 }
 
 resource "google_sql_user" "agent_os_root" {
-  count = var.agent_os_enabled ? 1 : 0
+  for_each = local.agent_os_postgres_instances
 
-  name     = random_string.agent_os_root_username[0].result
-  password = random_password.agent_os_root_password[0].result
-  instance = google_sql_database_instance.agent_os[0].name
+  name     = random_string.agent_os_root_username[each.key].result
+  password = random_password.agent_os_root_password[each.key].result
+  instance = google_sql_database_instance.agent_os[each.key].name
   project  = var.gcp_project_id
 }
 
@@ -365,7 +348,7 @@ resource "google_sql_user" "agent_os_app" {
 
   name     = random_string.agent_os_app_username[each.key].result
   password = random_password.agent_os_app_password[each.key].result
-  instance = google_sql_database_instance.agent_os[0].name
+  instance = google_sql_database_instance.agent_os["agent_os"].name
   project  = var.gcp_project_id
 }
 
@@ -375,6 +358,6 @@ resource "google_sql_database" "agent_os" {
 
   name       = each.value
   project    = var.gcp_project_id
-  instance   = google_sql_database_instance.agent_os[0].name
+  instance   = google_sql_database_instance.agent_os["agent_os"].name
   depends_on = [google_sql_user.agent_os_app]
 }

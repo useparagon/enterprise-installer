@@ -67,6 +67,5 @@ variable "gmk_sasl_plain_key_file_path" {
 variable "agent_os_enabled" {
   description = "Whether to create a dedicated Agent OS Kafka client service account."
   type        = bool
-  default     = false
 }
 

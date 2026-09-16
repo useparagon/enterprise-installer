@@ -52,18 +52,16 @@ variable "disable_deletion_protection" {
 variable "agent_os_enabled" {
   description = "Whether to create the dedicated Agent OS Valkey cache."
   type        = bool
-  default     = false
 }
 
 variable "agent_os_valkey" {
-  description = "Optional Agent OS Memorystore Valkey overrides keyed by cache name (cache). Null uses the defaults in valkey-agent-os.tf."
+  description = "Resolved Agent OS Memorystore for Valkey instances keyed by cache name. Defaults are owned by the workspace root."
   type = map(object({
-    node_type       = optional(string)
-    multi_az        = optional(bool)
-    cluster_enabled = optional(bool)
+    node_type       = string
+    multi_az        = bool
+    cluster_enabled = bool
+    engine_version  = string
   }))
-  default  = null
-  nullable = true
 }
 
 locals {

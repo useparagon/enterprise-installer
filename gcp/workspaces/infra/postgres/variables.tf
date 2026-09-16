@@ -55,23 +55,20 @@ variable "managed_sync_enabled" {
 variable "agent_os_enabled" {
   description = "Whether to create the dedicated Agent OS Cloud SQL instance."
   type        = bool
-  default     = false
 }
 
 variable "agent_os_postgres" {
-  description = "Optional Agent OS Cloud SQL overrides keyed by instance name (agent_os). Null uses the defaults in postgres-agent-os.tf."
+  description = "Resolved Agent OS Cloud SQL instances keyed by instance name. Defaults are owned by the workspace root."
   type = map(object({
-    instance_class         = optional(string)
-    allocated_storage      = optional(number)
-    max_allocated_storage  = optional(number)
-    engine_version         = optional(string)
-    multi_az               = optional(bool)
-    read_replica           = optional(bool)
-    replica_instance_class = optional(string)
-    storage_type           = optional(string)
+    instance_class         = string
+    allocated_storage      = number
+    max_allocated_storage  = number
+    engine_version         = string
+    multi_az               = bool
+    read_replica           = bool
+    replica_instance_class = string
+    storage_type           = string
   }))
-  default  = null
-  nullable = true
 }
 
 locals {

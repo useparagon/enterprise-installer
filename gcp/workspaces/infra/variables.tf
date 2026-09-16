@@ -215,30 +215,41 @@ variable "agent_os_version" {
 }
 
 variable "agent_os_postgres" {
-  description = "Optional Agent OS Cloud SQL overrides. Null uses enterprise defaults (db-custom-2-4096, 100/1000 GiB, POSTGRES_16, REGIONAL)."
+  description = "Agent OS Cloud SQL instances keyed by instance name. Each entry can be sized and changed independently."
   type = map(object({
-    instance_class         = optional(string)
-    allocated_storage      = optional(number)
-    max_allocated_storage  = optional(number)
-    engine_version         = optional(string)
-    multi_az               = optional(bool)
-    read_replica           = optional(bool)
-    replica_instance_class = optional(string)
-    storage_type           = optional(string)
+    instance_class         = optional(string, "db-custom-2-4096")
+    allocated_storage      = optional(number, 100)
+    max_allocated_storage  = optional(number, 1000)
+    engine_version         = optional(string, "POSTGRES_16")
+    multi_az               = optional(bool, true)
+    read_replica           = optional(bool, false)
+    replica_instance_class = optional(string, "db-custom-1-3840")
+    storage_type           = optional(string, "PD_SSD")
   }))
-  default  = null
-  nullable = true
+  default = {
+    agent_os = {}
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      cfg.max_allocated_storage >= 100 && cfg.max_allocated_storage >= cfg.allocated_storage
+    ])
+    error_message = "Agent OS Cloud SQL max_allocated_storage must be at least 100 GiB and >= allocated_storage."
+  }
 }
 
 variable "agent_os_valkey" {
-  description = "Optional Agent OS Memorystore Valkey overrides. Null uses STANDARD_SMALL with HA."
+  description = "Agent OS Memorystore for Valkey instances keyed by cache name. Each entry can be sized and changed independently."
   type = map(object({
-    node_type       = optional(string)
-    multi_az        = optional(bool)
-    cluster_enabled = optional(bool)
+    node_type       = optional(string, "STANDARD_SMALL")
+    multi_az        = optional(bool, true)
+    cluster_enabled = optional(bool, false)
+    engine_version  = optional(string, "VALKEY_7_2")
   }))
-  default  = null
-  nullable = true
+  default = {
+    cache = {}
+  }
 }
 
 variable "agent_os_index_machine_type" {
