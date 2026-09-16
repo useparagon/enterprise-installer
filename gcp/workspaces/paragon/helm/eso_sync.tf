@@ -180,7 +180,7 @@ data "kubernetes_secret" "agent_os_app" {
 
   metadata {
     name      = "agent-os-app"
-    namespace = kubernetes_namespace_v1.agent_os[0].id
+    namespace = kubernetes_namespace_v1.paragon.id
   }
 
   depends_on = [terraform_data.eso_secrets_gate]
@@ -191,7 +191,7 @@ data "kubernetes_secret" "agent_os_admin" {
 
   metadata {
     name      = "agent-os-admin"
-    namespace = kubernetes_namespace_v1.agent_os[0].id
+    namespace = kubernetes_namespace_v1.paragon.id
   }
 
   depends_on = [terraform_data.eso_secrets_gate]

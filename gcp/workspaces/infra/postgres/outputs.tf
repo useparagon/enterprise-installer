@@ -1,11 +1,11 @@
 # Agent OS: admin credentials for the migration Job plus one app user per logical database.
 output "agent_os" {
-  value = var.agent_os_enabled ? {
-    host           = google_sql_database_instance.agent_os[0].private_ip_address
+  value = var.agent_os_enabled && contains(keys(local.agent_os_postgres_instances), "agent_os") ? {
+    host           = google_sql_database_instance.agent_os["agent_os"].private_ip_address
     port           = "5432"
     admin_database = "postgres"
-    admin_user     = google_sql_user.agent_os_root[0].name
-    admin_password = random_password.agent_os_root_password[0].result
+    admin_user     = google_sql_user.agent_os_root["agent_os"].name
+    admin_password = random_password.agent_os_root_password["agent_os"].result
     databases = {
       for name in local.agent_os_databases :
       name => {

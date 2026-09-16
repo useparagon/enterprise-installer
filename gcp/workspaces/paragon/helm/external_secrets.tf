@@ -243,7 +243,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "agent-os-app"
-      namespace = kubernetes_namespace_v1.agent_os[0].id
+      namespace = kubernetes_namespace_v1.paragon.id
     }
     spec = {
       refreshInterval = "5m"
@@ -275,7 +275,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "agent-os-admin"
-      namespace = kubernetes_namespace_v1.agent_os[0].id
+      namespace = kubernetes_namespace_v1.paragon.id
     }
     spec = {
       refreshInterval = "5m"
@@ -339,25 +339,13 @@ resource "kubectl_manifest" "external_secret_redis_ca" {
   depends_on = [kubectl_manifest.secret_store]
 }
 
-# Namespace and KSA owned by Terraform; chart cloud mode expects SA agent-os already present.
-resource "kubernetes_namespace_v1" "agent_os" {
-  count = var.agent_os_enabled ? 1 : 0
-
-  metadata {
-    name = "agent-os"
-
-    labels = {
-      "app.kubernetes.io/name" = "agent-os"
-    }
-  }
-}
-
+# Agent OS reuses the Paragon namespace; only its dedicated KSA is created here.
 resource "kubernetes_service_account_v1" "agent_os" {
   count = var.agent_os_enabled ? 1 : 0
 
   metadata {
     name      = "agent-os"
-    namespace = kubernetes_namespace_v1.agent_os[0].id
+    namespace = kubernetes_namespace_v1.paragon.id
 
     annotations = var.agent_os_service_account != null ? {
       "iam.gke.io/gcp-service-account" = var.agent_os_service_account
@@ -371,7 +359,7 @@ resource "kubectl_manifest" "external_secret_agent_os_app" {
   yaml_body = local.external_secret_agent_os_app_yaml
   depends_on = [
     kubectl_manifest.secret_store,
-    kubernetes_namespace_v1.agent_os,
+    kubernetes_namespace_v1.paragon,
     kubernetes_service_account_v1.agent_os,
   ]
 }
@@ -382,7 +370,7 @@ resource "kubectl_manifest" "external_secret_agent_os_admin" {
   yaml_body = local.external_secret_agent_os_admin_yaml
   depends_on = [
     kubectl_manifest.secret_store,
-    kubernetes_namespace_v1.agent_os,
+    kubernetes_namespace_v1.paragon,
     kubernetes_service_account_v1.agent_os,
   ]
 }
