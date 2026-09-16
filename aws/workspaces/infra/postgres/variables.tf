@@ -93,48 +93,32 @@ variable "managed_sync_enabled" {
 }
 
 variable "agent_os_enabled" {
-  description = "Whether to create the dedicated Agent OS Postgres instance."
+  description = "Whether to create the Agent OS Postgres instances."
   type        = bool
-  default     = false
 }
 
 variable "agent_os_kms_key_arn" {
-  description = "KMS key ARN used to encrypt the Agent OS Postgres instance."
+  description = "KMS key ARN used to encrypt the Agent OS Postgres instances."
   type        = string
-  default     = null
 }
 
 variable "agent_os_postgres" {
-  description = "Optional Agent OS Postgres overrides keyed by instance name (agent_os). Null uses the defaults in rds-agent-os.tf."
+  description = "Resolved Agent OS Postgres instances keyed by instance name. Defaults are owned by the workspace root."
   type = map(object({
-    instance_class         = optional(string)
-    allocated_storage      = optional(number)
-    max_allocated_storage  = optional(number)
-    engine_version         = optional(string)
-    multi_az               = optional(bool)
-    read_replica           = optional(bool)
-    replica_instance_class = optional(string)
-    storage_type           = optional(string)
+    instance_class             = string
+    allocated_storage          = number
+    max_allocated_storage      = number
+    engine_version             = string
+    multi_az                   = bool
+    read_replica               = bool
+    replica_instance_class     = string
+    storage_type               = string
+    iops                       = number
+    storage_throughput         = number
+    backup_retention_days      = number
+    log_statement              = string
+    log_min_duration_statement = number
   }))
-  default  = null
-  nullable = true
-
-  validation {
-    condition = var.agent_os_postgres == null ? true : alltrue([
-      for _, cfg in var.agent_os_postgres :
-      coalesce(cfg.max_allocated_storage, 1000) >= 100 &&
-      coalesce(cfg.max_allocated_storage, 1000) >= ceil(coalesce(cfg.allocated_storage, 100) * 1.1)
-    ])
-    error_message = "Agent OS Postgres max_allocated_storage must be at least 100 GiB and at least 10% greater than allocated_storage."
-  }
-
-  validation {
-    condition = var.agent_os_postgres == null ? true : alltrue([
-      for _, cfg in var.agent_os_postgres :
-      contains(["gp2", "gp3"], coalesce(cfg.storage_type, "gp3"))
-    ])
-    error_message = "Agent OS Postgres storage_type must be gp2 or gp3."
-  }
 }
 
 variable "migrated_passwords" {

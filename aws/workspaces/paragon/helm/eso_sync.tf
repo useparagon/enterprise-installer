@@ -135,13 +135,10 @@ data "kubernetes_secret" "agent_os_app" {
 
   metadata {
     name      = "agent-os-app"
-    namespace = "agent-os"
+    namespace = local.paragon_namespace
   }
 
-  depends_on = [
-    kubernetes_namespace.agent_os,
-    terraform_data.eso_secrets_gate,
-  ]
+  depends_on = [terraform_data.eso_secrets_gate]
 }
 
 data "kubernetes_secret" "agent_os_admin" {
@@ -149,11 +146,8 @@ data "kubernetes_secret" "agent_os_admin" {
 
   metadata {
     name      = "agent-os-admin"
-    namespace = "agent-os"
+    namespace = local.paragon_namespace
   }
 
-  depends_on = [
-    kubernetes_namespace.agent_os,
-    terraform_data.eso_secrets_gate,
-  ]
+  depends_on = [terraform_data.eso_secrets_gate]
 }

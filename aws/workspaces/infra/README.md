@@ -5,12 +5,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-| Name | Version |
-| ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
-| <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
-| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
+No requirements.
 
 ## Providers
 
@@ -36,12 +31,16 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 
 | Name | Type |
 | ---- | ---- |
+| [aws_kms_alias.agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_alias) | resource |
+| [aws_kms_key.agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_key) | resource |
+| [aws_secretsmanager_secret.runtime_agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret_version.runtime_agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
@@ -49,11 +48,23 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | [aws_secretsmanager_secret_version.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
+| [aws_iam_policy_document.agent_os_kms](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_partition.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/partition) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive. | `bool` | `false` | no |
+| <a name="input_agent_os_extract_instance_types"></a> [agent\_os\_extract\_instance\_types](#input\_agent\_os\_extract\_instance\_types) | Compute-optimized AMD instance types for the Agent OS extraction managed node group. Use c6a.2xlarge for staging and c6a.4xlarge for production. | `list(string)` | <pre>[<br/>  "c6a.4xlarge"<br/>]</pre> | no |
+| <a name="input_agent_os_extract_max_count"></a> [agent\_os\_extract\_max\_count](#input\_agent\_os\_extract\_max\_count) | Maximum nodes in the Agent OS extraction managed node group. Use 3 for staging and 8 for production. | `number` | `8` | no |
+| <a name="input_agent_os_extract_min_count"></a> [agent\_os\_extract\_min\_count](#input\_agent\_os\_extract\_min\_count) | Minimum nodes in the Agent OS extraction managed node group. | `number` | `1` | no |
+| <a name="input_agent_os_index_instance_types"></a> [agent\_os\_index\_instance\_types](#input\_agent\_os\_index\_instance\_types) | Instance types for the Agent OS index managed node group. | `list(string)` | <pre>[<br/>  "r6a.2xlarge",<br/>  "r6i.2xlarge",<br/>  "r5a.2xlarge"<br/>]</pre> | no |
+| <a name="input_agent_os_index_max_count"></a> [agent\_os\_index\_max\_count](#input\_agent\_os\_index\_max\_count) | Maximum nodes in the Agent OS index managed node group. | `number` | `4` | no |
+| <a name="input_agent_os_index_min_count"></a> [agent\_os\_index\_min\_count](#input\_agent\_os\_index\_min\_count) | Minimum nodes in the Agent OS index managed node group. | `number` | `2` | no |
+| <a name="input_agent_os_postgres"></a> [agent\_os\_postgres](#input\_agent\_os\_postgres) | Agent OS Postgres instances keyed by instance name. Each entry can be sized and tuned independently. | <pre>map(object({<br/>    instance_class             = optional(string, "db.t4g.medium")<br/>    allocated_storage          = optional(number, 100)<br/>    max_allocated_storage      = optional(number, 1000)<br/>    engine_version             = optional(string, "16")<br/>    multi_az                   = optional(bool, true)<br/>    read_replica               = optional(bool, false)<br/>    replica_instance_class     = optional(string, "db.t4g.small")<br/>    storage_type               = optional(string, "gp3")<br/>    iops                       = optional(number)<br/>    storage_throughput         = optional(number)<br/>    backup_retention_days      = optional(number, 7)<br/>    log_statement              = optional(string, "ddl")<br/>    log_min_duration_statement = optional(number, 1000)<br/>  }))</pre> | <pre>{<br/>  "agent_os": {}<br/>}</pre> | no |
+| <a name="input_agent_os_valkey"></a> [agent\_os\_valkey](#input\_agent\_os\_valkey) | Agent OS Valkey instances keyed by cache name. Each entry can be sized and tuned independently. | <pre>map(object({<br/>    node_type               = optional(string, "cache.t4g.medium")<br/>    multi_az                = optional(bool, true)<br/>    cluster_enabled         = optional(bool, false)<br/>    engine_version          = optional(string, "7.2")<br/>    snapshot_retention_days = optional(number, 7)<br/>    log_retention_days      = optional(number, 30)<br/>  }))</pre> | <pre>{<br/>  "cache": {}<br/>}</pre> | no |
+| <a name="input_agent_os_version"></a> [agent\_os\_version](#input\_agent\_os\_version) | The version of the Agent OS helm chart to install (consumed by the paragon workspace in PARA-25775). | `string` | `"latest"` | no |
 | <a name="input_ami_release_version"></a> [ami\_release\_version](#input\_ami\_release\_version) | Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2023 legacy coexistence, use ami\_release\_versions instead. | `string` | `null` | no |
 | <a name="input_ami_release_versions"></a> [ami\_release\_versions](#input\_ami\_release\_versions) | Optional map of managed node group key (system, ondemand, spot) to AMI release version pin. When non-empty, overrides ami\_release\_version and pins only the listed groups. | `map(string)` | `{}` | no |
 | <a name="input_app_bucket_expiration"></a> [app\_bucket\_expiration](#input\_app\_bucket\_expiration) | The number of days to retain S3 app data before deleting | `number` | `90` | no |

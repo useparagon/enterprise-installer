@@ -152,55 +152,43 @@ resource "aws_db_instance" "postgres" {
   apply_immediately = true
 }
 
-# Agent OS Postgres. Dedicated instance so the Paragon/Managed Sync instance map above
-# keeps its resource addresses; hosts the `context` and `tools` logical databases.
-
+# Agent OS Postgres instances are driven by the workspace-level map so each physical
+# instance can be sized and changed independently without affecting Paragon/Managed Sync.
 locals {
-  agent_os_postgres_config_defaults = {
-    instance_class         = "db.t4g.medium"
-    allocated_storage      = 100
-    max_allocated_storage  = 1000
-    engine_version         = "16.13"
-    multi_az               = true
-    read_replica           = false
-    replica_instance_class = "db.t4g.small"
-    storage_type           = "gp3"
+  agent_os_postgres_instances = var.agent_os_enabled ? var.agent_os_postgres : {}
+
+  agent_os_postgres_names = {
+    for key, _ in local.agent_os_postgres_instances :
+    key => key == "agent_os" ? "${var.workspace}-agent-os" : "${var.workspace}-agent-os-${replace(key, "_", "-")}"
   }
 
-  # Partial overrides set omitted attributes to null; drop them so defaults survive the merge.
-  agent_os_postgres_config = merge(
-    local.agent_os_postgres_config_defaults,
-    { for key, value in try(var.agent_os_postgres["agent_os"], {}) : key => value if value != null },
-  )
-
-  agent_os_postgres_name   = "${var.workspace}-agent-os"
-  agent_os_postgres_family = "postgres${split(".", local.agent_os_postgres_config.engine_version)[0]}"
-
-  # gp3 below 400 GiB uses fixed AWS baselines that cannot be specified (see rds.tf).
-  agent_os_gp3_striped = local.agent_os_postgres_config.storage_type == "gp3" && local.agent_os_postgres_config.allocated_storage >= 400
-
-  # One physical instance, one app user per logical database. The databases and grants are
-  # applied by the Agent OS migration Job using the admin credentials.
-  agent_os_databases = var.agent_os_enabled ? toset(["context", "tools"]) : toset([])
-}
-
-check "agent_os_postgres_storage" {
-  assert {
-    condition = (
-      local.agent_os_postgres_config.max_allocated_storage >= 100 &&
-      local.agent_os_postgres_config.max_allocated_storage >= ceil(local.agent_os_postgres_config.allocated_storage * 1.1)
-    )
-    error_message = "Agent OS Postgres max_allocated_storage must be at least 100 GiB and at least 10% greater than allocated_storage."
+  agent_os_postgres_families = {
+    for key, cfg in local.agent_os_postgres_instances :
+    key => "postgres${split(".", cfg.engine_version)[0]}"
   }
 
-  assert {
-    condition     = contains(["gp2", "gp3"], local.agent_os_postgres_config.storage_type)
-    error_message = "Agent OS Postgres storage_type must be gp2 or gp3."
+  # gp3 below 400 GiB uses fixed AWS baselines that cannot be specified. At or
+  # above 400 GiB, callers may override the 12k IOPS / 500 MiB/s baseline per instance.
+  agent_os_gp3_striped = {
+    for key, cfg in local.agent_os_postgres_instances :
+    key => cfg.storage_type == "gp3" && cfg.allocated_storage >= 400
   }
+  agent_os_gp3_iops_effective = {
+    for key, cfg in local.agent_os_postgres_instances :
+    key => local.agent_os_gp3_striped[key] ? (cfg.iops != null ? cfg.iops : 12000) : null
+  }
+  agent_os_gp3_storage_throughput_effective = {
+    for key, cfg in local.agent_os_postgres_instances :
+    key => local.agent_os_gp3_striped[key] ? (cfg.storage_throughput != null ? cfg.storage_throughput : 500) : null
+  }
+
+  # `context` and `tools` are the logical Agent OS databases on the primary
+  # `agent_os` physical instance. Additional map entries are independent servers.
+  agent_os_databases = var.agent_os_enabled && contains(keys(local.agent_os_postgres_instances), "agent_os") ? toset(["context", "tools"]) : toset([])
 }
 
 resource "random_string" "agent_os_root_username" {
-  count = var.agent_os_enabled ? 1 : 0
+  for_each = local.agent_os_postgres_instances
 
   length  = 16
   lower   = true
@@ -210,7 +198,7 @@ resource "random_string" "agent_os_root_username" {
 }
 
 resource "random_password" "agent_os_root_password" {
-  count = var.agent_os_enabled ? 1 : 0
+  for_each = local.agent_os_postgres_instances
 
   length  = 32
   lower   = true
@@ -240,32 +228,32 @@ resource "random_password" "agent_os_app_password" {
 }
 
 resource "aws_db_subnet_group" "agent_os" {
-  count = var.agent_os_enabled ? 1 : 0
+  count = var.agent_os_enabled && length(local.agent_os_postgres_instances) > 0 ? 1 : 0
 
-  name        = "${local.agent_os_postgres_name}-subnet"
+  name        = "${var.workspace}-agent-os-subnet"
   description = "Agent OS Postgres subnet group"
   subnet_ids  = var.private_subnet[*].id
 
   tags = {
-    Name = "${local.agent_os_postgres_name}-subnet"
+    Name = "${var.workspace}-agent-os-subnet"
   }
 }
 
 resource "aws_db_parameter_group" "agent_os" {
-  count = var.agent_os_enabled ? 1 : 0
+  for_each = local.agent_os_postgres_instances
 
-  name   = "${local.agent_os_postgres_name}-${local.agent_os_postgres_family}"
-  family = local.agent_os_postgres_family
+  name   = "${local.agent_os_postgres_names[each.key]}-${local.agent_os_postgres_families[each.key]}"
+  family = local.agent_os_postgres_families[each.key]
 
   parameter {
     name         = "log_statement"
-    value        = "ddl"
+    value        = each.value.log_statement
     apply_method = "pending-reboot"
   }
 
   parameter {
     name         = "log_min_duration_statement"
-    value        = 1000
+    value        = each.value.log_min_duration_statement
     apply_method = "pending-reboot"
   }
 
@@ -274,45 +262,45 @@ resource "aws_db_parameter_group" "agent_os" {
   }
 
   tags = {
-    Name = "${local.agent_os_postgres_name}-postgres-group"
+    Name = "${local.agent_os_postgres_names[each.key]}-postgres-group"
   }
 }
 
 resource "aws_db_instance" "agent_os" {
-  count = var.agent_os_enabled ? 1 : 0
+  for_each = local.agent_os_postgres_instances
 
-  identifier = local.agent_os_postgres_name
+  identifier = local.agent_os_postgres_names[each.key]
   db_name    = "postgres"
   port       = "5432"
-  username   = random_string.agent_os_root_username[0].result
-  password   = random_password.agent_os_root_password[0].result
+  username   = random_string.agent_os_root_username[each.key].result
+  password   = random_password.agent_os_root_password[each.key].result
 
   engine               = "postgres"
-  engine_version       = local.agent_os_postgres_config.engine_version
-  instance_class       = local.agent_os_postgres_config.instance_class
-  parameter_group_name = aws_db_parameter_group.agent_os[0].name
-  storage_type         = local.agent_os_postgres_config.storage_type
+  engine_version       = each.value.engine_version
+  instance_class       = each.value.instance_class
+  parameter_group_name = aws_db_parameter_group.agent_os[each.key].name
+  storage_type         = each.value.storage_type
 
-  iops               = local.agent_os_gp3_striped ? 12000 : null
-  storage_throughput = local.agent_os_gp3_striped ? 500 : null
+  iops               = local.agent_os_gp3_iops_effective[each.key]
+  storage_throughput = local.agent_os_gp3_storage_throughput_effective[each.key]
 
-  allocated_storage           = local.agent_os_postgres_config.allocated_storage
-  max_allocated_storage       = local.agent_os_postgres_config.max_allocated_storage
+  allocated_storage           = each.value.allocated_storage
+  max_allocated_storage       = each.value.max_allocated_storage
   allow_major_version_upgrade = false
   auto_minor_version_upgrade  = true
-  availability_zone           = local.agent_os_postgres_config.multi_az ? null : var.availability_zones.names[0]
-  backup_retention_period     = 7
+  availability_zone           = each.value.multi_az ? null : var.availability_zones.names[0]
+  backup_retention_period     = each.value.backup_retention_days
   backup_window               = "06:00-07:00"
   ca_cert_identifier          = "rds-ca-rsa2048-g1"
   maintenance_window          = "Tue:04:00-Tue:05:00"
   monitoring_interval         = 15
   monitoring_role_arn         = aws_iam_role.rds_enhanced_monitoring.arn
-  multi_az                    = local.agent_os_postgres_config.multi_az
+  multi_az                    = each.value.multi_az
 
   db_subnet_group_name      = aws_db_subnet_group.agent_os[0].id
   deletion_protection       = !var.disable_deletion_protection
   skip_final_snapshot       = !var.rds_final_snapshot_enabled
-  final_snapshot_identifier = var.rds_final_snapshot_enabled ? "${local.agent_os_postgres_name}-${random_string.snapshot_identifier[0].result}" : null
+  final_snapshot_identifier = var.rds_final_snapshot_enabled ? "${local.agent_os_postgres_names[each.key]}-${random_string.snapshot_identifier[0].result}" : null
   publicly_accessible       = false
   storage_encrypted         = true
   kms_key_id                = var.agent_os_kms_key_arn
@@ -326,21 +314,24 @@ resource "aws_db_instance" "agent_os" {
   apply_immediately = true
 
   tags = {
-    Name = local.agent_os_postgres_name
+    Name = local.agent_os_postgres_names[each.key]
   }
 }
 
 resource "aws_db_instance" "agent_os_replica" {
-  count = var.agent_os_enabled && local.agent_os_postgres_config.read_replica ? 1 : 0
+  for_each = {
+    for key, cfg in local.agent_os_postgres_instances : key => cfg
+    if cfg.read_replica
+  }
 
-  identifier          = "${local.agent_os_postgres_name}-replica"
-  replicate_source_db = aws_db_instance.agent_os[0].arn
-  instance_class      = local.agent_os_postgres_config.replica_instance_class
+  identifier          = "${local.agent_os_postgres_names[each.key]}-replica"
+  replicate_source_db = aws_db_instance.agent_os[each.key].arn
+  instance_class      = each.value.replica_instance_class
 
   engine               = "postgres"
-  engine_version       = local.agent_os_postgres_config.engine_version
-  parameter_group_name = aws_db_parameter_group.agent_os[0].name
-  storage_type         = local.agent_os_postgres_config.storage_type
+  engine_version       = each.value.engine_version
+  parameter_group_name = aws_db_parameter_group.agent_os[each.key].name
+  storage_type         = each.value.storage_type
 
   auto_minor_version_upgrade = true
   ca_cert_identifier         = "rds-ca-rsa2048-g1"
@@ -354,14 +345,11 @@ resource "aws_db_instance" "agent_os_replica" {
   storage_encrypted      = true
   vpc_security_group_ids = [aws_security_group.agent_os[0].id]
 
-  performance_insights_enabled          = true
-  performance_insights_kms_key_id       = var.agent_os_kms_key_arn
-  performance_insights_retention_period = 31
-  enabled_cloudwatch_logs_exports       = ["postgresql", "upgrade"]
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
 
   apply_immediately = true
 
   tags = {
-    Name = "${local.agent_os_postgres_name}-replica"
+    Name = "${local.agent_os_postgres_names[each.key]}-replica"
   }
 }

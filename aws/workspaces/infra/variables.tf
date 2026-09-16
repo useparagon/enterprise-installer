@@ -472,47 +472,94 @@ variable "agent_os_version" {
 }
 
 variable "agent_os_postgres" {
-  description = "Optional Agent OS Postgres overrides keyed by instance name. Null uses enterprise defaults (db.t4g.medium, 100/1000 GiB, PostgreSQL 16.13, Multi-AZ)."
+  description = "Agent OS Postgres instances keyed by instance name. Each entry can be sized and tuned independently."
   type = map(object({
-    instance_class         = optional(string)
-    allocated_storage      = optional(number)
-    max_allocated_storage  = optional(number)
-    engine_version         = optional(string)
-    multi_az               = optional(bool)
-    read_replica           = optional(bool)
-    replica_instance_class = optional(string)
-    storage_type           = optional(string)
+    instance_class             = optional(string, "db.t4g.medium")
+    allocated_storage          = optional(number, 100)
+    max_allocated_storage      = optional(number, 1000)
+    engine_version             = optional(string, "16")
+    multi_az                   = optional(bool, true)
+    read_replica               = optional(bool, false)
+    replica_instance_class     = optional(string, "db.t4g.small")
+    storage_type               = optional(string, "gp3")
+    iops                       = optional(number)
+    storage_throughput         = optional(number)
+    backup_retention_days      = optional(number, 7)
+    log_statement              = optional(string, "ddl")
+    log_min_duration_statement = optional(number, 1000)
   }))
-  default  = null
-  nullable = true
+  default = {
+    agent_os = {}
+  }
 
   validation {
-    condition = var.agent_os_postgres == null ? true : alltrue([
+    condition = alltrue([
       for _, cfg in var.agent_os_postgres :
-      coalesce(cfg.max_allocated_storage, 1000) >= 100 &&
-      coalesce(cfg.max_allocated_storage, 1000) >= ceil(coalesce(cfg.allocated_storage, 100) * 1.1)
+      cfg.max_allocated_storage >= 100 &&
+      cfg.max_allocated_storage >= ceil(cfg.allocated_storage * 1.1)
     ])
     error_message = "Agent OS Postgres max_allocated_storage must be at least 100 GiB and at least 10% greater than allocated_storage."
   }
 
   validation {
-    condition = var.agent_os_postgres == null ? true : alltrue([
+    condition = alltrue([
       for _, cfg in var.agent_os_postgres :
-      contains(["gp2", "gp3"], coalesce(cfg.storage_type, "gp3"))
+      contains(["gp2", "gp3"], cfg.storage_type)
     ])
     error_message = "Agent OS Postgres storage_type must be gp2 or gp3."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      (cfg.iops == null) == (cfg.storage_throughput == null)
+    ])
+    error_message = "Agent OS Postgres iops and storage_throughput must be set together."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      cfg.iops == null || (
+        cfg.storage_type == "gp3" &&
+        cfg.allocated_storage >= 400 &&
+        cfg.iops >= 12000 &&
+        cfg.storage_throughput >= 500
+      )
+    ])
+    error_message = "Custom Agent OS Postgres gp3 performance requires at least 400 GiB, 12000 IOPS, and 500 MiB/s throughput."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      cfg.backup_retention_days >= 0 && cfg.backup_retention_days <= 35
+    ])
+    error_message = "Agent OS Postgres backup_retention_days must be between 0 and 35."
   }
 }
 
 variable "agent_os_valkey" {
-  description = "Optional Agent OS Valkey overrides keyed by cache name (default key cache). Null uses enterprise defaults (cache.t4g.medium, HA on, cluster off)."
+  description = "Agent OS Valkey instances keyed by cache name. Each entry can be sized and tuned independently."
   type = map(object({
-    node_type       = optional(string)
-    multi_az        = optional(bool)
-    cluster_enabled = optional(bool)
+    node_type               = optional(string, "cache.t4g.medium")
+    multi_az                = optional(bool, true)
+    cluster_enabled         = optional(bool, false)
+    engine_version          = optional(string, "7.2")
+    snapshot_retention_days = optional(number, 7)
+    log_retention_days      = optional(number, 30)
   }))
-  default  = null
-  nullable = true
+  default = {
+    cache = {}
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_valkey :
+      cfg.snapshot_retention_days >= 0 && cfg.snapshot_retention_days <= 35
+    ])
+    error_message = "Agent OS Valkey snapshot_retention_days must be between 0 and 35."
+  }
 }
 
 variable "agent_os_index_instance_types" {

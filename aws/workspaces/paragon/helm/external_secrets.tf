@@ -6,20 +6,12 @@ resource "kubernetes_namespace" "external_secrets" {
   }
 }
 
-resource "kubernetes_namespace" "agent_os" {
-  count = var.agent_os_enabled ? 1 : 0
-
-  metadata {
-    name = "agent-os"
-  }
-}
-
 resource "kubernetes_service_account" "agent_os" {
   count = var.agent_os_enabled ? 1 : 0
 
   metadata {
     name      = "agent-os"
-    namespace = kubernetes_namespace.agent_os[0].metadata[0].name
+    namespace = local.paragon_namespace
   }
 }
 
@@ -206,7 +198,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "agent-os-app"
-      namespace = "agent-os"
+      namespace = local.paragon_namespace
     }
     spec = {
       refreshInterval = "5m"
@@ -238,7 +230,7 @@ locals {
     kind       = "ExternalSecret"
     metadata = {
       name      = "agent-os-admin"
-      namespace = "agent-os"
+      namespace = local.paragon_namespace
     }
     spec = {
       refreshInterval = "5m"
@@ -297,19 +289,13 @@ resource "kubectl_manifest" "external_secret_openobserve" {
 resource "kubectl_manifest" "external_secret_agent_os_app" {
   count = var.install_external_secrets && var.agent_os_enabled ? 1 : 0
 
-  yaml_body = local.external_secret_agent_os_app_yaml
-  depends_on = [
-    kubernetes_namespace.agent_os[0],
-    kubectl_manifest.secret_store[0],
-  ]
+  yaml_body  = local.external_secret_agent_os_app_yaml
+  depends_on = [kubectl_manifest.secret_store[0]]
 }
 
 resource "kubectl_manifest" "external_secret_agent_os_admin" {
   count = var.install_external_secrets && var.agent_os_enabled ? 1 : 0
 
-  yaml_body = local.external_secret_agent_os_admin_yaml
-  depends_on = [
-    kubernetes_namespace.agent_os[0],
-    kubectl_manifest.secret_store[0],
-  ]
+  yaml_body  = local.external_secret_agent_os_admin_yaml
+  depends_on = [kubectl_manifest.secret_store[0]]
 }

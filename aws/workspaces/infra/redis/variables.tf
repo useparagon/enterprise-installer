@@ -41,26 +41,25 @@ variable "managed_sync_enabled" {
 }
 
 variable "agent_os_enabled" {
-  description = "Whether to create the dedicated Agent OS Valkey cache."
+  description = "Whether to create the Agent OS Valkey caches."
   type        = bool
-  default     = false
 }
 
 variable "agent_os_kms_key_arn" {
   description = "KMS key ARN used to encrypt Agent OS Valkey data and logs."
   type        = string
-  default     = null
 }
 
 variable "agent_os_valkey" {
-  description = "Optional Agent OS Valkey overrides keyed by cache name (cache). Null uses the defaults in elasticache-agent-os.tf."
+  description = "Resolved Agent OS Valkey instances keyed by cache name. Defaults are owned by the workspace root."
   type = map(object({
-    node_type       = optional(string)
-    multi_az        = optional(bool)
-    cluster_enabled = optional(bool)
+    node_type               = string
+    multi_az                = bool
+    cluster_enabled         = bool
+    engine_version          = string
+    snapshot_retention_days = number
+    log_retention_days      = number
   }))
-  default  = null
-  nullable = true
 }
 
 locals {
