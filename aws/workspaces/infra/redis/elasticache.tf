@@ -211,6 +211,15 @@ locals {
     for key, _ in local.agent_os_valkey_instances :
     key => key == "cache" ? "${var.workspace}-agent-os" : "${var.workspace}-agent-os-${replace(key, "_", "-")}"
   }
+
+  # ElastiCache IDs have short length limits. Keep a stable cache ID, and make
+  # additional map entries collision-safe by reserving room for a key hash.
+  agent_os_valkey_resource_ids = {
+    for key, _ in local.agent_os_valkey_instances :
+    key => key == "cache"
+    ? substr(replace("${var.workspace}-agent-os", "_", "-"), 0, 32)
+    : "${substr(replace("${var.workspace}-agent-os", "_", "-"), 0, 19)}-${substr(replace(key, "_", "-"), 0, 6)}-${substr(sha1(key), 0, 6)}"
+  }
 }
 
 data "aws_ec2_instance_type_offerings" "agent_os_cache_filter" {
@@ -250,14 +259,14 @@ resource "random_password" "agent_os_valkey_auth" {
 resource "aws_elasticache_subnet_group" "agent_os" {
   for_each = local.agent_os_valkey_instances
 
-  name       = "${substr(replace(local.agent_os_valkey_names[each.key], "_", "-"), 0, 32)}-vk-subnet"
+  name       = "${local.agent_os_valkey_resource_ids[each.key]}-vk-subnet"
   subnet_ids = local.agent_os_cache_subnet_ids[each.key]
 }
 
 resource "aws_elasticache_parameter_group" "agent_os" {
   for_each = local.agent_os_valkey_instances
 
-  name   = "${substr(replace(local.agent_os_valkey_names[each.key], "_", "-"), 0, 32)}-vk${split(".", each.value.engine_version)[0]}"
+  name   = "${local.agent_os_valkey_resource_ids[each.key]}-vk${split(".", each.value.engine_version)[0]}"
   family = "valkey${split(".", each.value.engine_version)[0]}"
 
   parameter {
@@ -293,7 +302,7 @@ resource "aws_elasticache_replication_group" "agent_os" {
   for_each = local.agent_os_valkey_instances
 
   # Replication group IDs are capped at 40 characters.
-  replication_group_id = "${substr(replace(local.agent_os_valkey_names[each.key], "_", "-"), 0, 32)}-vk"
+  replication_group_id = "${local.agent_os_valkey_resource_ids[each.key]}-vk"
   description          = "Agent OS Valkey cache ${each.key}."
   apply_immediately    = true
   node_type            = each.value.node_type

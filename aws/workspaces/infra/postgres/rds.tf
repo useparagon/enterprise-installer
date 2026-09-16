@@ -325,13 +325,10 @@ resource "aws_db_instance" "agent_os_replica" {
   }
 
   identifier          = "${local.agent_os_postgres_names[each.key]}-replica"
-  replicate_source_db = aws_db_instance.agent_os[each.key].arn
+  replicate_source_db = aws_db_instance.agent_os[each.key].identifier
   instance_class      = each.value.replica_instance_class
 
-  engine               = "postgres"
-  engine_version       = each.value.engine_version
   parameter_group_name = aws_db_parameter_group.agent_os[each.key].name
-  storage_type         = each.value.storage_type
 
   auto_minor_version_upgrade = true
   ca_cert_identifier         = "rds-ca-rsa2048-g1"
