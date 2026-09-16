@@ -1224,10 +1224,9 @@ locals {
     local.pg_config.paragon.max_storage_bytes,
     null
   )
-  postgres_max_storage_limit_is_set = (
-    local.postgres_max_storage_bytes != null &&
-    local.postgres_max_storage_bytes > 0
-  )
+  # `try` only catches errors, not nulls, and HCL evaluates both sides of `&&`,
+  # so the null case has to be folded into the value before the comparison.
+  postgres_max_storage_limit_is_set = coalesce(local.postgres_max_storage_bytes, 0) > 0
   postgres_max_storage_env = local.postgres_max_storage_limit_is_set ? {
     CERBERUS_POSTGRES_MAX_STORAGE_BYTES   = tostring(try(local.pg_config.cerberus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
     EVENT_LOGS_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.pg_config.eventlogs.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
