@@ -15,6 +15,21 @@ resource "google_secret_manager_secret_version" "runtime_postgres" {
   secret_data = jsonencode(module.postgres.postgres)
 }
 
+resource "google_secret_manager_secret" "runtime_monitoring" {
+  secret_id = "${local.runtime_secret_prefix}-monitoring"
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "runtime_monitoring" {
+  secret      = google_secret_manager_secret.runtime_monitoring.id
+  secret_data = jsonencode({
+    pg_config = module.postgres.pg_config
+  })
+}
+
 resource "google_secret_manager_secret" "runtime_redis" {
   secret_id = "${local.runtime_secret_prefix}-redis"
 

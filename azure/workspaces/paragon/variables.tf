@@ -531,14 +531,18 @@ locals {
     Creator      = "Terraform"
   }
 
+  # cloudflare_api_token is sensitive, so comparing it taints every value derived
+  # from it. module.dns feeds this into a for_each, which rejects sensitive input.
+  has_cloudflare_credentials = nonsensitive(var.cloudflare_api_token != null) && var.cloudflare_zone_id != null
+
   dns_enabled = var.ingress_scheme != "internal" && (
-    (var.dns_provider == "cloudflare" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null) ||
+    (var.dns_provider == "cloudflare" && local.has_cloudflare_credentials) ||
     var.dns_provider == "azure_dns" ||
     # Backward compatible: Cloudflare credentials without dns_provider=azure_dns keep working.
-    (var.dns_provider == "none" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null)
+    (var.dns_provider == "none" && local.has_cloudflare_credentials)
   )
 
-  cloudflare_dns_enabled = local.dns_enabled && var.dns_provider != "azure_dns" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
+  cloudflare_dns_enabled = local.dns_enabled && var.dns_provider != "azure_dns" && local.has_cloudflare_credentials
   azure_dns_enabled      = var.ingress_scheme != "internal" && var.dns_provider == "azure_dns"
 
   # AGC is only a public front door; internal-scheme stays nginx-only.
