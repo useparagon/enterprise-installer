@@ -148,43 +148,36 @@ variable "use_latest_ami_release_version" {
 }
 
 variable "agent_os_enabled" {
-  description = "Whether to create the Agent OS index managed node group."
+  description = "Whether to create the Agent OS managed node groups."
   type        = bool
-  default     = false
 }
 
 variable "agent_os_index_instance_types" {
   description = "Instance types for the Agent OS index managed node group."
   type        = list(string)
-  default     = ["r6a.2xlarge", "r6i.2xlarge", "r5a.2xlarge"]
 }
 
 variable "agent_os_index_min_count" {
-  type    = number
-  default = 2
+  type = number
 }
 
 variable "agent_os_index_max_count" {
-  type    = number
-  default = 4
+  type = number
 }
 
 variable "agent_os_extract_instance_types" {
   description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group."
   type        = list(string)
-  default     = ["c6a.4xlarge"]
 }
 
 variable "agent_os_extract_min_count" {
   description = "Minimum nodes in the Agent OS extraction managed node group."
   type        = number
-  default     = 1
 }
 
 variable "agent_os_extract_max_count" {
   description = "Maximum nodes in the Agent OS extraction managed node group."
   type        = number
-  default     = 8
 }
 
 variable "egress_ready" {

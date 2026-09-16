@@ -111,12 +111,6 @@ resource "aws_msk_scram_secret_association" "kafka" {
       aws_secretsmanager_secret.msk_credentials_acl_admin[0].arn,
     ] : []
   )
-
-  depends_on = [
-    aws_secretsmanager_secret_version.msk_credentials,
-    aws_secretsmanager_secret_version.msk_credentials_agent_os,
-    aws_secretsmanager_secret_version.msk_credentials_acl_admin,
-  ]
 }
 
 resource "aws_msk_cluster" "kafka" {

@@ -1,11 +1,11 @@
 # Agent OS: admin credentials for the migration Job plus one app user per logical database.
 output "agent_os" {
-  value = var.agent_os_enabled ? {
-    host           = aws_db_instance.agent_os[0].address
-    port           = aws_db_instance.agent_os[0].port
-    admin_database = aws_db_instance.agent_os[0].db_name
-    admin_user     = aws_db_instance.agent_os[0].username
-    admin_password = random_password.agent_os_root_password[0].result
+  value = var.agent_os_enabled && contains(keys(local.agent_os_postgres_instances), "agent_os") ? {
+    host           = aws_db_instance.agent_os["agent_os"].address
+    port           = aws_db_instance.agent_os["agent_os"].port
+    admin_database = aws_db_instance.agent_os["agent_os"].db_name
+    admin_user     = aws_db_instance.agent_os["agent_os"].username
+    admin_password = random_password.agent_os_root_password["agent_os"].result
     databases = {
       for name in local.agent_os_databases :
       name => {

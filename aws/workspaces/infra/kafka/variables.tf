@@ -36,5 +36,4 @@ variable "msk_autoscaling_enabled" {
 variable "agent_os_enabled" {
   description = "Whether to create a dedicated Agent OS SCRAM identity on this MSK cluster."
   type        = bool
-  default     = false
 }

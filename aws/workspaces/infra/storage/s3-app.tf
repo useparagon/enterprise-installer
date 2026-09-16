@@ -320,7 +320,7 @@ data "aws_iam_policy_document" "agent_os_assume" {
     condition {
       test     = "StringEquals"
       variable = "aws:RequestTag/kubernetes-namespace"
-      values   = ["agent-os"]
+      values   = ["paragon"]
     }
 
     condition {
