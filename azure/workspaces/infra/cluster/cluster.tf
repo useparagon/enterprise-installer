@@ -53,8 +53,16 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   node_resource_group = "${local.cluster_name}-nodes"
   sku_tier            = var.k8s_sku_tier
 
+  # Required for Hoop (and other pods) to federate a Kubernetes SA to Azure RBAC.
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
+
   # disable automatic upgrades - manual upgrades only
   node_os_upgrade_channel = "Unmanaged"
+
+  # OIDC issuer + workload identity only when AGC subnet is enabled (ALB controller federated credential).
+  oidc_issuer_enabled       = var.agc_subnet_enabled
+  workload_identity_enabled = var.agc_subnet_enabled
 
   # NOTE: The configuration for the cluster can't change at all
   # We're intentionally setting very low settings.

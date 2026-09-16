@@ -1,6 +1,6 @@
 output "blob" {
   value = {
-    name                        = local.storage_account_name
+    name = local.storage_account_name
     # Same account hosts public (cdn) and private containers; runtime_secrets expects this key.
     public_storage_account_name = local.storage_account_name
     access_key                  = azurerm_storage_account.blob.primary_access_key

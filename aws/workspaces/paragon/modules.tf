@@ -18,59 +18,68 @@ module "alb" {
   source = "./alb"
 
   certificate              = var.certificate
+  cluster_name             = local.cluster_name
   cloudflare_dns_api_token = var.cloudflare_dns_api_token
   cloudflare_zone_id       = var.cloudflare_zone_id
   dns_provider             = var.dns_provider
   domain                   = var.domain
+  microservices            = local.microservices
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
   release_ingress          = module.helm.release_ingress
   release_paragon_on_prem  = module.helm.release_paragon_on_prem
-  workspace                = local.workspace
+  vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
+  worker_security_group_ids = coalescelist(
+    try(compact(local.infra_vars.worker_security_group_ids.value), []),
+    try(compact(local.infra_vars.karpenter.value.security_group_ids), []),
+    [data.aws_eks_cluster.cluster.vpc_config[0].cluster_security_group_id],
+  )
+  workspace = local.workspace
 }
 
 module "helm" {
   source = "./helm"
 
-  certificate               = module.alb.certificate
-  aws_region                = var.aws_region
-  aws_access_key_id         = var.aws_access_key_id
-  aws_secret_access_key     = var.aws_secret_access_key
-  aws_session_token         = var.aws_session_token
-  aws_assume_role_arn       = var.aws_assume_role_arn
-  cluster_name              = local.cluster_name
-  docker_cfg_secret_name    = local.runtime_docker_cfg_secret_name
-  docker_email              = var.docker_email
-  docker_password           = var.docker_password
-  docker_registry_server    = var.docker_registry_server
-  docker_pull_secret_name   = var.docker_pull_secret_name
-  create_docker_pull_secret = var.create_docker_pull_secret
-  docker_username           = var.docker_username
-  env_secret_name           = local.runtime_env_secret_name
-  eso_role_arn              = local.eso_role_arn
-  feature_flags_content     = local.feature_flags_content
-  flipt_options             = local.flipt_options
-  helm_values               = local.helm_values_public
-  ingress_scheme            = var.ingress_scheme
-  install_external_secrets  = true
-  k8s_version               = var.k8s_version
-  cluster_k8s_version       = local.cluster_k8s_version
-  logs_bucket               = local.logs_bucket
-  managed_sync_enabled      = var.managed_sync_enabled
-  managed_sync_secret_name  = local.runtime_managed_sync_secret_name
-  managed_sync_version      = var.managed_sync_version
-  microservices             = local.microservices
-  monitor_version           = local.monitor_version
-  monitors                  = local.monitors
-  monitors_enabled          = var.monitors_enabled
-  openobserve_email         = local.openobserve_email
-  openobserve_password      = local.openobserve_password
-  openobserve_secret_name   = local.runtime_openobserve_secret_name
-  public_microservices      = local.public_microservices
-  public_monitors           = local.public_monitors
-  waf_web_acl_arn           = local.waf_active ? module.waf[0].web_acl_arn : ""
-  enable_legacy_mng_pools   = try(local.infra_vars.enable_legacy_mng_pools.value, true)
-  karpenter_enabled         = try(local.infra_vars.enable_karpenter.value, false)
+  certificate                   = module.alb.certificate
+  alb_backend_security_group_id = module.alb.backend_security_group_id
+  aws_region                    = var.aws_region
+  aws_access_key_id             = var.aws_access_key_id
+  aws_secret_access_key         = var.aws_secret_access_key
+  aws_session_token             = var.aws_session_token
+  aws_assume_role_arn           = var.aws_assume_role_arn
+  cluster_name                  = local.cluster_name
+  docker_cfg_secret_name        = local.runtime_docker_cfg_secret_name
+  docker_email                  = var.docker_email
+  docker_password               = var.docker_password
+  docker_registry_server        = var.docker_registry_server
+  docker_pull_secret_name       = var.docker_pull_secret_name
+  create_docker_pull_secret     = var.create_docker_pull_secret
+  docker_username               = var.docker_username
+  env_secret_name               = local.runtime_env_secret_name
+  eso_role_arn                  = local.eso_role_arn
+  feature_flags_content         = local.feature_flags_content
+  flipt_options                 = local.flipt_options
+  helm_values                   = local.helm_values_public
+  ingress_scheme                = var.ingress_scheme
+  install_external_secrets      = true
+  k8s_version                   = var.k8s_version
+  cluster_k8s_version           = local.cluster_k8s_version
+  logs_bucket                   = local.logs_bucket
+  managed_sync_enabled          = var.managed_sync_enabled
+  managed_sync_secret_name      = local.runtime_managed_sync_secret_name
+  managed_sync_version          = var.managed_sync_version
+  microservices                 = local.microservices
+  monitor_version               = local.monitor_version
+  monitors                      = local.monitors
+  monitors_enabled              = var.monitors_enabled
+  openobserve_email             = local.openobserve_email
+  openobserve_password          = local.openobserve_password
+  openobserve_secret_name       = local.runtime_openobserve_secret_name
+  public_microservices          = local.public_microservices
+  public_monitors               = local.public_monitors
+  waf_web_acl_arn               = local.waf_active ? module.waf[0].web_acl_arn : ""
+  enable_legacy_mng_pools       = try(local.infra_vars.enable_legacy_mng_pools.value, true)
+  karpenter_enabled             = try(local.infra_vars.enable_karpenter.value, false)
   karpenter_aws = (
     try(local.infra_vars.enable_karpenter.value, false) &&
     try(local.infra_vars.karpenter.value, null) != null

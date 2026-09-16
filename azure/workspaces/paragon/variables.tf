@@ -1,14 +1,18 @@
 # credentials
 variable "azure_client_id" {
-  description = "Azure client ID"
+  description = "Optional Azure client ID. Leave null to use environment-provided credentials such as ARM_*."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_client_secret" {
-  description = "Azure client secret"
+  description = "Optional Azure client secret. Leave null to use short-lived environment-provided credentials."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_subscription_id" {
@@ -18,9 +22,11 @@ variable "azure_subscription_id" {
 }
 
 variable "azure_tenant_id" {
-  description = "Azure tenant ID"
+  description = "Optional Azure tenant ID. Leave null to use the tenant from environment-provided credentials."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 # account
@@ -105,6 +111,166 @@ variable "ingress_scheme" {
   description = "Whether the load balancer is 'internet-facing' (public) or 'internal' (private)"
   type        = string
   default     = "internet-facing"
+}
+
+variable "agc_enabled" {
+  description = "Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc_fqdn). false = nginx only."
+  type        = bool
+  default     = false
+}
+
+variable "agc_direct_routing" {
+  description = "false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services (nginx Ingress disabled; controller stays)."
+  type        = bool
+  default     = false
+}
+
+variable "agc_dns_cutover" {
+  description = "Point Terraform-managed DNS (Cloudflare or Azure DNS) at agc_fqdn instead of the nginx load balancer. Set once AGC is validated; implied by agc_direct_routing."
+  type        = bool
+  default     = false
+}
+
+variable "dns_provider" {
+  description = "DNS provider for public records. Use azure_dns to create an azurerm_dns_zone (required for App Gateway wildcard certs via DNS-01). cloudflare keeps the existing Cloudflare CNAME path for Paragon-managed zones."
+  type        = string
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "cloudflare", "azure_dns"], var.dns_provider)
+    error_message = "dns_provider must be none, cloudflare, or azure_dns."
+  }
+}
+
+variable "agc_alb_controller_version" {
+  description = "Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27."
+  type        = string
+  default     = "1.11.3"
+}
+
+variable "waf_enabled" {
+  description = "Attach Azure WAF to AGC when AGC is active. Opt-in; default Detection + DRS 2.1, no custom/rate-limit rules. Ignored when agc_enabled=false."
+  type        = bool
+  default     = false
+}
+
+variable "waf_mode" {
+  description = "Detection (default) logs matches without blocking; Prevention blocks them. Switch to Prevention after reviewing Detection logs, since DRS 2.1 can flag legitimate traffic."
+  type        = string
+  default     = "Detection"
+
+  validation {
+    condition     = contains(["Detection", "Prevention"], var.waf_mode)
+    error_message = "waf_mode must be Detection or Prevention."
+  }
+}
+
+variable "waf_ip_whitelist" {
+  description = "CIDRs allowed by a high-priority custom rule. Empty = no whitelist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_ip_blacklist" {
+  description = "CIDRs blocked by a custom rule. Empty = no blacklist rule."
+  type        = list(string)
+  default     = []
+}
+
+variable "waf_rate_limit_global" {
+  description = "Max requests per client IP per window. null or 0 = no global rate-limit rule."
+  type        = number
+  default     = null
+  nullable    = true
+}
+
+variable "waf_rate_limit_global_duration" {
+  description = "Evaluation window for the optional global rate-limit rule: OneMin or FiveMins. Has no effect while waf_rate_limit_global is null or 0."
+  type        = string
+  default     = "FiveMins"
+
+  validation {
+    condition     = contains(["OneMin", "FiveMins"], var.waf_rate_limit_global_duration)
+    error_message = "waf_rate_limit_global_duration must be OneMin or FiveMins."
+  }
+}
+
+variable "waf_rate_limit_paths" {
+  description = "Map of URI path prefix to max requests per client IP per window. Empty = no path rate-limit rules."
+  type        = map(number)
+  default     = {}
+}
+
+variable "waf_rate_limit_path_duration" {
+  description = "Evaluation window for optional path rate-limit rules: OneMin or FiveMins. Has no effect while waf_rate_limit_paths is empty."
+  type        = string
+  default     = "FiveMins"
+
+  validation {
+    condition     = contains(["OneMin", "FiveMins"], var.waf_rate_limit_path_duration)
+    error_message = "waf_rate_limit_path_duration must be OneMin or FiveMins."
+  }
+}
+
+variable "waf_rate_limit_group_by" {
+  description = "Rate-limit grouping key. Use ClientAddr with AGC (XFF variables unsupported)."
+  type        = string
+  default     = "ClientAddr"
+
+  validation {
+    condition = contains([
+      "ClientAddr",
+      "GeoLocation",
+      "None",
+    ], var.waf_rate_limit_group_by)
+    error_message = "waf_rate_limit_group_by must be ClientAddr, GeoLocation, or None. AGC does not support X-Forwarded-For variables."
+  }
+}
+
+variable "waf_max_request_body_size_kb" {
+  description = "WAF max request body size in KB. 2000 is the DRS 2.1 engine maximum and avoids HTTP 413 on large Paragon payloads."
+  type        = number
+  default     = 2000
+
+  validation {
+    condition     = var.waf_max_request_body_size_kb >= 8 && var.waf_max_request_body_size_kb <= 2000
+    error_message = "waf_max_request_body_size_kb must be between 8 and 2000."
+  }
+}
+
+variable "waf_file_upload_limit_mb" {
+  description = "WAF file upload limit in MB."
+  type        = number
+  default     = 100
+}
+
+variable "waf_managed_rule_sets" {
+  description = "Managed rule sets to attach. Azure requires a primary rule set on every policy, and AGC only accepts DRS 2.1 (no CRS). Bot Manager 1.0/1.1 can be added alongside it. Per-rule actions go in rule_group_overrides (azurerm has no rule-set-level action)."
+  type = map(object({
+    type    = string
+    version = string
+    rule_group_overrides = optional(map(object({
+      rule_group_name = string
+      rules = optional(list(object({
+        id      = string
+        enabled = optional(bool)
+        action  = optional(string)
+      })), [])
+    })), {})
+  }))
+  default = {
+    drs = {
+      type    = "Microsoft_DefaultRuleSet"
+      version = "2.1"
+    }
+  }
+
+  validation {
+    condition = anytrue([
+      for set in values(var.waf_managed_rule_sets) : set.type == "Microsoft_DefaultRuleSet"
+    ])
+    error_message = "waf_managed_rule_sets must include a Microsoft_DefaultRuleSet entry: Azure rejects any policy without a primary rule set, and AGC supports only DRS 2.1."
+  }
 }
 
 variable "k8s_version" {
@@ -341,7 +507,34 @@ locals {
   legacy_infra_vars     = local.use_legacy_infra_json ? jsondecode(var.infra_json != null ? var.infra_json : file(local.infra_json_path)) : null
   workspace             = nonsensitive(local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, "paragon-${var.organization}-${local.hash}") : "paragon-${var.organization}-${local.hash}")
 
-  dns_enabled = nonsensitive(var.ingress_scheme != "internal" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null)
+  default_tags = {
+    Name         = local.workspace
+    Organization = var.organization
+    Creator      = "Terraform"
+  }
+
+  dns_enabled = var.ingress_scheme != "internal" && (
+    (var.dns_provider == "cloudflare" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null) ||
+    var.dns_provider == "azure_dns" ||
+    # Backward compatible: Cloudflare credentials without dns_provider=azure_dns keep working.
+    (var.dns_provider == "none" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null)
+  )
+
+  cloudflare_dns_enabled = local.dns_enabled && var.dns_provider != "azure_dns" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
+  azure_dns_enabled      = var.ingress_scheme != "internal" && var.dns_provider == "azure_dns"
+
+  # AGC is only a public front door; internal-scheme stays nginx-only.
+  agc_active = var.agc_enabled && var.ingress_scheme != "internal"
+  # Direct: AGC -> Services; nginx Ingress objects disabled (controller stays).
+  agc_direct = local.agc_active && var.agc_direct_routing
+  # nginx keeps its controller and public LB through every AGC mode so no cutover
+  # apply can tear down the old public path before AGC routes are programmed.
+  nginx_public = var.ingress_scheme != "internal"
+  # Managed DNS only follows AGC once the cutover flag is set, so a Terraform-owned
+  # zone never reverts records while AGC is still being validated.
+  dns_target_agc = local.agc_active && (var.agc_dns_cutover || local.agc_direct)
+  # WAF only attaches when AGC is up; no validation — just skip creating the policy.
+  waf_active = var.waf_enabled && local.agc_active
 
   resource_group_name = local.use_legacy_infra_json ? try(local.legacy_infra_vars.resource_group.value.name, "${local.workspace}-resources") : "${local.workspace}-resources"
   cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, "${local.workspace}-cluster") : "${local.workspace}-cluster"
@@ -561,6 +754,10 @@ locals {
     }
     "redis-exporter" = {
       "port"       = 9121
+      "public_url" = null
+    }
+    "redis-streams-exporter" = {
+      "port"       = 9124
       "public_url" = null
     }
     "redis-insight" = {
@@ -848,6 +1045,8 @@ locals {
         MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_PORT = try(local.monitors["monitor-queue-exporter"].port, null)
         MONITOR_REDIS_EXPORTER_HOST              = "http://redis-exporter"
         MONITOR_REDIS_EXPORTER_PORT              = try(local.monitors["redis-exporter"].port, null)
+        MONITOR_REDIS_STREAMS_EXPORTER_HOST      = "http://redis-streams-exporter"
+        MONITOR_REDIS_STREAMS_EXPORTER_PORT      = try(local.monitors["redis-streams-exporter"].port, null)
         MONITOR_REDIS_INSIGHT_HOST               = "http://redis-insight"
         MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
         }, {

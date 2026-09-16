@@ -20,8 +20,13 @@ resource "helm_release" "hoopagent" {
   }
 
   set {
+    name  = "image.repository"
+    value = var.hoop_image_repository
+  }
+
+  set {
     name  = "image.tag"
-    value = var.hoop_version
+    value = var.hoop_image_tag
   }
 
   set {

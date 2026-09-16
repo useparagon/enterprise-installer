@@ -28,3 +28,9 @@ variable "nsg_malicious_ips" {
     error_message = "nsg_malicious_ips cannot exceed Azure's 4000 address-prefix limit per NSG rule."
   }
 }
+
+variable "agc_subnet_enabled" {
+  description = "Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required before enabling agc_enabled in the paragon workspace."
+  type        = bool
+  default     = false
+}

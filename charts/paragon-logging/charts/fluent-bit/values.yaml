@@ -186,11 +186,20 @@ lifecycle: {}
 #     exec:
 #       command: ["/bin/sh", "-c", "sleep 20"]
 
+# kubelet holds liveness/readiness until startup succeeds (cold start on node join).
+startupProbe:
+  httpGet:
+    path: /api/v1/health
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 18
+
 livenessProbe:
   httpGet:
     path: /
     port: http
-  initialDelaySeconds: 45
+  initialDelaySeconds: 0
   periodSeconds: 10
   timeoutSeconds: 5
   failureThreshold: 3
@@ -199,7 +208,7 @@ readinessProbe:
   httpGet:
     path: /api/v1/health
     port: http
-  initialDelaySeconds: 30
+  initialDelaySeconds: 0
   periodSeconds: 10
   timeoutSeconds: 5
   failureThreshold: 3

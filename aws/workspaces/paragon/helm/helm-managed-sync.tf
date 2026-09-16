@@ -15,7 +15,16 @@ resource "helm_release" "managed_sync" {
 
   values = [
     local.global_values_minus_env,
-    local.secret_hash
+    local.secret_hash,
+    yamlencode({
+      ingress = {
+        annotations = {
+          # Same ALB group as paragon-onprem. Harmless with auto frontend SGs (annotation
+          # ignored); required if a future chart sets alb.ingress.kubernetes.io/security-groups.
+          "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "false"
+        }
+      }
+    }),
   ]
 
   set {

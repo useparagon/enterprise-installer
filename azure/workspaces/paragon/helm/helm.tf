@@ -38,15 +38,19 @@ locals {
   public_microservice_values = yamlencode({
     for microservice_name, microservice_config in var.public_microservices : microservice_name => {
       ingress = {
+        # In AGC direct-routing there is no nginx; AGC HTTPRoutes own the edge.
+        enabled   = !var.agc_direct
         class     = "nginx" # used for managed sync
         className = "nginx"
         host      = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
+        scheme    = var.ingress_scheme
+        agc       = var.agc_active
         annotations = {
           "kubernetes.io/ingress.class"    = "nginx"
           "cert-manager.io/cluster-issuer" = "letsencrypt-prod"
         }
-        scheme = var.ingress_scheme
       }
+      # Per-host certificates stay on nginx so enabling AGC never re-issues live TLS.
       tls_secret = "${microservice_name}-secret"
     }
   })
@@ -62,13 +66,15 @@ locals {
   public_monitor_values = yamlencode({
     for monitor_name, monitor_config in var.public_monitors : monitor_name => {
       ingress = {
+        enabled   = !var.agc_direct
         className = "nginx"
         host      = replace(replace(monitor_config.public_url, "https://", ""), "http://", "")
+        scheme    = var.ingress_scheme
+        agc       = var.agc_active
         annotations = {
           "kubernetes.io/ingress.class"    = "nginx"
           "cert-manager.io/cluster-issuer" = "letsencrypt-prod"
         }
-        scheme = var.ingress_scheme
       }
       tls_secret = "${monitor_name}-secret"
     }
@@ -237,7 +243,8 @@ resource "helm_release" "paragon_on_prem" {
     helm_release.ingress,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
-    kubernetes_config_map.feature_flag_content
+    kubernetes_config_map.feature_flag_content,
+    kubectl_manifest.agc_direct_certificate,
   ]
 }
 

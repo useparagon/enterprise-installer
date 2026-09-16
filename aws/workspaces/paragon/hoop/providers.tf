@@ -5,5 +5,9 @@ terraform {
       source  = "hoophq/hoop"
       version = ">= 0.0.19"
     }
+    kubectl = {
+      source  = "alekc/kubectl"
+      version = ">= 2.0"
+    }
   }
 }

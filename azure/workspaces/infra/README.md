@@ -2,18 +2,27 @@
 
 ## Azure credentials
 
-Terraform uses the Azure client ID, secret, subscription, and tenant from variables (e.g. `vars.auto.tfvars`) or from environment variables: `ARM_CLIENT_ID`, `ARM_CLIENT_SECRET`, `ARM_SUBSCRIPTION_ID`, `ARM_TENANT_ID`.
+`azure_subscription_id` remains required for stable resource naming. Prefer
+short-lived credentials supplied through the standard `ARM_*` environment
+variables (for example, by a CI cloud integration). The optional
+`azure_client_id`, `azure_client_secret`, and `azure_tenant_id` variables remain
+available for legacy local workflows.
 
-To update credentials when the app registration secret expires:
+This keeps the transition path backward compatible: the infra workspace can be
+applied with the existing service-principal variables before switching Terraform
+to environment-provided credentials. Apply against the current remote-state
+backend before any backend cutover. Apply infra before paragon so the cluster
+OIDC issuer and workload-identity support exist before the paragon workspace
+creates its federated identity.
 
-1. In **Azure Portal** go to **Microsoft Entra ID** → **App registrations** → select the app (use the client ID to find it).
-2. Open **Certificates & secrets** → **New client secret** → add a description and expiry → **Add**.
-3. Copy the new secret **Value** (it is shown only once).
-4. Update your tfvars or environment:
-   - In `vars.auto.tfvars`: set `azure_client_secret` to the new value.
-   - Or set `ARM_CLIENT_SECRET` in your environment (e.g. in CI or a `.env` that is not committed).
+The first transition apply may replace or reimage the bastion scale set because
+its startup data changes from service-principal login to managed-identity login.
+Expect brief bastion unavailability; startup retries Azure identity and cluster
+credential propagation before reporting success. The bastion identity is only
+assigned on the cluster, so startup tolerates a login with no subscription
+listed and reads the admin kubeconfig from the cluster resource in that case.
 
-Do not commit real secrets to git. Prefer environment variables or a secret manager for `azure_client_secret` / `ARM_CLIENT_SECRET`.
+Do not commit real credentials to git.
 
 ## Postgres Flexible Server storage
 
@@ -234,6 +243,7 @@ nsg_malicious_ips = [
 | [azurerm_key_vault_access_policy.terraform](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_access_policy) | resource |
 | [azurerm_key_vault_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_key_vault_secret.runtime_network](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_redis_managed](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
@@ -244,12 +254,13 @@ nsg_malicious_ips = [
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agc_subnet_enabled"></a> [agc\_subnet\_enabled](#input\_agc\_subnet\_enabled) | Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required before enabling agc\_enabled in the paragon workspace. | `bool` | `false` | no |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to lock the audit logs container immutability policy. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
-| <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Azure client ID | `string` | n/a | yes |
-| <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure\_client\_secret) | Azure client secret | `string` | n/a | yes |
+| <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Optional Azure client ID. Leave null to use environment-provided credentials such as ARM\_*. | `string` | `null` | no |
+| <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure\_client\_secret) | Optional Azure client secret. Leave null to use short-lived environment-provided credentials. | `string` | `null` | no |
 | <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure\_subscription\_id) | Azure subscription ID | `string` | n/a | yes |
-| <a name="input_azure_tenant_id"></a> [azure\_tenant\_id](#input\_azure\_tenant\_id) | Azure tenant ID | `string` | n/a | yes |
+| <a name="input_azure_tenant_id"></a> [azure\_tenant\_id](#input\_azure\_tenant\_id) | Optional Azure tenant ID. Leave null to use the tenant from environment-provided credentials. | `string` | `null` | no |
 | <a name="input_bastion_enabled"></a> [bastion\_enabled](#input\_bastion\_enabled) | Whether to create the bastion host and its associated Cloudflare tunnel. | `bool` | `true` | no |
 | <a name="input_bastion_vm_size"></a> [bastion\_vm\_size](#input\_bastion\_vm\_size) | VM size for the bastion scale set (e.g. Standard\_B1s). Must be available in the target region. | `string` | `"Standard_B1s"` | no |
 | <a name="input_cloudflare_api_token"></a> [cloudflare\_api\_token](#input\_cloudflare\_api\_token) | Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Account `Cloudflare Tunnel`, `Access: Organizations, Identity Providers, and Groups`, `Access: Apps and Policies` and Zone `DNS` | `string` | `"dummy-cloudflare-tokens-must-be-40-chars"` | no |
@@ -279,6 +290,7 @@ nsg_malicious_ips = [
 | <a name="input_k8s_spot_instance_percent"></a> [k8s\_spot\_instance\_percent](#input\_k8s\_spot\_instance\_percent) | The percentage of spot instances to use for Kubernetes nodes. | `number` | `75` | no |
 | <a name="input_k8s_spot_node_instance_type"></a> [k8s\_spot\_node\_instance\_type](#input\_k8s\_spot\_node\_instance\_type) | The compute instance type to use for Kubernetes spot nodes. | `string` | `"Standard_B2ms"` | no |
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.34"` | no |
+| <a name="input_key_vault_access_object_ids"></a> [key\_vault\_access\_object\_ids](#input\_key\_vault\_access\_object\_ids) | Entra object IDs granted secret access on the Paragon Key Vault in addition to the Terraform caller. Subscription roles are management plane only, so an incoming CI/CD principal must be listed here and applied with the outgoing credentials before a credential cutover; otherwise its first plan cannot read existing secrets. | `list(string)` | `[]` | no |
 | <a name="input_key_vault_purge_protection_enabled"></a> [key\_vault\_purge\_protection\_enabled](#input\_key\_vault\_purge\_protection\_enabled) | Enable purge protection on the Paragon Key Vault. Required by some Azure org policies (e.g. Enforce-GR-KeyVault). Cannot be disabled after creation. | `bool` | `false` | no |
 | <a name="input_location"></a> [location](#input\_location) | Azure geographic region to deploy resources in. | `string` | n/a | yes |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
@@ -316,6 +328,8 @@ nsg_malicious_ips = [
 | <a name="output_cluster_name"></a> [cluster\_name](#output\_cluster\_name) | The name of the AKS cluster. |
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka (Event Hubs for Kafka). |
 | <a name="output_logs_container"></a> [logs\_container](#output\_logs\_container) | The bucket used to store system logs. |
+| <a name="output_network"></a> [network](#output\_network) | Network identifiers for AGC association subnet and nginx internal LB wiring. |
+| <a name="output_oidc_issuer_url"></a> [oidc\_issuer\_url](#output\_oidc\_issuer\_url) | AKS OIDC issuer URL for workload-identity federated credentials (AGC ALB controller). |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection info for installer-managed Azure Cache for Redis. Null when redis\_enabled is false. |
 | <a name="output_redis_managed"></a> [redis\_managed](#output\_redis\_managed) | Azure Managed Redis 7.4 endpoints (null when redis\_managed\_enabled is false). Use during migration for kubectl trial routing while output redis still points at legacy. |

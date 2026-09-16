@@ -1,4 +1,9 @@
 # Preserve OpenObserve random_* state across module.helm → root (ESO refactor).
+
+moved {
+  from = module.helm.kubectl_manifest.certificate_issuer
+  to   = module.helm.kubectl_manifest.certificate_issuer_http01
+}
 moved {
   from = module.helm.random_string.openobserve_email[0]
   to   = random_string.openobserve_email[0]

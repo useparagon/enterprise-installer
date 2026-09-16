@@ -160,9 +160,14 @@ variable "elasticache_multi_az" {
 
 # eks
 variable "k8s_version" {
-  description = "The version of Kubernetes to run in the cluster."
+  description = "The version of Kubernetes to run in the cluster. Supported: 1.34, 1.35."
   type        = string
   default     = "1.34"
+
+  validation {
+    condition     = contains(["1.34", "1.35"], var.k8s_version)
+    error_message = "k8s_version must be 1.34 or 1.35; EKS add-on pins are defined for those versions only."
+  }
 }
 
 variable "eks_ondemand_node_instance_type" {

@@ -1,24 +1,5 @@
-# credentials
-variable "azure_client_id" {
-  description = "Azure client ID"
-  type        = string
-  sensitive   = true
-}
-
-variable "azure_client_secret" {
-  description = "Azure client secret"
-  type        = string
-  sensitive   = true
-}
-
 variable "azure_subscription_id" {
   description = "Azure subscription ID"
-  type        = string
-  sensitive   = true
-}
-
-variable "azure_tenant_id" {
-  description = "Azure tenant ID"
   type        = string
   sensitive   = true
 }
@@ -83,6 +64,11 @@ variable "cloudflare_tunnel_email_domain" {
 
 variable "cluster_name" {
   description = "The cluster that node groups and resources should be deployed to."
+  type        = string
+}
+
+variable "cluster_id" {
+  description = "Resource ID of the AKS cluster."
   type        = string
 }
 

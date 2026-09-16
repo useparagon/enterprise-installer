@@ -129,7 +129,7 @@ variable "ingress_scheme" {
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
-  default     = "1.31"
+  default     = "1.34"
 }
 
 variable "karpenter_node_os_volume_size_gib" {
@@ -825,6 +825,10 @@ locals {
       "port"       = 9121
       "public_url" = null
     }
+    "redis-streams-exporter" = {
+      "port"       = 9124
+      "public_url" = null
+    }
     "redis-insight" = {
       "port"       = 8500
       "public_url" = null
@@ -1081,6 +1085,8 @@ locals {
           MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_PORT = try(local.monitors["monitor-queue-exporter"].port, null)
           MONITOR_REDIS_EXPORTER_HOST              = "http://redis-exporter"
           MONITOR_REDIS_EXPORTER_PORT              = try(local.monitors["redis-exporter"].port, null)
+          MONITOR_REDIS_STREAMS_EXPORTER_HOST      = "http://redis-streams-exporter"
+          MONITOR_REDIS_STREAMS_EXPORTER_PORT      = try(local.monitors["redis-streams-exporter"].port, null)
           MONITOR_REDIS_INSIGHT_HOST               = "http://redis-insight"
           MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
           }, {
