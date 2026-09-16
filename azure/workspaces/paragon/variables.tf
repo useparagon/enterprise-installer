@@ -404,6 +404,24 @@ variable "hoop_enabled" {
   default     = true
 }
 
+variable "hoop_version" {
+  description = "Hoopagent Helm chart version."
+  type        = string
+  default     = "1.49.4"
+}
+
+variable "hoop_image_repository" {
+  description = "Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets."
+  type        = string
+  default     = "useparagon/hoop-agent-tools"
+}
+
+variable "hoop_image_tag" {
+  description = "Container image tag for the Hoop agent."
+  type        = string
+  default     = "1.0.1"
+}
+
 variable "hoop_grafana_connection" {
   description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
   type        = bool
@@ -530,14 +548,18 @@ locals {
     Creator      = "Terraform"
   }
 
+  # cloudflare_api_token is sensitive, so comparing it taints every value derived
+  # from it. module.dns feeds this into a for_each, which rejects sensitive input.
+  has_cloudflare_credentials = nonsensitive(var.cloudflare_api_token != null) && var.cloudflare_zone_id != null
+
   dns_enabled = var.ingress_scheme != "internal" && (
-    (var.dns_provider == "cloudflare" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null) ||
+    (var.dns_provider == "cloudflare" && local.has_cloudflare_credentials) ||
     var.dns_provider == "azure_dns" ||
     # Backward compatible: Cloudflare credentials without dns_provider=azure_dns keep working.
-    (var.dns_provider == "none" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null)
+    (var.dns_provider == "none" && local.has_cloudflare_credentials)
   )
 
-  cloudflare_dns_enabled = local.dns_enabled && var.dns_provider != "azure_dns" && var.cloudflare_api_token != null && var.cloudflare_zone_id != null
+  cloudflare_dns_enabled = local.dns_enabled && var.dns_provider != "azure_dns" && local.has_cloudflare_credentials
   azure_dns_enabled      = var.ingress_scheme != "internal" && var.dns_provider == "azure_dns"
 
   # AGC is only a public front door; internal-scheme stays nginx-only.
@@ -774,6 +796,10 @@ locals {
     }
     "redis-exporter" = {
       "port"       = 9121
+      "public_url" = null
+    }
+    "redis-streams-exporter" = {
+      "port"       = 9124
       "public_url" = null
     }
     "redis-insight" = {
@@ -1061,6 +1087,8 @@ locals {
         MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_PORT = try(local.monitors["monitor-queue-exporter"].port, null)
         MONITOR_REDIS_EXPORTER_HOST              = "http://redis-exporter"
         MONITOR_REDIS_EXPORTER_PORT              = try(local.monitors["redis-exporter"].port, null)
+        MONITOR_REDIS_STREAMS_EXPORTER_HOST      = "http://redis-streams-exporter"
+        MONITOR_REDIS_STREAMS_EXPORTER_PORT      = try(local.monitors["redis-streams-exporter"].port, null)
         MONITOR_REDIS_INSIGHT_HOST               = "http://redis-insight"
         MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
         }, {

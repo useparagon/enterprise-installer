@@ -80,10 +80,14 @@ locals {
         }
       }
       postgres = { value = jsondecode(data.azurerm_key_vault_secret.infra_postgres[0].value) }
-      redis    = { value = jsondecode(data.azurerm_key_vault_secret.infra_redis[0].value) }
+      redis = {
+        value = length(data.azurerm_key_vault_secret.infra_redis) > 0 ? jsondecode(data.azurerm_key_vault_secret.infra_redis[0].value) : null
+      }
       # Mirrors infra output redis_managed (null when AMR disabled / secret encodes null).
-      redis_managed = { value = jsondecode(data.azurerm_key_vault_secret.infra_redis_managed[0].value) }
-      storage       = { value = jsondecode(data.azurerm_key_vault_secret.infra_storage[0].value) }
+      redis_managed = {
+        value = length(data.azurerm_key_vault_secret.infra_redis_managed) > 0 ? jsondecode(data.azurerm_key_vault_secret.infra_redis_managed[0].value) : null
+      }
+      storage = { value = jsondecode(data.azurerm_key_vault_secret.infra_storage[0].value) }
     },
     local.agc_active ? {
       network = { value = jsondecode(data.azurerm_key_vault_secret.infra_network[0].value) }

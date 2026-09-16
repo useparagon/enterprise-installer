@@ -53,7 +53,8 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   node_resource_group = "${local.cluster_name}-nodes"
   sku_tier            = var.k8s_sku_tier
 
-  # Required for Hoop (and other pods) to federate a Kubernetes SA to Azure RBAC.
+  # Required for ESO, Hoop, and (when enabled) the AGC ALB controller to federate
+  # Kubernetes SAs to Azure RBAC. Do not gate this on agc_subnet_enabled.
   oidc_issuer_enabled       = true
   workload_identity_enabled = true
 

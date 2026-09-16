@@ -42,6 +42,10 @@ dependencies:
     version: __PARAGON_VERSION__
     condition: subchart.redis-exporter.enabled
     repository: file://charts/redis-exporter
+  - name: redis-streams-exporter
+    version: __PARAGON_VERSION__
+    condition: subchart.redis-streams-exporter.enabled
+    repository: file://charts/redis-streams-exporter
   - name: redis-insight
     version: __PARAGON_VERSION__
     condition: subchart.redis-insight.enabled

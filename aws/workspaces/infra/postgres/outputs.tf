@@ -11,3 +11,13 @@ output "rds" {
   }
   sensitive = true
 }
+
+output "pg_config" {
+  description = "Non-sensitive Postgres settings. Used to build monitoring/alerting configs. Same instance keys as `rds`."
+  value = {
+    for key, value in local.postgres_instances :
+    key => {
+      max_storage_bytes = var.rds_max_allocated_storage * 1073741824
+    }
+  }
+}

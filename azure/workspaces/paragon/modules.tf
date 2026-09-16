@@ -85,6 +85,9 @@ module "hoop" {
   organization                  = var.organization
   hoop_agent_name               = var.hoop_agent_name
   hoop_enabled                  = var.hoop_enabled
+  hoop_version                  = var.hoop_version
+  hoop_image_repository         = var.hoop_image_repository
+  hoop_image_tag                = var.hoop_image_tag
   hoop_key                      = var.hoop_key
   hoop_agent_id                 = var.hoop_agent_id
   hoop_slack_bot_token          = var.hoop_slack_bot_token
@@ -179,7 +182,7 @@ module "dns_zone" {
   workspace            = local.workspace
   resource_group_name  = local.infra_vars.resource_group.value.name
   domain               = var.domain
-  dns_provider         = var.cloudflare_api_token != null && var.cloudflare_zone_id != null ? "cloudflare" : "none"
+  dns_provider         = local.has_cloudflare_credentials ? "cloudflare" : "none"
   cloudflare_api_token = var.cloudflare_api_token
   cloudflare_zone_id   = var.cloudflare_zone_id
 }
