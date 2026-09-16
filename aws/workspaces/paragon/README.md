@@ -1,3 +1,5 @@
+# Paragon AWS Deployment
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -121,6 +123,17 @@
 | <a name="output_waf_logs_bucket"></a> [waf\_logs\_bucket](#output\_waf\_logs\_bucket) | S3 bucket name for WAF traffic logs when WAF is enabled, otherwise null. |
 | <a name="output_waf_web_acl_arn"></a> [waf\_web\_acl\_arn](#output\_waf\_web\_acl\_arn) | ARN of the regional WAFv2 Web ACL when WAF is enabled, otherwise null. |
 <!-- END_TF_DOCS -->
+
+
+## Postgres storage alerts (Grafana)
+
+Paragon Grafana reads `${DB}_POSTGRES_MAX_STORAGE_BYTES` for each named database (`DB` is HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, or TRIGGERKIT).
+
+This workspace injects those env vars from the infra `monitoring.pg_config` value `max_storage_bytes` (already converted from GiB). When unset, Grafana alerts assume a 1000 GiB default; Setting those vars to `0` disables the postgres storage-size alerts.
+
+Single-instance mode (`rds_multiple_instances = false`): all app DBs share one volume; we set the same instance cap on every `${DB}_POSTGRES_MAX_STORAGE_BYTES`.
+
+PHEME shares the hermes/paragon host, so PHEME bytes use the hermes cap.
 
 ## Updates
 
