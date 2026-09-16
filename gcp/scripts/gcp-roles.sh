@@ -8,7 +8,8 @@
 # for the Terraform installer SA roles.
 #
 # Enable required APIs in the console (or via gcloud) before apply — this repo does not
-# enable APIs during Terraform. See gcp/workspaces/infra/README.md.
+# enable APIs during Terraform. See gcp/workspaces/infra/README.md (includes GKE Hub,
+# GKE Connect, and Connect Gateway for private-cluster Fleet access).
 
 # Define the project ID and service account email
 PROJECT_ID="your-gcp-project-id"
@@ -20,6 +21,8 @@ ROLES=(
    "roles/compute.admin"                     # VPC, firewall, addresses, Cloud Armor, LB-related compute
    "roles/container.admin"                   # GKE cluster + Helm/K8s (covers container.developer)
    "roles/container.clusterAdmin"            # Cluster-level admin operations
+   "roles/gkehub.editor"                     # Register the private GKE cluster with Fleet
+   "roles/gkehub.gatewayEditor"              # Reach the private GKE API through Connect Gateway
    "roles/iam.serviceAccountAdmin"           # Create workload SAs
    "roles/iam.serviceAccountKeyAdmin"        # Optional SA keys (storage / Kafka SASL PLAIN)
    "roles/iam.serviceAccountUser"            # Attach / impersonate SAs

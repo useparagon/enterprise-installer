@@ -131,6 +131,9 @@ resource "aws_secretsmanager_secret_version" "runtime_cluster" {
     worker_security_group_ids = module.cluster.worker_security_group_ids
     karpenter                 = module.cluster.karpenter
     cluster_name              = module.cluster.eks_cluster.name
+    monitoring = {
+      pg_config = module.postgres.pg_config
+    }
   })
 }
 

@@ -31,6 +31,13 @@ variable "postgres_tier" {
   type        = string
 }
 
+variable "postgres_disk_autoresize_limit" {
+  description = "Maximum Cloud SQL disk size in GB for autoresize. Null/unset means no Terraform limit (Cloud SQL platform max). 0 is treated as unlimited (GCP default)."
+  type        = number
+  default     = null
+  nullable    = true
+}
+
 variable "disable_deletion_protection" {
   description = "Used to disable deletion protection on RDS and S3 resources."
   type        = bool

@@ -347,6 +347,24 @@ variable "hoop_enabled" {
   default     = true
 }
 
+variable "hoop_version" {
+  description = "Hoopagent Helm chart version."
+  type        = string
+  default     = "1.49.4"
+}
+
+variable "hoop_image_repository" {
+  description = "Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets."
+  type        = string
+  default     = "useparagon/hoop-agent-tools"
+}
+
+variable "hoop_image_tag" {
+  description = "Container image tag for the Hoop agent."
+  type        = string
+  default     = "1.0.1"
+}
+
 variable "hoop_grafana_connection" {
   description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
   type        = bool
@@ -921,6 +939,10 @@ locals {
       "port"       = 9121
       "public_url" = null
     }
+    "redis-streams-exporter" = {
+      "port"       = 9124
+      "public_url" = null
+    }
     "redis-insight" = {
       "port"       = 8500
       "public_url" = null
@@ -970,6 +992,8 @@ locals {
     "${local.helm_vars.global.env["REDIS_HOST"]}:${local.helm_vars.global.env["REDIS_PORT"]}",
     "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
   )
+
+  pg_config = try(local.infra_vars.monitoring.value.pg_config, {})
 
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
@@ -1077,38 +1101,44 @@ locals {
           FEATURE_FLAG_PLATFORM_ENDPOINT = "http://flipt:${local.microservices.flipt.port}"
 
           # Database configurations
-          CERBERUS_POSTGRES_HOST          = try(local.infra_vars.postgres.value.cerberus.host, local.infra_vars.postgres.value.paragon.host)
-          CERBERUS_POSTGRES_PORT          = try(local.infra_vars.postgres.value.cerberus.port, local.infra_vars.postgres.value.paragon.port)
-          CERBERUS_POSTGRES_USERNAME      = try(local.infra_vars.postgres.value.cerberus.user, local.infra_vars.postgres.value.paragon.user)
-          CERBERUS_POSTGRES_PASSWORD      = try(local.infra_vars.postgres.value.cerberus.password, local.infra_vars.postgres.value.paragon.password)
-          CERBERUS_POSTGRES_DATABASE      = try(local.infra_vars.postgres.value.cerberus.database, local.infra_vars.postgres.value.paragon.database)
-          EVENT_LOGS_POSTGRES_HOST        = try(local.infra_vars.postgres.value.eventlogs.host, local.infra_vars.postgres.value.paragon.host)
-          EVENT_LOGS_POSTGRES_PORT        = try(local.infra_vars.postgres.value.eventlogs.port, local.infra_vars.postgres.value.paragon.port)
-          EVENT_LOGS_POSTGRES_USERNAME    = try(local.infra_vars.postgres.value.eventlogs.user, local.infra_vars.postgres.value.paragon.user)
-          EVENT_LOGS_POSTGRES_PASSWORD    = try(local.infra_vars.postgres.value.eventlogs.password, local.infra_vars.postgres.value.paragon.password)
-          EVENT_LOGS_POSTGRES_DATABASE    = try(local.infra_vars.postgres.value.eventlogs.database, local.infra_vars.postgres.value.paragon.database)
-          CLOUD_STORAGE_COMPLIANCE_BUCKET = try(local.helm_vars.global.env["CLOUD_STORAGE_COMPLIANCE_BUCKET"], local.auditlogs_bucket)
-          AUDIT_LOGS_EVENT_BATCH_SIZE     = try(local.helm_vars.global.env["AUDIT_LOGS_EVENT_BATCH_SIZE"], 1000)
-          HERMES_POSTGRES_HOST            = try(local.infra_vars.postgres.value.hermes.host, local.infra_vars.postgres.value.paragon.host)
-          HERMES_POSTGRES_PORT            = try(local.infra_vars.postgres.value.hermes.port, local.infra_vars.postgres.value.paragon.port)
-          HERMES_POSTGRES_USERNAME        = try(local.infra_vars.postgres.value.hermes.user, local.infra_vars.postgres.value.paragon.user)
-          HERMES_POSTGRES_PASSWORD        = try(local.infra_vars.postgres.value.hermes.password, local.infra_vars.postgres.value.paragon.password)
-          HERMES_POSTGRES_DATABASE        = try(local.infra_vars.postgres.value.hermes.database, local.infra_vars.postgres.value.paragon.database)
-          PHEME_POSTGRES_HOST             = try(local.infra_vars.postgres.value.hermes.host, local.infra_vars.postgres.value.paragon.host)
-          PHEME_POSTGRES_PORT             = try(local.infra_vars.postgres.value.hermes.port, local.infra_vars.postgres.value.paragon.port)
-          PHEME_POSTGRES_USERNAME         = try(local.infra_vars.postgres.value.hermes.user, local.infra_vars.postgres.value.paragon.user)
-          PHEME_POSTGRES_PASSWORD         = try(local.infra_vars.postgres.value.hermes.password, local.infra_vars.postgres.value.paragon.password)
-          PHEME_POSTGRES_DATABASE         = try(local.infra_vars.postgres.value.hermes.database, local.infra_vars.postgres.value.paragon.database)
-          TRIGGERKIT_POSTGRES_HOST        = try(local.infra_vars.postgres.value.triggerkit.host, local.infra_vars.postgres.value.paragon.host)
-          TRIGGERKIT_POSTGRES_PORT        = try(local.infra_vars.postgres.value.triggerkit.port, local.infra_vars.postgres.value.paragon.port)
-          TRIGGERKIT_POSTGRES_USERNAME    = try(local.infra_vars.postgres.value.triggerkit.user, local.infra_vars.postgres.value.paragon.user)
-          TRIGGERKIT_POSTGRES_PASSWORD    = try(local.infra_vars.postgres.value.triggerkit.password, local.infra_vars.postgres.value.paragon.password)
-          TRIGGERKIT_POSTGRES_DATABASE    = try(local.infra_vars.postgres.value.triggerkit.database, local.infra_vars.postgres.value.paragon.database)
-          ZEUS_POSTGRES_HOST              = try(local.infra_vars.postgres.value.zeus.host, local.infra_vars.postgres.value.paragon.host)
-          ZEUS_POSTGRES_PORT              = try(local.infra_vars.postgres.value.zeus.port, local.infra_vars.postgres.value.paragon.port)
-          ZEUS_POSTGRES_USERNAME          = try(local.infra_vars.postgres.value.zeus.user, local.infra_vars.postgres.value.paragon.user)
-          ZEUS_POSTGRES_PASSWORD          = try(local.infra_vars.postgres.value.zeus.password, local.infra_vars.postgres.value.paragon.password)
-          ZEUS_POSTGRES_DATABASE          = try(local.infra_vars.postgres.value.zeus.database, local.infra_vars.postgres.value.paragon.database)
+          CERBERUS_POSTGRES_HOST                = try(local.infra_vars.postgres.value.cerberus.host, local.infra_vars.postgres.value.paragon.host)
+          CERBERUS_POSTGRES_PORT                = try(local.infra_vars.postgres.value.cerberus.port, local.infra_vars.postgres.value.paragon.port)
+          CERBERUS_POSTGRES_USERNAME            = try(local.infra_vars.postgres.value.cerberus.user, local.infra_vars.postgres.value.paragon.user)
+          CERBERUS_POSTGRES_PASSWORD            = try(local.infra_vars.postgres.value.cerberus.password, local.infra_vars.postgres.value.paragon.password)
+          CERBERUS_POSTGRES_DATABASE            = try(local.infra_vars.postgres.value.cerberus.database, local.infra_vars.postgres.value.paragon.database)
+          CERBERUS_POSTGRES_MAX_STORAGE_BYTES   = tostring(try(local.pg_config.cerberus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
+          EVENT_LOGS_POSTGRES_HOST              = try(local.infra_vars.postgres.value.eventlogs.host, local.infra_vars.postgres.value.paragon.host)
+          EVENT_LOGS_POSTGRES_PORT              = try(local.infra_vars.postgres.value.eventlogs.port, local.infra_vars.postgres.value.paragon.port)
+          EVENT_LOGS_POSTGRES_USERNAME          = try(local.infra_vars.postgres.value.eventlogs.user, local.infra_vars.postgres.value.paragon.user)
+          EVENT_LOGS_POSTGRES_PASSWORD          = try(local.infra_vars.postgres.value.eventlogs.password, local.infra_vars.postgres.value.paragon.password)
+          EVENT_LOGS_POSTGRES_DATABASE          = try(local.infra_vars.postgres.value.eventlogs.database, local.infra_vars.postgres.value.paragon.database)
+          EVENT_LOGS_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.pg_config.eventlogs.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
+          CLOUD_STORAGE_COMPLIANCE_BUCKET       = try(local.helm_vars.global.env["CLOUD_STORAGE_COMPLIANCE_BUCKET"], local.auditlogs_bucket)
+          AUDIT_LOGS_EVENT_BATCH_SIZE           = try(local.helm_vars.global.env["AUDIT_LOGS_EVENT_BATCH_SIZE"], 1000)
+          HERMES_POSTGRES_HOST                  = try(local.infra_vars.postgres.value.hermes.host, local.infra_vars.postgres.value.paragon.host)
+          HERMES_POSTGRES_PORT                  = try(local.infra_vars.postgres.value.hermes.port, local.infra_vars.postgres.value.paragon.port)
+          HERMES_POSTGRES_USERNAME              = try(local.infra_vars.postgres.value.hermes.user, local.infra_vars.postgres.value.paragon.user)
+          HERMES_POSTGRES_PASSWORD              = try(local.infra_vars.postgres.value.hermes.password, local.infra_vars.postgres.value.paragon.password)
+          HERMES_POSTGRES_DATABASE              = try(local.infra_vars.postgres.value.hermes.database, local.infra_vars.postgres.value.paragon.database)
+          HERMES_POSTGRES_MAX_STORAGE_BYTES     = tostring(try(local.pg_config.hermes.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
+          PHEME_POSTGRES_HOST                   = try(local.infra_vars.postgres.value.hermes.host, local.infra_vars.postgres.value.paragon.host)
+          PHEME_POSTGRES_PORT                   = try(local.infra_vars.postgres.value.hermes.port, local.infra_vars.postgres.value.paragon.port)
+          PHEME_POSTGRES_USERNAME               = try(local.infra_vars.postgres.value.hermes.user, local.infra_vars.postgres.value.paragon.user)
+          PHEME_POSTGRES_PASSWORD               = try(local.infra_vars.postgres.value.hermes.password, local.infra_vars.postgres.value.paragon.password)
+          PHEME_POSTGRES_DATABASE               = try(local.infra_vars.postgres.value.hermes.database, local.infra_vars.postgres.value.paragon.database)
+          PHEME_POSTGRES_MAX_STORAGE_BYTES      = tostring(try(local.pg_config.hermes.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
+          TRIGGERKIT_POSTGRES_HOST              = try(local.infra_vars.postgres.value.triggerkit.host, local.infra_vars.postgres.value.paragon.host)
+          TRIGGERKIT_POSTGRES_PORT              = try(local.infra_vars.postgres.value.triggerkit.port, local.infra_vars.postgres.value.paragon.port)
+          TRIGGERKIT_POSTGRES_USERNAME          = try(local.infra_vars.postgres.value.triggerkit.user, local.infra_vars.postgres.value.paragon.user)
+          TRIGGERKIT_POSTGRES_PASSWORD          = try(local.infra_vars.postgres.value.triggerkit.password, local.infra_vars.postgres.value.paragon.password)
+          TRIGGERKIT_POSTGRES_DATABASE          = try(local.infra_vars.postgres.value.triggerkit.database, local.infra_vars.postgres.value.paragon.database)
+          TRIGGERKIT_POSTGRES_MAX_STORAGE_BYTES = tostring(try(local.pg_config.triggerkit.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
+          ZEUS_POSTGRES_HOST                    = try(local.infra_vars.postgres.value.zeus.host, local.infra_vars.postgres.value.paragon.host)
+          ZEUS_POSTGRES_PORT                    = try(local.infra_vars.postgres.value.zeus.port, local.infra_vars.postgres.value.paragon.port)
+          ZEUS_POSTGRES_USERNAME                = try(local.infra_vars.postgres.value.zeus.user, local.infra_vars.postgres.value.paragon.user)
+          ZEUS_POSTGRES_PASSWORD                = try(local.infra_vars.postgres.value.zeus.password, local.infra_vars.postgres.value.paragon.password)
+          ZEUS_POSTGRES_DATABASE                = try(local.infra_vars.postgres.value.zeus.database, local.infra_vars.postgres.value.paragon.database)
+          ZEUS_POSTGRES_MAX_STORAGE_BYTES       = tostring(try(local.pg_config.zeus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes, 1000 * 1073741824))
 
           # Redis configurations
           REDIS_URL = local.default_redis_url
@@ -1169,6 +1199,8 @@ locals {
           MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_PORT = try(local.monitors["monitor-queue-exporter"].port, null)
           MONITOR_REDIS_EXPORTER_HOST              = "http://redis-exporter"
           MONITOR_REDIS_EXPORTER_PORT              = try(local.monitors["redis-exporter"].port, null)
+          MONITOR_REDIS_STREAMS_EXPORTER_HOST      = "http://redis-streams-exporter"
+          MONITOR_REDIS_STREAMS_EXPORTER_PORT      = try(local.monitors["redis-streams-exporter"].port, null)
           MONITOR_REDIS_INSIGHT_HOST               = "http://redis-insight"
           MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
           }, {

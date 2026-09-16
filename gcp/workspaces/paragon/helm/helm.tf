@@ -296,6 +296,8 @@ resource "helm_release" "paragon_on_prem" {
   timeout           = 900 # 15 minutes
   dependency_update = true
   force_update      = false
+  # The API server still validates writes; skip Helm's extra OpenAPI fetch over Connect Gateway.
+  disable_openapi_validation = true
 
   values = [
     local.helm_values_yaml,
@@ -308,6 +310,8 @@ resource "helm_release" "paragon_on_prem" {
   ]
 
   depends_on = [
+    # Serialize large Helm discovery passes through Connect Gateway.
+    helm_release.paragon_logging,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.redis_ca,
@@ -330,6 +334,8 @@ resource "helm_release" "paragon_logging" {
   timeout           = 900 # 15 minutes
   dependency_update = true
   force_update      = true
+  # The API server still validates writes; skip Helm's extra OpenAPI fetch over Connect Gateway.
+  disable_openapi_validation = true
 
   values = [
     local.helm_values_yaml,
@@ -390,6 +396,8 @@ resource "helm_release" "paragon_monitoring" {
   timeout           = 900 # 15 minutes
   dependency_update = true
   force_update      = true
+  # The API server still validates writes; skip Helm's extra OpenAPI fetch over Connect Gateway.
+  disable_openapi_validation = true
 
   values = [
     local.helm_values_yaml,

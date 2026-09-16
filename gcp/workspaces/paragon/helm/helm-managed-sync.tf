@@ -46,6 +46,8 @@ resource "helm_release" "managed_sync" {
   verify           = false
   timeout          = 300
   force_update     = true
+  # The API server still validates writes; skip Helm's extra OpenAPI fetch over Connect Gateway.
+  disable_openapi_validation = true
 
   values = concat(
     [local.global_values_minus_env],
@@ -111,6 +113,9 @@ resource "helm_release" "managed_sync" {
   }
 
   depends_on = [
+    # Keep this discovery pass from overlapping the core and monitoring charts.
+    helm_release.paragon_on_prem,
+    helm_release.paragon_monitoring,
     google_compute_managed_ssl_certificate.cert,
     google_compute_global_address.loadbalancer,
     google_compute_region_url_map.frontend_config,

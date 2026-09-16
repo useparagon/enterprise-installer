@@ -106,11 +106,11 @@ module "cluster" {
   k8s_max_node_count              = var.k8s_max_node_count
   k8s_min_node_count              = var.k8s_min_node_count
   k8s_network_plugin              = var.k8s_network_plugin
-  k8s_network_plugin_mode         = var.k8s_network_plugin_mode
+  k8s_network_plugin_mode         = local.k8s_network_plugin_mode
   k8s_network_policy              = var.k8s_network_policy
   k8s_ondemand_node_instance_type = var.k8s_ondemand_node_instance_type
   k8s_outbound_type               = var.k8s_outbound_type
-  k8s_pod_cidr                    = var.k8s_pod_cidr
+  k8s_pod_cidr                    = local.k8s_pod_cidr
   k8s_service_cidr                = var.k8s_service_cidr
   k8s_sku_tier                    = var.k8s_sku_tier
   k8s_spot_instance_percent       = var.k8s_spot_instance_percent

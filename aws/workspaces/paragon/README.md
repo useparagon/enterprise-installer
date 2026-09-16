@@ -1,3 +1,5 @@
+# Paragon AWS Deployment
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -99,6 +101,8 @@ No requirements.
 | <a name="input_hoop_custom_connections"></a> [hoop\_custom\_connections](#input\_hoop\_custom\_connections) | Custom Hoop connections defined via tfvars. Map of connection names to their configuration. | <pre>map(object({<br/>    type                  = string<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "disabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string))<br/>    secrets               = map(string)<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_enabled"></a> [hoop\_enabled](#input\_hoop\_enabled) | Whether to enable Hoop agent. hoop\_key, hoop\_api\_key, and hoop\_agent\_id must be set if this is true. | `bool` | `true` | no |
 | <a name="input_hoop_grafana_connection"></a> [hoop\_grafana\_connection](#input\_hoop\_grafana\_connection) | Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500). | `bool` | `false` | no |
+| <a name="input_hoop_image_repository"></a> [hoop\_image\_repository](#input\_hoop\_image\_repository) | Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets. | `string` | `"useparagon/hoop-agent-tools"` | no |
+| <a name="input_hoop_image_tag"></a> [hoop\_image\_tag](#input\_hoop\_image\_tag) | Container image tag for the Hoop agent. | `string` | `"1.0.1"` | no |
 | <a name="input_hoop_k8s_connections"></a> [hoop\_k8s\_connections](#input\_hoop\_k8s\_connections) | Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created. | <pre>map(object({<br/>    type                  = optional(string, "custom")<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "enabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string), ["bash"])<br/>    remote_url            = optional(string, "https://kubernetes.default.svc.cluster.local")<br/>    insecure              = optional(string, "true")<br/>    namespace             = optional(string, "paragon")<br/>    secrets               = optional(map(string), {})<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_key"></a> [hoop\_key](#input\_hoop\_key) | Hoop agent key (token). Only used if hoop\_enabled is true. | `string` | `null` | no |
 | <a name="input_hoop_postgres_guardrail_rules"></a> [hoop\_postgres\_guardrail\_rules](#input\_hoop\_postgres\_guardrail\_rules) | Guardrail rule IDs for PostgreSQL connections. | `list(string)` | <pre>[<br/>  "a85115f6-5ef3-4618-b70c-f7cccdc62c5a"<br/>]</pre> | no |
@@ -108,6 +112,7 @@ No requirements.
 | <a name="input_hoop_slack_app_token"></a> [hoop\_slack\_app\_token](#input\_hoop\_slack\_app\_token) | Slack app token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_bot_token"></a> [hoop\_slack\_bot\_token](#input\_hoop\_slack\_bot\_token) | Slack bot token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_channel_ids"></a> [hoop\_slack\_channel\_ids](#input\_hoop\_slack\_channel\_ids) | Slack channel IDs to notify for connections that require reviews. | `list(string)` | `[]` | no |
+| <a name="input_hoop_version"></a> [hoop\_version](#input\_hoop\_version) | Hoopagent Helm chart version. | `string` | `"1.49.4"` | no |
 | <a name="input_infra_json"></a> [infra\_json](#input\_infra\_json) | JSON string of `infra` workspace variables to use instead of `infra_json_path` | `string` | `null` | no |
 | <a name="input_infra_json_path"></a> [infra\_json\_path](#input\_infra\_json\_path) | Deprecated legacy path to infra workspace output JSON. Prefer reading infra handoff secrets from Secrets Manager (PARA-21726). | `string` | `null` | no |
 | <a name="input_ingress_scheme"></a> [ingress\_scheme](#input\_ingress\_scheme) | Whether the load balancer is 'internet-facing' (public) or 'internal' (private) | `string` | `"internet-facing"` | no |
@@ -153,6 +158,17 @@ No requirements.
 | <a name="output_waf_logs_bucket"></a> [waf\_logs\_bucket](#output\_waf\_logs\_bucket) | S3 bucket name for WAF traffic logs when WAF is enabled, otherwise null. |
 | <a name="output_waf_web_acl_arn"></a> [waf\_web\_acl\_arn](#output\_waf\_web\_acl\_arn) | ARN of the regional WAFv2 Web ACL when WAF is enabled, otherwise null. |
 <!-- END_TF_DOCS -->
+
+
+## Postgres storage alerts (Grafana)
+
+Paragon Grafana reads `${DB}_POSTGRES_MAX_STORAGE_BYTES` for each named database (`DB` is HERMES, CERBERUS, ZEUS, PHEME, EVENT_LOGS, or TRIGGERKIT).
+
+This workspace injects those env vars from the infra `monitoring.pg_config` value `max_storage_bytes` (already converted from GiB). When unset, Grafana alerts assume a 1000 GiB default; Setting those vars to `0` disables the postgres storage-size alerts.
+
+Single-instance mode (`rds_multiple_instances = false`): all app DBs share one volume; we set the same instance cap on every `${DB}_POSTGRES_MAX_STORAGE_BYTES`.
+
+PHEME shares the hermes/paragon host, so PHEME bytes use the hermes cap.
 
 ## Updates
 
