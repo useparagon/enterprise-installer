@@ -282,10 +282,10 @@ data "aws_iam_policy_document" "agent_os_kms" {
     }
 
     condition {
-      test     = "ArnEquals"
+      test     = "ArnLike"
       variable = "kms:EncryptionContext:aws:logs:arn"
       values = [
-        "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/elasticache/${local.workspace}-agent-os"
+        "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/elasticache/${local.workspace}-agent-os*"
       ]
     }
   }
