@@ -31,6 +31,7 @@ No requirements.
 | <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.77.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | 3.8.1 |
 | <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
+| <a name="provider_time"></a> [time](#provider\_time) | 0.13.1 |
 
 ## Modules
 
@@ -38,11 +39,11 @@ No requirements.
 | ---- | ------ | ------- |
 | <a name="module_agc"></a> [agc](#module\_agc) | ./agc | n/a |
 | <a name="module_dns"></a> [dns](#module\_dns) | ./dns | n/a |
-| <a name="module_dns_records"></a> [dns\_records](#module\_dns_records) | ./dns-records | n/a |
-| <a name="module_dns_zone"></a> [dns\_zone](#module\_dns_zone) | ./dns-zone | n/a |
+| <a name="module_dns_records"></a> [dns\_records](#module\_dns\_records) | ./dns-records | n/a |
+| <a name="module_dns_zone"></a> [dns\_zone](#module\_dns\_zone) | ./dns-zone | n/a |
 | <a name="module_helm"></a> [helm](#module\_helm) | ./helm | n/a |
 | <a name="module_hoop"></a> [hoop](#module\_hoop) | ./hoop | n/a |
-| <a name="module_managed_sync_config"></a> [managed\_sync\_config](#module\_managed_sync_config) | ./helm-config | n/a |
+| <a name="module_managed_sync_config"></a> [managed\_sync\_config](#module\_managed\_sync\_config) | ./helm-config | n/a |
 | <a name="module_monitors"></a> [monitors](#module\_monitors) | ./monitors | n/a |
 | <a name="module_uptime"></a> [uptime](#module\_uptime) | ./uptime | n/a |
 | <a name="module_waf"></a> [waf](#module\_waf) | ./waf | n/a |
@@ -51,18 +52,26 @@ No requirements.
 
 | Name | Type |
 | ---- | ---- |
+| [azurerm_federated_identity_credential.agent_os](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential) | resource |
 | [azurerm_federated_identity_credential.external_secrets](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential) | resource |
 | [azurerm_key_vault_access_policy.external_secrets](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_access_policy) | resource |
 | [azurerm_key_vault_secret.docker_cfg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.env](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.managed_sync](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.openobserve](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_role_assignment.agent_os_storage](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_user_assigned_identity.agent_os](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity) | resource |
 | [azurerm_user_assigned_identity.external_secrets](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity) | resource |
 | [random_password.openobserve_password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.openobserve_email](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [terraform_data.agc_requires_subnet](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
+| [time_sleep.external_secrets_federation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
 | [azurerm_key_vault.paragon](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault) | data source |
+| [azurerm_key_vault_secret.agent_os_admin](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
+| [azurerm_key_vault_secret.agent_os_app](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
+| [azurerm_key_vault_secret.agent_os_vendor](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
+| [azurerm_key_vault_secret.infra_agent_os](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
 | [azurerm_key_vault_secret.infra_kafka](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
 | [azurerm_key_vault_secret.infra_network](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
 | [azurerm_key_vault_secret.infra_postgres](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
@@ -77,90 +86,92 @@ No requirements.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_agc_alb_controller_version"></a> [agc\_alb\_controller\_version](#input\_agc_alb_controller_version) | Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27. | `string` | `"1.11.3"` | no |
-| <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc_direct_routing) | false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services (nginx Ingress disabled; controller stays). | `bool` | `false` | no |
-| <a name="input_agc_dns_cutover"></a> [agc\_dns\_cutover](#input\_agc_dns_cutover) | Point Terraform-managed DNS (Cloudflare or Azure DNS) at agc\_fqdn instead of the nginx load balancer. Set once AGC is validated; implied by agc\_direct\_routing. | `bool` | `false` | no |
-| <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc_enabled) | Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc\_fqdn). false = nginx only. | `bool` | `false` | no |
-| <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure_client_id) | Optional Azure client ID. Leave null to use environment-provided credentials such as ARM\_*. | `string` | `null` | no |
-| <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure_client_secret) | Optional Azure client secret. Leave null to use short-lived environment-provided credentials. | `string` | `null` | no |
-| <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure_subscription_id) | Azure subscription ID | `string` | n/a | yes |
-| <a name="input_azure_tenant_id"></a> [azure\_tenant\_id](#input\_azure_tenant_id) | Optional Azure tenant ID. Leave null to use the tenant from environment-provided credentials. | `string` | `null` | no |
-| <a name="input_cloudflare_api_token"></a> [cloudflare\_api\_token](#input\_cloudflare_api_token) | Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Zone `DNS` | `string` | `null` | no |
-| <a name="input_cloudflare_zone_id"></a> [cloudflare\_zone\_id](#input\_cloudflare_zone_id) | Cloudflare zone id to set CNAMEs. | `string` | `null` | no |
-| <a name="input_create_docker_pull_secret"></a> [create\_docker\_pull\_secret](#input\_create_docker_pull_secret) | Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm\_values. | `bool` | `true` | no |
-| <a name="input_customer_facing"></a> [customer\_facing](#input\_customer_facing) | Whether the connections are customer-facing (true limits access to dev-team-oncall/dev-team-managers/admin, false adds dev-team-engineering). | `bool` | `true` | no |
-| <a name="input_dns_provider"></a> [dns\_provider](#input\_dns_provider) | DNS provider for public records. Use azure\_dns to create an azurerm\_dns\_zone (required for App Gateway wildcard certs via DNS-01). cloudflare keeps the existing Cloudflare CNAME path for Paragon-managed zones. | `string` | `"none"` | no |
-| <a name="input_docker_email"></a> [docker\_email](#input\_docker_email) | Docker email to pull images. | `string` | `null` | no |
-| <a name="input_docker_password"></a> [docker\_password](#input\_docker_password) | Docker password to pull images. Null when using a pre-provisioned pull secret (create\_docker\_pull_secret=false). | `string` | `null` | no |
-| <a name="input_docker_pull_secret_name"></a> [docker\_pull\_secret\_name](#input\_docker_pull_secret_name) | Kubernetes secret name for registry pull credentials. | `string` | `"docker-cfg"` | no |
-| <a name="input_docker_registry_server"></a> [docker\_registry\_server](#input\_docker_registry_server) | Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry. | `string` | `"docker.io"` | no |
-| <a name="input_docker_username"></a> [docker\_username](#input\_docker_username) | Docker username to pull images. Null when using a pre-provisioned pull secret (create\_docker\_pull_secret=false). | `string` | `null` | no |
+| <a name="input_agc_alb_controller_version"></a> [agc\_alb\_controller\_version](#input\_agc\_alb\_controller\_version) | Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27. | `string` | `"1.11.3"` | no |
+| <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services (nginx Ingress disabled; controller stays). | `bool` | `false` | no |
+| <a name="input_agc_dns_cutover"></a> [agc\_dns\_cutover](#input\_agc\_dns\_cutover) | Point Terraform-managed DNS (Cloudflare or Azure DNS) at agc\_fqdn instead of the nginx load balancer. Set once AGC is validated; implied by agc\_direct\_routing. | `bool` | `false` | no |
+| <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc\_fqdn). false = nginx only. | `bool` | `false` | no |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. | `bool` | `false` | no |
+| <a name="input_agent_os_version"></a> [agent\_os\_version](#input\_agent\_os\_version) | The version of the Agent OS helm chart to install. | `string` | `"latest"` | no |
+| <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Optional Azure client ID. Leave null to use environment-provided credentials such as ARM\_*. | `string` | `null` | no |
+| <a name="input_azure_client_secret"></a> [azure\_client\_secret](#input\_azure\_client\_secret) | Optional Azure client secret. Leave null to use short-lived environment-provided credentials. | `string` | `null` | no |
+| <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure\_subscription\_id) | Azure subscription ID | `string` | n/a | yes |
+| <a name="input_azure_tenant_id"></a> [azure\_tenant\_id](#input\_azure\_tenant\_id) | Optional Azure tenant ID. Leave null to use the tenant from environment-provided credentials. | `string` | `null` | no |
+| <a name="input_cloudflare_api_token"></a> [cloudflare\_api\_token](#input\_cloudflare\_api\_token) | Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Zone `DNS` | `string` | `null` | no |
+| <a name="input_cloudflare_zone_id"></a> [cloudflare\_zone\_id](#input\_cloudflare\_zone\_id) | Cloudflare zone id to set CNAMEs. | `string` | `null` | no |
+| <a name="input_create_docker_pull_secret"></a> [create\_docker\_pull\_secret](#input\_create\_docker\_pull\_secret) | Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm\_values. | `bool` | `true` | no |
+| <a name="input_customer_facing"></a> [customer\_facing](#input\_customer\_facing) | Whether the connections are customer-facing (true limits access to dev-team-oncall/dev-team-managers/admin, false adds dev-team-engineering). | `bool` | `true` | no |
+| <a name="input_dns_provider"></a> [dns\_provider](#input\_dns\_provider) | DNS provider for public records. Use azure\_dns to create an azurerm\_dns\_zone (required for App Gateway wildcard certs via DNS-01). cloudflare keeps the existing Cloudflare CNAME path for Paragon-managed zones. | `string` | `"none"` | no |
+| <a name="input_docker_email"></a> [docker\_email](#input\_docker\_email) | Docker email to pull images. | `string` | `null` | no |
+| <a name="input_docker_password"></a> [docker\_password](#input\_docker\_password) | Docker password to pull images. Null when using a pre-provisioned pull secret (create\_docker\_pull\_secret=false). | `string` | `null` | no |
+| <a name="input_docker_pull_secret_name"></a> [docker\_pull\_secret\_name](#input\_docker\_pull\_secret\_name) | Kubernetes secret name for registry pull credentials. | `string` | `"docker-cfg"` | no |
+| <a name="input_docker_registry_server"></a> [docker\_registry\_server](#input\_docker\_registry\_server) | Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry. | `string` | `"docker.io"` | no |
+| <a name="input_docker_username"></a> [docker\_username](#input\_docker\_username) | Docker username to pull images. Null when using a pre-provisioned pull secret (create\_docker\_pull\_secret=false). | `string` | `null` | no |
 | <a name="input_domain"></a> [domain](#input\_domain) | The root domain used for the microservices. | `string` | n/a | yes |
-| <a name="input_excluded_microservices"></a> [excluded\_microservices](#input\_excluded_microservices) | The microservices that should be excluded from the deployment. | `list(string)` | `[]` | no |
-| <a name="input_feature_flags"></a> [feature\_flags](#input\_feature_flags) | Optional path to feature flags YAML file. | `string` | `null` | no |
-| <a name="input_health_checker_enabled"></a> [health\_checker\_enabled](#input\_health_checker_enabled) | Specifies that health checker is enabled. | `bool` | `false` | no |
-| <a name="input_helm_yaml"></a> [helm\_yaml](#input\_helm_yaml) | YAML string of helm values to use instead of `helm_yaml_path` | `string` | `null` | no |
-| <a name="input_helm_yaml_path"></a> [helm\_yaml\_path](#input\_helm_yaml_path) | Path to helm values.yaml file. | `string` | `".secure/values.yaml"` | no |
-| <a name="input_hoop_agent_id"></a> [hoop\_agent\_id](#input\_hoop_agent_id) | Hoop agent ID for connections. Only used if hoop\_enabled is true. | `string` | `null` | no |
-| <a name="input_hoop_agent_name"></a> [hoop\_agent\_name](#input\_hoop_agent_name) | Override Hoop agent name in HOOP\_KEY when organization does not identify the client (e.g. when organization is a region code like 'us', set to a client-identifying value such as 'client-us'). | `string` | `null` | no |
-| <a name="input_hoop_all_access_groups"></a> [hoop\_all\_access\_groups](#input\_hoop_all_access_groups) | Additional access-control groups allowed when customer\_facing is false. | `list(string)` | <pre>[<br/>  "dev-team-engineering"<br/>]</pre> | no |
-| <a name="input_hoop_api_key"></a> [hoop\_api\_key](#input\_hoop_api_key) | Hoop API key. Only used if hoop\_enabled is true. | `string` | `null` | no |
-| <a name="input_hoop_api_url"></a> [hoop\_api\_url](#input\_hoop_api_url) | Hoop API URL. | `string` | `"https://hoop.ops.paragoninternal.com/api"` | no |
-| <a name="input_hoop_custom_connections"></a> [hoop\_custom\_connections](#input\_hoop_custom_connections) | Custom Hoop connections defined via tfvars. Map of connection names to their configuration. | <pre>map(object({<br/>    type                  = string<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "disabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string))<br/>    secrets               = map(string)<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
-| <a name="input_hoop_enabled"></a> [hoop\_enabled](#input\_hoop_enabled) | Whether to enable Hoop agent. hoop\_key, hoop\_api\_key, and hoop\_agent\_id must be set if this is true. | `bool` | `true` | no |
-| <a name="input_hoop_grafana_connection"></a> [hoop\_grafana\_connection](#input\_hoop_grafana_connection) | Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500). | `bool` | `false` | no |
-| <a name="input_hoop_k8s_connections"></a> [hoop\_k8s\_connections](#input\_hoop_k8s_connections) | Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created. | <pre>map(object({<br/>    type                  = optional(string, "custom")<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "enabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string), ["bash"])<br/>    remote_url            = optional(string, "https://kubernetes.default.svc.cluster.local")<br/>    insecure              = optional(string, "true")<br/>    namespace             = optional(string, "paragon")<br/>    secrets               = optional(map(string), {})<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
-| <a name="input_hoop_key"></a> [hoop\_key](#input\_hoop_key) | Hoop agent key (token). Only used if hoop\_enabled is true. | `string` | `null` | no |
-| <a name="input_hoop_postgres_guardrail_rules"></a> [hoop\_postgres\_guardrail\_rules](#input\_hoop_postgres_guardrail_rules) | Guardrail rule IDs for PostgreSQL connections. | `list(string)` | <pre>[<br/>  "a85115f6-5ef3-4618-b70c-f7cccdc62c5a"<br/>]</pre> | no |
-| <a name="input_hoop_redis_guardrail_rules"></a> [hoop\_redis\_guardrail\_rules](#input\_hoop_redis_guardrail_rules) | Guardrail rule IDs for Redis connections. | `list(string)` | <pre>[<br/>  "182f59b2-5d5d-4ab8-978e-94472b3915fc"<br/>]</pre> | no |
-| <a name="input_hoop_restricted_access_groups"></a> [hoop\_restricted\_access\_groups](#input\_hoop_restricted_access_groups) | Base access-control groups allowed for all connections. | `list(string)` | <pre>[<br/>  "dev-team-oncall",<br/>  "dev-team-managers",<br/>  "admin"<br/>]</pre> | no |
-| <a name="input_hoop_reviewers_access_groups"></a> [hoop\_reviewers\_access\_groups](#input\_hoop_reviewers_access_groups) | Reviewer groups required for customer-facing app connections. | `list(string)` | <pre>[<br/>  "dev-team-managers"<br/>]</pre> | no |
-| <a name="input_hoop_slack_app_token"></a> [hoop\_slack\_app\_token](#input\_hoop_slack_app_token) | Slack app token for the Hoop Slack plugin. | `string` | `null` | no |
-| <a name="input_hoop_slack_bot_token"></a> [hoop\_slack\_bot\_token](#input\_hoop_slack_bot_token) | Slack bot token for the Hoop Slack plugin. | `string` | `null` | no |
-| <a name="input_hoop_slack_channel_ids"></a> [hoop\_slack\_channel\_ids](#input\_hoop_slack_channel_ids) | Slack channel IDs to notify for connections that require reviews. | `list(string)` | `[]` | no |
-| <a name="input_infra_json"></a> [infra\_json](#input\_infra_json) | Deprecated legacy JSON string of `infra` workspace variables. | `string` | `null` | no |
-| <a name="input_infra_json_path"></a> [infra\_json\_path](#input\_infra_json_path) | Deprecated legacy path to an `infra` workspace output JSON file. Prefer Key Vault handoff secrets (PARA-21726). | `string` | `null` | no |
-| <a name="input_ingress_scheme"></a> [ingress\_scheme](#input\_ingress_scheme) | Whether the load balancer is 'internet-facing' (public) or 'internal' (private) | `string` | `"internet-facing"` | no |
-| <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.31"` | no |
-| <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed_sync_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
-| <a name="input_managed_sync_version"></a> [managed\_sync\_version](#input\_managed_sync_version) | The version of the Managed Sync helm chart to install. | `string` | `"latest"` | no |
-| <a name="input_monitor_version"></a> [monitor\_version](#input\_monitor_version) | The version of the Paragon monitors to install. | `string` | `null` | no |
-| <a name="input_monitors_enabled"></a> [monitors\_enabled](#input\_monitors_enabled) | Specifies that monitors are enabled. | `bool` | `false` | no |
-| <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve_email) | OpenObserve admin login email. | `string` | `null` | no |
-| <a name="input_openobserve_password"></a> [openobserve\_password](#input\_openobserve_password) | OpenObserve admin login password. | `string` | `null` | no |
+| <a name="input_excluded_microservices"></a> [excluded\_microservices](#input\_excluded\_microservices) | The microservices that should be excluded from the deployment. | `list(string)` | `[]` | no |
+| <a name="input_feature_flags"></a> [feature\_flags](#input\_feature\_flags) | Optional path to feature flags YAML file. | `string` | `null` | no |
+| <a name="input_health_checker_enabled"></a> [health\_checker\_enabled](#input\_health\_checker\_enabled) | Specifies that health checker is enabled. | `bool` | `false` | no |
+| <a name="input_helm_yaml"></a> [helm\_yaml](#input\_helm\_yaml) | YAML string of helm values to use instead of `helm_yaml_path` | `string` | `null` | no |
+| <a name="input_helm_yaml_path"></a> [helm\_yaml\_path](#input\_helm\_yaml\_path) | Path to helm values.yaml file. | `string` | `".secure/values.yaml"` | no |
+| <a name="input_hoop_agent_id"></a> [hoop\_agent\_id](#input\_hoop\_agent\_id) | Hoop agent ID for connections. Only used if hoop\_enabled is true. | `string` | `null` | no |
+| <a name="input_hoop_agent_name"></a> [hoop\_agent\_name](#input\_hoop\_agent\_name) | Override Hoop agent name in HOOP\_KEY when organization does not identify the client (e.g. when organization is a region code like 'us', set to a client-identifying value such as 'client-us'). | `string` | `null` | no |
+| <a name="input_hoop_all_access_groups"></a> [hoop\_all\_access\_groups](#input\_hoop\_all\_access\_groups) | Additional access-control groups allowed when customer\_facing is false. | `list(string)` | <pre>[<br/>  "dev-team-engineering"<br/>]</pre> | no |
+| <a name="input_hoop_api_key"></a> [hoop\_api\_key](#input\_hoop\_api\_key) | Hoop API key. Only used if hoop\_enabled is true. | `string` | `null` | no |
+| <a name="input_hoop_api_url"></a> [hoop\_api\_url](#input\_hoop\_api\_url) | Hoop API URL. | `string` | `"https://hoop.ops.paragoninternal.com/api"` | no |
+| <a name="input_hoop_custom_connections"></a> [hoop\_custom\_connections](#input\_hoop\_custom\_connections) | Custom Hoop connections defined via tfvars. Map of connection names to their configuration. | <pre>map(object({<br/>    type                  = string<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "disabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string))<br/>    secrets               = map(string)<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
+| <a name="input_hoop_enabled"></a> [hoop\_enabled](#input\_hoop\_enabled) | Whether to enable Hoop agent. hoop\_key, hoop\_api\_key, and hoop\_agent\_id must be set if this is true. | `bool` | `true` | no |
+| <a name="input_hoop_grafana_connection"></a> [hoop\_grafana\_connection](#input\_hoop\_grafana\_connection) | Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500). | `bool` | `false` | no |
+| <a name="input_hoop_k8s_connections"></a> [hoop\_k8s\_connections](#input\_hoop\_k8s\_connections) | Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created. | <pre>map(object({<br/>    type                  = optional(string, "custom")<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "enabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string), ["bash"])<br/>    remote_url            = optional(string, "https://kubernetes.default.svc.cluster.local")<br/>    insecure              = optional(string, "true")<br/>    namespace             = optional(string, "paragon")<br/>    secrets               = optional(map(string), {})<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
+| <a name="input_hoop_key"></a> [hoop\_key](#input\_hoop\_key) | Hoop agent key (token). Only used if hoop\_enabled is true. | `string` | `null` | no |
+| <a name="input_hoop_postgres_guardrail_rules"></a> [hoop\_postgres\_guardrail\_rules](#input\_hoop\_postgres\_guardrail\_rules) | Guardrail rule IDs for PostgreSQL connections. | `list(string)` | <pre>[<br/>  "a85115f6-5ef3-4618-b70c-f7cccdc62c5a"<br/>]</pre> | no |
+| <a name="input_hoop_redis_guardrail_rules"></a> [hoop\_redis\_guardrail\_rules](#input\_hoop\_redis\_guardrail\_rules) | Guardrail rule IDs for Redis connections. | `list(string)` | <pre>[<br/>  "182f59b2-5d5d-4ab8-978e-94472b3915fc"<br/>]</pre> | no |
+| <a name="input_hoop_restricted_access_groups"></a> [hoop\_restricted\_access\_groups](#input\_hoop\_restricted\_access\_groups) | Base access-control groups allowed for all connections. | `list(string)` | <pre>[<br/>  "dev-team-oncall",<br/>  "dev-team-managers",<br/>  "admin"<br/>]</pre> | no |
+| <a name="input_hoop_reviewers_access_groups"></a> [hoop\_reviewers\_access\_groups](#input\_hoop\_reviewers\_access\_groups) | Reviewer groups required for customer-facing app connections. | `list(string)` | <pre>[<br/>  "dev-team-managers"<br/>]</pre> | no |
+| <a name="input_hoop_slack_app_token"></a> [hoop\_slack\_app\_token](#input\_hoop\_slack\_app\_token) | Slack app token for the Hoop Slack plugin. | `string` | `null` | no |
+| <a name="input_hoop_slack_bot_token"></a> [hoop\_slack\_bot\_token](#input\_hoop\_slack\_bot\_token) | Slack bot token for the Hoop Slack plugin. | `string` | `null` | no |
+| <a name="input_hoop_slack_channel_ids"></a> [hoop\_slack\_channel\_ids](#input\_hoop\_slack\_channel\_ids) | Slack channel IDs to notify for connections that require reviews. | `list(string)` | `[]` | no |
+| <a name="input_infra_json"></a> [infra\_json](#input\_infra\_json) | Deprecated legacy JSON string of `infra` workspace variables. | `string` | `null` | no |
+| <a name="input_infra_json_path"></a> [infra\_json\_path](#input\_infra\_json\_path) | Deprecated legacy path to an `infra` workspace output JSON file. Prefer Key Vault handoff secrets (PARA-21726). | `string` | `null` | no |
+| <a name="input_ingress_scheme"></a> [ingress\_scheme](#input\_ingress\_scheme) | Whether the load balancer is 'internet-facing' (public) or 'internal' (private) | `string` | `"internet-facing"` | no |
+| <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.31"` | no |
+| <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
+| <a name="input_managed_sync_version"></a> [managed\_sync\_version](#input\_managed\_sync\_version) | The version of the Managed Sync helm chart to install. | `string` | `"latest"` | no |
+| <a name="input_monitor_version"></a> [monitor\_version](#input\_monitor\_version) | The version of the Paragon monitors to install. | `string` | `null` | no |
+| <a name="input_monitors_enabled"></a> [monitors\_enabled](#input\_monitors\_enabled) | Specifies that monitors are enabled. | `bool` | `false` | no |
+| <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve\_email) | OpenObserve admin login email. | `string` | `null` | no |
+| <a name="input_openobserve_password"></a> [openobserve\_password](#input\_openobserve\_password) | OpenObserve admin login password. | `string` | `null` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
-| <a name="input_private_services"></a> [private\_services](#input\_private_services) | Services that should not be publicly exposed (filtered from public\_microservices and public\_monitors). | `list(string)` | `[]` | no |
-| <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime_api_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
-| <a name="input_uptime_company"></a> [uptime\_company](#input\_uptime_company) | Optional pretty company name to include in BetterStack Uptime monitors. | `string` | `null` | no |
-| <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf_enabled) | Attach Azure WAF to AGC when AGC is active. Opt-in; default Detection + DRS 2.1, no custom/rate-limit rules. Ignored when agc\_enabled=false. | `bool` | `false` | no |
-| <a name="input_waf_file_upload_limit_mb"></a> [waf\_file\_upload\_limit\_mb](#input\_waf_file_upload_limit_mb) | WAF file upload limit in MB. | `number` | `100` | no |
-| <a name="input_waf_ip_blacklist"></a> [waf\_ip\_blacklist](#input\_waf_ip_blacklist) | CIDRs blocked by a custom rule. Empty = no blacklist rule. | `list(string)` | `[]` | no |
-| <a name="input_waf_ip_whitelist"></a> [waf\_ip\_whitelist](#input\_waf_ip_whitelist) | CIDRs allowed by a high-priority custom rule. Empty = no whitelist rule. | `list(string)` | `[]` | no |
-| <a name="input_waf_managed_rule_sets"></a> [waf\_managed\_rule\_sets](#input\_waf_managed_rule_sets) | Managed rule sets to attach. Azure requires a primary rule set on every policy, and AGC only accepts DRS 2.1 (no CRS). Bot Manager 1.0/1.1 can be added alongside it. Per-rule actions go in rule\_group\_overrides (azurerm has no rule-set-level action). | <pre>map(object({<br/>    type    = string<br/>    version = string<br/>    rule_group_overrides = optional(map(object({<br/>      rule_group_name = string<br/>      rules = optional(list(object({<br/>        id      = string<br/>        enabled = optional(bool)<br/>        action  = optional(string)<br/>      })), [])<br/>    })), {})<br/>  }))</pre> | <pre>{<br/>  "drs": {<br/>    "type": "Microsoft_DefaultRuleSet",<br/>    "version": "2.1"<br/>  }<br/>}</pre> | no |
-| <a name="input_waf_max_request_body_size_kb"></a> [waf\_max\_request\_body\_size\_kb](#input\_waf_max_request_body_size_kb) | WAF max request body size in KB. 2000 is the DRS 2.1 engine maximum and avoids HTTP 413 on large Paragon payloads. | `number` | `2000` | no |
-| <a name="input_waf_mode"></a> [waf\_mode](#input\_waf_mode) | Detection (default) logs matches without blocking; Prevention blocks them. Switch to Prevention after reviewing Detection logs, since DRS 2.1 can flag legitimate traffic. | `string` | `"Detection"` | no |
-| <a name="input_waf_rate_limit_global"></a> [waf\_rate\_limit\_global](#input\_waf_rate_limit_global) | Max requests per client IP per window. null or 0 = no global rate-limit rule. | `number` | `null` | no |
-| <a name="input_waf_rate_limit_global_duration"></a> [waf\_rate\_limit\_global\_duration](#input\_waf_rate_limit_global_duration) | Evaluation window for the optional global rate-limit rule: OneMin or FiveMins. Has no effect while waf\_rate\_limit_global is null or 0. | `string` | `"FiveMins"` | no |
-| <a name="input_waf_rate_limit_group_by"></a> [waf\_rate\_limit\_group\_by](#input\_waf_rate_limit_group_by) | Rate-limit grouping key. Use ClientAddr with AGC (XFF variables unsupported). | `string` | `"ClientAddr"` | no |
-| <a name="input_waf_rate_limit_path_duration"></a> [waf\_rate\_limit\_path\_duration](#input\_waf_rate_limit_path_duration) | Evaluation window for optional path rate-limit rules: OneMin or FiveMins. Has no effect while waf\_rate\_limit_paths is empty. | `string` | `"FiveMins"` | no |
-| <a name="input_waf_rate_limit_paths"></a> [waf\_rate\_limit\_paths](#input\_waf_rate_limit_paths) | Map of URI path prefix to max requests per client IP per window. Empty = no path rate-limit rules. | `map(number)` | `{}` | no |
+| <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that should not be publicly exposed (filtered from public\_microservices and public\_monitors). | `list(string)` | `[]` | no |
+| <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
+| <a name="input_uptime_company"></a> [uptime\_company](#input\_uptime\_company) | Optional pretty company name to include in BetterStack Uptime monitors. | `string` | `null` | no |
+| <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf\_enabled) | Attach Azure WAF to AGC when AGC is active. Opt-in; default Detection + DRS 2.1, no custom/rate-limit rules. Ignored when agc\_enabled=false. | `bool` | `false` | no |
+| <a name="input_waf_file_upload_limit_mb"></a> [waf\_file\_upload\_limit\_mb](#input\_waf\_file\_upload\_limit\_mb) | WAF file upload limit in MB. | `number` | `100` | no |
+| <a name="input_waf_ip_blacklist"></a> [waf\_ip\_blacklist](#input\_waf\_ip\_blacklist) | CIDRs blocked by a custom rule. Empty = no blacklist rule. | `list(string)` | `[]` | no |
+| <a name="input_waf_ip_whitelist"></a> [waf\_ip\_whitelist](#input\_waf\_ip\_whitelist) | CIDRs allowed by a high-priority custom rule. Empty = no whitelist rule. | `list(string)` | `[]` | no |
+| <a name="input_waf_managed_rule_sets"></a> [waf\_managed\_rule\_sets](#input\_waf\_managed\_rule\_sets) | Managed rule sets to attach. Azure requires a primary rule set on every policy, and AGC only accepts DRS 2.1 (no CRS). Bot Manager 1.0/1.1 can be added alongside it. Per-rule actions go in rule\_group\_overrides (azurerm has no rule-set-level action). | <pre>map(object({<br/>    type    = string<br/>    version = string<br/>    rule_group_overrides = optional(map(object({<br/>      rule_group_name = string<br/>      rules = optional(list(object({<br/>        id      = string<br/>        enabled = optional(bool)<br/>        action  = optional(string)<br/>      })), [])<br/>    })), {})<br/>  }))</pre> | <pre>{<br/>  "drs": {<br/>    "type": "Microsoft_DefaultRuleSet",<br/>    "version": "2.1"<br/>  }<br/>}</pre> | no |
+| <a name="input_waf_max_request_body_size_kb"></a> [waf\_max\_request\_body\_size\_kb](#input\_waf\_max\_request\_body\_size\_kb) | WAF max request body size in KB. 2000 is the DRS 2.1 engine maximum and avoids HTTP 413 on large Paragon payloads. | `number` | `2000` | no |
+| <a name="input_waf_mode"></a> [waf\_mode](#input\_waf\_mode) | Detection (default) logs matches without blocking; Prevention blocks them. Switch to Prevention after reviewing Detection logs, since DRS 2.1 can flag legitimate traffic. | `string` | `"Detection"` | no |
+| <a name="input_waf_rate_limit_global"></a> [waf\_rate\_limit\_global](#input\_waf\_rate\_limit\_global) | Max requests per client IP per window. null or 0 = no global rate-limit rule. | `number` | `null` | no |
+| <a name="input_waf_rate_limit_global_duration"></a> [waf\_rate\_limit\_global\_duration](#input\_waf\_rate\_limit\_global\_duration) | Evaluation window for the optional global rate-limit rule: OneMin or FiveMins. Has no effect while waf\_rate\_limit\_global is null or 0. | `string` | `"FiveMins"` | no |
+| <a name="input_waf_rate_limit_group_by"></a> [waf\_rate\_limit\_group\_by](#input\_waf\_rate\_limit\_group\_by) | Rate-limit grouping key. Use ClientAddr with AGC (XFF variables unsupported). | `string` | `"ClientAddr"` | no |
+| <a name="input_waf_rate_limit_path_duration"></a> [waf\_rate\_limit\_path\_duration](#input\_waf\_rate\_limit\_path\_duration) | Evaluation window for optional path rate-limit rules: OneMin or FiveMins. Has no effect while waf\_rate\_limit\_paths is empty. | `string` | `"FiveMins"` | no |
+| <a name="input_waf_rate_limit_paths"></a> [waf\_rate\_limit\_paths](#input\_waf\_rate\_limit\_paths) | Map of URI path prefix to max requests per client IP per window. Empty = no path rate-limit rules. | `map(number)` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_agc_alb_id"></a> [agc\_alb\_id](#output\_agc_alb_id) | Application Gateway for Containers resource ID (null when agc\_enabled is false). |
-| <a name="output_agc_direct_routing"></a> [agc\_direct\_routing](#output\_agc_direct_routing) | false = AGC forwards to ingress-nginx (transition); true = AGC routes directly to Services (nginx Ingress disabled). |
-| <a name="output_agc_dns_cutover"></a> [agc\_dns\_cutover](#output\_agc_dns_cutover) | Whether Terraform-managed DNS points at agc\_fqdn instead of the nginx load balancer. |
-| <a name="output_agc_enabled"></a> [agc\_enabled](#output\_agc_enabled) | Whether Application Gateway for Containers is the public front door. |
-| <a name="output_agc_fqdn"></a> [agc\_fqdn](#output\_agc_fqdn) | AGC frontend FQDN for pre-cutover validation; DNS points here once agc\_dns\_cutover is true (null when agc\_enabled is false). |
-| <a name="output_grafana_admin_email"></a> [grafana\_admin\_email](#output\_grafana_admin_email) | Grafana admin login email. |
-| <a name="output_grafana_admin_password"></a> [grafana\_admin\_password](#output\_grafana_admin_password) | Grafana admin login password. |
-| <a name="output_load_balancer"></a> [load\_balancer](#output\_load_balancer) | Public front door FQDN that DNS records point at (nginx, or AGC once agc\_dns\_cutover is true). |
+| <a name="output_agc_alb_id"></a> [agc\_alb\_id](#output\_agc\_alb\_id) | Application Gateway for Containers resource ID (null when agc\_enabled is false). |
+| <a name="output_agc_direct_routing"></a> [agc\_direct\_routing](#output\_agc\_direct\_routing) | false = AGC forwards to ingress-nginx (transition); true = AGC routes directly to Services (nginx Ingress disabled). |
+| <a name="output_agc_dns_cutover"></a> [agc\_dns\_cutover](#output\_agc\_dns\_cutover) | Whether Terraform-managed DNS points at agc\_fqdn instead of the nginx load balancer. |
+| <a name="output_agc_enabled"></a> [agc\_enabled](#output\_agc\_enabled) | Whether Application Gateway for Containers is the public front door. |
+| <a name="output_agc_fqdn"></a> [agc\_fqdn](#output\_agc\_fqdn) | AGC frontend FQDN for pre-cutover validation; DNS points here once agc\_dns\_cutover is true (null when agc\_enabled is false). |
+| <a name="output_grafana_admin_email"></a> [grafana\_admin\_email](#output\_grafana\_admin\_email) | Grafana admin login email. |
+| <a name="output_grafana_admin_password"></a> [grafana\_admin\_password](#output\_grafana\_admin\_password) | Grafana admin login password. |
+| <a name="output_load_balancer"></a> [load\_balancer](#output\_load\_balancer) | Public front door FQDN that DNS records point at (nginx, or AGC once agc\_dns\_cutover is true). |
 | <a name="output_nameservers"></a> [nameservers](#output\_nameservers) | Azure DNS nameservers to delegate at the registrar (null when dns\_provider is not azure\_dns). |
-| <a name="output_pgadmin_admin_email"></a> [pgadmin\_admin\_email](#output\_pgadmin_admin_email) | PGAdmin admin login email. |
-| <a name="output_pgadmin_admin_password"></a> [pgadmin\_admin\_password](#output\_pgadmin_admin_password) | PGAdmin admin login password. |
-| <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime_webhook) | Uptime webhook URL |
+| <a name="output_pgadmin_admin_email"></a> [pgadmin\_admin\_email](#output\_pgadmin\_admin\_email) | PGAdmin admin login email. |
+| <a name="output_pgadmin_admin_password"></a> [pgadmin\_admin\_password](#output\_pgadmin\_admin\_password) | PGAdmin admin login password. |
+| <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime\_webhook) | Uptime webhook URL |
 <!-- END_TF_DOCS -->
 
 ## Updates

@@ -50,7 +50,7 @@ resource "azurerm_federated_identity_credential" "agent_os" {
   name                      = "agent-os"
   audience                  = ["api://AzureADTokenExchange"]
   issuer                    = data.azurerm_kubernetes_cluster.cluster.oidc_issuer_url
-  subject                   = "system:serviceaccount:agent-os:agent-os"
+  subject                   = "system:serviceaccount:paragon:agent-os"
   user_assigned_identity_id = azurerm_user_assigned_identity.agent_os[0].id
 }
 

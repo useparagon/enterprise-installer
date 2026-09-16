@@ -18,7 +18,6 @@ variable "workspace" {
 variable "agent_os_enabled" {
   description = "Whether to create a dedicated Agent OS Event Hubs authorization rule."
   type        = bool
-  default     = false
 }
 
 variable "tags" {

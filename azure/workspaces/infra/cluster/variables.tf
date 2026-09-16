@@ -68,41 +68,34 @@ variable "k8s_spot_node_instance_type" {
 }
 
 variable "agent_os_enabled" {
-  type    = bool
-  default = false
+  type = bool
 }
 
 variable "agent_os_index_vm_size" {
-  type    = string
-  default = "Standard_E8as_v5"
+  type = string
 }
 
 variable "agent_os_index_min_count" {
-  type    = number
-  default = 2
+  type = number
 }
 
 variable "agent_os_index_max_count" {
-  type    = number
-  default = 4
+  type = number
 }
 
 variable "agent_os_extract_vm_size" {
   description = "Compute-optimized AMD VM size for the Agent OS extraction node pool."
   type        = string
-  default     = "Standard_F16as_v6"
 }
 
 variable "agent_os_extract_min_count" {
   description = "Minimum nodes in the Agent OS extraction node pool."
   type        = number
-  default     = 1
 }
 
 variable "agent_os_extract_max_count" {
   description = "Maximum nodes in the Agent OS extraction node pool."
   type        = number
-  default     = 8
 }
 
 variable "k8s_sku_tier" {

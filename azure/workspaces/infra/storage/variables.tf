@@ -25,7 +25,6 @@ variable "managed_sync_enabled" {
 variable "agent_os_enabled" {
   description = "Whether to create the Agent OS blob container."
   type        = bool
-  default     = false
 }
 
 variable "auditlogs_retention_days" {
