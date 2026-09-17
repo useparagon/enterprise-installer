@@ -46,17 +46,16 @@ serviceAccount:
 podAnnotations: {}
 
 podSecurityContext:
-  {}
-  # fsGroup: 2000
+  fsGroup: 472
+  fsGroupChangePolicy: OnRootMismatch
+  supplementalGroups:
+    - 0
 
 securityContext:
-  {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+  runAsNonRoot: true
+  runAsUser: 472
+  runAsGroup: 0
+  allowPrivilegeEscalation: false
 
 ingress:
   certificate: ''
