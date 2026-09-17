@@ -265,10 +265,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "agent_os" {
   count  = var.agent_os_enabled ? 1 : 0
   bucket = aws_s3_bucket.agent_os[0].id
 
-  # Agent OS owns application-level retention. Infra only removes storage
-  # artifacts that otherwise accumulate indefinitely on a versioned bucket.
+  # Agent OS owns current-object retention. Infra only cleans storage artifacts
+  # that otherwise accumulate indefinitely on the versioned bucket.
   rule {
-    id     = "storage-hygiene"
+    id     = "abort-incomplete-uploads"
     status = "Enabled"
 
     filter {}
@@ -276,9 +276,31 @@ resource "aws_s3_bucket_lifecycle_configuration" "agent_os" {
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
     }
+  }
+
+  rule {
+    id     = "parsed-noncurrent-versions"
+    status = "Enabled"
+
+    filter {
+      prefix = "parsed/"
+    }
 
     noncurrent_version_expiration {
       noncurrent_days = 30
+    }
+  }
+
+  rule {
+    id     = "index-noncurrent-versions"
+    status = "Enabled"
+
+    filter {
+      prefix = "index/"
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 7
     }
   }
 
