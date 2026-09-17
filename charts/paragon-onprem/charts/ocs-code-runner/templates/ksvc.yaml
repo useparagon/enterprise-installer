@@ -1,0 +1,50 @@
+{{- if eq .Values.mode "knative" }}
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: {{ include "ocs-code-runner.fullname" . }}
+  labels:
+    {{- include "ocs-code-runner.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: {{ .Values.knative.minScale | quote }}
+        autoscaling.knative.dev/max-scale: {{ .Values.knative.maxScale | quote }}
+        autoscaling.knative.dev/target: {{ .Values.knative.target | quote }}
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "ocs-code-runner.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "ocs-code-runner.serviceAccountName" . }}
+      containerConcurrency: {{ .Values.knative.containerConcurrency }}
+      timeoutSeconds: {{ .Values.knative.timeoutSeconds }}
+      {{- $pullSecrets := include "paragon.imagePullSecrets" (dict "root" .) -}}
+      {{- if $pullSecrets }}
+      imagePullSecrets:
+        {{- $pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: code-runner
+          image: {{ include "paragon.image" (dict "root" . "repository" .Values.image.repository "tag" .Values.image.tag) | quote }}
+          imagePullPolicy: {{ include "paragon.imagePullPolicy" (dict "root" .) }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              name: http1
+          env:
+            {{- include "ocs-code-runner.containerEnv" . | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+{{- end }}

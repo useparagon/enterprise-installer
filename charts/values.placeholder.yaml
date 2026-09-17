@@ -24,6 +24,16 @@ global:
 #     enabled: false
 #   kafka-exporter:
 #     enabled: false
+#   ocs-code-runner:
+#     enabled: false
+#
+# OCS knative code-runner (on-prem custom-code runtime). Default is a ClusterIP
+# Deployment of useparagon/ocs-code-runner-knative. After installing Knative
+# Serving, set ocs-code-runner.mode: knative.
+# ocs-code-runner:
+#   mode: knative
+#   image:
+#     tag: latest
 
 # Optional example for per-service resource tuning.
 # hades:
