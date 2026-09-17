@@ -20,6 +20,16 @@ variable "agent_os_enabled" {
   type        = bool
 }
 
+variable "agent_os_eventhub_partition_count" {
+  description = "Partition count for Event Hubs owned by Agent OS."
+  type        = number
+}
+
+variable "agent_os_eventhub_message_retention" {
+  description = "Retention in days for Event Hubs owned by Agent OS."
+  type        = number
+}
+
 variable "tags" {
   description = "Default tags to apply to resources"
   type        = map(string)

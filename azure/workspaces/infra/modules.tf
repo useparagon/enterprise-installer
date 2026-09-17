@@ -136,14 +136,16 @@ module "kafka" {
   count  = var.managed_sync_enabled ? 1 : 0
   source = "./kafka"
 
-  agent_os_enabled                  = var.agent_os_enabled
-  eventhub_auto_inflate_enabled     = var.eventhub_auto_inflate_enabled
-  eventhub_capacity                 = var.eventhub_capacity
-  eventhub_maximum_throughput_units = var.eventhub_maximum_throughput_units
-  eventhub_namespace_sku            = var.eventhub_namespace_sku
-  private_subnet                    = module.network.private_subnet
-  resource_group                    = module.network.resource_group
-  tags                              = local.default_tags
-  virtual_network                   = module.network.virtual_network
-  workspace                         = local.workspace
+  agent_os_enabled                    = var.agent_os_enabled
+  agent_os_eventhub_partition_count   = var.agent_os_eventhub_partition_count
+  agent_os_eventhub_message_retention = var.agent_os_eventhub_message_retention
+  eventhub_auto_inflate_enabled       = var.eventhub_auto_inflate_enabled
+  eventhub_capacity                   = var.eventhub_capacity
+  eventhub_maximum_throughput_units   = var.eventhub_maximum_throughput_units
+  eventhub_namespace_sku              = var.eventhub_namespace_sku
+  private_subnet                      = module.network.private_subnet
+  resource_group                      = module.network.resource_group
+  tags                                = local.default_tags
+  virtual_network                     = module.network.virtual_network
+  workspace                           = local.workspace
 }

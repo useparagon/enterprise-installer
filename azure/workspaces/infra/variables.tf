@@ -583,6 +583,28 @@ variable "eventhub_maximum_throughput_units" {
   default     = 20
 }
 
+variable "agent_os_eventhub_partition_count" {
+  description = "Partition count for Event Hubs owned by Agent OS. Event Hubs partitions cannot be decreased after creation."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.agent_os_eventhub_partition_count >= 1 && var.agent_os_eventhub_partition_count <= 32
+    error_message = "agent_os_eventhub_partition_count must be between 1 and 32."
+  }
+}
+
+variable "agent_os_eventhub_message_retention" {
+  description = "Retention in days for Event Hubs owned by Agent OS."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.agent_os_eventhub_message_retention >= 1 && var.agent_os_eventhub_message_retention <= 7
+    error_message = "agent_os_eventhub_message_retention must be between 1 and 7 days for a shared Event Hubs namespace."
+  }
+}
+
 locals {
   # Spacelift can only pass TF_VAR_* as environment variables, which Terraform reads
   # literally for string variables, so `""` and `"null"` are the only ways a context
