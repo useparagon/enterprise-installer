@@ -23,13 +23,42 @@ locals {
     }
   }
 
-  # This chart publishes its own Ingress for api-sync, so the Service needs the
-  # BackendConfig annotation too or sync.${domain} bypasses Cloud Armor.
-  managed_sync_waf_values = {
-    "api-sync" = {
-      service = local.waf_service_annotations
+  # shared-ingress fronts these five Services on sync.${domain}. Cloud Armor
+  # attaches via BackendConfig on the Service, so every backend needs the
+  # annotation — not just api-sync. The chart renders the Service from
+  # <name>.common.service; keep <name>.service too in case a parent key is used.
+  managed_sync_ingress_service_values = {
+    for service in [
+      "api-project",
+      "api-sync",
+      "api-webhook",
+      "worker-sync",
+      "worker-history-sync",
+      ] : service => {
+      common = {
+        service = merge(
+          { type = "NodePort" },
+          local.waf_service_annotations
+        )
+      }
+      service = merge(
+        { type = "NodePort" },
+        local.waf_service_annotations
+      )
     }
   }
+
+  # Chart pods all use this KSA. Per-service serviceAccount values are ignored.
+  managed_sync_workload_identity_values = var.storage_service_account != null ? {
+    serviceAccount = {
+      create = true
+      name   = "managed-sync-service-account"
+      annotations = {
+        "iam.gke.io/gcp-service-account"          = var.storage_service_account
+        "iam.gke.io/return-principal-id-as-email" = "true"
+      }
+    }
+  } : {}
 }
 
 resource "helm_release" "managed_sync" {
@@ -52,14 +81,21 @@ resource "helm_release" "managed_sync" {
   values = concat(
     [local.global_values_minus_env],
     local.managed_sync_storage_values != {} ? [yamlencode(local.managed_sync_storage_values)] : [],
+    local.managed_sync_workload_identity_values != {} ? [yamlencode(local.managed_sync_workload_identity_values)] : [],
+    [yamlencode(local.managed_sync_ingress_service_values)],
     [yamlencode(local.managed_sync_jobs_env_from)],
-    [yamlencode(local.managed_sync_waf_values)],
     [local.secret_hash]
   )
 
   set {
     name  = "secretName"
     value = "paragon-managed-sync-secrets"
+  }
+
+  # Same static IP as shared-ingress; GCP only allows one forwarding rule per IP:port.
+  set {
+    name  = "ingress.enabled"
+    value = "false"
   }
 
   set {
@@ -123,5 +159,6 @@ resource "helm_release" "managed_sync" {
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.managed_sync_secrets,
     kubectl_manifest.waf_backendconfig,
+    google_service_account_iam_member.managed_sync_workload_identity,
   ]
 }
