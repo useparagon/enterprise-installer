@@ -22,10 +22,13 @@ module "helm" {
   flipt_options                         = local.flipt_options
   helm_values                           = local.helm_values_public
   secrets_revision = sha256(jsonencode({
-    env          = azurerm_key_vault_secret.env.version
-    docker_cfg   = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
-    managed_sync = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
-    openobserve  = azurerm_key_vault_secret.openobserve[0].version
+    env             = azurerm_key_vault_secret.env.version
+    docker_cfg      = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
+    managed_sync    = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
+    openobserve     = azurerm_key_vault_secret.openobserve[0].version
+    agent_os_app    = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_app[0].version : null
+    agent_os_admin  = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_admin[0].version : null
+    agent_os_vendor = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_vendor[0].version : null
   }))
   ingress_scheme           = var.ingress_scheme
   nginx_public             = local.nginx_public
@@ -40,17 +43,29 @@ module "helm" {
   managed_sync_enabled     = var.managed_sync_enabled
   managed_sync_secret_name = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
   managed_sync_version     = var.managed_sync_version
-  microservices            = local.microservices
-  monitor_version          = local.monitor_version
-  monitors                 = local.monitors
-  monitors_enabled         = var.monitors_enabled
-  openobserve_email        = local.openobserve_email
-  openobserve_password     = local.openobserve_password
-  openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
-  public_microservices     = local.public_microservices
-  public_monitors          = local.public_monitors
-  resource_group           = local.infra_vars.resource_group.value
-  workspace                = local.workspace
+  agent_os_enabled         = var.agent_os_enabled
+  agent_os_version         = var.agent_os_version
+  agent_os_secret_names = var.agent_os_enabled ? {
+    app    = azurerm_key_vault_secret.agent_os_app[0].name
+    admin  = azurerm_key_vault_secret.agent_os_admin[0].name
+    vendor = azurerm_key_vault_secret.agent_os_vendor[0].name
+  } : null
+  agent_os_workload_identity_client_id = var.agent_os_enabled ? azurerm_user_assigned_identity.agent_os[0].client_id : null
+  agent_os_workload_identity_ready = var.agent_os_enabled ? sha256(join(":", [
+    azurerm_federated_identity_credential.agent_os[0].id,
+    azurerm_role_assignment.agent_os_storage[0].id,
+  ])) : null
+  microservices           = local.microservices
+  monitor_version         = local.monitor_version
+  monitors                = local.monitors
+  monitors_enabled        = var.monitors_enabled
+  openobserve_email       = local.openobserve_email
+  openobserve_password    = local.openobserve_password
+  openobserve_secret_name = azurerm_key_vault_secret.openobserve[0].name
+  public_microservices    = local.public_microservices
+  public_monitors         = local.public_monitors
+  resource_group          = local.infra_vars.resource_group.value
+  workspace               = local.workspace
 }
 
 module "managed_sync_config" {

@@ -173,3 +173,81 @@ resource "azurerm_kubernetes_cluster_node_pool" "pool" {
     ]
   }
 }
+
+# Agent OS index workloads require dedicated regular, memory-optimized capacity.
+resource "azurerm_kubernetes_cluster_node_pool" "agent_os_index" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                  = "aosindex"
+  auto_scaling_enabled  = true
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.cluster.id
+  max_count             = var.agent_os_index_max_count
+  min_count             = var.agent_os_index_min_count
+  orchestrator_version  = var.k8s_version
+  os_sku                = "Ubuntu"
+  os_type               = "Linux"
+  tags                  = merge(var.tags, { Name = "agent-os-index" })
+  vm_size               = var.agent_os_index_vm_size
+  vnet_subnet_id        = var.private_subnet.id
+  priority              = "Regular"
+  node_taints           = ["useparagon.com/workload=agent-os-index:NoSchedule"]
+
+  node_labels = {
+    "useparagon.com/workload"     = "agent-os-index"
+    "useparagon.com/capacityType" = "ondemand"
+  }
+
+  upgrade_settings {
+    max_surge = "1"
+  }
+
+  depends_on = [
+    azurerm_role_assignment.aks_network_contributor,
+    azurerm_role_assignment.aks_nsg_network_contributor,
+  ]
+
+  lifecycle {
+    ignore_changes = [
+      upgrade_settings
+    ]
+  }
+}
+
+# Agent OS extraction workloads require dedicated regular, compute-optimized AMD capacity.
+resource "azurerm_kubernetes_cluster_node_pool" "agent_os_extract" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                  = "aosextract"
+  auto_scaling_enabled  = true
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.cluster.id
+  max_count             = var.agent_os_extract_max_count
+  min_count             = var.agent_os_extract_min_count
+  orchestrator_version  = var.k8s_version
+  os_sku                = "Ubuntu"
+  os_type               = "Linux"
+  tags                  = merge(var.tags, { Name = "agent-os-extract" })
+  vm_size               = var.agent_os_extract_vm_size
+  vnet_subnet_id        = var.private_subnet.id
+  priority              = "Regular"
+  node_taints           = ["useparagon.com/workload=agent-os-extract:NoSchedule"]
+
+  node_labels = {
+    "useparagon.com/workload"     = "agent-os-extract"
+    "useparagon.com/capacityType" = "ondemand"
+  }
+
+  upgrade_settings {
+    max_surge = "1"
+  }
+
+  depends_on = [
+    azurerm_role_assignment.aks_network_contributor,
+    azurerm_role_assignment.aks_nsg_network_contributor,
+  ]
+
+  lifecycle {
+    ignore_changes = [
+      upgrade_settings
+    ]
+  }
+}

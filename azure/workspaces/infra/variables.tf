@@ -194,12 +194,14 @@ variable "postgres_multiple_instances" {
 
 variable "postgres_instances" {
   description = <<-EOT
-    Per-instance PostgreSQL overrides. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon).
-    Both sku and redundant must be set on each entry you include. Omitted keys use built-in defaults (no HA). Null uses defaults for all instances.
+    Per-instance PostgreSQL overrides. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon, agent_os).
+    Both sku and redundant must be set on each entry you include. Omitted keys and null optional fields retain their built-in defaults.
   EOT
   type = map(object({
-    sku       = string
-    redundant = bool
+    sku        = string
+    redundant  = bool
+    storage_mb = optional(number)
+    version    = optional(string)
   }))
   default  = null
   nullable = true
@@ -272,7 +274,7 @@ variable "redis_managed_enabled" {
 
 variable "redis_managed_instances" {
   description = <<-EOT
-    Overrides for Azure Managed Redis instances (Redis 7.4). Each key is a logical name (cache, queue, system, managed-sync).
+    Overrides for Azure Managed Redis instances (Redis 7.4). Each key is a logical name (cache, queue, system, managed-sync, agent_os).
     Merged per key with redis_managed_instances_default (sku, ha_enabled, cluster_enabled, persistence_*). Null uses defaults only.
   EOT
   type = map(object({
@@ -483,6 +485,67 @@ variable "managed_sync_enabled" {
   default     = false
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+
+  validation {
+    condition     = !var.agent_os_enabled || var.postgres_enabled
+    error_message = "Agent OS requires PostgreSQL. Set postgres_enabled = true when agent_os_enabled is true."
+  }
+
+  validation {
+    condition     = !var.agent_os_enabled || var.redis_managed_enabled
+    error_message = "Agent OS requires Azure Managed Redis. Set redis_managed_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "The version of the Agent OS helm chart to install (consumed by the paragon workspace in PARA-25775)."
+  type        = string
+  default     = "latest"
+}
+
+variable "agent_os_index_vm_size" {
+  description = "VM size for the Agent OS index AKS node pool."
+  type        = string
+  default     = "Standard_E8as_v5"
+}
+
+variable "agent_os_index_min_count" {
+  type    = number
+  default = 2
+}
+
+variable "agent_os_index_max_count" {
+  type    = number
+  default = 4
+}
+
+variable "agent_os_extract_vm_size" {
+  description = "Compute-optimized AMD VM size for the Agent OS extraction AKS node pool. Use Standard_F8as_v6 for staging and Standard_F16as_v6 for production."
+  type        = string
+  default     = "Standard_F16as_v6"
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction AKS node pool."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction AKS node pool. Use 3 for staging and 8 for production."
+  type        = number
+  default     = 8
+}
+
 variable "eventhub_namespace_sku" {
   description = "The SKU name for the Event Hubs namespace (Basic, Standard, Premium)."
   type        = string
@@ -490,6 +553,11 @@ variable "eventhub_namespace_sku" {
   validation {
     condition     = contains(["Basic", "Standard", "Premium"], var.eventhub_namespace_sku)
     error_message = "The sku_name must be `Basic`, `Standard`, or `Premium`."
+  }
+
+  validation {
+    condition     = !var.agent_os_enabled || contains(["Standard", "Premium"], var.eventhub_namespace_sku)
+    error_message = "Agent OS Kafka requires an Event Hubs Standard or Premium namespace."
   }
 }
 
@@ -515,6 +583,28 @@ variable "eventhub_maximum_throughput_units" {
   default     = 20
 }
 
+variable "agent_os_eventhub_partition_count" {
+  description = "Partition count for the Managed Sync instance-status Event Hubs that Agent OS also uses. Partitions cannot be decreased after creation."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.agent_os_eventhub_partition_count >= 1 && var.agent_os_eventhub_partition_count <= 32
+    error_message = "agent_os_eventhub_partition_count must be between 1 and 32."
+  }
+}
+
+variable "agent_os_eventhub_message_retention" {
+  description = "Retention in days for the Managed Sync instance-status Event Hubs that Agent OS also uses."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.agent_os_eventhub_message_retention >= 1 && var.agent_os_eventhub_message_retention <= 7
+    error_message = "agent_os_eventhub_message_retention must be between 1 and 7 days for a shared Event Hubs namespace."
+  }
+}
+
 locals {
   # Spacelift can only pass TF_VAR_* as environment variables, which Terraform reads
   # literally for string variables, so `""` and `"null"` are the only ways a context
@@ -538,26 +628,41 @@ locals {
   ssh_whitelist = distinct([for value in split(",", var.ssh_whitelist) : "${trimspace(value)}${replace(value, "/", "") != value ? "" : "/32"}" if trimspace(value) != ""])
 
   postgres_instances_defaults = {
-    cerberus     = { sku = var.postgres_base_sku_name, redundant = false }
-    eventlogs    = { sku = var.postgres_base_sku_name, redundant = false }
-    hermes       = { sku = var.postgres_sku_name, redundant = false }
-    triggerkit   = { sku = var.postgres_base_sku_name, redundant = false }
-    zeus         = { sku = var.postgres_base_sku_name, redundant = false }
-    managed_sync = { sku = var.postgres_base_sku_name, redundant = false }
-    paragon      = { sku = var.postgres_sku_name, redundant = false }
+    cerberus     = { sku = var.postgres_base_sku_name, redundant = false, storage_mb = null, version = null }
+    eventlogs    = { sku = var.postgres_base_sku_name, redundant = false, storage_mb = null, version = null }
+    hermes       = { sku = var.postgres_sku_name, redundant = false, storage_mb = null, version = null }
+    triggerkit   = { sku = var.postgres_base_sku_name, redundant = false, storage_mb = null, version = null }
+    zeus         = { sku = var.postgres_base_sku_name, redundant = false, storage_mb = null, version = null }
+    managed_sync = { sku = var.postgres_base_sku_name, redundant = false, storage_mb = null, version = null }
+    paragon      = { sku = var.postgres_sku_name, redundant = false, storage_mb = null, version = null }
+    # Agent OS uses a dedicated production-sized PostgreSQL server.
+    agent_os = { sku = "GP_Standard_D2ds_v5", redundant = true, storage_mb = 131072, version = "16" }
   }
+
+  postgres_instances_overrides = var.postgres_instances != null ? var.postgres_instances : {}
 
   postgres_instances_config = merge(
     local.postgres_instances_defaults,
-    var.postgres_instances != null ? var.postgres_instances : {},
+    {
+      for name, override in local.postgres_instances_overrides : name => merge(
+        lookup(local.postgres_instances_defaults, name, {
+          sku        = override.sku
+          redundant  = override.redundant
+          storage_mb = null
+          version    = null
+        }),
+        { for key, value in override : key => value if value != null },
+      )
+    },
   )
 
   postgres_instances = var.postgres_multiple_instances ? {
     for name, cfg in local.postgres_instances_config : name => cfg
-    if name != "paragon" && (var.managed_sync_enabled || name != "managed_sync")
-    } : {
-    paragon = local.postgres_instances_config["paragon"]
-  }
+    if name != "paragon" && (var.managed_sync_enabled || name != "managed_sync") && (var.agent_os_enabled || name != "agent_os")
+    } : merge(
+    { paragon = local.postgres_instances_config["paragon"] },
+    var.agent_os_enabled ? { agent_os = local.postgres_instances_config["agent_os"] } : {},
+  )
 
   redis_managed_instance_defaults = {
     sku                   = "Balanced_B3"
@@ -596,6 +701,14 @@ locals {
       persistence_mode      = null
       persistence_frequency = null
     }
+    # Agent OS uses a dedicated production-sized Azure Managed Redis instance.
+    agent_os = {
+      sku                   = "Balanced_B3"
+      ha_enabled            = true
+      cluster_enabled       = false
+      persistence_mode      = null
+      persistence_frequency = null
+    }
   }
 
   redis_managed_instances_overrides = var.redis_managed_instances != null ? var.redis_managed_instances : {}
@@ -611,11 +724,13 @@ locals {
     },
   )
 
-  redis_managed_instances = var.redis_multiple_instances ? (
-    var.managed_sync_enabled ? local.redis_managed_instances_config : {
-      for name, cfg in local.redis_managed_instances_config : name => cfg if name != "managed-sync"
-    }
-    ) : {
-    cache = merge(local.redis_managed_instances_config["cache"], { cluster_enabled = false })
-  }
+  redis_managed_instances = var.redis_multiple_instances ? {
+    for name, cfg in local.redis_managed_instances_config : name => cfg
+    if(var.managed_sync_enabled || name != "managed-sync") && (var.agent_os_enabled || name != "agent_os")
+    } : merge(
+    {
+      cache = merge(local.redis_managed_instances_config["cache"], { cluster_enabled = false })
+    },
+    var.agent_os_enabled ? { agent_os = local.redis_managed_instances_config["agent_os"] } : {},
+  )
 }

@@ -49,6 +49,13 @@ data "azurerm_key_vault_secret" "infra_kafka" {
   key_vault_id = data.azurerm_key_vault.paragon.id
 }
 
+# Agent OS reads only the infra handoff metadata; ESO reads the referenced payload secrets.
+data "azurerm_key_vault_secret" "infra_agent_os" {
+  count        = var.agent_os_enabled ? 1 : 0
+  name         = "agent-os"
+  key_vault_id = data.azurerm_key_vault.paragon.id
+}
+
 data "azurerm_key_vault_secret" "infra_network" {
   # Only required when AGC is enabled; existing nginx-only deployments may not
   # have this secret until infra is re-applied.
@@ -58,6 +65,9 @@ data "azurerm_key_vault_secret" "infra_network" {
 }
 
 locals {
+  agent_os_handoff      = var.agent_os_enabled ? jsondecode(data.azurerm_key_vault_secret.infra_agent_os[0].value) : null
+  agent_os_container_id = var.agent_os_enabled ? nonsensitive(local.agent_os_handoff.container_id) : null
+
   provider_infra_vars = merge(
     {
       workspace        = { value = local.workspace }
@@ -97,7 +107,10 @@ locals {
     ? local.infra_vars_source.redis.value
     : try(local.infra_vars_source.redis_managed.value, null)
   )
-  infra_vars = merge(local.infra_vars_source, {
-    redis = { value = local.redis_from_infra }
-  })
+  infra_vars = merge(
+    local.infra_vars_source,
+    {
+      redis = { value = local.redis_from_infra }
+    },
+  )
 }

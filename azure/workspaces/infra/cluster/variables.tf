@@ -67,6 +67,37 @@ variable "k8s_spot_node_instance_type" {
   type        = string
 }
 
+variable "agent_os_enabled" {
+  type = bool
+}
+
+variable "agent_os_index_vm_size" {
+  type = string
+}
+
+variable "agent_os_index_min_count" {
+  type = number
+}
+
+variable "agent_os_index_max_count" {
+  type = number
+}
+
+variable "agent_os_extract_vm_size" {
+  description = "Compute-optimized AMD VM size for the Agent OS extraction node pool."
+  type        = string
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction node pool."
+  type        = number
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction node pool."
+  type        = number
+}
+
 variable "k8s_sku_tier" {
   description = "The SKU Tier of the AKS cluster (`Free`, `Standard` or `Premium`)."
   type        = string
