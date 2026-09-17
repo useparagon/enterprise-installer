@@ -24,6 +24,11 @@ listed and reads the admin kubeconfig from the cluster resource in that case.
 
 Do not commit real credentials to git.
 
+## Postgres Flexible Server storage
+
+Azure Database for PostgreSQL Flexible Server is configured with `auto_grow_enabled = true`. Terraform does **not** expose a separate maximum autogrow size (there is no max-storage argument on `azurerm_postgresql_flexible_server` in this module). Do not treat initial `storage_mb` as an alert cap. Grafana storage alerts default to 1000 GiB until operators set `${DB}_POSTGRES_MAX_STORAGE_BYTES` in Helm `global.env`.
+
+
 ## Redis: legacy vs Azure Managed Redis
 
 Branch: `fix/PARA-21251/managed-sync-redis` ([PARA-21251](https://useparagon.atlassian.net/browse/PARA-21251)).
@@ -165,6 +170,8 @@ k8s_service_cidr        = "172.0.0.0/16"
 k8s_dns_service_ip      = "172.0.0.10"
 ```
 
+Environment-provided values (`TF_VAR_*`, including Spacelift contexts) are always strings and cannot express a real null, so set `k8s_network_plugin_mode` and `k8s_pod_cidr` to `null` or an empty string there — both are read as null.
+
 Optional staged migrations for legacy clusters (each step is one-way where noted):
 
 1. **NAT Gateway outbound**: remove any `k8s_outbound_type = "loadBalancer"` override and apply — creates the NAT Gateway and switches outbound SNAT.
@@ -190,7 +197,23 @@ AKS LoadBalancer provisioning needs the cluster identity to have **Network Contr
 - the private subnet (VMSS / subnet join)
 - the `aks-nsg` NSG (cloud-provider-azure reconciles LB security rules on the associated NSG)
 
-Those role assignments are created by infra Terraform and require the Terraform principal to also have **User Access Administrator** (included in `azure/scripts/setup-roles.sh`).
+Those role assignments are created by infra Terraform. `azure/scripts/setup-roles.sh`
+grants **Role Based Access Control Administrator** only on the Paragon resource
+group, with an ABAC condition that limits Terraform to Network Contributor,
+AKS Cluster Admin, Storage Blob Data Contributor, Reader, AppGw for Containers
+Configuration Manager, and DNS Zone Contributor. It also grants **Locks
+Contributor** on that group so `postgres_management_lock_enabled` can manage
+`Microsoft.Authorization/locks/*`. It does not grant User Access Administrator.
+Custom-role display names include the subscription ID and each definition has
+only that subscription in `AssignableScopes`. Azure requires
+`roleDefinitions/write` on every assignable scope when updating a custom role,
+so this avoids requiring one subscription administrator to control another
+subscription in the same tenant. The script also registers installer resource providers
+(including Microsoft.ServiceNetworking) with `az provider register --wait`;
+Terraform does not. If a subscription-scoped Reader still exists on the Hoop
+support identity, the script leaves User Access Administrator in place and
+prints a required post-paragon rerun: run `setup-roles.sh` again after that
+apply so the broad role is removed.
 
 Optional malicious-IP denylist (inbound and outbound) via `nsg_malicious_ips`. Empty by default (rules omitted). Azure allows at most 4000 prefixes per rule:
 
@@ -207,7 +230,6 @@ nsg_malicious_ips = [
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
-| <a name="requirement_azuread"></a> [azuread](#requirement\_azuread) | ~> 3.0 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.0 |
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
 
@@ -275,11 +297,11 @@ nsg_malicious_ips = [
 | <a name="input_k8s_max_node_count"></a> [k8s\_max\_node\_count](#input\_k8s\_max\_node\_count) | Maximum number of node Kubernetes can scale up to. | `number` | `50` | no |
 | <a name="input_k8s_min_node_count"></a> [k8s\_min\_node\_count](#input\_k8s\_min\_node\_count) | Minimum number of node Kubernetes can scale down to. | `number` | `3` | no |
 | <a name="input_k8s_network_plugin"></a> [k8s\_network\_plugin](#input\_k8s\_network\_plugin) | AKS network plugin. Use `azure` (recommended) or legacy `kubenet`. | `string` | `"azure"` | no |
-| <a name="input_k8s_network_plugin_mode"></a> [k8s\_network\_plugin\_mode](#input\_k8s\_network\_plugin\_mode) | Azure CNI mode. `overlay` assigns pod IPs from k8s\_pod\_cidr (default, IP-efficient). Set to null for legacy node-subnet mode (pod IPs from the VNet). | `string` | `"overlay"` | no |
+| <a name="input_k8s_network_plugin_mode"></a> [k8s\_network\_plugin\_mode](#input\_k8s\_network\_plugin\_mode) | Azure CNI mode. `overlay` assigns pod IPs from k8s\_pod\_cidr (default, IP-efficient). Set to null, `""` or `"null"` for legacy node-subnet mode (pod IPs from the VNet). | `string` | `"overlay"` | no |
 | <a name="input_k8s_network_policy"></a> [k8s\_network\_policy](#input\_k8s\_network\_policy) | Network policy engine. Leave null to disable, or set to `azure`, `calico`, or `cilium`. | `string` | `null` | no |
 | <a name="input_k8s_ondemand_node_instance_type"></a> [k8s\_ondemand\_node\_instance\_type](#input\_k8s\_ondemand\_node\_instance\_type) | The compute instance type to use for Kubernetes on demand nodes. | `string` | `"Standard_B2ms"` | no |
 | <a name="input_k8s_outbound_type"></a> [k8s\_outbound\_type](#input\_k8s\_outbound\_type) | AKS outbound connectivity type. Use `userAssignedNATGateway` when the private subnet has a NAT Gateway (recommended). | `string` | `"userAssignedNATGateway"` | no |
-| <a name="input_k8s_pod_cidr"></a> [k8s\_pod\_cidr](#input\_k8s\_pod\_cidr) | Pod overlay CIDR (RFC 1918 private). Used when k8s\_network\_plugin\_mode is `overlay` or k8s\_network\_plugin is `kubenet`. Must not overlap vpc\_cidr or k8s\_service\_cidr. | `string` | `"192.168.0.0/16"` | no |
+| <a name="input_k8s_pod_cidr"></a> [k8s\_pod\_cidr](#input\_k8s\_pod\_cidr) | Pod overlay CIDR (RFC 1918 private). Used when k8s\_network\_plugin\_mode is `overlay` or k8s\_network\_plugin is `kubenet`. Must not overlap vpc\_cidr or k8s\_service\_cidr. Set to null, `""` or `"null"` when unused. | `string` | `"192.168.0.0/16"` | no |
 | <a name="input_k8s_service_cidr"></a> [k8s\_service\_cidr](#input\_k8s\_service\_cidr) | Kubernetes service CIDR block (RFC 1918 private). Immutable after cluster creation. | `string` | `"172.16.0.0/16"` | no |
 | <a name="input_k8s_sku_tier"></a> [k8s\_sku\_tier](#input\_k8s\_sku\_tier) | The SKU Tier of the AKS cluster (`Free`, `Standard` or `Premium`). | `string` | `"Premium"` | no |
 | <a name="input_k8s_spot_instance_percent"></a> [k8s\_spot\_instance\_percent](#input\_k8s\_spot\_instance\_percent) | The percentage of spot instances to use for Kubernetes nodes. | `number` | `75` | no |

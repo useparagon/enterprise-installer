@@ -39,6 +39,8 @@ resource "helm_release" "reloader" {
   create_namespace = false
   atomic           = true
   cleanup_on_fail  = true
+
+  depends_on = [helm_release.external_secrets]
 }
 
 locals {
@@ -238,7 +240,7 @@ locals {
 
 resource "kubectl_manifest" "secret_store" {
   yaml_body  = local.secret_store_yaml
-  depends_on = [helm_release.external_secrets, kubernetes_namespace_v1.paragon]
+  depends_on = [helm_release.reloader, kubernetes_namespace_v1.paragon]
 }
 
 resource "kubectl_manifest" "external_secret_paragon" {
@@ -246,9 +248,10 @@ resource "kubectl_manifest" "external_secret_paragon" {
   depends_on = [kubectl_manifest.secret_store]
 }
 
-# The yaml locals embed the paragon namespace id, which is unknown until the
-# namespace is created, so count must come from the variables instead.
 resource "kubectl_manifest" "external_secret_docker" {
+  # Gate on known inputs, not yamlencode(...) != null. The YAML includes
+  # kubernetes_namespace_v1.paragon.id, which is unknown on first apply, so using
+  # the encoded document for count makes Terraform refuse to plan.
   count = var.create_docker_pull_secret && var.docker_cfg_secret_name != null ? 1 : 0
 
   yaml_body  = local.external_secret_docker_yaml
