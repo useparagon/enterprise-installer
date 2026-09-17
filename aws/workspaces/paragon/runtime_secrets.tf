@@ -149,6 +149,7 @@ resource "aws_secretsmanager_secret_version" "agent_os_vendor_paragon_overlay" {
   count = var.agent_os_enabled ? 1 : 0
 
   secret_id = data.aws_secretsmanager_secret.agent_os_vendor[0].id
+  # Merge so an empty tfvars map cannot wipe keys already in Secrets Manager.
   secret_string = jsonencode(merge(
     jsondecode(data.aws_secretsmanager_secret_version.agent_os_vendor[0].secret_string),
     var.agent_os_vendor_config,

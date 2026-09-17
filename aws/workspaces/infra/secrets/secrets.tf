@@ -109,7 +109,9 @@ resource "aws_secretsmanager_secret_version" "openobserve" {
 }
 
 # Agent OS secrets: app (mounted by every service), admin (migration Job only) and vendor
-# (operator-owned API keys; Terraform creates the path and never manages its contents).
+# (operator-owned API keys). Infra creates the secret paths and seeds app/admin.
+# The paragon workspace overlays extra keys. Vendor is created empty here and
+# ignore_changes so later infra applies do not wipe operator or paragon writes.
 
 resource "aws_secretsmanager_secret" "agent_os_app" {
   count = var.agent_os_enabled ? 1 : 0
