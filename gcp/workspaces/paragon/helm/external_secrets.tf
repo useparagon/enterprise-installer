@@ -354,7 +354,7 @@ resource "kubernetes_service_account_v1" "agent_os" {
 }
 
 resource "kubectl_manifest" "external_secret_agent_os_app" {
-  count = local.external_secret_agent_os_app_yaml != null ? 1 : 0
+  count = var.agent_os_enabled && var.agent_os_app_secret_name != null && var.agent_os_vendor_secret_name != null ? 1 : 0
 
   yaml_body = local.external_secret_agent_os_app_yaml
   depends_on = [
@@ -365,7 +365,7 @@ resource "kubectl_manifest" "external_secret_agent_os_app" {
 }
 
 resource "kubectl_manifest" "external_secret_agent_os_admin" {
-  count = local.external_secret_agent_os_admin_yaml != null ? 1 : 0
+  count = var.agent_os_enabled && var.agent_os_admin_secret_name != null ? 1 : 0
 
   yaml_body = local.external_secret_agent_os_admin_yaml
   depends_on = [
