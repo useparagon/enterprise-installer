@@ -21,12 +21,12 @@ variable "agent_os_enabled" {
 }
 
 variable "agent_os_eventhub_partition_count" {
-  description = "Partition count for Event Hubs owned by Agent OS."
+  description = "Partition count for the Managed Sync instance-status Event Hubs that Agent OS also uses. Partitions cannot be decreased after creation."
   type        = number
 }
 
 variable "agent_os_eventhub_message_retention" {
-  description = "Retention in days for Event Hubs owned by Agent OS."
+  description = "Retention in days for the Managed Sync instance-status Event Hubs that Agent OS also uses."
   type        = number
 }
 
