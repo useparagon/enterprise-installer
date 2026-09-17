@@ -1013,6 +1013,11 @@ locals {
       "port"             = try(local.helm_vars.global.env["FLIPT_PORT"], 1722)
       "public_url"       = try(local.helm_vars.global.env["FLIPT_PUBLIC_URL"], null)
     }
+    "ocs-code-runner" = {
+      "healthcheck_path" = "/healthz"
+      "port"             = 8080
+      "public_url"       = null
+    }
     "hades" = {
       "healthcheck_path" = "/healthz"
       "port"             = try(local.helm_vars.global.env["HADES_PORT"], 1710)
@@ -1419,6 +1424,13 @@ locals {
           try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
           local.cloud_storage_type == "GCP" ? "https://storage.googleapis.com" : null,
         )
+
+        # OCS knative code-runner (on-prem substitute for WORKER_SHARED_OCS_LAMBDA_NAME).
+        WORKER_SHARED_OCS_KNATIVE_SERVICE_URL = try(local.helm_vars.global.env["WORKER_SHARED_OCS_KNATIVE_SERVICE_URL"], "http://ocs-code-runner.paragon.svc.cluster.local")
+        OCS_CODE_RUNNER_STORAGE_TYPE          = try(local.helm_vars.global.env["OCS_CODE_RUNNER_STORAGE_TYPE"], lower(local.cloud_storage_type))
+        OCS_CODE_RUNNER_STORAGE_BUCKET        = try(local.helm_vars.global.env["OCS_CODE_RUNNER_STORAGE_BUCKET"], try(local.storage_output.private_bucket, "${local.workspace}-app"))
+        OCS_CODE_RUNNER_STORAGE_REGION        = try(local.helm_vars.global.env["OCS_CODE_RUNNER_STORAGE_REGION"], var.region)
+        OCS_CODE_RUNNER_STORAGE_ENDPOINT      = try(local.helm_vars.global.env["OCS_CODE_RUNNER_STORAGE_ENDPOINT"], "https://storage.googleapis.com")
 
         # Monitor configurations
         MONITOR_BULL_EXPORTER_HOST              = "http://bull-exporter"

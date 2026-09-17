@@ -22,6 +22,8 @@ const ignoredServices = [
   // MinIO was retired (PARA-21646); its chart is removed, but atlas input may
   // still list it while datastores/minio remains in the monorepo.
   'minio',
+  // On-prem OCS knative runner; not a platform-monorepo atlas service.
+  'ocs-code-runner',
 ];
 
 /**

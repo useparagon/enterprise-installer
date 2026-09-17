@@ -1,0 +1,73 @@
+# OCS knative node-script code runner (on-prem substitute for AWS Lambda).
+#
+# mode: knative     — serving.knative.dev/v1 Service (requires Knative Serving CRDs)
+# mode: deployment  — plain Deployment + ClusterIP (same HTTP image; no CRDs)
+#
+# Default is deployment so existing clusters without Knative Serving can helm-upgrade.
+# After installing Knative Serving + Kourier, set mode: knative.
+mode: deployment
+
+replicaCount: 2
+
+image:
+  # Docker Hub equivalent of ocs/knative-node-script. Independent of Paragon VERSION.
+  repository: useparagon/ocs-code-runner-knative
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  limits:
+    cpu: '1'
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 75
+
+knative:
+  minScale: '0'
+  maxScale: '10'
+  target: '20'
+  containerConcurrency: 20
+  timeoutSeconds: 600
+
+secretName: paragon-secrets
+
+imagePullSecrets: []
+nameOverride: ''
+fullnameOverride: ocs-code-runner
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ''
+
+podAnnotations: {}
+
+podSecurityContext:
+  {}
+
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  capabilities:
+    drop:
+      - ALL
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

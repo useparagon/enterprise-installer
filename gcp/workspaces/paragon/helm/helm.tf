@@ -138,6 +138,7 @@ locals {
       "hades",
       "health-checker",
       "hermes",
+      "ocs-code-runner",
       "openobserve",
       "release",
       "worker-actionkit",

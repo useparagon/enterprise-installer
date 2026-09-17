@@ -39,3 +39,4 @@ This is a **Paragon Enterprise** self-hosted deployment repository — an infras
 - `terraform init -backend=false` is required for local validation since backend configs reference remote state stores.
 - Files under `.secure/`, `main.tf`, and `*.tfvars` are gitignored. `prepare.sh` generates them from templates/examples.
 - There are no automated tests or lint scripts in this repo. Validation = `terraform validate` + `helm lint` + running `prepare.sh`.
+- OCS custom-code on-prem uses the knative HTTP runner (`charts/paragon-onprem/charts/ocs-code-runner`), not AWS Lambda. Image is Docker Hub `useparagon/ocs-code-runner-knative` (not ECR). Default `mode: deployment` (ClusterIP) so clusters without Knative Serving CRDs still upgrade; set `ocs-code-runner.mode: knative` after installing Serving + Kourier. Workers receive `WORKER_SHARED_OCS_KNATIVE_SERVICE_URL` plus `OCS_CODE_RUNNER_STORAGE_*` (same provider set as `CLOUD_STORAGE_TYPE`).
