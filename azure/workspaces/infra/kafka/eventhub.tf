@@ -34,20 +34,22 @@ resource "azurerm_eventhub_namespace_authorization_rule" "kafka" {
   manage = true
 }
 
-# Agent OS consumes the Managed Sync `sync.instance-status` stream and writes its
-# DLT. Event Hubs does not support Kafka AdminClient topic management, so both
-# Event Hubs required by this integration must exist before the workloads start.
-locals {
-  agent_os_required_eventhubs = var.agent_os_enabled ? toset([
-    "sync.instance-status",
-    "sync.instance-status.dlt",
-  ]) : toset([])
+# Managed Sync owns the source stream. Event Hubs does not support Kafka AdminClient
+# topic management, so Terraform must provision it whenever Managed Sync is enabled.
+resource "azurerm_eventhub" "managed_sync_instance_status" {
+  count = var.managed_sync_enabled ? 1 : 0
+
+  name              = "sync.instance-status"
+  namespace_id      = azurerm_eventhub_namespace.kafka.id
+  partition_count   = var.agent_os_eventhub_partition_count
+  message_retention = var.agent_os_eventhub_message_retention
 }
 
-resource "azurerm_eventhub" "agent_os_required" {
-  for_each = local.agent_os_required_eventhubs
+# Agent OS owns only the DLT for the Managed Sync source stream.
+resource "azurerm_eventhub" "agent_os_dlt" {
+  count = var.agent_os_enabled ? 1 : 0
 
-  name              = each.value
+  name              = "sync.instance-status.dlt"
   namespace_id      = azurerm_eventhub_namespace.kafka.id
   partition_count   = var.agent_os_eventhub_partition_count
   message_retention = var.agent_os_eventhub_message_retention
