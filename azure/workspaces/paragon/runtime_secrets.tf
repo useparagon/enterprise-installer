@@ -56,6 +56,39 @@ resource "azurerm_key_vault_secret" "managed_sync" {
   value        = jsonencode(module.managed_sync_config[0].config)
 }
 
+# Agent OS follows the Managed Sync ownership pattern on Azure: infra publishes
+# resource-derived values through its handoff, and the paragon workspace owns the
+# application secrets that ESO syncs into Kubernetes.
+resource "azurerm_key_vault_secret" "agent_os_app" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name         = "agent-os-app"
+  key_vault_id = data.azurerm_key_vault.paragon.id
+  value = jsonencode(merge(
+    local.agent_os_handoff.app_config,
+    var.agent_os_app_config,
+  ))
+}
+
+resource "azurerm_key_vault_secret" "agent_os_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name         = "agent-os-admin"
+  key_vault_id = data.azurerm_key_vault.paragon.id
+  value = jsonencode(merge(
+    local.agent_os_handoff.admin_config,
+    var.agent_os_admin_config,
+  ))
+}
+
+resource "azurerm_key_vault_secret" "agent_os_vendor" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name         = "agent-os-vendor"
+  key_vault_id = data.azurerm_key_vault.paragon.id
+  value        = jsonencode(var.agent_os_vendor_config)
+}
+
 resource "azurerm_key_vault_secret" "openobserve" {
   count = 1
 

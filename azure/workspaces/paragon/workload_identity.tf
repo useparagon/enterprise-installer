@@ -58,7 +58,7 @@ resource "azurerm_federated_identity_credential" "agent_os" {
 resource "azurerm_role_assignment" "agent_os_storage" {
   count = var.agent_os_enabled ? 1 : 0
 
-  scope                            = local.agent_os_handoff.container_id
+  scope                            = local.agent_os_container_id
   role_definition_name             = "Storage Blob Data Contributor"
   principal_id                     = azurerm_user_assigned_identity.agent_os[0].principal_id
   skip_service_principal_aad_check = true

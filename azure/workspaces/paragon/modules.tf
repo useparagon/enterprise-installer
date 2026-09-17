@@ -26,9 +26,9 @@ module "helm" {
     docker_cfg      = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
     managed_sync    = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
     openobserve     = azurerm_key_vault_secret.openobserve[0].version
-    agent_os_app    = var.agent_os_enabled ? data.azurerm_key_vault_secret.agent_os_app[0].version : null
-    agent_os_admin  = var.agent_os_enabled ? data.azurerm_key_vault_secret.agent_os_admin[0].version : null
-    agent_os_vendor = var.agent_os_enabled ? data.azurerm_key_vault_secret.agent_os_vendor[0].version : null
+    agent_os_app    = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_app[0].version : null
+    agent_os_admin  = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_admin[0].version : null
+    agent_os_vendor = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_vendor[0].version : null
   }))
   ingress_scheme           = var.ingress_scheme
   nginx_public             = local.nginx_public
@@ -46,9 +46,9 @@ module "helm" {
   agent_os_enabled         = var.agent_os_enabled
   agent_os_version         = var.agent_os_version
   agent_os_secret_names = var.agent_os_enabled ? {
-    app    = local.agent_os_handoff.app
-    admin  = local.agent_os_handoff.admin
-    vendor = local.agent_os_handoff.vendor
+    app    = azurerm_key_vault_secret.agent_os_app[0].name
+    admin  = azurerm_key_vault_secret.agent_os_admin[0].name
+    vendor = azurerm_key_vault_secret.agent_os_vendor[0].name
   } : null
   agent_os_workload_identity_client_id = var.agent_os_enabled ? azurerm_user_assigned_identity.agent_os[0].client_id : null
   agent_os_workload_identity_ready = var.agent_os_enabled ? sha256(join(":", [
