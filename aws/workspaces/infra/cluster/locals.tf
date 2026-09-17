@@ -187,15 +187,57 @@ locals {
     ]
   }
 
+  # vCPU from the size suffix; memory GiB/vCPU from the family letter so Karpenter
+  # limits stay correct when instance types change (c=2, m=4, r/i=8, x=16).
+  agent_os_ec2_size_vcpu = {
+    large      = 2
+    xlarge     = 4
+    "2xlarge"  = 8
+    "3xlarge"  = 12
+    "4xlarge"  = 16
+    "6xlarge"  = 24
+    "8xlarge"  = 32
+    "9xlarge"  = 36
+    "10xlarge" = 40
+    "12xlarge" = 48
+    "16xlarge" = 64
+    "18xlarge" = 72
+    "24xlarge" = 96
+    "32xlarge" = 128
+    "48xlarge" = 192
+  }
+  agent_os_ec2_gib_per_vcpu = {
+    c = 2
+    m = 4
+    r = 8
+    i = 8
+    x = 16
+  }
+  agent_os_index_node_vcpu = max([
+    for t in var.agent_os_index_instance_types : local.agent_os_ec2_size_vcpu[split(".", t)[1]]
+  ]...)
+  agent_os_index_node_memory_gib = max([
+    for t in var.agent_os_index_instance_types :
+    local.agent_os_ec2_size_vcpu[split(".", t)[1]] * local.agent_os_ec2_gib_per_vcpu[substr(t, 0, 1)]
+  ]...)
+  agent_os_extract_node_vcpu = max([
+    for t in var.agent_os_extract_instance_types : local.agent_os_ec2_size_vcpu[split(".", t)[1]]
+  ]...)
+  agent_os_extract_node_memory_gib = max([
+    for t in var.agent_os_extract_instance_types :
+    local.agent_os_ec2_size_vcpu[split(".", t)[1]] * local.agent_os_ec2_gib_per_vcpu[substr(t, 0, 1)]
+  ]...)
+
   # Agent OS Karpenter capacity is defined in infra so both compute modes use
   # the same instance types and limits. The paragon workspace only renders the
-  # Kubernetes NodePool resources from this handoff.
+  # Kubernetes NodePool resources from this handoff. Limits use the largest
+  # selected type so a fallback instance in the list can actually launch.
   agent_os_karpenter_node_pools = var.agent_os_enabled ? {
     "agent-os-index" = {
       capacity_types = ["on-demand"]
       instance_types = var.agent_os_index_instance_types
-      cpu_limit      = tostring(var.agent_os_index_max_count * 8)
-      memory_limit   = "${var.agent_os_index_max_count * 64}Gi"
+      cpu_limit      = tostring(var.agent_os_index_max_count * local.agent_os_index_node_vcpu)
+      memory_limit   = "${var.agent_os_index_max_count * local.agent_os_index_node_memory_gib}Gi"
       nodes_limit    = var.agent_os_index_max_count
       weight         = 10
       labels = {
@@ -213,8 +255,8 @@ locals {
     "agent-os-extract" = {
       capacity_types = ["on-demand"]
       instance_types = var.agent_os_extract_instance_types
-      cpu_limit      = tostring(var.agent_os_extract_max_count * 16)
-      memory_limit   = "${var.agent_os_extract_max_count * 32}Gi"
+      cpu_limit      = tostring(var.agent_os_extract_max_count * local.agent_os_extract_node_vcpu)
+      memory_limit   = "${var.agent_os_extract_max_count * local.agent_os_extract_node_memory_gib}Gi"
       nodes_limit    = var.agent_os_extract_max_count
       weight         = 10
       labels = {

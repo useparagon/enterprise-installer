@@ -499,7 +499,7 @@ variable "agent_os_admin_config" {
 }
 
 variable "agent_os_vendor_config" {
-  description = "Agent OS vendor/application credentials populated by the paragon workspace. Keys are intentionally open-ended so the Agent OS contract can evolve without changing the Terraform schema."
+  description = "Optional Agent OS vendor keys merged onto the operator-owned secret. An empty map cannot wipe keys already in Secrets Manager."
   type        = map(string)
   sensitive   = true
   default     = {}

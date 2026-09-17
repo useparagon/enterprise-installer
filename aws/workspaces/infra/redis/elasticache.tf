@@ -212,8 +212,9 @@ locals {
     key => key == "cache" ? "${var.workspace}-agent-os" : "${var.workspace}-agent-os-${replace(key, "_", "-")}"
   }
 
-  # ElastiCache IDs have short length limits. Keep a stable cache ID, and make
-  # additional map entries collision-safe by reserving room for a key hash.
+  # ElastiCache IDs have short length limits. These strings are the resource
+  # identity after first apply; changing them replaces the replication group.
+  # Keep a stable cache ID, and make additional map entries collision-safe.
   agent_os_valkey_resource_ids = {
     for key, _ in local.agent_os_valkey_instances :
     key => key == "cache"
