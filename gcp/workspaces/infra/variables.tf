@@ -204,6 +204,95 @@ variable "managed_sync_enabled" {
   default     = false
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "The version of the Agent OS helm chart to install (consumed by the paragon workspace in PARA-25775)."
+  type        = string
+  default     = "latest"
+}
+
+variable "agent_os_postgres" {
+  description = "Agent OS Cloud SQL instances keyed by instance name. Each entry can be sized and changed independently."
+  type = map(object({
+    instance_class         = optional(string, "db-custom-2-4096")
+    allocated_storage      = optional(number, 100)
+    max_allocated_storage  = optional(number, 1000)
+    engine_version         = optional(string, "POSTGRES_16")
+    multi_az               = optional(bool, true)
+    read_replica           = optional(bool, false)
+    replica_instance_class = optional(string, "db-custom-1-3840")
+    storage_type           = optional(string, "PD_SSD")
+  }))
+  default = {
+    agent_os = {}
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      cfg.max_allocated_storage >= 100 && cfg.max_allocated_storage >= cfg.allocated_storage
+    ])
+    error_message = "Agent OS Cloud SQL max_allocated_storage must be at least 100 GiB and >= allocated_storage."
+  }
+}
+
+variable "agent_os_valkey" {
+  description = "Agent OS Memorystore for Valkey instances keyed by cache name. Each entry can be sized and changed independently."
+  type = map(object({
+    node_type       = optional(string, "STANDARD_SMALL")
+    multi_az        = optional(bool, true)
+    cluster_enabled = optional(bool, false)
+    engine_version  = optional(string, "VALKEY_7_2")
+  }))
+  default = {
+    cache = {}
+  }
+}
+
+variable "agent_os_index_machine_type" {
+  description = "GKE machine type for the Agent OS index node pool."
+  type        = string
+  default     = "n2-highmem-8"
+}
+
+variable "agent_os_index_min_count" {
+  type    = number
+  default = 2
+}
+
+variable "agent_os_index_max_count" {
+  type    = number
+  default = 4
+}
+
+variable "agent_os_extract_machine_type" {
+  description = "Compute-optimized AMD machine type for the Agent OS extraction GKE node pool. Use c2d-standard-8 for staging and c2d-standard-16 for production."
+  type        = string
+  default     = "c2d-standard-16"
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction GKE node pool."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction GKE node pool. Use 3 for staging and 8 for production."
+  type        = number
+  default     = 8
+}
+
 variable "gmk_kafka_version" {
   description = "Kafka version for the Google Managed Kafka cluster (version offered by the service)."
   type        = string
@@ -242,6 +331,11 @@ variable "gmk_sasl_mechanism" {
   validation {
     condition     = contains(["oauthbearer", "plain"], var.gmk_sasl_mechanism)
     error_message = "gmk_sasl_mechanism must be \"oauthbearer\" or \"plain\"."
+  }
+
+  validation {
+    condition     = !var.agent_os_enabled || var.gmk_sasl_mechanism == "plain"
+    error_message = "Agent OS currently requires gmk_sasl_mechanism = \"plain\"; its workload identity is assigned to the storage/Valkey service account, not the Kafka client service account."
   }
 }
 

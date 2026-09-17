@@ -21,3 +21,26 @@ resource "google_service_account_key" "kafka_client" {
   service_account_id = google_service_account.kafka_client.name
 }
 
+# Agent OS uses a separate client identity on the shared Managed Kafka cluster.
+resource "google_service_account" "kafka_client_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  project      = var.gcp_project_id
+  account_id   = "kafka-${substr(md5(var.workspace), 0, 8)}-aos"
+  display_name = "Kafka client for Agent OS (${var.workspace})"
+}
+
+resource "google_project_iam_member" "kafka_client_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  project = var.gcp_project_id
+  role    = "roles/managedkafka.client"
+  member  = "serviceAccount:${google_service_account.kafka_client_agent_os[0].email}"
+}
+
+resource "google_service_account_key" "kafka_client_agent_os" {
+  count = var.agent_os_enabled && var.gmk_sasl_mechanism == "plain" ? 1 : 0
+
+  service_account_id = google_service_account.kafka_client_agent_os[0].name
+}
+
