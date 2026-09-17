@@ -19,3 +19,12 @@ resource "google_service_account_iam_member" "agent_os_workload_identity" {
 
   depends_on = [kubernetes_service_account_v1.agent_os]
 }
+
+# The managed-sync chart uses one shared KSA, not per-service names like api-sync.
+resource "google_service_account_iam_member" "managed_sync_workload_identity" {
+  count = var.managed_sync_enabled && var.storage_service_account != null ? 1 : 0
+
+  service_account_id = "projects/${data.google_container_cluster.cluster.project}/serviceAccounts/${var.storage_service_account}"
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${data.google_container_cluster.cluster.project}.svc.id.goog[${kubernetes_namespace_v1.paragon.id}/managed-sync-service-account]"
+}

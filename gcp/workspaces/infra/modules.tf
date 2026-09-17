@@ -76,6 +76,15 @@ module "storage" {
   agent_os_enabled            = var.agent_os_enabled
 }
 
+# Pods share one KSA (managed-sync-service-account) annotated with the storage
+# GSA, so that GSA also needs Managed Kafka data-plane access for OAUTHBEARER.
+resource "google_project_iam_member" "storage_managedkafka_client" {
+  count   = var.managed_sync_enabled && var.gmk_sasl_mechanism == "oauthbearer" ? 1 : 0
+  project = local.gcp_project_id
+  role    = "roles/managedkafka.client"
+  member  = "serviceAccount:${nonsensitive(module.storage.storage.service_account)}"
+}
+
 module "cluster" {
   source = "./cluster"
 
