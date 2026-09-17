@@ -187,6 +187,50 @@ locals {
     ]
   }
 
+  # Agent OS Karpenter capacity is defined in infra so both compute modes use
+  # the same instance types and limits. The paragon workspace only renders the
+  # Kubernetes NodePool resources from this handoff.
+  agent_os_karpenter_node_pools = var.agent_os_enabled ? {
+    "agent-os-index" = {
+      capacity_types = ["on-demand"]
+      instance_types = var.agent_os_index_instance_types
+      cpu_limit      = tostring(var.agent_os_index_max_count * 8)
+      memory_limit   = "${var.agent_os_index_max_count * 64}Gi"
+      nodes_limit    = var.agent_os_index_max_count
+      weight         = 10
+      labels = {
+        "useparagon.com/workload"     = "agent-os-index"
+        "useparagon.com/capacityType" = "ondemand"
+      }
+      taints = [
+        {
+          key    = "useparagon.com/workload"
+          value  = "agent-os-index"
+          effect = "NoSchedule"
+        }
+      ]
+    }
+    "agent-os-extract" = {
+      capacity_types = ["on-demand"]
+      instance_types = var.agent_os_extract_instance_types
+      cpu_limit      = tostring(var.agent_os_extract_max_count * 16)
+      memory_limit   = "${var.agent_os_extract_max_count * 32}Gi"
+      nodes_limit    = var.agent_os_extract_max_count
+      weight         = 10
+      labels = {
+        "useparagon.com/workload"     = "agent-os-extract"
+        "useparagon.com/capacityType" = "ondemand"
+      }
+      taints = [
+        {
+          key    = "useparagon.com/workload"
+          value  = "agent-os-extract"
+          effect = "NoSchedule"
+        }
+      ]
+    }
+  } : {}
+
   # Do not duplicate Agent OS capacity during Karpenter migration coexistence.
   # Karpenter owns these pools whenever it is enabled; MNGs are the fallback.
   agent_os_mng_enabled = var.agent_os_enabled && !var.enable_karpenter

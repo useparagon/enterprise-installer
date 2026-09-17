@@ -505,40 +505,6 @@ variable "agent_os_vendor_config" {
   default     = {}
 }
 
-variable "agent_os_index_instance_types" {
-  description = "Memory-optimized EC2 instance types for the Agent OS Karpenter index pool."
-  type        = list(string)
-  default     = ["r6a.2xlarge", "r6i.2xlarge", "r5a.2xlarge"]
-}
-
-variable "agent_os_index_max_count" {
-  description = "Maximum nodes in the Agent OS Karpenter index pool. Karpenter intentionally scales the pool to zero when idle."
-  type        = number
-  default     = 4
-
-  validation {
-    condition     = var.agent_os_index_max_count >= 1
-    error_message = "agent_os_index_max_count must be at least 1."
-  }
-}
-
-variable "agent_os_extract_instance_types" {
-  description = "Compute-optimized AMD EC2 instance types for the Agent OS Karpenter extraction pool."
-  type        = list(string)
-  default     = ["c6a.4xlarge"]
-}
-
-variable "agent_os_extract_max_count" {
-  description = "Maximum nodes in the Agent OS Karpenter extraction pool. Use 3 for staging and 8 for production; Karpenter scales to zero when idle."
-  type        = number
-  default     = 8
-
-  validation {
-    condition     = var.agent_os_extract_max_count >= 1
-    error_message = "agent_os_extract_max_count must be at least 1."
-  }
-}
-
 variable "waf_enabled" {
   description = "Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf_managed_rule_groups, rate limits, or IP lists in tfvars."
   type        = bool
@@ -699,49 +665,11 @@ locals {
 
   waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
 
-  # Agent OS index and extraction workloads use separate on-demand Karpenter pools.
+  # Agent OS capacity is owned by infra. This workspace only renders the
+  # Karpenter NodePools from the cluster handoff.
   karpenter_node_pools = merge(
     var.karpenter_node_pools,
-    var.agent_os_enabled ? {
-      "agent-os-index" = {
-        capacity_types = ["on-demand"]
-        instance_types = var.agent_os_index_instance_types
-        cpu_limit      = tostring(var.agent_os_index_max_count * 8)
-        memory_limit   = "${var.agent_os_index_max_count * 64}Gi"
-        nodes_limit    = var.agent_os_index_max_count
-        weight         = 10
-        labels = {
-          "useparagon.com/workload"     = "agent-os-index"
-          "useparagon.com/capacityType" = "ondemand"
-        }
-        taints = [
-          {
-            key    = "useparagon.com/workload"
-            value  = "agent-os-index"
-            effect = "NoSchedule"
-          }
-        ]
-      }
-      "agent-os-extract" = {
-        capacity_types = ["on-demand"]
-        instance_types = var.agent_os_extract_instance_types
-        cpu_limit      = tostring(var.agent_os_extract_max_count * 16)
-        memory_limit   = "${var.agent_os_extract_max_count * 32}Gi"
-        nodes_limit    = var.agent_os_extract_max_count
-        weight         = 10
-        labels = {
-          "useparagon.com/workload"     = "agent-os-extract"
-          "useparagon.com/capacityType" = "ondemand"
-        }
-        taints = [
-          {
-            key    = "useparagon.com/workload"
-            value  = "agent-os-extract"
-            effect = "NoSchedule"
-          }
-        ]
-      }
-    } : {},
+    var.agent_os_enabled ? try(local.infra_vars.karpenter.value.agent_os_node_pools, {}) : {},
   )
 
   # use default where standard value can be determined
