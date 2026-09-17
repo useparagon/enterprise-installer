@@ -87,6 +87,12 @@ resource "azurerm_key_vault_secret" "agent_os_vendor" {
   name         = "agent-os-vendor"
   key_vault_id = data.azurerm_key_vault.paragon.id
   value        = jsonencode(var.agent_os_vendor_config)
+
+  # Operator-owned API keys (Voyage, extraction, etc.). Tfvars only seed create;
+  # later applies must not wipe console or Spacelift-out-of-band updates.
+  lifecycle {
+    ignore_changes = [value]
+  }
 }
 
 resource "azurerm_key_vault_secret" "openobserve" {
