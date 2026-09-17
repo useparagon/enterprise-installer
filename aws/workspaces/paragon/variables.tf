@@ -484,6 +484,27 @@ variable "agent_os_version" {
   default     = "latest"
 }
 
+variable "agent_os_app_config" {
+  description = "Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_admin_config" {
+  description = "Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_vendor_config" {
+  description = "Agent OS vendor/application credentials populated by the paragon workspace. Keys are intentionally open-ended so the Agent OS contract can evolve without changing the Terraform schema."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
 variable "agent_os_index_instance_types" {
   description = "Memory-optimized EC2 instance types for the Agent OS Karpenter index pool."
   type        = list(string)
