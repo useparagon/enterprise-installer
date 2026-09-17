@@ -136,6 +136,7 @@ module "kafka" {
   count  = var.managed_sync_enabled ? 1 : 0
   source = "./kafka"
 
+  managed_sync_enabled                = var.managed_sync_enabled
   agent_os_enabled                    = var.agent_os_enabled
   agent_os_eventhub_partition_count   = var.agent_os_eventhub_partition_count
   agent_os_eventhub_message_retention = var.agent_os_eventhub_message_retention
