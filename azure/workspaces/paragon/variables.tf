@@ -534,6 +534,27 @@ variable "agent_os_version" {
   default     = "latest"
 }
 
+variable "agent_os_app_config" {
+  description = "Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_admin_config" {
+  description = "Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_vendor_config" {
+  description = "Agent OS vendor/application credentials populated by the paragon workspace. Keys are intentionally open-ended so the Agent OS contract can evolve without changing the Terraform schema."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
 locals {
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
   hash                  = substr(sha256(var.azure_subscription_id), 0, 8)

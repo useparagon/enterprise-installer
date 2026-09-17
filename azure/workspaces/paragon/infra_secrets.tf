@@ -65,7 +65,8 @@ data "azurerm_key_vault_secret" "infra_network" {
 }
 
 locals {
-  agent_os_handoff = var.agent_os_enabled ? jsondecode(data.azurerm_key_vault_secret.infra_agent_os[0].value) : null
+  agent_os_handoff      = var.agent_os_enabled ? jsondecode(data.azurerm_key_vault_secret.infra_agent_os[0].value) : null
+  agent_os_container_id = var.agent_os_enabled ? nonsensitive(local.agent_os_handoff.container_id) : null
 
   provider_infra_vars = merge(
     {
@@ -111,26 +112,5 @@ locals {
     {
       redis = { value = local.redis_from_infra }
     },
-    var.agent_os_enabled ? {
-      agent_os = { value = local.agent_os_handoff }
-    } : {},
   )
-}
-
-data "azurerm_key_vault_secret" "agent_os_app" {
-  count        = var.agent_os_enabled ? 1 : 0
-  name         = local.agent_os_handoff.app
-  key_vault_id = data.azurerm_key_vault.paragon.id
-}
-
-data "azurerm_key_vault_secret" "agent_os_admin" {
-  count        = var.agent_os_enabled ? 1 : 0
-  name         = local.agent_os_handoff.admin
-  key_vault_id = data.azurerm_key_vault.paragon.id
-}
-
-data "azurerm_key_vault_secret" "agent_os_vendor" {
-  count        = var.agent_os_enabled ? 1 : 0
-  name         = local.agent_os_handoff.vendor
-  key_vault_id = data.azurerm_key_vault.paragon.id
 }

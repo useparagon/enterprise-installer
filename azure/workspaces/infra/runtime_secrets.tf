@@ -119,51 +119,14 @@ resource "azurerm_key_vault_secret" "runtime_storage" {
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
 
-# Agent OS secrets: app (mounted by every service), admin (migration Job only) and vendor
-# (operator-owned API keys; Terraform creates the entry and never manages its contents).
-resource "azurerm_key_vault_secret" "agent_os_app" {
-  count = var.agent_os_enabled ? 1 : 0
-
-  name         = "agent-os-app"
-  key_vault_id = azurerm_key_vault.paragon.id
-  value        = jsonencode(local.agent_os_app_config)
-
-  depends_on = [azurerm_key_vault_access_policy.terraform]
-}
-
-resource "azurerm_key_vault_secret" "agent_os_admin" {
-  count = var.agent_os_enabled ? 1 : 0
-
-  name         = "agent-os-admin"
-  key_vault_id = azurerm_key_vault.paragon.id
-  value        = jsonencode(local.agent_os_admin_config)
-
-  depends_on = [azurerm_key_vault_access_policy.terraform]
-}
-
-resource "azurerm_key_vault_secret" "agent_os_vendor" {
-  count = var.agent_os_enabled ? 1 : 0
-
-  name         = "agent-os-vendor"
-  key_vault_id = azurerm_key_vault.paragon.id
-  value        = jsonencode({})
-
-  lifecycle {
-    ignore_changes = [value]
-  }
-
-  depends_on = [azurerm_key_vault_access_policy.terraform]
-}
-
 resource "azurerm_key_vault_secret" "runtime_agent_os" {
   count = var.agent_os_enabled ? 1 : 0
 
   name         = "agent-os"
   key_vault_id = azurerm_key_vault.paragon.id
   value = jsonencode({
-    app                = azurerm_key_vault_secret.agent_os_app[0].name
-    admin              = azurerm_key_vault_secret.agent_os_admin[0].name
-    vendor             = azurerm_key_vault_secret.agent_os_vendor[0].name
+    app_config         = local.agent_os_app_config
+    admin_config       = local.agent_os_admin_config
     storage_account    = module.storage.blob.name
     storage_account_id = module.storage.blob.id
     container          = module.storage.blob.agent_os_container
