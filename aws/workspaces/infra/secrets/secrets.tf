@@ -107,3 +107,75 @@ resource "aws_secretsmanager_secret_version" "openobserve" {
     ZO_ROOT_USER_PASSWORD = random_password.openobserve_password[0].result
   })
 }
+
+# Agent OS secrets: app (mounted by every service), admin (migration Job only) and vendor
+# (operator-owned API keys). Infra creates the secret paths and seeds app/admin.
+# The paragon workspace overlays extra keys. Vendor is created empty here and
+# ignore_changes so later infra applies do not wipe operator or paragon writes.
+
+resource "aws_secretsmanager_secret" "agent_os_app" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                    = "${local.secret_prefix}/agent-os/app"
+  description             = "Agent OS datastore and broker credentials for ${var.organization}"
+  kms_key_id              = var.agent_os_kms_key_arn
+  recovery_window_in_days = var.recovery_window_in_days
+
+  tags = {
+    Name         = "${local.secret_prefix}/agent-os/app"
+    Organization = var.organization
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "agent_os_app" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id     = aws_secretsmanager_secret.agent_os_app[0].id
+  secret_string = jsonencode(var.agent_os_app_config)
+}
+
+resource "aws_secretsmanager_secret" "agent_os_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                    = "${local.secret_prefix}/agent-os/admin"
+  description             = "Agent OS Postgres superuser and Kafka ACL admin for ${var.organization}"
+  kms_key_id              = var.agent_os_kms_key_arn
+  recovery_window_in_days = var.recovery_window_in_days
+
+  tags = {
+    Name         = "${local.secret_prefix}/agent-os/admin"
+    Organization = var.organization
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "agent_os_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id     = aws_secretsmanager_secret.agent_os_admin[0].id
+  secret_string = jsonencode(var.agent_os_admin_config)
+}
+
+resource "aws_secretsmanager_secret" "agent_os_vendor" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                    = "${local.secret_prefix}/agent-os/vendor"
+  description             = "Operator-managed Agent OS vendor keys for ${var.organization}"
+  kms_key_id              = var.agent_os_kms_key_arn
+  recovery_window_in_days = var.recovery_window_in_days
+
+  tags = {
+    Name         = "${local.secret_prefix}/agent-os/vendor"
+    Organization = var.organization
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "agent_os_vendor" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id     = aws_secretsmanager_secret.agent_os_vendor[0].id
+  secret_string = jsonencode({})
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}

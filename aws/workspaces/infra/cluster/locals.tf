@@ -147,10 +147,144 @@ locals {
     taints          = [local.karpenter_controller_taint]
   }
 
+  # Agent OS index workloads require dedicated on-demand, memory-optimized capacity.
+  agent_os_index_node_group = {
+    min_count      = var.agent_os_index_min_count
+    max_count      = var.agent_os_index_max_count
+    instance_types = var.agent_os_index_instance_types
+    capacity       = "ON_DEMAND"
+    ami_type       = local.legacy_node_ami_type
+    labels = {
+      "useparagon.com/workload"     = "agent-os-index"
+      "useparagon.com/capacityType" = "ondemand"
+    }
+    taints = [
+      {
+        key    = "useparagon.com/workload"
+        value  = "agent-os-index"
+        effect = "NO_SCHEDULE"
+      }
+    ]
+  }
+
+  # Agent OS extraction workloads require dedicated on-demand, compute-optimized capacity.
+  agent_os_extract_node_group = {
+    min_count      = var.agent_os_extract_min_count
+    max_count      = var.agent_os_extract_max_count
+    instance_types = var.agent_os_extract_instance_types
+    capacity       = "ON_DEMAND"
+    ami_type       = local.legacy_node_ami_type
+    labels = {
+      "useparagon.com/workload"     = "agent-os-extract"
+      "useparagon.com/capacityType" = "ondemand"
+    }
+    taints = [
+      {
+        key    = "useparagon.com/workload"
+        value  = "agent-os-extract"
+        effect = "NO_SCHEDULE"
+      }
+    ]
+  }
+
+  # vCPU from the size suffix; memory GiB/vCPU from the family letter so Karpenter
+  # limits stay correct when instance types change (c=2, m=4, r/i=8, x=16).
+  agent_os_ec2_size_vcpu = {
+    large      = 2
+    xlarge     = 4
+    "2xlarge"  = 8
+    "3xlarge"  = 12
+    "4xlarge"  = 16
+    "6xlarge"  = 24
+    "8xlarge"  = 32
+    "9xlarge"  = 36
+    "10xlarge" = 40
+    "12xlarge" = 48
+    "16xlarge" = 64
+    "18xlarge" = 72
+    "24xlarge" = 96
+    "32xlarge" = 128
+    "48xlarge" = 192
+  }
+  agent_os_ec2_gib_per_vcpu = {
+    c = 2
+    m = 4
+    r = 8
+    i = 8
+    x = 16
+  }
+  agent_os_index_node_vcpu = max([
+    for t in var.agent_os_index_instance_types : local.agent_os_ec2_size_vcpu[split(".", t)[1]]
+  ]...)
+  agent_os_index_node_memory_gib = max([
+    for t in var.agent_os_index_instance_types :
+    local.agent_os_ec2_size_vcpu[split(".", t)[1]] * local.agent_os_ec2_gib_per_vcpu[substr(t, 0, 1)]
+  ]...)
+  agent_os_extract_node_vcpu = max([
+    for t in var.agent_os_extract_instance_types : local.agent_os_ec2_size_vcpu[split(".", t)[1]]
+  ]...)
+  agent_os_extract_node_memory_gib = max([
+    for t in var.agent_os_extract_instance_types :
+    local.agent_os_ec2_size_vcpu[split(".", t)[1]] * local.agent_os_ec2_gib_per_vcpu[substr(t, 0, 1)]
+  ]...)
+
+  # Agent OS Karpenter capacity is defined in infra so both compute modes use
+  # the same instance types and limits. The paragon workspace only renders the
+  # Kubernetes NodePool resources from this handoff. Limits use the largest
+  # selected type so a fallback instance in the list can actually launch.
+  agent_os_karpenter_node_pools = var.agent_os_enabled ? {
+    "agent-os-index" = {
+      capacity_types = ["on-demand"]
+      instance_types = var.agent_os_index_instance_types
+      cpu_limit      = tostring(var.agent_os_index_max_count * local.agent_os_index_node_vcpu)
+      memory_limit   = "${var.agent_os_index_max_count * local.agent_os_index_node_memory_gib}Gi"
+      nodes_limit    = var.agent_os_index_max_count
+      weight         = 10
+      labels = {
+        "useparagon.com/workload"     = "agent-os-index"
+        "useparagon.com/capacityType" = "ondemand"
+      }
+      taints = [
+        {
+          key    = "useparagon.com/workload"
+          value  = "agent-os-index"
+          effect = "NoSchedule"
+        }
+      ]
+    }
+    "agent-os-extract" = {
+      capacity_types = ["on-demand"]
+      instance_types = var.agent_os_extract_instance_types
+      cpu_limit      = tostring(var.agent_os_extract_max_count * local.agent_os_extract_node_vcpu)
+      memory_limit   = "${var.agent_os_extract_max_count * local.agent_os_extract_node_memory_gib}Gi"
+      nodes_limit    = var.agent_os_extract_max_count
+      weight         = 10
+      labels = {
+        "useparagon.com/workload"     = "agent-os-extract"
+        "useparagon.com/capacityType" = "ondemand"
+      }
+      taints = [
+        {
+          key    = "useparagon.com/workload"
+          value  = "agent-os-extract"
+          effect = "NoSchedule"
+        }
+      ]
+    }
+  } : {}
+
+  # Do not duplicate Agent OS capacity during Karpenter migration coexistence.
+  # Karpenter owns these pools whenever it is enabled; MNGs are the fallback.
+  agent_os_mng_enabled = var.agent_os_enabled && !var.enable_karpenter
+
   # Karpenter on → dedicated system MNG. Legacy pools are independent (migration coexistence).
   managed_node_groups = merge(
     var.enable_karpenter ? { system = local.system_node_group } : {},
     var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
+    local.agent_os_mng_enabled ? {
+      "agent-os-index"   = local.agent_os_index_node_group
+      "agent-os-extract" = local.agent_os_extract_node_group
+    } : {},
   )
 
   # Release-version pins are AMI-family-specific (Bottlerocket vs AL2023).
@@ -158,7 +292,13 @@ locals {
     for _, v in local.managed_node_groups : coalesce(try(v.ami_type, null), local.legacy_node_ami_type)
   ])
 
-  cluster_autoscaler_node_groups = var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {}
+  cluster_autoscaler_node_groups = merge(
+    var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
+    local.agent_os_mng_enabled ? {
+      "agent-os-index"   = local.agent_os_index_node_group
+      "agent-os-extract" = local.agent_os_extract_node_group
+    } : {},
+  )
 
   cluster_autoscaler_enabled = length(local.cluster_autoscaler_node_groups) > 0
 

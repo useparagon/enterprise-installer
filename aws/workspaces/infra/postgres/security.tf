@@ -62,3 +62,36 @@ resource "aws_security_group" "postgres" {
     Name = "${var.workspace}-postgres-security-group"
   }
 }
+
+# Agent OS Postgres accepts traffic only from private workload subnets.
+resource "aws_security_group" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name_prefix = "${var.workspace}-agent-os-postgres"
+  description = "Security access rules for Agent OS Postgres."
+  vpc_id      = var.vpc.id
+
+  ingress {
+    description = "Allow Agent OS workloads on port 5432."
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = var.private_subnet[*].cidr_block
+  }
+
+  egress {
+    description = "Allow all outbound traffic."
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name = "${var.workspace}-agent-os-postgres"
+  }
+}

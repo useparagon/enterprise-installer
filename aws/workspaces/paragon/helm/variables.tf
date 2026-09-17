@@ -196,6 +196,39 @@ variable "managed_sync_version" {
   type        = string
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled."
+  type        = bool
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "The version of the Agent OS helm chart to install."
+  type        = string
+}
+
+variable "agent_os_app_secret_name" {
+  description = "Secrets Manager name for Agent OS application configuration."
+  type        = string
+  default     = null
+}
+
+variable "agent_os_admin_secret_name" {
+  description = "Secrets Manager name for Agent OS migration-only administration configuration."
+  type        = string
+  default     = null
+}
+
+variable "agent_os_vendor_secret_name" {
+  description = "Secrets Manager name for operator-managed Agent OS vendor configuration."
+  type        = string
+  default     = null
+}
+
 variable "waf_web_acl_arn" {
   description = "Regional WAFv2 Web ACL ARN for the shared ALB. Empty disables WAF association."
   type        = string

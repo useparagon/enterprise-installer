@@ -35,9 +35,82 @@ resource "aws_secretsmanager_secret_version" "msk_credentials" {
   })
 }
 
+# Agent OS gets isolated application and ACL-admin identities on the shared MSK cluster.
+resource "random_string" "msk_username_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 16
+  special = false
+}
+
+resource "random_password" "msk_password_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
+resource "aws_secretsmanager_secret" "msk_credentials_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name       = "AmazonMSK_${var.workspace}-agent-os-credentials"
+  kms_key_id = aws_kms_key.kafka.key_id
+}
+
+resource "aws_secretsmanager_secret_version" "msk_credentials_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.msk_credentials_agent_os[0].id
+  secret_string = jsonencode({
+    username  = random_string.msk_username_agent_os[0].result
+    password  = random_password.msk_password_agent_os[0].result
+    mechanism = "SCRAM-SHA-512"
+  })
+}
+
+resource "random_string" "msk_username_acl_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 16
+  special = false
+}
+
+resource "random_password" "msk_password_acl_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
+resource "aws_secretsmanager_secret" "msk_credentials_acl_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name       = "AmazonMSK_${var.workspace}-acl-admin-credentials"
+  kms_key_id = aws_kms_key.kafka.key_id
+}
+
+resource "aws_secretsmanager_secret_version" "msk_credentials_acl_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.msk_credentials_acl_admin[0].id
+  secret_string = jsonencode({
+    username  = random_string.msk_username_acl_admin[0].result
+    password  = random_password.msk_password_acl_admin[0].result
+    mechanism = "SCRAM-SHA-512"
+  })
+}
+
 resource "aws_msk_scram_secret_association" "kafka" {
-  cluster_arn     = aws_msk_cluster.kafka.arn
-  secret_arn_list = [aws_secretsmanager_secret.msk_credentials.arn]
+  cluster_arn = aws_msk_cluster.kafka.arn
+  secret_arn_list = concat(
+    [aws_secretsmanager_secret.msk_credentials.arn],
+    var.agent_os_enabled ? [
+      aws_secretsmanager_secret.msk_credentials_agent_os[0].arn,
+      aws_secretsmanager_secret.msk_credentials_acl_admin[0].arn,
+    ] : []
+  )
 }
 
 resource "aws_msk_cluster" "kafka" {

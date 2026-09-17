@@ -454,6 +454,150 @@ variable "managed_sync_enabled" {
   default     = false
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "The version of the Agent OS helm chart to install (consumed by the paragon workspace in PARA-25775)."
+  type        = string
+  default     = "latest"
+}
+
+variable "agent_os_postgres" {
+  description = "Agent OS Postgres instances keyed by instance name. Each entry can be sized and tuned independently."
+  type = map(object({
+    instance_class             = optional(string, "db.t4g.medium")
+    allocated_storage          = optional(number, 100)
+    max_allocated_storage      = optional(number, 1000)
+    engine_version             = optional(string, "16")
+    multi_az                   = optional(bool, true)
+    read_replica               = optional(bool, false)
+    replica_instance_class     = optional(string, "db.t4g.small")
+    storage_type               = optional(string, "gp3")
+    iops                       = optional(number)
+    storage_throughput         = optional(number)
+    backup_retention_days      = optional(number, 7)
+    log_statement              = optional(string, "ddl")
+    log_min_duration_statement = optional(number, 1000)
+  }))
+  default = {
+    agent_os = {}
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      cfg.max_allocated_storage >= 100 &&
+      cfg.max_allocated_storage >= ceil(cfg.allocated_storage * 1.1)
+    ])
+    error_message = "Agent OS Postgres max_allocated_storage must be at least 100 GiB and at least 10% greater than allocated_storage."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      contains(["gp2", "gp3"], cfg.storage_type)
+    ])
+    error_message = "Agent OS Postgres storage_type must be gp2 or gp3."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      (cfg.iops == null) == (cfg.storage_throughput == null)
+    ])
+    error_message = "Agent OS Postgres iops and storage_throughput must be set together."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      cfg.iops == null || (
+        cfg.storage_type == "gp3" &&
+        cfg.allocated_storage >= 400 &&
+        cfg.iops >= 12000 &&
+        cfg.storage_throughput >= 500
+      )
+    ])
+    error_message = "Custom Agent OS Postgres gp3 performance requires at least 400 GiB, 12000 IOPS, and 500 MiB/s throughput."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      cfg.backup_retention_days >= 0 && cfg.backup_retention_days <= 35
+    ])
+    error_message = "Agent OS Postgres backup_retention_days must be between 0 and 35."
+  }
+}
+
+variable "agent_os_valkey" {
+  description = "Agent OS Valkey instances keyed by cache name. Each entry can be sized and tuned independently."
+  type = map(object({
+    node_type               = optional(string, "cache.t4g.medium")
+    multi_az                = optional(bool, true)
+    cluster_enabled         = optional(bool, false)
+    engine_version          = optional(string, "7.2")
+    snapshot_retention_days = optional(number, 7)
+    log_retention_days      = optional(number, 30)
+  }))
+  default = {
+    cache = {}
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_valkey :
+      cfg.snapshot_retention_days >= 0 && cfg.snapshot_retention_days <= 35
+    ])
+    error_message = "Agent OS Valkey snapshot_retention_days must be between 0 and 35."
+  }
+}
+
+variable "agent_os_index_instance_types" {
+  description = "Instance types for the Agent OS index managed node group."
+  type        = list(string)
+  default     = ["r6a.2xlarge", "r6i.2xlarge", "r5a.2xlarge"]
+}
+
+variable "agent_os_index_min_count" {
+  description = "Minimum nodes in the Agent OS index managed node group."
+  type        = number
+  default     = 2
+}
+
+variable "agent_os_index_max_count" {
+  description = "Maximum nodes in the Agent OS index managed node group."
+  type        = number
+  default     = 4
+}
+
+variable "agent_os_extract_instance_types" {
+  description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group. Use c6a.2xlarge for staging and c6a.4xlarge for production."
+  type        = list(string)
+  default     = ["c6a.4xlarge"]
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction managed node group."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction managed node group. Use 3 for staging and 8 for production."
+  type        = number
+  default     = 8
+}
+
 variable "msk_kafka_version" {
   description = "The Kafka version for the MSK cluster."
   type        = string
