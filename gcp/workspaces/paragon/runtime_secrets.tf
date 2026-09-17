@@ -82,6 +82,59 @@ resource "google_secret_manager_secret_version" "managed_sync" {
   secret_data = jsonencode(module.managed_sync_config[0].config)
 }
 
+# Agent OS follows the Managed Sync flow on GCP: infra publishes resource-derived
+# values in its handoff, and the paragon workspace owns the final secrets consumed by ESO.
+resource "google_secret_manager_secret" "agent_os_app" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = local.agent_os_app_secret_name
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "agent_os_app" {
+  count  = var.agent_os_enabled ? 1 : 0
+  secret = google_secret_manager_secret.agent_os_app[0].id
+  secret_data = jsonencode(merge(
+    local.agent_os_handoff.app_config,
+    var.agent_os_app_config,
+  ))
+}
+
+resource "google_secret_manager_secret" "agent_os_admin" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = local.agent_os_admin_secret_name
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "agent_os_admin" {
+  count  = var.agent_os_enabled ? 1 : 0
+  secret = google_secret_manager_secret.agent_os_admin[0].id
+  secret_data = jsonencode(merge(
+    local.agent_os_handoff.admin_config,
+    var.agent_os_admin_config,
+  ))
+}
+
+resource "google_secret_manager_secret" "agent_os_vendor" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = local.agent_os_vendor_secret_name
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "agent_os_vendor" {
+  count       = var.agent_os_enabled ? 1 : 0
+  secret      = google_secret_manager_secret.agent_os_vendor[0].id
+  secret_data = jsonencode(var.agent_os_vendor_config)
+}
+
 resource "google_secret_manager_secret" "openobserve" {
   count     = 1
   secret_id = local.runtime_secret_names.openobserve
