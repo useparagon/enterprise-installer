@@ -133,6 +133,12 @@ resource "google_secret_manager_secret_version" "agent_os_vendor" {
   count       = var.agent_os_enabled ? 1 : 0
   secret      = google_secret_manager_secret.agent_os_vendor[0].id
   secret_data = jsonencode(var.agent_os_vendor_config)
+
+  # Operator-owned API keys. Tfvars only seed the first version; later applies
+  # must not create a new empty version that ESO would sync as latest.
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 resource "google_secret_manager_secret" "openobserve" {
