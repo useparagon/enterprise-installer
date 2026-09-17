@@ -24,7 +24,7 @@ resource "google_secret_manager_secret" "runtime_monitoring" {
 }
 
 resource "google_secret_manager_secret_version" "runtime_monitoring" {
-  secret      = google_secret_manager_secret.runtime_monitoring.id
+  secret = google_secret_manager_secret.runtime_monitoring.id
   secret_data = jsonencode({
     pg_config = module.postgres.pg_config
   })
@@ -145,57 +145,6 @@ resource "google_secret_manager_secret_version" "runtime_cluster" {
   })
 }
 
-# Agent OS secrets: app (mounted by every service), admin (migration Job only) and vendor
-# (operator-owned API keys; Terraform creates the secret and never manages its contents).
-resource "google_secret_manager_secret" "agent_os_app" {
-  count     = var.agent_os_enabled ? 1 : 0
-  secret_id = "${local.workspace}-agent-os-app"
-
-  replication {
-    auto {}
-  }
-}
-
-resource "google_secret_manager_secret_version" "agent_os_app" {
-  count       = var.agent_os_enabled ? 1 : 0
-  secret      = google_secret_manager_secret.agent_os_app[0].id
-  secret_data = jsonencode(local.agent_os_app_config)
-}
-
-resource "google_secret_manager_secret" "agent_os_admin" {
-  count     = var.agent_os_enabled ? 1 : 0
-  secret_id = "${local.workspace}-agent-os-admin"
-
-  replication {
-    auto {}
-  }
-}
-
-resource "google_secret_manager_secret_version" "agent_os_admin" {
-  count       = var.agent_os_enabled ? 1 : 0
-  secret      = google_secret_manager_secret.agent_os_admin[0].id
-  secret_data = jsonencode(local.agent_os_admin_config)
-}
-
-resource "google_secret_manager_secret" "agent_os_vendor" {
-  count     = var.agent_os_enabled ? 1 : 0
-  secret_id = "${local.workspace}-agent-os-vendor"
-
-  replication {
-    auto {}
-  }
-}
-
-resource "google_secret_manager_secret_version" "agent_os_vendor" {
-  count       = var.agent_os_enabled ? 1 : 0
-  secret      = google_secret_manager_secret.agent_os_vendor[0].id
-  secret_data = jsonencode({})
-
-  lifecycle {
-    ignore_changes = [secret_data]
-  }
-}
-
 resource "google_secret_manager_secret" "runtime_agent_os" {
   count     = var.agent_os_enabled ? 1 : 0
   secret_id = "${local.runtime_secret_prefix}-agent-os"
@@ -209,9 +158,8 @@ resource "google_secret_manager_secret_version" "runtime_agent_os" {
   count  = var.agent_os_enabled ? 1 : 0
   secret = google_secret_manager_secret.runtime_agent_os[0].id
   secret_data = jsonencode({
-    app             = google_secret_manager_secret.agent_os_app[0].secret_id
-    admin           = google_secret_manager_secret.agent_os_admin[0].secret_id
-    vendor          = google_secret_manager_secret.agent_os_vendor[0].secret_id
+    app_config      = local.agent_os_app_config
+    admin_config    = local.agent_os_admin_config
     bucket          = module.storage.storage.agent_os_bucket
     service_account = module.storage.storage.agent_os_service_account
   })

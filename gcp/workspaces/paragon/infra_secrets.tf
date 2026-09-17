@@ -97,9 +97,9 @@ locals {
           : {}
         )
       }
-      redis            = { value = jsondecode(data.google_secret_manager_secret_version.infra_redis[0].secret_data) }
-      storage          = { value = jsondecode(data.google_secret_manager_secret_version.infra_storage[0].secret_data) }
-      k8s_version      = { value = try(local.provider_cluster.k8s_version, null) }
+      redis       = { value = jsondecode(data.google_secret_manager_secret_version.infra_redis[0].secret_data) }
+      storage     = { value = jsondecode(data.google_secret_manager_secret_version.infra_storage[0].secret_data) }
+      k8s_version = { value = try(local.provider_cluster.k8s_version, null) }
     },
     var.managed_sync_enabled ? {
       kafka = { value = jsondecode(data.google_secret_manager_secret_version.infra_kafka[0].secret_data) }
@@ -115,31 +115,10 @@ locals {
     : jsondecode(data.google_secret_manager_secret_version.infra_agent_os[0].secret_data)
   )
 
-  # Names/emails are not credentials; nonsensitive keeps them usable as plain module inputs.
-  agent_os_app_secret_name    = try(nonsensitive(local.agent_os_handoff.app), null)
-  agent_os_admin_secret_name  = try(nonsensitive(local.agent_os_handoff.admin), null)
-  agent_os_vendor_secret_name = try(nonsensitive(local.agent_os_handoff.vendor), null)
+  # Final Agent OS application secrets follow the workspace naming convention.
+  agent_os_app_secret_name    = var.agent_os_enabled ? "${local.workspace}-agent-os-app" : null
+  agent_os_admin_secret_name  = var.agent_os_enabled ? "${local.workspace}-agent-os-admin" : null
+  agent_os_vendor_secret_name = var.agent_os_enabled ? "${local.workspace}-agent-os-vendor" : null
   agent_os_bucket             = try(nonsensitive(local.agent_os_handoff.bucket), null)
   agent_os_service_account    = try(nonsensitive(local.agent_os_handoff.service_account), null)
-}
-
-data "google_secret_manager_secret_version" "agent_os_app" {
-  count   = var.agent_os_enabled && local.agent_os_app_secret_name != null ? 1 : 0
-  project = local.gcp_project_id
-  secret  = local.agent_os_app_secret_name
-  version = "latest"
-}
-
-data "google_secret_manager_secret_version" "agent_os_admin" {
-  count   = var.agent_os_enabled && local.agent_os_admin_secret_name != null ? 1 : 0
-  project = local.gcp_project_id
-  secret  = local.agent_os_admin_secret_name
-  version = "latest"
-}
-
-data "google_secret_manager_secret_version" "agent_os_vendor" {
-  count   = var.agent_os_enabled && local.agent_os_vendor_secret_name != null ? 1 : 0
-  project = local.gcp_project_id
-  secret  = local.agent_os_vendor_secret_name
-  version = "latest"
 }
