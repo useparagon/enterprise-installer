@@ -34,6 +34,19 @@ resource "azurerm_eventhub_namespace_authorization_rule" "kafka" {
   manage = true
 }
 
+# Agent OS owns the DLT below. The source `sync.instance-status` Event Hub is
+# owned by Managed Sync and must already exist on the shared namespace. Azure
+# Event Hubs does not support Kafka AdminClient topic creation, so Terraform
+# creates Agent OS-owned topics instead of relying on the chart's Kafka hook.
+resource "azurerm_eventhub" "agent_os_dlt" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name              = "sync.instance-status.dlt"
+  namespace_id      = azurerm_eventhub_namespace.kafka.id
+  partition_count   = var.agent_os_eventhub_partition_count
+  message_retention = var.agent_os_eventhub_message_retention
+}
+
 # Agent OS uses a least-privilege identity on the shared Event Hubs namespace.
 resource "azurerm_eventhub_namespace_authorization_rule" "agent_os" {
   count = var.agent_os_enabled ? 1 : 0
