@@ -7,6 +7,9 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 - Cloud SQL Admin API
 - Compute Engine API
 - Google Cloud Memorystore for Redis API
+- Memorystore for Valkey API
+- Network Connectivity API
+- Service Consumer Management API
 - Service Networking API
 - Secret Manager API
 - Kubernetes Engine API

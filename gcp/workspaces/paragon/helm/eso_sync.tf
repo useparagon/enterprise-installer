@@ -6,8 +6,8 @@ locals {
     var.openobserve_gcs_secret_name != null ? try(kubectl_manifest.external_secret_openobserve_gcs[0].uid, null) : null,
     var.redis_ca_cert_secret_name != null ? try(kubectl_manifest.external_secret_redis_ca[0].uid, null) : null,
     var.managed_sync_secret_name != null ? try(kubectl_manifest.external_secret_managed_sync[0].uid, null) : null,
-    local.external_secret_agent_os_app_yaml != null ? try(kubectl_manifest.external_secret_agent_os_app[0].uid, null) : null,
-    local.external_secret_agent_os_admin_yaml != null ? try(kubectl_manifest.external_secret_agent_os_admin[0].uid, null) : null,
+    var.agent_os_enabled && var.agent_os_app_secret_name != null && var.agent_os_vendor_secret_name != null ? try(kubectl_manifest.external_secret_agent_os_app[0].uid, null) : null,
+    var.agent_os_enabled && var.agent_os_admin_secret_name != null ? try(kubectl_manifest.external_secret_agent_os_admin[0].uid, null) : null,
   ]))
 }
 
@@ -74,7 +74,7 @@ resource "time_sleep" "wait_for_eso_managed_sync" {
 }
 
 resource "time_sleep" "wait_for_eso_agent_os_app" {
-  count = local.external_secret_agent_os_app_yaml != null ? 1 : 0
+  count = var.agent_os_enabled && var.agent_os_app_secret_name != null && var.agent_os_vendor_secret_name != null ? 1 : 0
 
   create_duration = "30s"
 
@@ -86,7 +86,7 @@ resource "time_sleep" "wait_for_eso_agent_os_app" {
 }
 
 resource "time_sleep" "wait_for_eso_agent_os_admin" {
-  count = local.external_secret_agent_os_admin_yaml != null ? 1 : 0
+  count = var.agent_os_enabled && var.agent_os_admin_secret_name != null ? 1 : 0
 
   create_duration = "30s"
 
@@ -176,7 +176,7 @@ data "kubernetes_secret" "redis_ca" {
 }
 
 data "kubernetes_secret" "agent_os_app" {
-  count = local.external_secret_agent_os_app_yaml != null ? 1 : 0
+  count = var.agent_os_enabled && var.agent_os_app_secret_name != null && var.agent_os_vendor_secret_name != null ? 1 : 0
 
   metadata {
     name      = "agent-os-app"
@@ -187,7 +187,7 @@ data "kubernetes_secret" "agent_os_app" {
 }
 
 data "kubernetes_secret" "agent_os_admin" {
-  count = local.external_secret_agent_os_admin_yaml != null ? 1 : 0
+  count = var.agent_os_enabled && var.agent_os_admin_secret_name != null ? 1 : 0
 
   metadata {
     name      = "agent-os-admin"
