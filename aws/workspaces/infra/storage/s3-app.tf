@@ -261,6 +261,41 @@ resource "aws_s3_bucket_versioning" "agent_os" {
   }
 }
 
+resource "aws_s3_bucket_lifecycle_configuration" "agent_os" {
+  count  = var.agent_os_enabled ? 1 : 0
+  bucket = aws_s3_bucket.agent_os[0].id
+
+  # Agent OS owns application-level retention. Infra only removes storage
+  # artifacts that otherwise accumulate indefinitely on a versioned bucket.
+  rule {
+    id     = "storage-hygiene"
+    status = "Enabled"
+
+    filter {}
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+
+  rule {
+    id     = "delete-markers"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.agent_os]
+}
+
 resource "aws_s3_bucket_public_access_block" "agent_os" {
   count  = var.agent_os_enabled ? 1 : 0
   bucket = aws_s3_bucket.agent_os[0].bucket
