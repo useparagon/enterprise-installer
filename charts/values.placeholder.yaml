@@ -27,11 +27,10 @@ global:
 #   ocs-code-runner:
 #     enabled: false
 #
-# OCS knative code-runner (on-prem custom-code runtime). Default is a ClusterIP
-# Deployment of useparagon/ocs-code-runner-knative. After installing Knative
-# Serving, set ocs-code-runner.mode: knative.
+# OCS knative code-runner (on-prem custom-code runtime). Deploys
+# useparagon/ocs-code-runner-knative as a serving.knative.dev/v1 Service.
+# Requires Knative Serving + Kourier.
 # ocs-code-runner:
-#   mode: knative
 #   image:
 #     tag: latest
 

@@ -1045,10 +1045,8 @@ locals {
         )
 
         # OCS knative code-runner (on-prem substitute for WORKER_SHARED_OCS_LAMBDA_NAME).
+        # Storage offload uses CLOUD_STORAGE_* (same contract as platform createOcsRuntime).
         WORKER_SHARED_OCS_KNATIVE_SERVICE_URL = try(local.helm_vars.global.env["WORKER_SHARED_OCS_KNATIVE_SERVICE_URL"], "http://ocs-code-runner.paragon.svc.cluster.local")
-        OCS_CODE_RUNNER_STORAGE_TYPE          = try(local.helm_vars.global.env["OCS_CODE_RUNNER_STORAGE_TYPE"], lower(local.cloud_storage_type))
-        OCS_CODE_RUNNER_STORAGE_BUCKET        = try(local.helm_vars.global.env["OCS_CODE_RUNNER_STORAGE_BUCKET"], try(local.storage_output.private_bucket, "${local.workspace}-app"))
-        OCS_CODE_RUNNER_STORAGE_ENDPOINT      = try(local.helm_vars.global.env["OCS_CODE_RUNNER_STORAGE_ENDPOINT"], "https://${local.storage_output.root_user}.blob.core.windows.net")
 
         # Monitor configurations
         MONITOR_BULL_EXPORTER_HOST               = "http://bull-exporter"

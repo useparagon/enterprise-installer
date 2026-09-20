@@ -32,22 +32,10 @@ Environment variables helper
       key: {{ $key }}
       optional: true
 {{- end }}
-{{- /* OCS knative code-runner: inject when terraform/global.env sets them, even
-     before platform-monorepo atlas-env.yaml lists the keys. */}}
-{{- $ocsKnativeKeys := list
-      "WORKER_SHARED_OCS_KNATIVE_SERVICE_URL"
-      "OCS_CODE_RUNNER_STORAGE_TYPE"
-      "OCS_CODE_RUNNER_STORAGE_BUCKET"
-      "OCS_CODE_RUNNER_STORAGE_REGION"
-      "OCS_CODE_RUNNER_STORAGE_ENDPOINT"
-      "OCS_CODE_RUNNER_STORAGE_KEY_PREFIX"
--}}
-{{- if and $.Values.global.env (kindIs "map" $.Values.global.env) }}
-{{- range $key := $ocsKnativeKeys }}
-{{- if and (hasKey $.Values.global.env $key) (not (has $key $envKeys)) }}
-- name: {{ $key }}
-  value: {{ index $.Values.global.env $key | quote }}
-{{- end }}
-{{- end }}
+{{- /* OCS knative URL: inject even before atlas-env.yaml lists the key.
+     Storage offload uses CLOUD_STORAGE_* already present on workers. */}}
+{{- if and $.Values.global.env (kindIs "map" $.Values.global.env) (hasKey $.Values.global.env "WORKER_SHARED_OCS_KNATIVE_SERVICE_URL") (not (has "WORKER_SHARED_OCS_KNATIVE_SERVICE_URL" $envKeys)) }}
+- name: WORKER_SHARED_OCS_KNATIVE_SERVICE_URL
+  value: {{ index $.Values.global.env "WORKER_SHARED_OCS_KNATIVE_SERVICE_URL" | quote }}
 {{- end }}
 {{- end -}}
