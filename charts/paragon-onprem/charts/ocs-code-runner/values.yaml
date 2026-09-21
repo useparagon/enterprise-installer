@@ -1,5 +1,5 @@
 # OCS knative node-script code runner (on-prem substitute for AWS Lambda).
-# Emits a serving.knative.dev/v1 Service. Requires Knative Serving + Kourier.
+# Emits a cluster-local serving.knative.dev/v1 Service. Requires Knative Serving + Kourier.
 
 image:
   # Docker Hub equivalent of ocs/knative-node-script. Independent of Paragon VERSION.
@@ -19,7 +19,7 @@ resources:
     memory: 256Mi
 
 knative:
-  minScale: '0'
+  minScale: '1'
   maxScale: '10'
   target: '20'
   containerConcurrency: 20
@@ -34,11 +34,15 @@ serviceAccount:
   annotations: {}
   name: ''
 
-podAnnotations: {}
+# Queue-proxy serves revision_* metrics on 9091. Prometheus k8s_pod_discovery
+# only scrapes the paragon namespace when prometheus.io/scrape=true.
+podAnnotations:
+  prometheus.io/scrape: 'true'
+  prometheus.io/path: /metrics
+  prometheus.io/port: '9091'
 
 securityContext:
   allowPrivilegeEscalation: false
-  runAsNonRoot: true
   capabilities:
     drop:
       - ALL

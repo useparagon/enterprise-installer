@@ -1,0 +1,22 @@
+{{/*
+ClusterIP in front of the ksvc pods. Workers resolve
+http://ocs-code-runner.paragon.svc.cluster.local — a real A record, not
+Knative's ExternalName CNAME to kourier-internal (Node getaddrinfo ENOTFOUND).
+Keep minScale >= 1 so this Service has endpoints; scale-to-zero has no pods.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ocs-code-runner.fullname" . }}
+  labels:
+    {{- include "ocs-code-runner.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    # Port 80 so WORKER_SHARED_OCS_KNATIVE_SERVICE_URL needs no :8080 suffix.
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    serving.knative.dev/service: {{ include "ocs-code-runner.ksvcName" . }}

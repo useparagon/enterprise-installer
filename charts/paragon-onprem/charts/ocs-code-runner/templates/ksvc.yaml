@@ -1,8 +1,9 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: {{ include "ocs-code-runner.fullname" . }}
+  name: {{ include "ocs-code-runner.ksvcName" . }}
   labels:
+    networking.knative.dev/visibility: cluster-local
     {{- include "ocs-code-runner.labels" . | nindent 4 }}
 spec:
   template:

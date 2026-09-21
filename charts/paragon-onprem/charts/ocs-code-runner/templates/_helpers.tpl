@@ -47,3 +47,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Knative Service object name. Must differ from fullname so the cluster-local
+Kubernetes Service `ocs-code-runner` can be a ClusterIP (A record). Knative
+would otherwise own that name as ExternalName → kourier-internal, which
+Node getaddrinfo cannot resolve (ENOTFOUND).
+*/}}
+{{- define "ocs-code-runner.ksvcName" -}}
+{{- printf "%s-ksvc" (include "ocs-code-runner.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
