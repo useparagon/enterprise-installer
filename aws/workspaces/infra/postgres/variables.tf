@@ -92,6 +92,35 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS Postgres instances."
+  type        = bool
+}
+
+variable "agent_os_kms_key_arn" {
+  description = "KMS key ARN used to encrypt the Agent OS Postgres instances."
+  type        = string
+}
+
+variable "agent_os_postgres" {
+  description = "Resolved Agent OS Postgres instances keyed by instance name. Defaults are owned by the workspace root."
+  type = map(object({
+    instance_class             = string
+    allocated_storage          = number
+    max_allocated_storage      = number
+    engine_version             = string
+    multi_az                   = bool
+    read_replica               = bool
+    replica_instance_class     = string
+    storage_type               = string
+    iops                       = number
+    storage_throughput         = number
+    backup_retention_days      = number
+    log_statement              = string
+    log_min_duration_statement = number
+  }))
+}
+
 variable "migrated_passwords" {
   description = "Override credentials to preserve complexity conventions when migrating from legacy workspaces"
   type        = map(string)

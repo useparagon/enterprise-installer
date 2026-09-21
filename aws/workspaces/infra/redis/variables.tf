@@ -40,6 +40,28 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS Valkey caches."
+  type        = bool
+}
+
+variable "agent_os_kms_key_arn" {
+  description = "KMS key ARN used to encrypt Agent OS Valkey data and logs."
+  type        = string
+}
+
+variable "agent_os_valkey" {
+  description = "Resolved Agent OS Valkey instances keyed by cache name. Defaults are owned by the workspace root."
+  type = map(object({
+    node_type               = string
+    multi_az                = bool
+    cluster_enabled         = bool
+    engine_version          = string
+    snapshot_retention_days = number
+    log_retention_days      = number
+  }))
+}
+
 locals {
   redis_instances = var.elasticache_multiple_instances ? merge({
     cache = {

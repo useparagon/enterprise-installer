@@ -26,6 +26,18 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS bucket."
+  type        = bool
+  default     = false
+}
+
+variable "agent_os_kms_key_arn" {
+  description = "KMS key ARN used to encrypt the Agent OS bucket."
+  type        = string
+  default     = null
+}
+
 variable "s3_kms_encryption_enabled" {
   description = "Encrypt the app, CDN, audit logs, and managed sync buckets with AWS KMS (SSE-KMS) instead of SSE-S3. The logs bucket always stays on SSE-S3 since ALB and S3 server access logs do not support SSE-KMS."
   type        = bool

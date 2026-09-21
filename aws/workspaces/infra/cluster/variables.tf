@@ -147,6 +147,57 @@ variable "use_latest_ami_release_version" {
   default     = false
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS managed node groups."
+  type        = bool
+}
+
+variable "agent_os_index_instance_types" {
+  description = "Instance types for the Agent OS index managed node group."
+  type        = list(string)
+
+  validation {
+    condition = length(var.agent_os_index_instance_types) > 0 && alltrue([
+      for t in var.agent_os_index_instance_types :
+      contains(["c", "m", "r", "i", "x"], substr(t, 0, 1)) &&
+      contains(["large", "xlarge", "2xlarge", "3xlarge", "4xlarge", "6xlarge", "8xlarge", "9xlarge", "10xlarge", "12xlarge", "16xlarge", "18xlarge", "24xlarge", "32xlarge", "48xlarge"], try(split(".", t)[1], ""))
+    ])
+    error_message = "Agent OS index instance types must use a supported c/m/r/i/x EC2 family and size."
+  }
+}
+
+variable "agent_os_index_min_count" {
+  type = number
+}
+
+variable "agent_os_index_max_count" {
+  type = number
+}
+
+variable "agent_os_extract_instance_types" {
+  description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group."
+  type        = list(string)
+
+  validation {
+    condition = length(var.agent_os_extract_instance_types) > 0 && alltrue([
+      for t in var.agent_os_extract_instance_types :
+      contains(["c", "m", "r", "i", "x"], substr(t, 0, 1)) &&
+      contains(["large", "xlarge", "2xlarge", "3xlarge", "4xlarge", "6xlarge", "8xlarge", "9xlarge", "10xlarge", "12xlarge", "16xlarge", "18xlarge", "24xlarge", "32xlarge", "48xlarge"], try(split(".", t)[1], ""))
+    ])
+    error_message = "Agent OS extraction instance types must use a supported c/m/r/i/x EC2 family and size."
+  }
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction managed node group."
+  type        = number
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction managed node group."
+  type        = number
+}
+
 variable "egress_ready" {
   description = "Set when private egress routing is ready. Implicit apply-order dependency for internet-bootstrapping workloads."
   type        = string

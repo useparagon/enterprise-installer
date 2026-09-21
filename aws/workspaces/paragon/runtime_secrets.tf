@@ -123,6 +123,39 @@ resource "aws_secretsmanager_secret_version" "managed_sync_paragon_overlay" {
   ))
 }
 
+# Match the Managed Sync flow: infra owns/initially populates these secrets,
+# while the paragon workspace overlays app-level values that infra cannot know.
+resource "aws_secretsmanager_secret_version" "agent_os_app_paragon_overlay" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = data.aws_secretsmanager_secret.agent_os_app[0].id
+  secret_string = jsonencode(merge(
+    jsondecode(data.aws_secretsmanager_secret_version.agent_os_app[0].secret_string),
+    var.agent_os_app_config,
+  ))
+}
+
+resource "aws_secretsmanager_secret_version" "agent_os_admin_paragon_overlay" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = data.aws_secretsmanager_secret.agent_os_admin[0].id
+  secret_string = jsonencode(merge(
+    jsondecode(data.aws_secretsmanager_secret_version.agent_os_admin[0].secret_string),
+    var.agent_os_admin_config,
+  ))
+}
+
+resource "aws_secretsmanager_secret_version" "agent_os_vendor_paragon_overlay" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = data.aws_secretsmanager_secret.agent_os_vendor[0].id
+  # Merge so an empty tfvars map cannot wipe keys already in Secrets Manager.
+  secret_string = jsonencode(merge(
+    jsondecode(data.aws_secretsmanager_secret_version.agent_os_vendor[0].secret_string),
+    var.agent_os_vendor_config,
+  ))
+}
+
 data "aws_secretsmanager_secret" "openobserve" {
   name = local.runtime_secret_names.openobserve
 }
@@ -144,9 +177,12 @@ locals {
 # Gate Helm/ESO until Secrets Manager values exist (not just secret metadata).
 resource "terraform_data" "runtime_secrets_populated" {
   input = {
-    env         = aws_secretsmanager_secret_version.env_paragon_overlay.version_id
-    docker_cfg  = local.runtime_docker_cfg_sync_enabled ? local.runtime_docker_cfg_version_id : null
-    openobserve = data.aws_secretsmanager_secret_version.openobserve.version_id
+    env             = aws_secretsmanager_secret_version.env_paragon_overlay.version_id
+    docker_cfg      = local.runtime_docker_cfg_sync_enabled ? local.runtime_docker_cfg_version_id : null
+    openobserve     = data.aws_secretsmanager_secret_version.openobserve.version_id
+    agent_os_app    = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_app_paragon_overlay[0].version_id : null
+    agent_os_admin  = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_admin_paragon_overlay[0].version_id : null
+    agent_os_vendor = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_vendor_paragon_overlay[0].version_id : null
     managed_sync = var.managed_sync_enabled ? (
       aws_secretsmanager_secret_version.managed_sync_paragon_overlay[0].version_id
     ) : null

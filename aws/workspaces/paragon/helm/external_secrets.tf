@@ -6,6 +6,15 @@ resource "kubernetes_namespace" "external_secrets" {
   }
 }
 
+resource "kubernetes_service_account" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  metadata {
+    name      = "agent-os"
+    namespace = local.paragon_namespace
+  }
+}
+
 resource "helm_release" "external_secrets" {
   count = var.install_external_secrets ? 1 : 0
 
@@ -183,6 +192,63 @@ locals {
       }]
     }
   }) : null
+
+  external_secret_agent_os_app_yaml = var.agent_os_enabled ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "agent-os-app"
+      namespace = local.paragon_namespace
+    }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef = {
+        name = "aws-secrets-manager"
+        kind = "ClusterSecretStore"
+      }
+      target = {
+        name           = "agent-os-app"
+        creationPolicy = "Owner"
+      }
+      dataFrom = [
+        {
+          extract = {
+            key = var.agent_os_vendor_secret_name
+          }
+        },
+        {
+          extract = {
+            key = var.agent_os_app_secret_name
+          }
+        },
+      ]
+    }
+  }) : null
+
+  external_secret_agent_os_admin_yaml = var.agent_os_enabled ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "agent-os-admin"
+      namespace = local.paragon_namespace
+    }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef = {
+        name = "aws-secrets-manager"
+        kind = "ClusterSecretStore"
+      }
+      target = {
+        name           = "agent-os-admin"
+        creationPolicy = "Owner"
+      }
+      dataFrom = [{
+        extract = {
+          key = var.agent_os_admin_secret_name
+        }
+      }]
+    }
+  }) : null
 }
 
 resource "kubectl_manifest" "secret_store" {
@@ -218,4 +284,18 @@ resource "kubectl_manifest" "external_secret_openobserve" {
 
   yaml_body  = local.external_secret_openobserve_yaml
   depends_on = [kubectl_manifest.secret_store[0]]
+}
+
+resource "kubectl_manifest" "external_secret_agent_os_app" {
+  count = var.install_external_secrets && var.agent_os_enabled ? 1 : 0
+
+  yaml_body  = local.external_secret_agent_os_app_yaml
+  depends_on = [kubectl_manifest.secret_store[0], kubernetes_namespace.paragon]
+}
+
+resource "kubectl_manifest" "external_secret_agent_os_admin" {
+  count = var.install_external_secrets && var.agent_os_enabled ? 1 : 0
+
+  yaml_body  = local.external_secret_agent_os_admin_yaml
+  depends_on = [kubectl_manifest.secret_store[0], kubernetes_namespace.paragon]
 }
