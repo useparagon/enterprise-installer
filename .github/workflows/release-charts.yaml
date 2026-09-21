@@ -134,13 +134,16 @@ jobs:
           fi
           cd "$pkg_dir"
 
-          aws s3 cp "s3://$S3_BUCKET/index.yaml" existing-index.yaml 2>/dev/null \
-            || echo "No existing index found; creating new index."
-
-          if [ -f existing-index.yaml ]; then
+          download_err="$RUNNER_TEMP/index-download.err"
+          if aws s3 cp "s3://$S3_BUCKET/index.yaml" existing-index.yaml 2>"$download_err"; then
             helm repo index . --url "$HELM_REPO_URL" --merge existing-index.yaml
-          else
+          elif grep -Eq '\(404\)|NoSuchKey' "$download_err"; then
+            echo "No existing index found; creating new index."
             helm repo index . --url "$HELM_REPO_URL"
+          else
+            echo "Error: failed to download s3://$S3_BUCKET/index.yaml; refusing to overwrite the Helm repo index." >&2
+            cat "$download_err" >&2
+            exit 1
           fi
 
           for tgz in "${tgz_files[@]}"; do
