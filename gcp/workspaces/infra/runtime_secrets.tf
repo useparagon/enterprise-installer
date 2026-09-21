@@ -193,13 +193,14 @@ locals {
     REDIS_HOST = local.agent_os_cache.host
     REDIS_PORT = tostring(local.agent_os_cache.port)
     REDIS_URL  = "rediss://${local.agent_os_cache.host}:${local.agent_os_cache.port}"
-    # IAM auth uses the workload GSA email as username. The short-lived access
-    # token must be minted from Workload Identity and refreshed by the client.
-    REDIS_USERNAME        = module.storage.storage.agent_os_service_account
-    REDIS_PASSWORD        = ""
-    REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
-    REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
-    REDIS_CA_CERT         = local.agent_os_cache.ca_certificate
+    # Memorystore for Valkey IAM auth has no static password. The workload identity
+    # principal obtains a short-lived access token at runtime, so do not publish the
+    # GSA email/password pair as if it were normal Redis AUTH credentials.
+    REDIS_AUTH_MODE           = "iam"
+    REDIS_IAM_SERVICE_ACCOUNT = module.storage.storage.agent_os_service_account
+    REDIS_TLS_ENABLED         = tostring(local.agent_os_cache.ssl)
+    REDIS_CLUSTER_ENABLED     = tostring(local.agent_os_cache.cluster)
+    REDIS_CA_CERT             = local.agent_os_cache.ca_certificate
 
     KAFKA_BROKER_URLS   = local.agent_os_kafka.cluster_bootstrap_brokers
     KAFKA_SASL_USERNAME = coalesce(local.agent_os_kafka.agent_os_cluster_username, local.agent_os_kafka.agent_os_service_account_email)
