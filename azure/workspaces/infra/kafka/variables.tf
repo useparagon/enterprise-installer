@@ -21,7 +21,7 @@ variable "managed_sync_enabled" {
 }
 
 variable "agent_os_enabled" {
-  description = "Whether to create a dedicated Agent OS Event Hubs authorization rule."
+  description = "Whether to create Agent OS Event Hubs resources and scoped authorization rules."
   type        = bool
 }
 

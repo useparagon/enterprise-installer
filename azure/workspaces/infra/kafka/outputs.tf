@@ -29,10 +29,20 @@ output "tls_enabled" {
 }
 
 output "agent_os_kafka_credentials" {
-  description = "Least-privilege Event Hubs credentials for Agent OS."
+  description = "Read-only namespace Event Hubs credentials for the Agent OS Kafka consumer."
   value = var.agent_os_enabled ? {
     username  = "$ConnectionString"
     password  = azurerm_eventhub_namespace_authorization_rule.agent_os[0].primary_connection_string
+    mechanism = "PLAIN"
+  } : null
+  sensitive = true
+}
+
+output "agent_os_dlt_kafka_credentials" {
+  description = "Entity-scoped send-only Event Hubs credentials for the Agent OS status DLT."
+  value = var.agent_os_enabled ? {
+    username  = "$ConnectionString"
+    password  = azurerm_eventhub_authorization_rule.agent_os_dlt_writer[0].primary_connection_string
     mechanism = "PLAIN"
   } : null
   sensitive = true
