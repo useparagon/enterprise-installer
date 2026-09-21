@@ -44,6 +44,26 @@ variable "managed_sync_enabled" {
   default     = false
 }
 
+variable "disable_deletion_protection" {
+  description = "Whether to disable deletion protection on the Agent OS Valkey instance."
+  type        = bool
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create the dedicated Agent OS Valkey cache."
+  type        = bool
+}
+
+variable "agent_os_valkey" {
+  description = "Resolved Agent OS Memorystore for Valkey instances keyed by cache name. Defaults are owned by the workspace root."
+  type = map(object({
+    node_type       = string
+    multi_az        = bool
+    cluster_enabled = bool
+    engine_version  = string
+  }))
+}
+
 locals {
   redis_instances = var.multi_redis ? merge({
     cache = {

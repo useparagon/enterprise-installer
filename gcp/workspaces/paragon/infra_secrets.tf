@@ -7,6 +7,7 @@ locals {
     kafka         = "${local.workspace}-kafka"
     redis_ca_cert = "${local.workspace}-redis-ca-cert"
     cluster       = "${local.workspace}-cluster"
+    agent_os      = "${local.workspace}-agent-os"
   }
 }
 
@@ -67,6 +68,14 @@ data "google_secret_manager_secret_version" "infra_cluster" {
   version = "latest"
 }
 
+# Agent OS handoff: Secret Manager names for app/admin/vendor plus bucket and GSA email.
+data "google_secret_manager_secret_version" "infra_agent_os" {
+  count   = local.use_legacy_infra_json ? 0 : (var.agent_os_enabled ? 1 : 0)
+  project = local.gcp_project_id
+  secret  = local.infra_secret_names.agent_os
+  version = "latest"
+}
+
 locals {
   # Cluster metadata is not sensitive; nonsensitive avoids propagating secret
   # sensitivity into providers/modules that take a plain cluster name.
@@ -88,9 +97,9 @@ locals {
           : {}
         )
       }
-      redis            = { value = jsondecode(data.google_secret_manager_secret_version.infra_redis[0].secret_data) }
-      storage          = { value = jsondecode(data.google_secret_manager_secret_version.infra_storage[0].secret_data) }
-      k8s_version      = { value = try(local.provider_cluster.k8s_version, null) }
+      redis       = { value = jsondecode(data.google_secret_manager_secret_version.infra_redis[0].secret_data) }
+      storage     = { value = jsondecode(data.google_secret_manager_secret_version.infra_storage[0].secret_data) }
+      k8s_version = { value = try(local.provider_cluster.k8s_version, null) }
     },
     var.managed_sync_enabled ? {
       kafka = { value = jsondecode(data.google_secret_manager_secret_version.infra_kafka[0].secret_data) }
@@ -98,4 +107,18 @@ locals {
   )
 
   infra_vars = local.use_legacy_infra_json ? local.legacy_infra_vars : local.provider_infra_vars
+
+  # Decode handoff once; only Secret Manager *names* and the GSA email are passed to Helm.
+  agent_os_handoff = !var.agent_os_enabled ? null : (
+    local.use_legacy_infra_json
+    ? try(local.legacy_infra_vars.agent_os.value, null)
+    : jsondecode(data.google_secret_manager_secret_version.infra_agent_os[0].secret_data)
+  )
+
+  # Final Agent OS application secrets follow the workspace naming convention.
+  agent_os_app_secret_name    = var.agent_os_enabled ? "${local.workspace}-agent-os-app" : null
+  agent_os_admin_secret_name  = var.agent_os_enabled ? "${local.workspace}-agent-os-admin" : null
+  agent_os_vendor_secret_name = var.agent_os_enabled ? "${local.workspace}-agent-os-vendor" : null
+  agent_os_bucket             = try(nonsensitive(local.agent_os_handoff.bucket), null)
+  agent_os_service_account    = try(nonsensitive(local.agent_os_handoff.service_account), null)
 }

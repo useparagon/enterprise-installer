@@ -48,3 +48,16 @@ output "cluster_tls_enabled" {
   description = "TLS is always enabled for the Managed Kafka data plane."
   value       = true
 }
+
+output "agent_os_cluster_username" {
+  value = var.agent_os_enabled ? (var.gmk_sasl_mechanism == "plain" ? google_service_account.kafka_client_agent_os[0].email : null) : null
+}
+
+output "agent_os_cluster_password" {
+  value     = var.agent_os_enabled && var.gmk_sasl_mechanism == "plain" ? base64decode(google_service_account_key.kafka_client_agent_os[0].private_key) : null
+  sensitive = true
+}
+
+output "agent_os_service_account_email" {
+  value = var.agent_os_enabled ? google_service_account.kafka_client_agent_os[0].email : null
+}

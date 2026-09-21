@@ -236,6 +236,64 @@ locals {
       }]
     }
   }) : null
+
+  # Agent OS: vendor first then app so Terraform app keys win collisions; admin is separate.
+  external_secret_agent_os_app_yaml = var.agent_os_enabled && var.agent_os_app_secret_name != null && var.agent_os_vendor_secret_name != null ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "agent-os-app"
+      namespace = kubernetes_namespace_v1.paragon.id
+    }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef = {
+        name = "gcp-secret-manager"
+        kind = "ClusterSecretStore"
+      }
+      target = {
+        name           = "agent-os-app"
+        creationPolicy = "Owner"
+      }
+      dataFrom = [
+        {
+          extract = {
+            key = var.agent_os_vendor_secret_name
+          }
+        },
+        {
+          extract = {
+            key = var.agent_os_app_secret_name
+          }
+        },
+      ]
+    }
+  }) : null
+
+  external_secret_agent_os_admin_yaml = var.agent_os_enabled && var.agent_os_admin_secret_name != null ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "agent-os-admin"
+      namespace = kubernetes_namespace_v1.paragon.id
+    }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef = {
+        name = "gcp-secret-manager"
+        kind = "ClusterSecretStore"
+      }
+      target = {
+        name           = "agent-os-admin"
+        creationPolicy = "Owner"
+      }
+      dataFrom = [{
+        extract = {
+          key = var.agent_os_admin_secret_name
+        }
+      }]
+    }
+  }) : null
 }
 
 resource "kubectl_manifest" "secret_store" {
@@ -279,4 +337,40 @@ resource "kubectl_manifest" "external_secret_redis_ca" {
   count      = var.redis_ca_cert_secret_name != null ? 1 : 0
   yaml_body  = local.external_secret_redis_ca_yaml
   depends_on = [kubectl_manifest.secret_store]
+}
+
+# Agent OS reuses the Paragon namespace; only its dedicated KSA is created here.
+resource "kubernetes_service_account_v1" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  metadata {
+    name      = "agent-os"
+    namespace = kubernetes_namespace_v1.paragon.id
+
+    annotations = var.agent_os_service_account != null ? {
+      "iam.gke.io/gcp-service-account" = var.agent_os_service_account
+    } : {}
+  }
+}
+
+resource "kubectl_manifest" "external_secret_agent_os_app" {
+  count = var.agent_os_enabled && var.agent_os_app_secret_name != null && var.agent_os_vendor_secret_name != null ? 1 : 0
+
+  yaml_body = local.external_secret_agent_os_app_yaml
+  depends_on = [
+    kubectl_manifest.secret_store,
+    kubernetes_namespace_v1.paragon,
+    kubernetes_service_account_v1.agent_os,
+  ]
+}
+
+resource "kubectl_manifest" "external_secret_agent_os_admin" {
+  count = var.agent_os_enabled && var.agent_os_admin_secret_name != null ? 1 : 0
+
+  yaml_body = local.external_secret_agent_os_admin_yaml
+  depends_on = [
+    kubectl_manifest.secret_store,
+    kubernetes_namespace_v1.paragon,
+    kubernetes_service_account_v1.agent_os,
+  ]
 }
