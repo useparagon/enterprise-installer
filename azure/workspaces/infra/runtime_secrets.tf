@@ -222,6 +222,13 @@ locals {
     KAFKA_SASL_MECHANISM = local.agent_os_kafka.agent_os_kafka_credentials.mechanism
     KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.tls_enabled)
 
+    # Event Hubs SAS rules cannot express read-on-source + write-on-DLT with one key.
+    # Keep runtime consumption read-only and publish the DLT writer separately for the
+    # application path that emits dead letters.
+    KAFKA_DLT_SASL_USERNAME  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.username
+    KAFKA_DLT_SASL_PASSWORD  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.password
+    KAFKA_DLT_SASL_MECHANISM = local.agent_os_kafka.agent_os_dlt_kafka_credentials.mechanism
+
     # Blob container, addressed through the S3_* keys the Agent OS config slices expect.
     AZURE_STORAGE_ACCOUNT = module.storage.blob.name
     S3_BUCKET             = module.storage.blob.agent_os_container
