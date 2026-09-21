@@ -207,9 +207,11 @@ The `version` field at the top level matches the git tag.
 
 ### How `service-inputs.json` Is Processed
 
-#### 1. CI Automation (`update-charts.yaml` workflow)
+#### 1. CI Automation (tag then stage-charts then release-charts)
 
-The GitHub Actions workflow `.github/workflows/update-charts.yaml` triggers on `repository_dispatch` events with type `update-charts`. It receives the full service inputs as the client payload, runs `scripts/update-charts.mjs` with that payload, then commits and tags the result via `scripts/push-versioned-commit.sh`.
+The platform-monorepo `release` workflow writes `charts/files/service-inputs.json` and pushes an installer git tag equal to `VERSION`. It then dispatches `stage-charts.yaml` on this repo (`main`) with that version.
+
+`stage-charts` packages via `package-charts.yaml` (fixtures from the tag, templates from `chart_ref`), pushes `.tgz` files to ECR, then calls `release-charts.yaml` with `skip_package: true` so the same artifacts are indexed onto S3 `paragon-helm-production`. `release-charts` can also be dispatched on its own (re-packages unless `skip_package` is set). S3 index writes use `concurrency: helm-production-index`.
 
 #### 2. `scripts/update-charts.mjs` — Splitting to Per-Subchart Files
 
@@ -400,5 +402,28 @@ When modifying ingress behavior, test with all relevant `HOST_ENV` values.
 | `scripts/update-charts.mjs` | Splits monolithic service-inputs.json into per-subchart files |
 | `scripts/generate-tfvars.mjs` | Generates placeholder `.tfvars` from `variables.tf` |
 | `scripts/push-versioned-commit.sh` | CI helper: commits, tags, and force-pushes tags |
+| `scripts/fetch-service-inputs-from-tag.sh` | Extract `charts/files/service-inputs.json` from a release tag |
 | `prepare.sh` | Main entry point: fetches tag, runs update-charts, copies/versions charts |
-| `.github/workflows/update-charts.yaml` | CI workflow triggered by monorepo releases |
+| `.github/workflows/package-charts.yaml` | Reusable job: fetch tag fixtures, stamp versions, `helm package`, upload artifacts |
+| `.github/workflows/stage-charts.yaml` | Package to ECR, then call release-charts |
+| `.github/workflows/release-charts.yaml` | Publish packaged charts to S3 (production Helm repo) |
+
+### Stage / Release chart workflows (split ref)
+
+`package-charts.yaml`, `stage-charts.yaml`, and `release-charts.yaml` decouple **chart templates** from the **Paragon release tag** (same idea as `prepare.sh`):
+
+| Input | Purpose |
+|-------|---------|
+| `version` | Release tag (e.g. `2026.0528.1501-2b7d0d71`). Stamps `__PARAGON_VERSION__` and supplies `service-inputs.json` from this tag. |
+| `chart_ref` | Optional branch/SHA for chart sources. Defaults to the ref that started the workflow. |
+
+**Typical GitOps feature work:** dispatch `stage-charts` from your feature branch, set `version` to the image release tag, leave `chart_ref` empty (or set it explicitly to your branch). Chart templates come from the branch; fixtures and image tags match the release. Production S3 publish follows automatically after ECR.
+
+**Local equivalent:**
+
+```bash
+bash scripts/fetch-service-inputs-from-tag.sh 2026.0528.1501-2b7d0d71
+node scripts/update-charts.mjs charts/files/service-inputs.json
+# then helm package with __PARAGON_VERSION__ = release tag, or use prepare.sh -t <tag> on the branch
+```
+

@@ -1,0 +1,138 @@
+# Reusable packaging job for stage-charts and release-charts.
+# Chart templates come from chart_ref (or the caller ref); fixtures come from the release tag.
+name: Package Charts
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: >
+          Paragon release tag (e.g. 2026.0528.1501-2b7d0d71). Stamps __PARAGON_VERSION__
+          and loads charts/files/service-inputs.json from this tag.
+        required: true
+        type: string
+      chart_ref:
+        description: >
+          Git ref for chart templates (branch or SHA). Defaults to the ref that
+          started the calling workflow.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  package-charts:
+    name: Package Helm Charts
+    runs-on:
+      - self-hosted
+      - self-hosted-lite
+    env:
+      CHARTS: paragon-onprem paragon-logging paragon-monitoring
+
+    steps:
+      - name: Checkout chart sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.3.1
+        with:
+          ref: ${{ inputs.chart_ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+
+      # ubuntu-latest includes rsync; common act images (e.g. catthehacker/ubuntu:js-22.04) do not
+      - name: Ensure rsync is installed
+        run: |
+          if command -v rsync >/dev/null 2>&1; then
+            exit 0
+          fi
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y rsync
+          else
+            apt-get update -qq
+            apt-get install -y rsync
+          fi
+
+      - name: Fetch service-inputs from release tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash scripts/fetch-service-inputs-from-tag.sh "$VERSION"
+
+      - name: Update chart fixtures
+        run: node scripts/update-charts.mjs charts/files/service-inputs.json
+
+      - name: Stage and version charts
+        id: stamp
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          staging="$RUNNER_TEMP/charts"
+          mkdir -p "$staging"
+
+          rsync -aq --delete \
+            --exclude='example.yaml' \
+            --exclude='values.placeholder.yaml' \
+            --exclude='bootstrap/' \
+            charts/ "$staging/"
+
+          for chart in "$staging"/*/; do
+            [ -d "$chart" ] || continue
+            find "$chart" -type f -exec perl -pi -e 's/\Q__PARAGON_VERSION__\E/$ENV{VERSION}/g' {} +
+            echo "$(basename "$chart"): ${VERSION}"
+          done
+
+          echo "staging=$staging" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: v3.16.1
+
+      - name: Build and package charts
+        run: |
+          set -euo pipefail
+          staging="${{ steps.stamp.outputs.staging }}"
+          pkg_dir="$GITHUB_WORKSPACE/dist-helm"
+          mkdir -p "$pkg_dir"
+          packaged=0
+
+          for chart_name in $CHARTS; do
+            chart_dir="$staging/$chart_name"
+            if [ ! -d "$chart_dir" ]; then
+              echo "Skipping $chart_name (directory not found)"
+              continue
+            fi
+
+            echo "=== Building $chart_name ==="
+            for sub in "$chart_dir"/charts/*/; do
+              if [ -f "$sub/Chart.yaml" ]; then
+                helm dependency build "$sub"
+              fi
+            done
+            helm dependency build "$chart_dir"
+            helm package "$chart_dir" --destination "$pkg_dir"
+            packaged=$((packaged + 1))
+          done
+
+          if [ "$packaged" -eq 0 ]; then
+            echo "Error: no charts were packaged; check CHARTS and staging directory contents." >&2
+            exit 1
+          fi
+
+          echo "--- Packaged charts ---"
+          ls -1 "$pkg_dir"/*.tgz
+
+      - name: Upload packaged charts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: helm-packages
+          path: dist-helm/*.tgz
+          if-no-files-found: error
+          retention-days: 5
