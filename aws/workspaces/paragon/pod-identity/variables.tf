@@ -24,12 +24,6 @@ variable "agent_os_enabled" {
   default     = false
 }
 
-variable "agent_os_namespace" {
-  description = "Kubernetes namespace for the Agent OS workload."
-  type        = string
-  default     = "agent-os"
-}
-
 variable "agent_os_service_account" {
   description = "Kubernetes ServiceAccount used by Agent OS."
   type        = string

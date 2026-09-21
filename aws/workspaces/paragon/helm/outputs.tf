@@ -10,10 +10,6 @@ output "namespace_paragon" {
   value = kubernetes_namespace.paragon
 }
 
-output "namespace_agent_os" {
-  value = var.agent_os_enabled ? kubernetes_namespace.agent_os[0] : null
-}
-
 output "openobserve_email" {
   value     = local.openobserve_email
   sensitive = true

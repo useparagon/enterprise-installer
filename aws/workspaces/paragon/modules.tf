@@ -125,7 +125,6 @@ module "pod_identity" {
   namespace                = module.helm.namespace_paragon.id
   s3_role_arn              = local.storage_output.role_arn
   agent_os_enabled         = var.agent_os_enabled
-  agent_os_namespace       = var.agent_os_enabled ? module.helm.namespace_agent_os.id : "agent-os"
   agent_os_service_account = "agent-os"
   agent_os_role_arn        = var.agent_os_enabled ? local.agent_os_handoff.pod_identity_role_arn : null
   service_accounts = setunion(

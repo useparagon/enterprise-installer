@@ -205,17 +205,8 @@ resource "kubernetes_namespace" "paragon" {
   }
 }
 
-resource "kubernetes_namespace" "agent_os" {
-  count = var.agent_os_enabled ? 1 : 0
-
-  metadata {
-    name = "agent-os"
-  }
-}
-
 locals {
-  paragon_namespace  = kubernetes_namespace.paragon.metadata[0].name
-  agent_os_namespace = var.agent_os_enabled ? kubernetes_namespace.agent_os[0].metadata[0].name : "agent-os"
+  paragon_namespace = kubernetes_namespace.paragon.metadata[0].name
 }
 
 resource "kubernetes_config_map" "feature_flag_content" {
