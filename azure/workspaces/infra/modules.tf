@@ -87,6 +87,7 @@ module "storage" {
   source = "./storage"
 
   managed_sync_enabled       = var.managed_sync_enabled
+  agent_os_enabled           = var.agent_os_enabled
   storage_account_tier       = var.storage_account_tier
   auditlogs_lock_enabled     = var.auditlogs_lock_enabled
   auditlogs_retention_days   = var.auditlogs_retention_days
@@ -122,19 +123,30 @@ module "cluster" {
   resource_group                  = module.network.resource_group
   tags                            = local.default_tags
   workspace                       = local.workspace
+  agent_os_enabled                = var.agent_os_enabled
+  agent_os_index_vm_size          = var.agent_os_index_vm_size
+  agent_os_index_min_count        = var.agent_os_index_min_count
+  agent_os_index_max_count        = var.agent_os_index_max_count
+  agent_os_extract_vm_size        = var.agent_os_extract_vm_size
+  agent_os_extract_min_count      = var.agent_os_extract_min_count
+  agent_os_extract_max_count      = var.agent_os_extract_max_count
 }
 
 module "kafka" {
   count  = var.managed_sync_enabled ? 1 : 0
   source = "./kafka"
 
-  eventhub_auto_inflate_enabled     = var.eventhub_auto_inflate_enabled
-  eventhub_capacity                 = var.eventhub_capacity
-  eventhub_maximum_throughput_units = var.eventhub_maximum_throughput_units
-  eventhub_namespace_sku            = var.eventhub_namespace_sku
-  private_subnet                    = module.network.private_subnet
-  resource_group                    = module.network.resource_group
-  tags                              = local.default_tags
-  virtual_network                   = module.network.virtual_network
-  workspace                         = local.workspace
+  managed_sync_enabled                = var.managed_sync_enabled
+  agent_os_enabled                    = var.agent_os_enabled
+  agent_os_eventhub_partition_count   = var.agent_os_eventhub_partition_count
+  agent_os_eventhub_message_retention = var.agent_os_eventhub_message_retention
+  eventhub_auto_inflate_enabled       = var.eventhub_auto_inflate_enabled
+  eventhub_capacity                   = var.eventhub_capacity
+  eventhub_maximum_throughput_units   = var.eventhub_maximum_throughput_units
+  eventhub_namespace_sku              = var.eventhub_namespace_sku
+  private_subnet                      = module.network.private_subnet
+  resource_group                      = module.network.resource_group
+  tags                                = local.default_tags
+  virtual_network                     = module.network.virtual_network
+  workspace                           = local.workspace
 }

@@ -15,6 +15,26 @@ variable "workspace" {
   type        = string
 }
 
+variable "managed_sync_enabled" {
+  description = "Whether Managed Sync owns the sync.instance-status Event Hub."
+  type        = bool
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create Agent OS Event Hubs resources and scoped authorization rules."
+  type        = bool
+}
+
+variable "agent_os_eventhub_partition_count" {
+  description = "Partition count for the Managed Sync instance-status Event Hubs that Agent OS also uses. Partitions cannot be decreased after creation."
+  type        = number
+}
+
+variable "agent_os_eventhub_message_retention" {
+  description = "Retention in days for the Managed Sync instance-status Event Hubs that Agent OS also uses."
+  type        = number
+}
+
 variable "tags" {
   description = "Default tags to apply to resources"
   type        = map(string)
