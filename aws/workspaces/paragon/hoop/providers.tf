@@ -3,7 +3,7 @@ terraform {
   required_providers {
     hoop = {
       source  = "hoophq/hoop"
-      version = ">= 0.0.19"
+      version = "0.0.21"
     }
     kubectl = {
       source  = "alekc/kubectl"
