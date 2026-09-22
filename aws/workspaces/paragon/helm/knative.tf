@@ -79,7 +79,32 @@ resource "kubectl_manifest" "knative_serving" {
           deployment = {
             "registries-skipping-tag-resolving" = "kind.local,ko.local,dev.local,index.docker.io,docker.io"
           }
+          # Default is OTLP http/protobuf. Grafana knative-ocs needs Prom series
+          # (kn_revision_*, queue-proxy request counters on :9091).
+          observability = {
+            "metrics-protocol"         = "prometheus"
+            "request-metrics-protocol" = "prometheus"
+          }
         }
+        # For annotation-based (prometheus.io/scrape) discovery of autoscaler/activator :9090.
+        deployments = [
+          {
+            name = "autoscaler"
+            annotations = {
+              "prometheus.io/scrape" = "true"
+              "prometheus.io/port"   = "9090"
+              "prometheus.io/path"   = "/metrics"
+            }
+          },
+          {
+            name = "activator"
+            annotations = {
+              "prometheus.io/scrape" = "true"
+              "prometheus.io/port"   = "9090"
+              "prometheus.io/path"   = "/metrics"
+            }
+          },
+        ]
       },
       local.knative_serving_pull_secret ? {
         registry = {

@@ -3,6 +3,10 @@ ClusterIP in front of the ksvc pods. Workers resolve
 http://ocs-code-runner.paragon.svc.cluster.local — a real A record, not
 Knative's ExternalName CNAME to kourier-internal (Node getaddrinfo ENOTFOUND).
 Keep minScale >= 1 so this Service has endpoints; scale-to-zero has no pods.
+
+targetPort MUST be queue-proxy 8012 (same as the Knative revision Service),
+not user-container 8080. Hitting 8080 skips queue-proxy, so request metrics,
+concurrency, and autoscaling never see worker traffic.
 */}}
 apiVersion: v1
 kind: Service
@@ -13,9 +17,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    # Port 80 so WORKER_SHARED_OCS_KNATIVE_SERVICE_URL needs no :8080 suffix.
+    # Port 80 so WORKER_SHARED_OCS_KNATIVE_SERVICE_URL needs no suffix.
     - port: 80
-      targetPort: 8080
+      targetPort: 8012
       protocol: TCP
       name: http
   selector:

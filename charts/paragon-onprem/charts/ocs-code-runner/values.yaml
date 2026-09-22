@@ -34,8 +34,8 @@ serviceAccount:
   annotations: {}
   name: ''
 
-# Queue-proxy serves revision_* metrics on 9091. Prometheus k8s_pod_discovery
-# only scrapes the paragon namespace when prometheus.io/scrape=true.
+# queue-proxy serves Prometheus request metrics on 9091 (http-usermetric);
+# 9090 is the autoscaler's protobuf stats feed and yields no samples.
 podAnnotations:
   prometheus.io/scrape: 'true'
   prometheus.io/path: /metrics
