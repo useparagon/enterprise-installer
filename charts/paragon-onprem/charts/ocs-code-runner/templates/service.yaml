@@ -1,6 +1,6 @@
 {{/*
 ClusterIP in front of the ksvc pods. Workers resolve
-http://ocs-code-runner.paragon.svc.cluster.local — a real A record, not
+http://ocs-code-runner — a same-namespace A record, not
 Knative's ExternalName CNAME to kourier-internal (Node getaddrinfo ENOTFOUND).
 Keep minScale >= 1 so this Service has endpoints; scale-to-zero has no pods.
 

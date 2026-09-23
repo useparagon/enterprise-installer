@@ -116,8 +116,22 @@ resource "kubectl_manifest" "knative_serving" {
   ]
 }
 
-# Operator installs serving.knative.dev CRDs asynchronously after the CR is applied.
-resource "time_sleep" "wait_for_knative_serving_crds" {
-  depends_on      = [kubectl_manifest.knative_serving]
-  create_duration = "90s"
+# Operator installs serving.knative.dev only after this CR is applied. Poll
+# KnativeServing Ready so paragon-on-prem does not apply a ksvc early.
+resource "terraform_data" "knative_serving_ready" {
+  depends_on = [kubectl_manifest.knative_serving]
+
+  input = sha256(kubectl_manifest.knative_serving.yaml_body)
+
+  provisioner "local-exec" {
+    command = "sh ${path.module}/../../../../scripts/wait-knative-serving.sh"
+    environment = {
+      KNATIVE_API_HOST    = data.azurerm_kubernetes_cluster.cluster.kube_config[0].host
+      KNATIVE_CA_PEM      = base64decode(data.azurerm_kubernetes_cluster.cluster.kube_config[0].cluster_ca_certificate)
+      KNATIVE_CLIENT_CERT = base64decode(data.azurerm_kubernetes_cluster.cluster.kube_config[0].client_certificate)
+      KNATIVE_CLIENT_KEY  = base64decode(data.azurerm_kubernetes_cluster.cluster.kube_config[0].client_key)
+      KNATIVE_USERNAME    = data.azurerm_kubernetes_cluster.cluster.kube_config[0].username
+      KNATIVE_PASSWORD    = data.azurerm_kubernetes_cluster.cluster.kube_config[0].password
+    }
+  }
 }

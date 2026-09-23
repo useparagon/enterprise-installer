@@ -125,8 +125,21 @@ resource "kubectl_manifest" "knative_serving" {
   ]
 }
 
-# Operator installs serving.knative.dev CRDs asynchronously after the CR is applied.
-resource "time_sleep" "wait_for_knative_serving_crds" {
-  depends_on      = [kubectl_manifest.knative_serving]
-  create_duration = "90s"
+# Operator installs serving.knative.dev only after this CR is applied. Poll
+# KnativeServing Ready so paragon-on-prem does not apply a ksvc early.
+resource "terraform_data" "knative_serving_ready" {
+  depends_on = [kubectl_manifest.knative_serving]
+
+  input = sha256(kubectl_manifest.knative_serving.yaml_body)
+
+  provisioner "local-exec" {
+    command = "sh ${path.module}/../../../../scripts/wait-knative-serving.sh"
+    environment = merge(local.eks_exec_env, {
+      KNATIVE_API_HOST     = data.aws_eks_cluster.cluster.endpoint
+      KNATIVE_CA_PEM       = base64decode(data.aws_eks_cluster.cluster.certificate_authority[0].data)
+      KNATIVE_AWS_CLUSTER  = var.cluster_name
+      KNATIVE_AWS_REGION   = var.aws_region
+      KNATIVE_AWS_ROLE_ARN = var.aws_assume_role_arn == null ? "" : var.aws_assume_role_arn
+    })
+  }
 }

@@ -1082,7 +1082,7 @@ locals {
 
           # OCS knative code-runner (on-prem substitute for WORKER_SHARED_OCS_LAMBDA_NAME).
           # Storage offload uses CLOUD_STORAGE_* (same contract as platform createOcsRuntime).
-          WORKER_SHARED_OCS_KNATIVE_SERVICE_URL = try(local.helm_vars.global.env["WORKER_SHARED_OCS_KNATIVE_SERVICE_URL"], "http://ocs-code-runner.paragon.svc.cluster.local")
+          WORKER_SHARED_OCS_KNATIVE_SERVICE_URL = try(local.helm_vars.global.env["WORKER_SHARED_OCS_KNATIVE_SERVICE_URL"], "http://ocs-code-runner")
 
           # Monitor configurations (Grafana CloudWatch via EKS Pod Identity; no static AWS keys)
           MONITOR_BULL_EXPORTER_HOST               = "http://bull-exporter"

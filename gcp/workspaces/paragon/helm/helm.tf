@@ -314,7 +314,7 @@ resource "helm_release" "paragon_on_prem" {
   depends_on = [
     # Serialize large Helm discovery passes through Connect Gateway.
     helm_release.paragon_logging,
-    time_sleep.wait_for_knative_serving_crds,
+    terraform_data.knative_serving_ready,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.redis_ca,
