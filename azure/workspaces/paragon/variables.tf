@@ -1045,6 +1045,7 @@ locals {
         )
 
         # OCS knative code-runner (on-prem substitute for WORKER_SHARED_OCS_LAMBDA_NAME).
+        # Pods receive this only when service-inputs.json lists the key.
         # Storage offload uses CLOUD_STORAGE_* (same contract as platform createOcsRuntime).
         WORKER_SHARED_OCS_KNATIVE_SERVICE_URL = try(local.helm_vars.global.env["WORKER_SHARED_OCS_KNATIVE_SERVICE_URL"], "http://ocs-code-runner")
 

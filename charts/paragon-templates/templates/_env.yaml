@@ -32,10 +32,4 @@ Environment variables helper
       key: {{ $key }}
       optional: true
 {{- end }}
-{{- /* OCS knative URL: inject even before atlas-env.yaml lists the key.
-     Storage offload uses CLOUD_STORAGE_* already present on workers. */}}
-{{- if and $.Values.global.env (kindIs "map" $.Values.global.env) (hasKey $.Values.global.env "WORKER_SHARED_OCS_KNATIVE_SERVICE_URL") (not (has "WORKER_SHARED_OCS_KNATIVE_SERVICE_URL" $envKeys)) }}
-- name: WORKER_SHARED_OCS_KNATIVE_SERVICE_URL
-  value: {{ index $.Values.global.env "WORKER_SHARED_OCS_KNATIVE_SERVICE_URL" | quote }}
-{{- end }}
 {{- end -}}
