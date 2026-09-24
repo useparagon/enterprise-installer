@@ -327,7 +327,7 @@ variable "hoop_image_repository" {
 variable "hoop_image_tag" {
   description = "Container image tag for the Hoop agent."
   type        = string
-  default     = "1.0.1"
+  default     = "1.1.0"
 }
 
 variable "hoop_grafana_connection" {
