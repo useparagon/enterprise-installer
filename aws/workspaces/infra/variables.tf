@@ -581,9 +581,9 @@ variable "agent_os_index_max_count" {
 }
 
 variable "agent_os_extract_instance_types" {
-  description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group. Use c6a.2xlarge for staging and c6a.4xlarge for production."
+  description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group. Use c6a.4xlarge for staging and c6a.8xlarge for production."
   type        = list(string)
-  default     = ["c6a.4xlarge"]
+  default     = ["c6a.8xlarge"]
 }
 
 variable "agent_os_extract_min_count" {
