@@ -171,9 +171,14 @@ locals {
             try(nonsensitive(var.helm_values).global.podAnnotations, {}),
             { "reloader.stakater.com/auto" = "true" }
           )
-          env = {
-            HOST_ENV = "AWS_K8"
-          }
+          env = merge(
+            { HOST_ENV = "AWS_K8" },
+            {
+              for key, value in try(nonsensitive(var.helm_values).global.env, {}) :
+              key => value
+              if strcontains(key, "SYNC") && value != null
+            },
+          )
         },
         local.docker_pull_secret_global_values
       )

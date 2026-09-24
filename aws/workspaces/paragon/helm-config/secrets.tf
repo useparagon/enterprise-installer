@@ -83,7 +83,16 @@ locals {
     password = try(var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_HTTP_PASSWORD"], random_password.queue_exporter_password.result)
   }
 
-  managed_sync_secrets = {
+  # Customer global.env tunables whose names contain SYNC (PARA-26440). Managed-sync
+  # charts resolve these via optional secretKeyRef when Helm global.env is stripped.
+  managed_sync_sync_env_from_values = {
+    for key, value in try(var.base_helm_values.global.env, {}) :
+    key => tostring(value)
+    if strcontains(key, "SYNC") && value != null && tostring(value) != ""
+  }
+
+  managed_sync_secrets = merge(
+    {
     HOST_ENV       = "AWS_K8"
     LOG_LEVEL      = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
     TRIAL_DISABLED = try(var.base_helm_values.global.env["TRIAL_DISABLED"], "true")
@@ -224,7 +233,9 @@ locals {
     # not used at the moment
     # MONITOR_KUBE_STATE_METRICS_HTTP_USERNAME = ""
     # MONITOR_KUBE_STATE_METRICS_HTTP_PASSWORD = ""
-  }
+    },
+    local.managed_sync_sync_env_from_values,
+  )
 }
 
 resource "random_string" "postgres_username" {
