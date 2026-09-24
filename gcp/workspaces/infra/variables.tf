@@ -276,9 +276,9 @@ variable "agent_os_index_max_count" {
 }
 
 variable "agent_os_extract_machine_type" {
-  description = "Compute-optimized AMD machine type for the Agent OS extraction GKE node pool. Use c2d-standard-8 for staging and c2d-standard-16 for production."
+  description = "Compute-optimized AMD machine type for the Agent OS extraction GKE node pool. Use c2d-standard-16 for staging and c2d-standard-32 for production."
   type        = string
-  default     = "c2d-standard-16"
+  default     = "c2d-standard-32"
 }
 
 variable "agent_os_extract_min_count" {

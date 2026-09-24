@@ -79,7 +79,7 @@ No requirements.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive. | `bool` | `false` | no |
-| <a name="input_agent_os_extract_machine_type"></a> [agent\_os\_extract\_machine\_type](#input\_agent\_os\_extract\_machine\_type) | Compute-optimized AMD machine type for the Agent OS extraction GKE node pool. Use c2d-standard-8 for staging and c2d-standard-16 for production. | `string` | `"c2d-standard-16"` | no |
+| <a name="input_agent_os_extract_machine_type"></a> [agent\_os\_extract\_machine\_type](#input\_agent\_os\_extract\_machine\_type) | Compute-optimized AMD machine type for the Agent OS extraction GKE node pool. Use c2d-standard-16 for staging and c2d-standard-32 for production. | `string` | `"c2d-standard-32"` | no |
 | <a name="input_agent_os_extract_max_count"></a> [agent\_os\_extract\_max\_count](#input\_agent\_os\_extract\_max\_count) | Maximum nodes in the Agent OS extraction GKE node pool. Use 3 for staging and 8 for production. | `number` | `8` | no |
 | <a name="input_agent_os_extract_min_count"></a> [agent\_os\_extract\_min\_count](#input\_agent\_os\_extract\_min\_count) | Minimum nodes in the Agent OS extraction GKE node pool. | `number` | `1` | no |
 | <a name="input_agent_os_index_machine_type"></a> [agent\_os\_index\_machine\_type](#input\_agent\_os\_index\_machine\_type) | GKE machine type for the Agent OS index node pool. | `string` | `"n2-highmem-8"` | no |
