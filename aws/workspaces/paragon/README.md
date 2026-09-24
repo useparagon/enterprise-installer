@@ -106,7 +106,7 @@
 | <a name="input_hoop_slack_app_token"></a> [hoop\_slack\_app\_token](#input\_hoop\_slack\_app\_token) | Slack app token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_bot_token"></a> [hoop\_slack\_bot\_token](#input\_hoop\_slack\_bot\_token) | Slack bot token for the Hoop Slack plugin. | `string` | `null` | no |
 | <a name="input_hoop_slack_channel_ids"></a> [hoop\_slack\_channel\_ids](#input\_hoop\_slack\_channel\_ids) | Slack channel IDs to notify for connections that require reviews. | `list(string)` | `[]` | no |
-| <a name="input_hoop_version"></a> [hoop\_version](#input\_hoop\_version) | Hoopagent Helm chart version. | `string` | `"1.49.4"` | no |
+| <a name="input_hoop_version"></a> [hoop\_version](#input\_hoop\_version) | Hoopagent Helm chart version. | `string` | `"1.184.2"` | no |
 | <a name="input_infra_json"></a> [infra\_json](#input\_infra\_json) | JSON string of `infra` workspace variables to use instead of `infra_json_path` | `string` | `null` | no |
 | <a name="input_infra_json_path"></a> [infra\_json\_path](#input\_infra\_json\_path) | Deprecated legacy path to infra workspace output JSON. Prefer reading infra handoff secrets from Secrets Manager (PARA-21726). | `string` | `null` | no |
 | <a name="input_ingress_scheme"></a> [ingress\_scheme](#input\_ingress\_scheme) | Whether the load balancer is 'internet-facing' (public) or 'internal' (private) | `string` | `"internet-facing"` | no |

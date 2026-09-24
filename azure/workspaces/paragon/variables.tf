@@ -407,7 +407,7 @@ variable "hoop_enabled" {
 variable "hoop_version" {
   description = "Hoopagent Helm chart version."
   type        = string
-  default     = "1.49.4"
+  default     = "1.184.2"
 }
 
 variable "hoop_image_repository" {
