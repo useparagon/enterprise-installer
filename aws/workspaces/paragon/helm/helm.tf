@@ -443,6 +443,7 @@ resource "helm_release" "paragon_on_prem" {
   depends_on = [
     module.karpenter,
     helm_release.ingress,
+    terraform_data.knative_serving_ready,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
     kubernetes_secret.docker_login,

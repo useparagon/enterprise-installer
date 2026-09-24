@@ -1,0 +1,48 @@
+# OCS knative node-script code runner (on-prem substitute for AWS Lambda).
+# Emits a cluster-local serving.knative.dev/v1 Service. Requires Knative Serving + Kourier.
+
+image:
+  # Docker Hub equivalent of ocs/knative-node-script. Independent of Paragon VERSION.
+  repository: useparagon/ocs-code-runner-knative
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  port: 8080
+
+resources:
+  limits:
+    cpu: '1'
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+knative:
+  minScale: '1'
+  maxScale: '10'
+  target: '20'
+  containerConcurrency: 20
+  timeoutSeconds: 600
+
+imagePullSecrets: []
+nameOverride: ''
+fullnameOverride: ocs-code-runner
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ''
+
+# queue-proxy serves Prometheus request metrics on 9091 (http-usermetric);
+# 9090 is the autoscaler's protobuf stats feed and yields no samples.
+podAnnotations:
+  prometheus.io/scrape: 'true'
+  prometheus.io/path: /metrics
+  prometheus.io/port: '9091'
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL

@@ -1013,6 +1013,11 @@ locals {
       "port"             = try(local.helm_vars.global.env["FLIPT_PORT"], 1722)
       "public_url"       = try(local.helm_vars.global.env["FLIPT_PUBLIC_URL"], null)
     }
+    "ocs-code-runner" = {
+      "healthcheck_path" = "/healthz"
+      "port"             = 8080
+      "public_url"       = null
+    }
     "hades" = {
       "healthcheck_path" = "/healthz"
       "port"             = try(local.helm_vars.global.env["HADES_PORT"], 1710)
@@ -1419,6 +1424,11 @@ locals {
           try(local.helm_vars.global.env["CLOUD_STORAGE_PUBLIC_URL"], null),
           local.cloud_storage_type == "GCP" ? "https://storage.googleapis.com" : null,
         )
+
+        # OCS knative code-runner (on-prem substitute for WORKER_SHARED_OCS_LAMBDA_NAME).
+        # Pods receive this only when service-inputs.json lists the key.
+        # Storage offload uses CLOUD_STORAGE_* (same contract as platform createOcsRuntime).
+        WORKER_SHARED_OCS_KNATIVE_SERVICE_URL = try(local.helm_vars.global.env["WORKER_SHARED_OCS_KNATIVE_SERVICE_URL"], "http://ocs-code-runner")
 
         # Monitor configurations
         MONITOR_BULL_EXPORTER_HOST              = "http://bull-exporter"
