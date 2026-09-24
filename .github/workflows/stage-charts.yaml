@@ -44,6 +44,11 @@ jobs:
       AWS_REGION: us-east-1
 
     steps:
+      # Ephemeral runners already start empty; this avoids leftover *.tgz if a
+      # workspace is ever reused between jobs.
+      - name: Clear leftover chart packages
+        run: rm -rf "$GITHUB_WORKSPACE/dist-helm"
+
       - name: Download packaged charts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:

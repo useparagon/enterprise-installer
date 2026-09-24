@@ -100,6 +100,7 @@ jobs:
           set -euo pipefail
           staging="${{ steps.stamp.outputs.staging }}"
           pkg_dir="$GITHUB_WORKSPACE/dist-helm"
+          rm -rf "$pkg_dir"
           mkdir -p "$pkg_dir"
           packaged=0
 
