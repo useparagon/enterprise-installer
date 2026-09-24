@@ -529,9 +529,9 @@ variable "agent_os_index_max_count" {
 }
 
 variable "agent_os_extract_vm_size" {
-  description = "Compute-optimized AMD VM size for the Agent OS extraction AKS node pool. Use Standard_F8as_v6 for staging and Standard_F16as_v6 for production."
+  description = "Compute-optimized AMD VM size for the Agent OS extraction AKS node pool. Use Standard_F16as_v6 for staging and Standard_F32as_v6 for production."
   type        = string
-  default     = "Standard_F16as_v6"
+  default     = "Standard_F32as_v6"
 }
 
 variable "agent_os_extract_min_count" {
