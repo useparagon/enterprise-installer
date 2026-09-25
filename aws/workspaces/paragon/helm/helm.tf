@@ -76,7 +76,10 @@ locals {
       },
       # env.standard only emits keys listed in service-inputs envKeys or Values.envKeys.
       var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
-        envKeys = ["HTTP_PATH_PREFIX"]
+        envKeys = distinct(concat(
+          try(nonsensitive(var.helm_values)[microservice_name].envKeys, []),
+          ["HTTP_PATH_PREFIX"]
+        ))
       } : {}
     )
   })
