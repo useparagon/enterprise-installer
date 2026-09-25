@@ -8,7 +8,7 @@ image:
   repository: useparagon/health-checker
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: '2025.1215.1845-d85aba8f'
+  tag: '2026.0727.2308-0d4887b8'
 
 service:
   type: ClusterIP

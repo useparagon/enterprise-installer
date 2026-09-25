@@ -24,17 +24,14 @@ serviceAccount:
 podAnnotations: {}
 
 podSecurityContext:
-  {}
-  # fsGroup: 2000
+  fsGroup: 65532
+  fsGroupChangePolicy: OnRootMismatch
 
 securityContext:
-  {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  allowPrivilegeEscalation: false
 
 service:
   type: ClusterIP
