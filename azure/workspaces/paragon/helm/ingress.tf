@@ -15,11 +15,25 @@ locals {
   )
 
   # Hostnames that need Certificate CRs when nginx Ingress is gone (AGC direct).
-  agc_direct_certificate_hosts = {
-    for name, cfg in merge(var.public_microservices, var.public_monitors) :
-    name => replace(replace(cfg.public_url, "https://", ""), "http://", "")
-    if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true)
-  }
+  # Path-routed services keep certificates on their Paragon-domain origin hosts;
+  # the customer's external shared host terminates TLS at their reverse proxy.
+  agc_direct_certificate_hosts = merge(
+    {
+      for name, cfg in var.public_microservices :
+      name => cfg.origin_host
+      if try(local.subchart_enabled[name].enabled, true)
+    },
+    {
+      for name, cfg in var.public_monitors :
+      name => replace(replace(cfg.public_url, "https://", ""), "http://", "")
+      if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true)
+    },
+    var.path_based_routing_enabled && anytrue([
+      for cfg in var.public_microservices : cfg.path_prefix != ""
+      ]) ? {
+      "path-routing" = "path-routing.${var.domain}"
+    } : {},
+  )
 }
 
 resource "azurerm_key_vault_access_policy" "aks_access_to_kv" {

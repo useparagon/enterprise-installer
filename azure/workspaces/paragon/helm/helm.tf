@@ -23,9 +23,14 @@ locals {
 
   microservice_values = yamlencode({
     for microservice_name, microservice_config in var.microservices : microservice_name => {
-      env = {
-        SERVICE = microservice_name
-      }
+      env = merge(
+        {
+          SERVICE = microservice_name
+        },
+        var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
+          HTTP_PATH_PREFIX = var.public_microservices[microservice_name].path_prefix
+        } : {}
+      )
     }
   })
 
@@ -42,7 +47,7 @@ locals {
         enabled   = !var.agc_direct
         class     = "nginx" # used for managed sync
         className = "nginx"
-        host      = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
+        host      = microservice_config.origin_host
         scheme    = var.ingress_scheme
         agc       = var.agc_active
         annotations = {
