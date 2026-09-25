@@ -99,7 +99,14 @@ locals {
     password = try(var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_HTTP_PASSWORD"], random_password.queue_exporter_password.result)
   }
 
-  managed_sync_secrets = {
+  managed_sync_sync_env_from_values = {
+    for key, value in try(var.base_helm_values.global.env, {}) :
+    key => tostring(value)
+    if strcontains(key, "SYNC") && value != null && tostring(value) != ""
+  }
+
+  managed_sync_secrets = merge(
+    {
     HOST_ENV       = "GCP_K8"
     LOG_LEVEL      = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
     TRIAL_DISABLED = try(var.base_helm_values.global.env["TRIAL_DISABLED"], "true")
@@ -237,7 +244,9 @@ locals {
     MONITOR_MANAGED_SYNC_POSTGRES_PASSWORD    = local.postgres_config.admin.password
     MONITOR_MANAGED_SYNC_POSTGRES_DATABASE    = local.postgres_config.admin.database
     MONITOR_MANAGED_SYNC_POSTGRES_SSL_ENABLED = "true"
-  }
+    },
+    local.managed_sync_sync_env_from_values,
+  )
 }
 
 resource "random_string" "postgres_username" {
