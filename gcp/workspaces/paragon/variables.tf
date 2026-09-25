@@ -182,9 +182,14 @@ variable "ingress_scheme" {
 }
 
 variable "path_based_routing_enabled" {
-  description = "Enable shared-host path-prefixed public routes on the GCP shared ingress."
+  description = "Enable shared-host path-prefixed public routes on the GCP shared ingress. Requires ingress_scheme=external. Services without a path keep host-based routing."
   type        = bool
   default     = false
+
+  validation {
+    condition     = !var.path_based_routing_enabled || var.ingress_scheme == "external"
+    error_message = "path_based_routing_enabled=true requires ingress_scheme=external (customer reverse-proxy + path-routing.<domain> certs are an external-LB design)."
+  }
 
   validation {
     condition = !var.path_based_routing_enabled || alltrue([
@@ -223,14 +228,40 @@ variable "path_based_routing_enabled" {
     error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
   }
 
+  # GCE Ingress Prefix is a raw string prefix: /hermes also matches /hermes2.
   validation {
     condition = !var.path_based_routing_enabled || alltrue(flatten([
       for service, prefix in local.path_routed_public_prefixes : [
         for other_service, other_prefix in local.path_routed_public_prefixes :
-        service == other_service || !startswith(other_prefix, "${prefix}/")
+        service == other_service || (
+          !startswith(other_prefix, prefix) && !startswith(prefix, other_prefix)
+        )
       ]
     ]))
-    error_message = "Path-based public route prefixes must not overlap; each service needs a distinct path namespace."
+    error_message = "Path-based public route prefixes must not overlap as string prefixes (e.g. /hermes vs /hermes2); each service needs a distinct path namespace."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || length(distinct([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ])) <= 1
+    error_message = "Path-based routing requires all path-routed services to share the same public host (customer reverse-proxy hostname)."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || !var.managed_sync_enabled || alltrue([
+      for prefix in values(local.path_routed_public_prefixes) :
+      alltrue([
+        for reserved in local.managed_sync_reserved_path_prefixes :
+        !startswith(prefix, reserved) && !startswith(reserved, prefix)
+      ])
+    ])
+    error_message = "Path-based public route prefixes must not collide with Managed Sync ingress paths (/api/syncs, /api/webhooks, etc.)."
   }
 }
 
@@ -1164,7 +1195,7 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
-  # Phase 1 from PARA-24782. Adding another service also requires
+  # Phase 1 from PARA-25255. Adding another service also requires
   # application-level HTTP_PATH_PREFIX support.
   path_routing_supported_services = toset([
     "connect",
@@ -1174,6 +1205,18 @@ locals {
     "zeus",
   ])
   path_routing_origin_host = "path-routing.${var.domain}"
+
+  # Keep in sync with helm/ingress.tf managed_sync_routes (hostless path rules
+  # would otherwise steal these prefixes on any unmatched Host).
+  managed_sync_reserved_path_prefixes = toset([
+    "/api/sync-projects",
+    "/api/catalog",
+    "/api/syncs",
+    "/api/permissions",
+    "/api/webhooks",
+    "/worker/sync",
+    "/worker/history/sync",
+  ])
 
   public_microservices_base = {
     for microservice, config in local.microservices :
