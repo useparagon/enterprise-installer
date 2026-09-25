@@ -29,6 +29,8 @@ variable "public_microservices" {
     port             = number
     healthcheck_path = string
     public_url       = string
+    public_host      = string
+    path_prefix      = string
   }))
 }
 

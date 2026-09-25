@@ -16,7 +16,10 @@ resource "aws_route53_record" "microservice" {
   for_each = merge(var.public_microservices, var.public_monitors)
 
   zone_id = aws_route53_zone.paragon.zone_id
-  name = replace(
+  # Path-routed public URLs may point at a customer-owned reverse proxy.
+  # Keep the Paragon origin DNS name stable so that proxy can target the shared ALB
+  # using a hostname covered by the deployment certificate.
+  name = try(each.value.path_prefix, "") != "" ? each.key : replace(
     replace(
       replace(each.value.public_url, var.domain, ""),
       "https://",

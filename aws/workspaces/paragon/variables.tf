@@ -126,6 +126,12 @@ variable "ingress_scheme" {
   default     = "internet-facing"
 }
 
+variable "path_based_routing_enabled" {
+  description = "Enable shared-host path-based public routing for supported services. When enabled, supported *_PUBLIC_URL values must include a non-root path prefix."
+  type        = bool
+  default     = false
+}
+
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
@@ -798,10 +804,35 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
-  public_microservices = {
+  path_based_routing_services = toset(["connect", "hermes", "passport", "worker-proxy", "zeus"])
+
+  public_microservices_raw = {
     for microservice, config in local.microservices :
     microservice => config
     if config.public_url != null && config.public_url != "" && !contains(var.private_services, microservice)
+  }
+
+  public_microservice_url_parts = {
+    for microservice, config in local.public_microservices_raw :
+    microservice => try(regex("^https?://([^/?#]+)(/[^?#]*)?$", config.public_url), [])
+  }
+
+  public_microservices = {
+    for microservice, config in local.public_microservices_raw :
+    microservice => merge(config, {
+      public_host = try(local.public_microservice_url_parts[microservice][0], "")
+      path_prefix = (
+        var.path_based_routing_enabled &&
+        contains(local.path_based_routing_services, microservice) &&
+        try(local.public_microservice_url_parts[microservice][1] != null, false)
+      ) ? local.public_microservice_url_parts[microservice][1] : ""
+    })
+  }
+
+  path_routed_microservices = {
+    for microservice, config in local.public_microservices :
+    microservice => config
+    if config.path_prefix != ""
   }
 
   uptime_services = {

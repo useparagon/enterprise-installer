@@ -63,11 +63,19 @@ locals {
   })
 
   microservice_values = yamlencode({
-    for microservice_name, microservice_config in var.microservices : microservice_name => {
-      env = {
-        SERVICE = microservice_name
-      }
-    }
+    for microservice_name, microservice_config in var.microservices : microservice_name => merge(
+      {
+        env = {
+          SERVICE = microservice_name
+        }
+      },
+      try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
+        env = {
+          SERVICE          = microservice_name
+          HTTP_PATH_PREFIX = var.public_microservices[microservice_name].path_prefix
+        }
+      } : {}
+    )
   })
 
   public_microservice_values = yamlencode({
@@ -75,7 +83,9 @@ locals {
       ingress = merge(
         {
           className          = "alb"
-          host               = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
+          host               = microservice_config.public_host
+          path               = microservice_config.path_prefix != "" ? microservice_config.path_prefix : "/"
+          path_based         = microservice_config.path_prefix != ""
           scheme             = var.ingress_scheme
           certificate        = var.certificate
           load_balancer_name = var.workspace
