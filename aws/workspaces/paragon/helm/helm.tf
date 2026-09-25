@@ -64,9 +64,14 @@ locals {
 
   microservice_values = yamlencode({
     for microservice_name, microservice_config in var.microservices : microservice_name => {
-      env = {
-        SERVICE = microservice_name
-      }
+      env = merge(
+        {
+          SERVICE = microservice_name
+        },
+        var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
+          HTTP_PATH_PREFIX = var.public_microservices[microservice_name].path_prefix
+        } : {}
+      )
     }
   })
 
@@ -75,12 +80,18 @@ locals {
       ingress = merge(
         {
           className          = "alb"
-          host               = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
+          host               = microservice_config.public_host
           scheme             = var.ingress_scheme
           certificate        = var.certificate
           load_balancer_name = var.workspace
           logs_bucket        = var.logs_bucket
         },
+        var.path_based_routing_enabled && microservice_config.path_prefix != "" ? {
+          # Outrank legacy host-based rules if the customer's reverse proxy rewrites Host.
+          group_order = -100
+          hostless    = true
+          path        = microservice_config.path_prefix
+        } : {},
         var.waf_web_acl_arn != "" ? { wafv2_acl_arn = var.waf_web_acl_arn } : {}
       )
     }
