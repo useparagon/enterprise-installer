@@ -189,15 +189,23 @@ variable "path_based_routing_enabled" {
         "$1"
       ))
     ])) <= 1
-    error_message = "Path-based routing requires all path-routed services to share the same public host (customer reverse-proxy hostname)."
+    error_message = "Path-based routing requires all path-routed services to share the same public host (external reverse-proxy hostname)."
   }
 
   validation {
     condition = !var.path_based_routing_enabled || alltrue([
       for prefix in values(local.path_routed_public_prefixes) :
-      length(prefix) <= 128
+      prefix != "/projects" && !startswith(prefix, "/projects/")
     ])
-    error_message = "AWS ALB path patterns can be at most 128 characters."
+    error_message = "Path-based public routes must not use the reserved /projects namespace because AWS already uses hostless Connect SDK rules under /projects/*/sdk/*."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for prefix in values(local.path_routed_public_prefixes) :
+      length(prefix) <= 126
+    ])
+    error_message = "AWS path prefixes can be at most 126 characters because the Load Balancer Controller also emits a trailing /* pattern and ALB limits each path pattern to 128 characters."
   }
 }
 
