@@ -168,6 +168,8 @@ variable "path_based_routing_enabled" {
     error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
   }
 
+  # ALB Prefix rules match /prefix and /prefix/* (not /prefix2). Reject nested
+  # namespaces such as /foo vs /foo/bar; exact duplicates are covered above.
   validation {
     condition = !var.path_based_routing_enabled || alltrue(flatten([
       for service, prefix in local.path_routed_public_prefixes : [
@@ -176,6 +178,26 @@ variable "path_based_routing_enabled" {
       ]
     ]))
     error_message = "Path-based public route prefixes must not overlap; each service needs a distinct path namespace."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || length(distinct([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ])) <= 1
+    error_message = "Path-based routing requires all path-routed services to share the same public host (customer reverse-proxy hostname)."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for prefix in values(local.path_routed_public_prefixes) :
+      length(prefix) <= 128
+    ])
+    error_message = "AWS ALB path patterns can be at most 128 characters."
   }
 }
 
@@ -851,7 +873,7 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
-  # Phase 1 from PARA-24782. Adding a service also requires application-level
+  # Phase 1 from PARA-25255. Adding a service also requires application-level
   # HTTP_PATH_PREFIX support before its public URL can safely carry a path.
   path_routing_supported_services = toset([
     "connect",

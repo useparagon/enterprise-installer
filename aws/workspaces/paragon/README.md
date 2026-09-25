@@ -1,5 +1,27 @@
 # Paragon AWS Deployment
 
+## Shared-host path routing
+
+Set `path_based_routing_enabled = true` to route supported public services through a shared external host with service-specific path prefixes. The path prefix is taken from each service's existing `*_PUBLIC_URL`; there is no separate path variable.
+
+For example:
+
+```yaml
+global:
+  env:
+    HERMES_PUBLIC_URL: https://proxy.customer.com/paragon/hermes
+    ZEUS_PUBLIC_URL: https://proxy.customer.com/paragon/zeus
+    CONNECT_PUBLIC_URL: https://proxy.customer.com/paragon/connect
+    PASSPORT_PUBLIC_URL: https://proxy.customer.com/paragon/passport
+    WORKER_PROXY_PUBLIC_URL: https://proxy.customer.com/paragon/worker-proxy
+```
+
+All path-routed services must use the same public host and unique, non-root path prefixes without trailing slashes (max 128 characters for ALB). Ingress rules match the path without requiring the public `Host` header, so an upstream reverse proxy may rewrite `Host`. Route53 keeps `<service>.<domain>` CNAMEs as the TLS-valid origin the proxy targets.
+
+ALB target-group health checks and Kubernetes probes stay on `/healthz` without the public path prefix. Hermes/worker-proxy Connect SDK ALB rules (`/projects/*/sdk/*`) remain host-agnostic alongside path prefixes. Application support is PARA-25254; Helm also injects `HTTP_PATH_PREFIX` via an `envKeys` override so the var reaches pods even before `service-inputs` lists it.
+
+Uptime monitors use `public_url + healthcheck_path` (the customer proxy URL). Pause or retarget them until the proxy and app middleware are live.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 

@@ -63,16 +63,22 @@ locals {
   })
 
   microservice_values = yamlencode({
-    for microservice_name, microservice_config in var.microservices : microservice_name => {
-      env = merge(
-        {
-          SERVICE = microservice_name
-        },
-        var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
-          HTTP_PATH_PREFIX = var.public_microservices[microservice_name].path_prefix
-        } : {}
-      )
-    }
+    for microservice_name, microservice_config in var.microservices : microservice_name => merge(
+      {
+        env = merge(
+          {
+            SERVICE = microservice_name
+          },
+          var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
+            HTTP_PATH_PREFIX = var.public_microservices[microservice_name].path_prefix
+          } : {}
+        )
+      },
+      # env.standard only emits keys listed in service-inputs envKeys or Values.envKeys.
+      var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
+        envKeys = ["HTTP_PATH_PREFIX"]
+      } : {}
+    )
   })
 
   public_microservice_values = yamlencode({
