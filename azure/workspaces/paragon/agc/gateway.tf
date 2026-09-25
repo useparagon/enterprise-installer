@@ -1,6 +1,6 @@
 locals {
   # Legacy services keep one HTTPS listener per host. Path-routed services share
-  # a hostless listener so the customer's reverse proxy may preserve or rewrite Host.
+  # a hostless listener so the external reverse proxy may preserve or rewrite Host.
   host_public_services = {
     for name, svc in var.public_services :
     name => svc

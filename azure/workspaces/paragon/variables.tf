@@ -176,17 +176,16 @@ variable "path_based_routing_enabled" {
     error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
   }
 
-  # Gateway PathPrefix is a raw string prefix: /hermes also matches /hermes2.
+  # Gateway API PathPrefix matches path elements, so /foo overlaps /foo/bar
+  # but not /foobar. Exact duplicates are covered by the validation above.
   validation {
     condition = !var.path_based_routing_enabled || alltrue(flatten([
       for service, prefix in local.path_routed_public_prefixes : [
         for other_service, other_prefix in local.path_routed_public_prefixes :
-        service == other_service || (
-          !startswith(other_prefix, prefix) && !startswith(prefix, other_prefix)
-        )
+        service == other_service || !startswith(other_prefix, "${prefix}/")
       ]
     ]))
-    error_message = "Path-based public route prefixes must not overlap as string prefixes (e.g. /hermes vs /hermes2); each service needs a distinct path namespace."
+    error_message = "Path-based public route prefixes must not overlap by path namespace; each service needs a distinct path prefix."
   }
 
   validation {
@@ -198,7 +197,7 @@ variable "path_based_routing_enabled" {
         "$1"
       ))
     ])) <= 1
-    error_message = "Path-based routing requires all path-routed services to share the same public host (customer reverse-proxy hostname)."
+    error_message = "Path-based routing requires all path-routed services to share the same public host (external reverse-proxy hostname)."
   }
 
 }

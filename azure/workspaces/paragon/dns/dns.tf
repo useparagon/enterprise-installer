@@ -11,7 +11,7 @@ locals {
 resource "cloudflare_record" "cname" {
   for_each = var.enabled ? var.public_services : {}
 
-  # Path-routed public URLs belong to the customer's reverse proxy. DNS keeps
+  # Path-routed public URLs belong to the external reverse proxy. DNS keeps
   # the Paragon-domain origin hostname that proxy targets.
   name = replace(
     coalesce(

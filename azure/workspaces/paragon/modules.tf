@@ -133,7 +133,7 @@ locals {
     {
       for name, cfg in local.public_services :
       name => cfg
-      # Path-routed customer proxy hosts are not in the Paragon zone. Only the
+      # Path-routed external proxy hosts are not in the Paragon zone. Only the
       # shared path-routing.<domain> origin is published for those services.
       if try(cfg.path_prefix, "") == ""
     },
