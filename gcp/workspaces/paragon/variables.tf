@@ -181,6 +181,59 @@ variable "ingress_scheme" {
   default     = "external"
 }
 
+variable "path_based_routing_enabled" {
+  description = "Enable shared-host path-prefixed public routes on the GCP shared ingress."
+  type        = bool
+  default     = false
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+(/[^?#]*)?$", config.public_url)) == 1
+    ])
+    error_message = "Public microservice URLs must be absolute HTTP(S) URLs without query strings or fragments."
+  }
+
+  validation {
+    condition = var.path_based_routing_enabled || alltrue([
+      for config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+    ])
+    error_message = "A path-bearing *_PUBLIC_URL requires path_based_routing_enabled=true."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for config in local.public_monitors :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+    ])
+    error_message = "Path-based routing currently applies to Paragon services only; public monitor URLs must remain host-based."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for service in keys(local.path_routed_public_prefixes) :
+      contains(local.path_routing_supported_services, service)
+    ])
+    error_message = "Path-based routing is currently supported only for Connect, Hermes, Passport, worker-proxy, and Zeus."
+  }
+
+  validation {
+    condition     = !var.path_based_routing_enabled || length(values(local.path_routed_public_prefixes)) == length(distinct(values(local.path_routed_public_prefixes)))
+    error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue(flatten([
+      for service, prefix in local.path_routed_public_prefixes : [
+        for other_service, other_prefix in local.path_routed_public_prefixes :
+        service == other_service || !startswith(other_prefix, "${prefix}/")
+      ]
+    ]))
+    error_message = "Path-based public route prefixes must not overlap; each service needs a distinct path namespace."
+  }
+}
+
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
@@ -1111,10 +1164,47 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
-  public_microservices = {
+  # Phase 1 from PARA-24782. Adding another service also requires
+  # application-level HTTP_PATH_PREFIX support.
+  path_routing_supported_services = toset([
+    "connect",
+    "hermes",
+    "passport",
+    "worker-proxy",
+    "zeus",
+  ])
+  path_routing_origin_host = "path-routing.${var.domain}"
+
+  public_microservices_base = {
     for microservice, config in local.microservices :
     microservice => config
     if config.public_url != null && config.public_url != "" && !contains(var.private_services, microservice)
+  }
+
+  path_routed_public_prefixes = {
+    for microservice, config in local.public_microservices_base :
+    microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
+    if trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+  }
+
+  public_microservices = {
+    for microservice, config in local.public_microservices_base :
+    microservice => merge(config, {
+      public_host = var.path_based_routing_enabled ? replace(
+        config.public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ) : replace(replace(config.public_url, "https://", ""), "http://", "")
+      path_prefix = lookup(local.path_routed_public_prefixes, microservice, "")
+      origin_host = (
+        var.path_based_routing_enabled &&
+        lookup(local.path_routed_public_prefixes, microservice, "") != ""
+        ) ? local.path_routing_origin_host : (
+        var.path_based_routing_enabled
+        ? replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
+        : replace(replace(config.public_url, "https://", ""), "http://", "")
+      )
+    })
   }
 
   uptime_services = {
