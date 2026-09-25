@@ -130,7 +130,13 @@ locals {
   dns_record_ttl = local.agc_active && !local.dns_target_agc ? 60 : 300
 
   dns_public_services = merge(
-    local.public_services,
+    {
+      for name, cfg in local.public_services :
+      name => cfg
+      # Path-routed customer proxy hosts are not in the Paragon zone. Only the
+      # shared path-routing.<domain> origin is published for those services.
+      if try(cfg.path_prefix, "") == ""
+    },
     var.path_based_routing_enabled && length(local.path_routed_public_prefixes) > 0 ? {
       "path-routing" = {
         port        = 443
@@ -150,7 +156,7 @@ locals {
   )
 
   # AGC routes are normalized at the workspace boundary. Path-routed services
-  # use Paragon-domain origin TLS hosts while HTTPRoute matching stays hostless.
+  # share path-routing.<domain> TLS while HTTPRoute matching stays hostless.
   agc_public_routes = {
     for name, cfg in local.public_services :
     name => {

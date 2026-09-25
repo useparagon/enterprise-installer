@@ -173,14 +173,14 @@ locals {
           parentRefs = [{
             name = local.gateway_name
             sectionName = (
-              svc.path_prefix != ""
+              contains(keys(local.path_public_services), name)
               ? local.path_listener.listener
               : local.https_listeners[name].listener
             )
           }]
           rules = [
             merge(
-              svc.path_prefix != "" ? {
+              contains(keys(local.path_public_services), name) ? {
                 matches = [{
                   path = {
                     type  = "PathPrefix"
@@ -197,7 +197,7 @@ locals {
             )
           ]
         },
-        svc.path_prefix != "" ? {} : {
+        contains(keys(local.path_public_services), name) ? {} : {
           hostnames = [svc.host]
         },
       )
@@ -205,7 +205,7 @@ locals {
   }
 
   # Explicit probes keep the backend check on /healthz (or the service's existing
-  # healthcheck_path) rather than inheriting the public route prefix.
+  # healthcheck_path). AGC does not inherit HTTPRoute PathPrefix for probes.
   path_health_check_yaml = {
     for name, svc in local.path_public_services :
     name => yamlencode({

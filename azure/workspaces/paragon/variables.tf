@@ -176,14 +176,29 @@ variable "path_based_routing_enabled" {
     error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
   }
 
+  # Gateway PathPrefix is a raw string prefix: /hermes also matches /hermes2.
   validation {
     condition = !var.path_based_routing_enabled || alltrue(flatten([
       for service, prefix in local.path_routed_public_prefixes : [
         for other_service, other_prefix in local.path_routed_public_prefixes :
-        service == other_service || !startswith(other_prefix, "${prefix}/")
+        service == other_service || (
+          !startswith(other_prefix, prefix) && !startswith(prefix, other_prefix)
+        )
       ]
     ]))
-    error_message = "Path-based public route prefixes must not overlap; each service needs a distinct path namespace."
+    error_message = "Path-based public route prefixes must not overlap as string prefixes (e.g. /hermes vs /hermes2); each service needs a distinct path namespace."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || length(distinct([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ])) <= 1
+    error_message = "Path-based routing requires all path-routed services to share the same public host (customer reverse-proxy hostname)."
   }
 
 }
@@ -796,7 +811,7 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
-  # Phase 1 from PARA-24782. Adding a service also requires application-level
+  # Phase 1 from PARA-25255. Adding a service also requires application-level
   # HTTP_PATH_PREFIX support before its public URL can safely carry a path.
   path_routing_supported_services = toset([
     "connect",
@@ -828,12 +843,13 @@ locals {
         "$1"
       ) : replace(replace(config.public_url, "https://", ""), "http://", "")
       path_prefix = lookup(local.path_routed_public_prefixes, microservice, "")
-      # Preserve the existing per-service Paragon origin host for DNS/cert
-      # compatibility. Shared path traffic terminates on path-routing.<domain>.
+      # Path-routed traffic terminates on the shared path-routing.<domain> origin
+      # (AGC hostless listener + cert). Per-service *.domain names are not TLS
+      # listeners in this mode — do not publish them as proxy targets.
       origin_host = (
         var.path_based_routing_enabled &&
         lookup(local.path_routed_public_prefixes, microservice, "") != ""
-        ) ? "${microservice}.${var.domain}" : (
+        ) ? local.path_routing_origin_host : (
         var.path_based_routing_enabled
         ? replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
         : replace(replace(config.public_url, "https://", ""), "http://", "")

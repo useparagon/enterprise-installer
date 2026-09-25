@@ -15,13 +15,13 @@ locals {
   )
 
   # Hostnames that need Certificate CRs when nginx Ingress is gone (AGC direct).
-  # Path-routed services keep certificates on their Paragon-domain origin hosts;
-  # the customer's external shared host terminates TLS at their reverse proxy.
+  # Path-routed services share path-routing.<domain> on the hostless listener —
+  # do not issue unused per-service certs that AGC will never present.
   agc_direct_certificate_hosts = merge(
     {
       for name, cfg in var.public_microservices :
       name => cfg.origin_host
-      if try(local.subchart_enabled[name].enabled, true)
+      if try(local.subchart_enabled[name].enabled, true) && try(cfg.path_prefix, "") == ""
     },
     {
       for name, cfg in var.public_monitors :
