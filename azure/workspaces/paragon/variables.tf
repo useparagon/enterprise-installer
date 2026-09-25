@@ -200,6 +200,27 @@ variable "path_based_routing_enabled" {
     error_message = "Path-based routing requires all path-routed services to share the same public host (external reverse-proxy hostname)."
   }
 
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue(concat(
+      [
+        for service, config in local.public_microservices_base :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+        if !contains(keys(local.path_routed_public_prefixes), service)
+      ],
+      [
+        for config in local.public_monitors :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+      ]
+    ))
+    error_message = "Host-based public services and monitors must not use the shared path-routing public host or path-routing.<domain> origin because specific Gateway listeners take precedence over the hostless listener."
+  }
+
 }
 
 variable "agc_dns_cutover" {
@@ -832,6 +853,18 @@ locals {
     microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
     if trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
   }
+
+  path_routing_reserved_hosts = toset(concat(
+    [
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ],
+    [lower(local.path_routing_origin_host)]
+  ))
 
   public_microservices = {
     for microservice, config in local.public_microservices_base :

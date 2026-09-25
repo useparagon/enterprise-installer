@@ -23,7 +23,7 @@ Do not commit real credentials to git.
 
 Set `path_based_routing_enabled = true` (requires `agc_enabled`, `agc_direct_routing`, and a non-internal ingress scheme). Supported `*_PUBLIC_URL` values must include a non-root path on a shared external-proxy host. AGC terminates path traffic on a hostless listener with cert/DNS for `path-routing.<domain>` only — point the reverse proxy at that origin (SNI/Host).
 
-Helm injects `HTTP_PATH_PREFIX` via an `envKeys` override. HealthCheckPolicy probes stay on `/healthz`. Uptime monitors use the external `public_url`; pause or retarget them until the proxy is ready.
+Helm injects `HTTP_PATH_PREFIX` via an `envKeys` override. HealthCheckPolicy probes stay on `/healthz`. Host-based services must not reuse the shared external host or `path-routing.<domain>` origin. Uptime monitors use the external `public_url`; pause or retarget them until the proxy is ready.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
