@@ -93,7 +93,7 @@ locals {
           logs_bucket        = var.logs_bucket
         },
         var.path_based_routing_enabled && microservice_config.path_prefix != "" ? {
-          # Outrank legacy host-based rules if the customer's reverse proxy rewrites Host.
+          # Outrank legacy host-based rules if the external reverse proxy rewrites Host.
           group_order = -100
           hostless    = true
           path        = microservice_config.path_prefix

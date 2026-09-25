@@ -16,7 +16,7 @@ resource "aws_route53_record" "microservice" {
   for_each = merge(var.public_microservices, var.public_monitors)
 
   zone_id = aws_route53_zone.paragon.zone_id
-  # Path-routed public hosts belong to the customer's reverse proxy. Keep the
+  # Path-routed public hosts belong to the external reverse proxy. Keep the
   # per-service Paragon-domain CNAME as the TLS-valid origin that proxy can target.
   name = (
     var.path_based_routing_enabled &&
