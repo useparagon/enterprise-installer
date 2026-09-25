@@ -18,9 +18,26 @@ variable "domain" {
   type        = string
 }
 
+variable "path_based_routing_enabled" {
+  description = "Enable path-prefixed public routing. Public proxy hostnames are not managed in this Route53 zone."
+  type        = bool
+  default     = false
+}
+
 variable "certificate" {
   description = "Optional ACM certificate ARN of an existing certificate to use with the load balancer."
   type        = string
+}
+
+variable "public_microservices" {
+  description = "The microservices running within the system exposed to the load balancer"
+  type = map(object({
+    port             = number
+    healthcheck_path = string
+    public_url       = string
+    public_host      = string
+    path_prefix      = string
+  }))
 }
 
 variable "microservices" {

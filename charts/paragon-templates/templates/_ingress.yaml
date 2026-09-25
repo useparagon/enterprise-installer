@@ -7,17 +7,8 @@ Call with: include "ingress.standard" $
 {{- $name := .Chart.Name -}}
 {{- $fullName := include (printf "%s.fullname" $name) . -}}
 {{- $svcPort := .Values.service.port -}}
-{{- /* Empty className must match the controller that owns this cloud. nginx on AWS conflicts with the alb annotation and fails the release. Internal GCP uses gce-internal; internet-facing GCP uses gce. */ -}}
-{{- $ingressClass := .Values.ingress.className -}}
-{{- if not $ingressClass -}}
-{{- if eq .Values.global.env.HOST_ENV "AWS_K8" -}}
-{{- $ingressClass = "alb" -}}
-{{- else if eq .Values.global.env.HOST_ENV "GCP_K8" -}}
-{{- $ingressClass = ternary "gce-internal" "gce" (eq (default "" .Values.ingress.scheme) "internal") -}}
-{{- else -}}
-{{- $ingressClass = "nginx" -}}
-{{- end -}}
-{{- end -}}
+{{- $hostless := .Values.ingress.hostless | default false -}}
+{{- $path := .Values.ingress.path | default "/" -}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -94,7 +85,7 @@ spec:
   loadBalancerIP: {{ .Values.ingress.loadBalancerIP }}
   {{- end }}
   rules:
-    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "hermes") }}
+    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "hermes") (not $hostless) }}
     - http:
         paths:
           - path: /projects/*/sdk/triggers/*
@@ -105,7 +96,7 @@ spec:
                 port:
                   number: {{ $svcPort }}
     {{- end }}
-    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "worker-proxy") }}
+    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "worker-proxy") (not $hostless) }}
     - http:
         paths:
           - path: /projects/*/sdk/proxy/*
@@ -116,6 +107,17 @@ spec:
                 port:
                   number: {{ $svcPort }}
     {{- end }}
+    {{- if $hostless }}
+    - http:
+        paths:
+          - path: {{ $path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+    {{- else }}
     - host: {{ include (printf "%s.ingressHost" $name) . }}
       http:
         paths:
@@ -126,6 +128,7 @@ spec:
                 name: {{ $fullName }}
                 port:
                   number: {{ $svcPort }}
+    {{- end }}
 {{- end }}
 {{- end -}}
 
