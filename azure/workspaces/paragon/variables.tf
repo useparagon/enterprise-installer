@@ -164,6 +164,15 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for service, config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+      if contains(keys(local.managed_sync_microservices), service)
+    ])
+    error_message = "Managed Sync public URLs must remain host-based; Managed Sync path routing is configured separately."
+  }
+
+  validation {
     condition     = !var.path_based_routing_enabled || length(values(local.path_routed_public_prefixes)) == length(distinct(values(local.path_routed_public_prefixes)))
     error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
   }
@@ -211,6 +220,14 @@ variable "path_based_routing_enabled" {
       ]
     ))
     error_message = "Host-based public services and monitors must not use the shared path-routing public host or path-routing.<domain> origin because specific Gateway listeners take precedence over the hostless listener."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || !contains(
+      local.path_routing_public_hosts,
+      lower(local.path_routing_origin_host)
+    )
+    error_message = "The shared external path-routing host must not be path-routing.<domain>, which is reserved for the Paragon origin."
   }
 
 }
@@ -834,20 +851,25 @@ locals {
   path_routed_public_prefixes = {
     for microservice, config in local.public_microservices_base :
     microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
-    if trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+    if(
+      trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != "" &&
+      !contains(keys(local.managed_sync_microservices), microservice)
+    )
   }
 
-  path_routing_reserved_hosts = toset(concat(
-    [
-      for service in keys(local.path_routed_public_prefixes) :
-      lower(replace(
-        local.public_microservices_base[service].public_url,
-        "/^https?:\\/\\/([^\\/?#]+).*$/",
-        "$1"
-      ))
-    ],
-    [lower(local.path_routing_origin_host)]
-  ))
+  path_routing_public_hosts = toset([
+    for service in keys(local.path_routed_public_prefixes) :
+    lower(replace(
+      local.public_microservices_base[service].public_url,
+      "/^https?:\\/\\/([^\\/?#]+).*$/",
+      "$1"
+    ))
+  ])
+
+  path_routing_reserved_hosts = setunion(
+    local.path_routing_public_hosts,
+    toset([lower(local.path_routing_origin_host)])
+  )
 
   public_microservices = {
     for microservice, config in local.public_microservices_base :

@@ -21,7 +21,7 @@ Do not commit real credentials to git.
 
 ## Shared-host path routing
 
-Set `path_based_routing_enabled = true` (requires `agc_enabled`, `agc_direct_routing`, and a non-internal ingress scheme). Path-routed `*_PUBLIC_URL` values include a non-root path on a shared external-proxy host. AGC terminates path traffic on a hostless listener with cert/DNS for `path-routing.<domain>` only — point the reverse proxy at that origin (SNI/Host).
+Set `path_based_routing_enabled = true` (requires `agc_enabled`, `agc_direct_routing`, and a non-internal ingress scheme). Path-routed Paragon microservice `*_PUBLIC_URL` values include a non-root path on a shared external-proxy host. Public monitor URLs and Managed Sync remain host-based in this flow. AGC terminates path traffic on a hostless listener with cert/DNS for `path-routing.<domain>` only — point the reverse proxy at that origin (SNI/Host).
 
 Helm injects `HTTP_PATH_PREFIX` via an `envKeys` override. HealthCheckPolicy probes stay on `/healthz`. Host-based services must not reuse the shared external host or `path-routing.<domain>` origin. Uptime monitors use the external `public_url`; pause or retarget them until the proxy is ready.
 
