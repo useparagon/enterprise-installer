@@ -164,14 +164,6 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || alltrue([
-      for service in keys(local.path_routed_public_prefixes) :
-      contains(local.path_routing_supported_services, service)
-    ])
-    error_message = "Path-based routing is currently supported only for Connect, Hermes, Passport, worker-proxy, and Zeus. Managed Sync and other services have separate application work."
-  }
-
-  validation {
     condition     = !var.path_based_routing_enabled || length(values(local.path_routed_public_prefixes)) == length(distinct(values(local.path_routed_public_prefixes)))
     error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
   }
@@ -831,15 +823,6 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
-  # Phase 1 from PARA-25255. Adding a service also requires application-level
-  # HTTP_PATH_PREFIX support before its public URL can safely carry a path.
-  path_routing_supported_services = toset([
-    "connect",
-    "hermes",
-    "passport",
-    "worker-proxy",
-    "zeus",
-  ])
   path_routing_origin_host = "path-routing.${var.domain}"
 
   public_microservices_base = {
