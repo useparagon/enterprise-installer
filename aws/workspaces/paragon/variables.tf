@@ -185,6 +185,27 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue(concat(
+      [
+        for service, config in local.public_microservices_base :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+        if !contains(keys(local.path_routed_public_prefixes), service)
+      ],
+      [
+        for config in local.public_monitors :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+      ]
+    ))
+    error_message = "Host-based public services and monitors must not reuse the shared external path-routing host because Terraform-managed DNS would bypass the external reverse proxy."
+  }
+
+  validation {
     condition = !var.path_based_routing_enabled || alltrue([
       for prefix in values(local.path_routed_public_prefixes) :
       prefix != "/projects" && !startswith(prefix, "/projects/")
@@ -884,6 +905,15 @@ locals {
     microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
     if trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
   }
+
+  path_routing_reserved_hosts = toset([
+    for service in keys(local.path_routed_public_prefixes) :
+    lower(replace(
+      local.public_microservices_base[service].public_url,
+      "/^https?:\\/\\/([^\\/?#]+).*$/",
+      "$1"
+    ))
+  ])
 
   public_microservices = {
     for microservice, config in local.public_microservices_base :
