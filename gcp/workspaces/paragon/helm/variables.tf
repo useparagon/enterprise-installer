@@ -159,6 +159,9 @@ variable "public_microservices" {
     port             = number
     healthcheck_path = string
     public_url       = string
+    public_host      = string
+    origin_host      = string
+    path_prefix      = string
   }))
 }
 
@@ -191,9 +194,19 @@ variable "public_monitors" {
 variable "public_services" {
   description = "The services exposed to the public internet."
   type = map(object({
-    port       = number
-    public_url = string
+    port             = number
+    public_url       = string
+    healthcheck_path = optional(string)
+    public_host      = optional(string)
+    origin_host      = optional(string)
+    path_prefix      = optional(string, "")
   }))
+}
+
+variable "path_based_routing_enabled" {
+  description = "Enable shared-host path-prefixed public routes on the GCP shared ingress."
+  type        = bool
+  default     = false
 }
 
 variable "ingress_scheme" {
