@@ -66,6 +66,7 @@
         "elasticloadbalancing:ModifyListenerAttributes",
         "elasticloadbalancing:ModifyLoadBalancerAttributes",
         "elasticloadbalancing:ModifyRule",
+        "elasticloadbalancing:SetRulePriorities",
         "elasticloadbalancing:ModifyTargetGroup",
         "elasticloadbalancing:ModifyTargetGroupAttributes",
         "elasticloadbalancing:RegisterTargets",
