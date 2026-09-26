@@ -12,14 +12,23 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 
 ## Shared-host path routing
 
-Set `path_based_routing_enabled = true` with `ingress_scheme = "external"`. Supported `*_PUBLIC_URL` values must include a non-root path on a shared external-proxy host. Certs/DNS use `path-routing.<domain>` as the Paragon origin; the reverse proxy should target that name. Path prefixes must not collide with Managed Sync routes (`/api/syncs`, `/api/webhooks`, …).
+Set `path_based_routing_enabled = true` with `ingress_scheme = "external"`. Path-routed `*_PUBLIC_URL` values include a non-root path on a shared external-proxy host. Certs/DNS use `path-routing.<domain>` as the Paragon origin; the reverse proxy should target that name. Path prefixes must not collide with Managed Sync routes (`/api/syncs`, `/api/webhooks`, …).
 
 Helm injects `HTTP_PATH_PREFIX` via an `envKeys` override. LB health checks stay on `/healthz`. Host-based services must not reuse the shared external host or `path-routing.<domain>` origin. Uptime monitors use the external `public_url`; pause or retarget them until the proxy is ready.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
+| <a name="requirement_google"></a> [google](#requirement\_google) | ~> 7.0 |
+| <a name="requirement_google-beta"></a> [google-beta](#requirement\_google-beta) | ~> 7.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
+| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
+| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 1.17.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 
 ## Providers
 
@@ -130,7 +139,7 @@ No requirements.
 | <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve\_email) | OpenObserve admin login email. | `string` | `null` | no |
 | <a name="input_openobserve_password"></a> [openobserve\_password](#input\_openobserve\_password) | OpenObserve admin login password. | `string` | `null` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
-| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Enable shared-host path-prefixed public routes on the GCP shared ingress. | `bool` | `false` | no |
+| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Enable shared-host path-prefixed public routes on the GCP shared ingress. Requires ingress\_scheme=external. Services without a path keep host-based routing. | `bool` | `false` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that should not be publicly exposed (filtered from public\_microservices and public\_monitors). | `list(string)` | `[]` | no |
 | <a name="input_region"></a> [region](#input\_region) | The region where to host Google Cloud Organization resources. | `string` | n/a | yes |
 | <a name="input_region_zone"></a> [region\_zone](#input\_region\_zone) | The zone in the region where to host Google Cloud Organization resources. | `string` | n/a | yes |
