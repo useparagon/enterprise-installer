@@ -2,7 +2,7 @@
 
 ## Shared-host path routing
 
-Set `path_based_routing_enabled = true` to route supported public services through a shared external host with service-specific path prefixes. The path prefix is taken from each service's existing `*_PUBLIC_URL`; there is no separate path variable.
+Set `path_based_routing_enabled = true` to route public services through a shared external host with service-specific path prefixes. The path prefix is taken from each service's existing `*_PUBLIC_URL`; there is no separate path variable.
 
 For example:
 
@@ -16,9 +16,9 @@ global:
     WORKER_PROXY_PUBLIC_URL: https://proxy.example.com/paragon/worker-proxy
 ```
 
-All path-routed services must use the same public host and unique, non-root path prefixes without trailing slashes (max 126 characters; the AWS Load Balancer Controller also emits the `/*` form and ALB limits each path pattern to 128 characters). Ingress rules match the path without requiring the public `Host` header, so an upstream reverse proxy may rewrite `Host`. Route53 keeps `<service>.<domain>` CNAMEs as the TLS-valid origin the proxy targets.
+All path-routed services must use the same public host and unique, non-root path prefixes without trailing slashes (max 126 characters; the AWS Load Balancer Controller also emits the `/*` form and ALB limits each path pattern to 128 characters). Ingress rules match the path without requiring the public `Host` header, so an upstream reverse proxy may rewrite `Host`. Host-based services and monitors cannot reuse that shared external hostname. Route53 keeps `<service>.<domain>` CNAMEs as TLS-valid origins the proxy can target.
 
-ALB target-group health checks and Kubernetes probes stay on `/healthz` without the public path prefix. Hermes/worker-proxy Connect SDK ALB rules (`/projects/*/sdk/*`) remain host-agnostic alongside path prefixes. Application support is PARA-25254; Helm also injects `HTTP_PATH_PREFIX` via an `envKeys` override so the var reaches pods even before `service-inputs` lists it.
+ALB target-group health checks and Kubernetes probes stay on `/healthz` without the public path prefix. Existing unprefixed Connect SDK ALB routes remain available, and when Connect itself is path-routed the prefixed SDK trigger/proxy paths are routed to Hermes/worker-proxy before the Connect catch-all. Application support is PARA-25254; Helm also injects `HTTP_PATH_PREFIX` via an `envKeys` override so the var reaches pods even before `service-inputs` lists it.
 
 Uptime monitors use `public_url + healthcheck_path` (the external proxy URL). Pause or retarget them until the proxy and app middleware are live.
 

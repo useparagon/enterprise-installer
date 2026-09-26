@@ -109,7 +109,38 @@ spec:
                 port:
                   number: {{ $svcPort }}
     {{- end }}
-    {{- if $hostless }}
+    {{- if and $hostless (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "connect") .Values.ingress.connect_sdk_routes }}
+    - http:
+        paths:
+          - path: {{ $path }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+          - path: {{ printf "%s/projects/*/sdk/triggers/*" $path }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: hermes
+                port:
+                  number: {{ .Values.ingress.connect_sdk_routes.hermes_port }}
+          - path: {{ printf "%s/projects/*/sdk/proxy/*" $path }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: worker-proxy
+                port:
+                  number: {{ .Values.ingress.connect_sdk_routes.worker_proxy_port }}
+          - path: {{ printf "%s/*" $path }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+    {{- else if $hostless }}
     - http:
         paths:
           - path: {{ $path }}
