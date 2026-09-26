@@ -144,6 +144,9 @@ variable "public_microservices" {
     port             = number
     healthcheck_path = string
     public_url       = string
+    public_host      = string
+    origin_host      = string
+    path_prefix      = string
   }))
 }
 
@@ -176,6 +179,12 @@ variable "public_monitors" {
 variable "ingress_scheme" {
   description = "Whether the load balancer is 'internet-facing' (public) or 'internal' (private)"
   type        = string
+}
+
+variable "path_based_routing_enabled" {
+  description = "Enable path-prefixed public routes through AGC direct routing."
+  type        = bool
+  default     = false
 }
 
 variable "nginx_public" {
