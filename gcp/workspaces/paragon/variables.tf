@@ -266,6 +266,14 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || !contains(
+      local.path_routing_public_hosts,
+      lower(local.path_routing_origin_host)
+    )
+    error_message = "The shared external path-routing host must not be path-routing.<domain>, which is reserved for the Paragon origin."
+  }
+
+  validation {
     condition = !var.path_based_routing_enabled || !var.managed_sync_enabled || alltrue([
       for prefix in values(local.path_routed_public_prefixes) :
       alltrue([
@@ -1235,17 +1243,19 @@ locals {
     if trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
   }
 
-  path_routing_reserved_hosts = toset(concat(
-    [
-      for service in keys(local.path_routed_public_prefixes) :
-      lower(replace(
-        local.public_microservices_base[service].public_url,
-        "/^https?:\\/\\/([^\\/?#]+).*$/",
-        "$1"
-      ))
-    ],
-    [lower(local.path_routing_origin_host)]
-  ))
+  path_routing_public_hosts = toset([
+    for service in keys(local.path_routed_public_prefixes) :
+    lower(replace(
+      local.public_microservices_base[service].public_url,
+      "/^https?:\\/\\/([^\\/?#]+).*$/",
+      "$1"
+    ))
+  ])
+
+  path_routing_reserved_hosts = setunion(
+    local.path_routing_public_hosts,
+    toset([lower(local.path_routing_origin_host)])
+  )
 
   public_microservices = {
     for microservice, config in local.public_microservices_base :

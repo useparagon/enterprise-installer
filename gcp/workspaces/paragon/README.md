@@ -12,7 +12,7 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 
 ## Shared-host path routing
 
-Set `path_based_routing_enabled = true` with `ingress_scheme = "external"`. Path-routed `*_PUBLIC_URL` values include a non-root path on a shared external-proxy host. Certs/DNS use `path-routing.<domain>` as the Paragon origin; the reverse proxy should target that name. Path prefixes must not collide with Managed Sync routes (`/api/syncs`, `/api/webhooks`, …).
+Set `path_based_routing_enabled = true` with `ingress_scheme = "external"`. Path-routed Paragon microservice `*_PUBLIC_URL` values include a non-root path on a shared external-proxy host. Public monitor URLs remain host-based and Managed Sync routing remains separate. Certs/DNS use `path-routing.<domain>` as the Paragon origin; the reverse proxy should target that name. Path prefixes must not collide with Managed Sync routes (`/api/syncs`, `/api/webhooks`, …).
 
 Helm injects `HTTP_PATH_PREFIX` via an `envKeys` override. LB health checks stay on `/healthz`. Host-based services must not reuse the shared external host or `path-routing.<domain>` origin. Uptime monitors use the external `public_url`; pause or retarget them until the proxy is ready.
 
