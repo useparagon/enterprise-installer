@@ -126,6 +126,119 @@ variable "ingress_scheme" {
   default     = "internet-facing"
 }
 
+variable "path_based_routing_enabled" {
+  description = "Enable path-prefixed public routes for services whose *_PUBLIC_URL includes a non-root path. Services without a path keep the existing host-based routing."
+  type        = bool
+  default     = false
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+(/[^?#]*)?$", config.public_url)) == 1
+    ])
+    error_message = "Public microservice URLs must be absolute HTTP(S) URLs without query strings or fragments."
+  }
+
+  validation {
+    condition = var.path_based_routing_enabled || alltrue([
+      for config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+    ])
+    error_message = "A path-bearing *_PUBLIC_URL requires path_based_routing_enabled=true."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for config in local.public_monitors :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+    ])
+    error_message = "Path-based routing currently applies to Paragon services only; public monitor URLs must remain host-based."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for service, config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+      if contains(keys(local.managed_sync_microservices), service)
+    ])
+    error_message = "Managed Sync public URLs must remain host-based; Managed Sync path routing is configured separately."
+  }
+
+  validation {
+    condition     = !var.path_based_routing_enabled || length(values(local.path_routed_public_prefixes)) == length(distinct(values(local.path_routed_public_prefixes)))
+    error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
+  }
+
+  # ALB Prefix rules match /prefix and /prefix/* (not /prefix2). Reject nested
+  # namespaces such as /foo vs /foo/bar; exact duplicates are covered above.
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue(flatten([
+      for service, prefix in local.path_routed_public_prefixes : [
+        for other_service, other_prefix in local.path_routed_public_prefixes :
+        service == other_service || !startswith(other_prefix, "${prefix}/")
+      ]
+    ]))
+    error_message = "Path-based public route prefixes must not overlap; each service needs a distinct path namespace."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || length(distinct([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ])) <= 1
+    error_message = "Path-based routing requires all path-routed services to share the same public host (external reverse-proxy hostname)."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue(concat(
+      [
+        for service, config in local.public_microservices_base :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+        if !contains(keys(local.path_routed_public_prefixes), service)
+      ],
+      [
+        for config in local.public_monitors :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+      ]
+    ))
+    error_message = "Host-based public services and monitors must not reuse the shared external path-routing host because Terraform-managed DNS would bypass the external reverse proxy."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue([
+      for shared_host in local.path_routing_reserved_hosts :
+      !contains(local.path_routing_origin_hosts, shared_host)
+    ])
+    error_message = "The shared external path-routing host must not match a Terraform-managed Paragon origin hostname."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for prefix in values(local.path_routed_public_prefixes) :
+      prefix != "/projects" && !startswith(prefix, "/projects/")
+    ])
+    error_message = "Path-based public routes must not use the reserved /projects namespace because AWS already uses hostless Connect SDK rules under /projects/*/sdk/*."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for prefix in values(local.path_routed_public_prefixes) :
+      length(prefix) <= 126
+    ])
+    error_message = "AWS path prefixes can be at most 126 characters because the Load Balancer Controller also emits a trailing /* pattern and ALB limits each path pattern to 128 characters."
+  }
+}
+
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
@@ -798,10 +911,47 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
-  public_microservices = {
+  public_microservices_base = {
     for microservice, config in local.microservices :
     microservice => config
     if config.public_url != null && config.public_url != "" && !contains(var.private_services, microservice)
+  }
+
+  path_routed_public_prefixes = {
+    for microservice, config in local.public_microservices_base :
+    microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
+    if(
+      trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != "" &&
+      !contains(keys(local.managed_sync_microservices), microservice)
+    )
+  }
+
+  path_routing_reserved_hosts = toset([
+    for service in keys(local.path_routed_public_prefixes) :
+    lower(replace(
+      local.public_microservices_base[service].public_url,
+      "/^https?:\\/\\/([^\\/?#]+).*$/",
+      "$1"
+    ))
+  ])
+
+  # Path-routed services keep <service>.<domain> as Terraform-managed ALB origins.
+  # The external reverse-proxy hostname must remain distinct from every such origin.
+  path_routing_origin_hosts = toset([
+    for service in keys(local.path_routed_public_prefixes) :
+    lower("${service}.${var.domain}")
+  ])
+
+  public_microservices = {
+    for microservice, config in local.public_microservices_base :
+    microservice => merge(config, {
+      public_host = var.path_based_routing_enabled ? replace(
+        config.public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ) : replace(replace(config.public_url, "https://", ""), "http://", "")
+      path_prefix = lookup(local.path_routed_public_prefixes, microservice, "")
+    })
   }
 
   uptime_services = {

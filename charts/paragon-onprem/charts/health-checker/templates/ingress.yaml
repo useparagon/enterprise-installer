@@ -1,6 +1,8 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName := include "health-checker.fullname" . -}}
 {{- $svcPort := .Values.service.port -}}
+{{- $hostless := .Values.ingress.hostless | default false -}}
+{{- $path := .Values.ingress.path | default "/" -}}
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -17,6 +19,9 @@ metadata:
     alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
     alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.certificate }}
     alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.load_balancer_name | default "paragon" }}
+    {{- if hasKey .Values.ingress "group_order" }}
+    alb.ingress.kubernetes.io/group.order: '{{ .Values.ingress.group_order }}'
+    {{- end }}
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
     alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.ingress.healthcheck_path | default "/healthz" }}
     alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
@@ -73,6 +78,17 @@ spec:
   loadBalancerIP: {{ .Values.ingress.loadBalancerIP }}
   {{- end }}
   rules:
+    {{- if $hostless }}
+    - http:
+        paths:
+          - path: {{ $path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+    {{- else }}
     - host: {{ include "health-checker.ingressHost" . }}
       http:
         paths:
@@ -83,4 +99,5 @@ spec:
                 name: {{ $fullName }}
                 port:
                   number: {{ $svcPort }}
+    {{- end }}
 {{- end }}
