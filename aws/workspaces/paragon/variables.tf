@@ -156,6 +156,15 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for service, config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+      if contains(keys(local.managed_sync_microservices), service)
+    ])
+    error_message = "Managed Sync public URLs must remain host-based; Managed Sync path routing is configured separately."
+  }
+
+  validation {
     condition     = !var.path_based_routing_enabled || length(values(local.path_routed_public_prefixes)) == length(distinct(values(local.path_routed_public_prefixes)))
     error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
   }
@@ -203,6 +212,14 @@ variable "path_based_routing_enabled" {
       ]
     ))
     error_message = "Host-based public services and monitors must not reuse the shared external path-routing host because Terraform-managed DNS would bypass the external reverse proxy."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue([
+      for shared_host in local.path_routing_reserved_hosts :
+      !contains(local.path_routing_origin_hosts, shared_host)
+    ])
+    error_message = "The shared external path-routing host must not match a Terraform-managed Paragon origin hostname."
   }
 
   validation {
@@ -903,7 +920,10 @@ locals {
   path_routed_public_prefixes = {
     for microservice, config in local.public_microservices_base :
     microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
-    if trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+    if(
+      trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != "" &&
+      !contains(keys(local.managed_sync_microservices), microservice)
+    )
   }
 
   path_routing_reserved_hosts = toset([
@@ -913,6 +933,13 @@ locals {
       "/^https?:\\/\\/([^\\/?#]+).*$/",
       "$1"
     ))
+  ])
+
+  # Path-routed services keep <service>.<domain> as Terraform-managed ALB origins.
+  # The external reverse-proxy hostname must remain distinct from every such origin.
+  path_routing_origin_hosts = toset([
+    for service in keys(local.path_routed_public_prefixes) :
+    lower("${service}.${var.domain}")
   ])
 
   public_microservices = {

@@ -2,7 +2,7 @@
 
 ## Shared-host path routing
 
-Set `path_based_routing_enabled = true` to route public services through a shared external host with service-specific path prefixes. The path prefix is taken from each service's existing `*_PUBLIC_URL`; there is no separate path variable.
+Set `path_based_routing_enabled = true` to route public Paragon microservices through a shared external host with service-specific path prefixes. The path prefix is taken from each service's existing `*_PUBLIC_URL`; there is no separate path variable. Public monitor URLs and Managed Sync remain host-based in this flow.
 
 For example:
 
