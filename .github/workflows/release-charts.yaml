@@ -1,25 +1,160 @@
-# Stub so workflow_dispatch appears on main before the full pipeline lands.
-# Replace this file with the real release-charts workflow in a follow-up PR.
+# Publish packaged charts to the production S3 Helm repo.
+# Called from stage-charts after ECR push (skip_package=true, reuse helm-packages artifact)
+# or dispatched directly to package and publish.
 name: Release Charts
+run-name: Release Charts - ${{ inputs.version }}
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Git tag (reserved for the full workflow; unused in this stub)."
+        description: >
+          Paragon release tag (e.g. 2026.0528.1501-2b7d0d71). Stamps __PARAGON_VERSION__
+          and loads charts/files/service-inputs.json from this tag.
         required: true
         type: string
+      chart_ref:
+        description: >
+          Git ref for chart templates (branch or SHA). Defaults to the ref that
+          started this workflow (use your feature branch when dispatching from it).
+        required: false
+        type: string
+      skip_package:
+        description: >
+          Download the helm-packages artifact from this run instead of packaging.
+          Used when called from stage-charts.
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      version:
+        description: >
+          Paragon release tag (e.g. 2026.0528.1501-2b7d0d71). Stamps __PARAGON_VERSION__
+          and loads charts/files/service-inputs.json from this tag.
+        required: true
+        type: string
+      chart_ref:
+        description: Git ref for chart templates (branch or SHA).
+        required: false
+        type: string
+        default: ""
+      skip_package:
+        description: Download helm-packages from this run instead of packaging.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
+  id-token: write
   contents: read
+  actions: write
 
 jobs:
-  release-charts:
-    name: Stub (no-op)
-    runs-on: ubuntu-latest
+  package:
+    name: Package Helm Charts
+    if: ${{ !inputs.skip_package }}
+    uses: ./.github/workflows/package-charts.yaml
+    with:
+      version: ${{ inputs.version }}
+      chart_ref: ${{ inputs.chart_ref }}
+
+  publish-s3:
+    name: Publish Production Helm Charts
+    needs: package
+    if: ${{ always() && (inputs.skip_package || needs.package.result == 'success') }}
+    concurrency:
+      group: helm-production-index
+      cancel-in-progress: false
+    environment: helm-production
+    runs-on:
+      - self-hosted
+      - self-hosted-lite
+    env:
+      HELM_REPO_URL: https://paragon-helm-production.s3.amazonaws.com
+      S3_BUCKET: paragon-helm-production
+
     steps:
-      - name: Placeholder
+      # Ephemeral runners already start empty; this avoids leftover *.tgz if a
+      # workspace is ever reused between jobs.
+      - name: Clear leftover chart packages
+        run: rm -rf "$GITHUB_WORKSPACE/dist-helm"
+
+      - name: Download packaged charts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: helm-packages
+          path: dist-helm
+
+      - name: Setup Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: v3.16.1
+
+      # GitHub-hosted: OIDC → role. Local act: pass -s ACT_AWS_ACCESS_KEY_ID / -s ACT_AWS_SECRET_ACCESS_KEY
+      # (and optional -s ACT_AWS_SESSION_TOKEN) for an IAM principal in account 571812824132 with S3 + Helm index permissions.
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ !env.ACT }}
+        uses: aws-actions/configure-aws-credentials@99214aa6889fcddfa57764031d71add364327e59 # v6.1.3
+        with:
+          aws-region: us-east-1
+          role-session-name: enterprise-chart-release
+          role-to-assume: arn:aws:iam::571812824132:role/helm-repo-manager
+
+      - name: Configure AWS credentials (act — access keys)
+        if: ${{ env.ACT }}
+        uses: aws-actions/configure-aws-credentials@99214aa6889fcddfa57764031d71add364327e59 # v6.1.3
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.ACT_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ACT_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.ACT_AWS_SESSION_TOKEN }}
+
+      - name: Ensure AWS CLI is installed
         run: |
-          echo "release-charts: no-op stub on main."
-          echo "version input: ${{ inputs.version }}"
-          echo "Run the full workflow from a branch that includes the chart packaging implementation."
+          if command -v aws >/dev/null 2>&1; then
+            exit 0
+          fi
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y awscli
+          else
+            apt-get update -qq
+            apt-get install -y awscli
+          fi
+          aws --version
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Publish charts to S3
+        run: |
+          set -euo pipefail
+          pkg_dir="$GITHUB_WORKSPACE/dist-helm"
+          shopt -s nullglob
+          tgz_files=("$pkg_dir"/*.tgz)
+          if [ "${#tgz_files[@]}" -eq 0 ]; then
+            echo "Error: no packaged charts found in $pkg_dir" >&2
+            exit 1
+          fi
+          cd "$pkg_dir"
+
+          download_err="$RUNNER_TEMP/index-download.err"
+          if aws s3 cp "s3://$S3_BUCKET/index.yaml" existing-index.yaml 2>"$download_err"; then
+            helm repo index . --url "$HELM_REPO_URL" --merge existing-index.yaml
+          elif grep -Eq '\(404\)|NoSuchKey' "$download_err"; then
+            echo "No existing index found; creating new index."
+            helm repo index . --url "$HELM_REPO_URL"
+          else
+            echo "Error: failed to download s3://$S3_BUCKET/index.yaml; refusing to overwrite the Helm repo index." >&2
+            cat "$download_err" >&2
+            exit 1
+          fi
+
+          for tgz in "${tgz_files[@]}"; do
+            echo "Uploading $(basename "$tgz")"
+            aws s3 cp "$tgz" "s3://$S3_BUCKET/"
+          done
+
+          echo "Uploading index.yaml"
+          aws s3 cp index.yaml "s3://$S3_BUCKET/"
