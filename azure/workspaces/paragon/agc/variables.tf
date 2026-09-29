@@ -10,6 +10,12 @@ variable "direct_routing" {
   default     = false
 }
 
+variable "path_based_routing_enabled" {
+  description = "Enable shared hostless HTTPS listener and PathPrefix HTTPRoutes. Requires direct_routing."
+  type        = bool
+  default     = false
+}
+
 variable "workspace" {
   description = "Workspace prefix for AGC resources."
   type        = string
@@ -60,10 +66,12 @@ variable "nginx_service_port" {
 }
 
 variable "public_services" {
-  description = "Public services for direct routing. Map of service name to host + backend port."
+  description = "Public services for direct routing, normalized to origin host and optional path prefix."
   type = map(object({
-    host = string
-    port = number
+    host             = string
+    path_prefix      = string
+    healthcheck_path = string
+    port             = number
   }))
   default = {}
 }

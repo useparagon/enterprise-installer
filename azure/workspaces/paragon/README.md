@@ -19,6 +19,12 @@ empty strings), the unused secret is deleted on the next apply.
 
 Do not commit real credentials to git.
 
+## Shared-host path routing
+
+Set `path_based_routing_enabled = true` (requires `agc_enabled`, `agc_direct_routing`, and a non-internal ingress scheme). Path-routed Paragon microservice `*_PUBLIC_URL` values include a non-root path on a shared external-proxy host. Public monitor URLs and Managed Sync remain host-based in this flow. AGC terminates path traffic on a hostless listener with cert/DNS for `path-routing.<domain>` only — point the reverse proxy at that origin (SNI/Host).
+
+Helm injects `HTTP_PATH_PREFIX` via an `envKeys` override. HealthCheckPolicy probes stay on `/healthz`. Host-based services must not reuse the shared external host or `path-routing.<domain>` origin. Uptime monitors use the external `public_url`; pause or retarget them until the proxy is ready.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -141,6 +147,7 @@ Do not commit real credentials to git.
 | <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve\_email) | OpenObserve admin login email. | `string` | `null` | no |
 | <a name="input_openobserve_password"></a> [openobserve\_password](#input\_openobserve\_password) | OpenObserve admin login password. | `string` | `null` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
+| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Enable shared-host path-prefixed public routes. Azure path routing requires AGC direct routing; ingress-nginx is not used for this mode. | `bool` | `false` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that should not be publicly exposed (filtered from public\_microservices and public\_monitors). | `list(string)` | `[]` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
 | <a name="input_uptime_company"></a> [uptime\_company](#input\_uptime\_company) | Optional pretty company name to include in BetterStack Uptime monitors. | `string` | `null` | no |

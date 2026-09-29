@@ -125,6 +125,113 @@ variable "agc_direct_routing" {
   default     = false
 }
 
+variable "path_based_routing_enabled" {
+  description = "Enable shared-host path-prefixed public routes. Azure path routing requires AGC direct routing; ingress-nginx is not used for this mode."
+  type        = bool
+  default     = false
+
+  validation {
+    condition = !var.path_based_routing_enabled || (
+      var.agc_enabled &&
+      var.agc_direct_routing &&
+      var.ingress_scheme != "internal"
+    )
+    error_message = "path_based_routing_enabled=true requires agc_enabled=true, agc_direct_routing=true, and an internet-facing ingress scheme."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+(/[^?#]*)?$", config.public_url)) == 1
+    ])
+    error_message = "Public microservice URLs must be absolute HTTP(S) URLs without query strings or fragments."
+  }
+
+  validation {
+    condition = var.path_based_routing_enabled || alltrue([
+      for config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+    ])
+    error_message = "A path-bearing *_PUBLIC_URL requires path_based_routing_enabled=true."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for config in local.public_monitors :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+    ])
+    error_message = "Path-based routing currently applies to Paragon services only; public monitor URLs must remain host-based."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue([
+      for service, config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+      if contains(keys(local.managed_sync_microservices), service)
+    ])
+    error_message = "Managed Sync public URLs must remain host-based; Managed Sync path routing is configured separately."
+  }
+
+  validation {
+    condition     = !var.path_based_routing_enabled || length(values(local.path_routed_public_prefixes)) == length(distinct(values(local.path_routed_public_prefixes)))
+    error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
+  }
+
+  # Gateway API PathPrefix matches path elements, so /foo overlaps /foo/bar
+  # but not /foobar. Exact duplicates are covered by the validation above.
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue(flatten([
+      for service, prefix in local.path_routed_public_prefixes : [
+        for other_service, other_prefix in local.path_routed_public_prefixes :
+        service == other_service || !startswith(other_prefix, "${prefix}/")
+      ]
+    ]))
+    error_message = "Path-based public route prefixes must not overlap by path namespace; each service needs a distinct path prefix."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || length(distinct([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ])) <= 1
+    error_message = "Path-based routing requires all path-routed services to share the same public host (external reverse-proxy hostname)."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue(concat(
+      [
+        for service, config in local.public_microservices_base :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+        if !contains(keys(local.path_routed_public_prefixes), service)
+      ],
+      [
+        for config in local.public_monitors :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+      ]
+    ))
+    error_message = "Host-based public services and monitors must not use the shared path-routing public host or path-routing.<domain> origin because specific Gateway listeners take precedence over the hostless listener."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || !contains(
+      local.path_routing_public_hosts,
+      lower(local.path_routing_origin_host)
+    )
+    error_message = "The shared external path-routing host must not be path-routing.<domain>, which is reserved for the Paragon origin."
+  }
+
+}
+
 variable "agc_dns_cutover" {
   description = "Point Terraform-managed DNS (Cloudflare or Azure DNS) at agc_fqdn instead of the nginx load balancer. Set once AGC is validated; implied by agc_direct_routing."
   type        = bool
@@ -733,10 +840,58 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
-  public_microservices = {
+  path_routing_origin_host = "path-routing.${var.domain}"
+
+  public_microservices_base = {
     for microservice, config in local.microservices :
     microservice => config
     if lookup(config, "public_url", null) != null && !contains(var.private_services, microservice)
+  }
+
+  path_routed_public_prefixes = {
+    for microservice, config in local.public_microservices_base :
+    microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
+    if(
+      trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != "" &&
+      !contains(keys(local.managed_sync_microservices), microservice)
+    )
+  }
+
+  path_routing_public_hosts = toset([
+    for service in keys(local.path_routed_public_prefixes) :
+    lower(replace(
+      local.public_microservices_base[service].public_url,
+      "/^https?:\\/\\/([^\\/?#]+).*$/",
+      "$1"
+    ))
+  ])
+
+  path_routing_reserved_hosts = setunion(
+    local.path_routing_public_hosts,
+    toset([lower(local.path_routing_origin_host)])
+  )
+
+  public_microservices = {
+    for microservice, config in local.public_microservices_base :
+    microservice => merge(config, {
+      public_host = var.path_based_routing_enabled ? replace(
+        config.public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ) : replace(replace(config.public_url, "https://", ""), "http://", "")
+      path_prefix = lookup(local.path_routed_public_prefixes, microservice, "")
+      # Path-routed traffic terminates on the shared path-routing.<domain> origin
+      # (AGC hostless listener + cert). Per-service *.domain names are not TLS
+      # listeners in this mode — do not publish them as proxy targets.
+      origin_host = (
+        var.path_based_routing_enabled &&
+        lookup(local.path_routed_public_prefixes, microservice, "") != ""
+        ) ? local.path_routing_origin_host : (
+        var.path_based_routing_enabled
+        ? replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
+        : replace(replace(config.public_url, "https://", ""), "http://", "")
+      )
+    })
   }
 
   uptime_services = {

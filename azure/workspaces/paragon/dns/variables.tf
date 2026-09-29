@@ -28,8 +28,9 @@ variable "ingress_loadbalancer" {
 variable "public_services" {
   description = "The services exposed to the public internet."
   type = map(object({
-    port       = number
-    public_url = string
+    port        = number
+    public_url  = string
+    origin_host = optional(string)
   }))
 }
 
