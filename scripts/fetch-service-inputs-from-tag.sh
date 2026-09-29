@@ -12,13 +12,21 @@ if [[ -z "$tag" ]]; then
   exit 1
 fi
 
-git fetch --tags --quiet origin 2>/dev/null || git fetch --tags --quiet
-
-if ! git rev-parse "refs/tags/${tag}^{commit}" >/dev/null 2>&1; then
-  if ! git rev-parse "${tag}^{commit}" >/dev/null 2>&1; then
+# Shallow checkouts of chart_ref usually lack release tags. Fetch only this tag
+# (not --tags / full history) when it is not already local.
+if ! git rev-parse "refs/tags/${tag}^{commit}" >/dev/null 2>&1 \
+  && ! git rev-parse "${tag}^{commit}" >/dev/null 2>&1; then
+  echo "Fetching tag ${tag} from origin..."
+  if ! git fetch --no-tags origin "refs/tags/${tag}:refs/tags/${tag}"; then
     echo "Error: git tag or ref not found: ${tag}" >&2
     exit 1
   fi
+fi
+
+if ! git rev-parse "refs/tags/${tag}^{commit}" >/dev/null 2>&1 \
+  && ! git rev-parse "${tag}^{commit}" >/dev/null 2>&1; then
+  echo "Error: git tag or ref not found: ${tag}" >&2
+  exit 1
 fi
 
 if ! git cat-file -e "${tag}:charts/files/service-inputs.json" 2>/dev/null; then
