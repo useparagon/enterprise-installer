@@ -62,7 +62,7 @@ jobs:
       cancel-in-progress: false
     environment: helm-production
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     env:
       HELM_REPO_URL: https://paragon-helm-production.s3.amazonaws.com
       S3_BUCKET: paragon-helm-production

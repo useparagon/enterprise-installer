@@ -37,7 +37,7 @@ jobs:
     name: Push Helm Charts to ECR
     needs: package
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     env:
       ECR_REGISTRY: 055987364777.dkr.ecr.us-east-1.amazonaws.com
       ECR_REPOSITORY_PREFIX: paragon-ci
