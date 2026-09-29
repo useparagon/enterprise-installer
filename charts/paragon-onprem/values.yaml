@@ -19,6 +19,8 @@ subchart:
     enabled: false
   hermes:
     enabled: true
+  ocs-code-runner:
+    enabled: true
   passport:
     enabled: true
   pheme:
