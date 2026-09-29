@@ -109,6 +109,10 @@ containers:
 {{- if .Values.hotReload.enabled }}
   - name: reloader
     image: {{ include "fluent-bit.image" (merge (deepCopy .Values.hotReload.image) (dict "root" .)) | quote }}
+  {{- with .Values.hotReload.securityContext }}
+    securityContext:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
     args:
       - {{ printf "-webhook-url=http://localhost:%s/api/v2/reload" (toString .Values.metricsPort) }}
       - -volume-dir=/watch/config
