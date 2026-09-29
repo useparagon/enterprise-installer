@@ -19,13 +19,6 @@ on:
           started this workflow (use your feature branch when dispatching from it).
         required: false
         type: string
-      skip_package:
-        description: >
-          Download the helm-packages artifact from this run instead of packaging.
-          Used when called from stage-charts.
-        required: false
-        type: boolean
-        default: false
   workflow_call:
     inputs:
       version:
@@ -52,8 +45,9 @@ permissions:
 
 jobs:
   package:
-    name: Package Helm Charts
-    if: ${{ !inputs.skip_package }}
+    # Caller name omitted to avoid "Package Helm Charts / Package Helm Charts".
+    # skip_package is workflow_call-only; unset on dispatch → package runs.
+    if: ${{ inputs.skip_package != true }}
     uses: ./.github/workflows/package-charts.yaml
     with:
       version: ${{ inputs.version }}
@@ -62,14 +56,13 @@ jobs:
   publish-s3:
     name: Publish Production Helm Charts
     needs: package
-    if: ${{ always() && (inputs.skip_package || needs.package.result == 'success') }}
+    if: ${{ always() && (inputs.skip_package == true || needs.package.result == 'success') }}
     concurrency:
       group: helm-production-index
       cancel-in-progress: false
     environment: helm-production
-    runs-on:
-      - self-hosted
-      - self-hosted-lite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       HELM_REPO_URL: https://paragon-helm-production.s3.amazonaws.com
       S3_BUCKET: paragon-helm-production
