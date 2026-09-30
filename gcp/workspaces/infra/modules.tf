@@ -39,15 +39,15 @@ module "kafka" {
   count  = var.managed_sync_enabled ? 1 : 0
   source = "./kafka"
 
-  gcp_project_id               = local.gcp_project_id
-  region                       = var.region
-  workspace                    = local.workspace
-  private_subnet_uri           = module.network.private_subnet.self_link
-  gmk_vcpu_count               = var.gmk_vcpu_count
-  gmk_memory_bytes             = var.gmk_memory_gib * 1024 * 1024 * 1024
-  gmk_disk_size_gib            = var.gmk_disk_size_gib
-  gmk_auto_rebalance           = var.gmk_auto_rebalance
-  gmk_sasl_mechanism           = var.gmk_sasl_mechanism
+  gcp_project_id     = local.gcp_project_id
+  region             = var.region
+  workspace          = local.workspace
+  private_subnet_uri = module.network.private_subnet.self_link
+  gmk_vcpu_count     = var.gmk_vcpu_count
+  gmk_memory_bytes   = var.gmk_memory_gib * 1024 * 1024 * 1024
+  gmk_disk_size_gib  = var.gmk_disk_size_gib
+  gmk_auto_rebalance = var.gmk_auto_rebalance
+  gmk_sasl_mechanism = var.gmk_sasl_mechanism
 }
 
 module "storage" {

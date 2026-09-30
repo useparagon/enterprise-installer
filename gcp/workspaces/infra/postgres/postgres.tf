@@ -125,7 +125,7 @@ locals {
   openfga_instance_key        = var.managed_sync_enabled ? (contains(keys(local.postgres_instances), "managed_sync") ? "managed_sync" : "paragon") : null
   managed_sync_extra_db_names = toset(local.openfga_instance_key != null ? ["sync_project", "sync_instance"] : [])
   # Cloud SQL disk_autoresize_limit is GB; null means unlimited (no useful Grafana cap).
-  max_storage_bytes           = var.postgres_disk_autoresize_limit != null ? var.postgres_disk_autoresize_limit * 1073741824 : null
+  max_storage_bytes = var.postgres_disk_autoresize_limit != null ? var.postgres_disk_autoresize_limit * 1073741824 : null
 }
 
 resource "google_sql_database" "openfga" {
