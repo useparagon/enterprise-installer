@@ -540,30 +540,35 @@ variable "agent_os_postgres" {
 }
 
 variable "agent_os_valkey" {
-  description = "Agent OS Valkey instances keyed by cache name. Each entry can be sized and tuned independently."
+  description = <<-EOT
+    Overrides for Agent OS Valkey instances. Each key is a logical cache name (cache).
+    Merged per key with agent_os_valkey_default (node_type, multi_az, cluster_enabled, engine_version, snapshot_retention_days, log_retention_days).
+    Null uses defaults only.
+  EOT
   type = map(object({
-    node_type               = optional(string, "cache.t4g.medium")
-    multi_az                = optional(bool, true)
-    cluster_enabled         = optional(bool, false)
-    engine_version          = optional(string, "7.2")
-    snapshot_retention_days = optional(number, 7)
-    log_retention_days      = optional(number, 30)
+    node_type               = optional(string)
+    multi_az                = optional(bool)
+    cluster_enabled         = optional(bool)
+    engine_version          = optional(string)
+    snapshot_retention_days = optional(number)
+    log_retention_days      = optional(number)
   }))
-  default = {
-    cache = {}
-  }
+  default  = null
+  nullable = true
 
   validation {
-    condition = alltrue([
+    condition = var.agent_os_valkey == null ? true : alltrue([
       for _, cfg in var.agent_os_valkey :
-      cfg.snapshot_retention_days >= 0 && cfg.snapshot_retention_days <= 35
+      cfg.snapshot_retention_days == null || (
+        cfg.snapshot_retention_days >= 0 && cfg.snapshot_retention_days <= 35
+      )
     ])
-    error_message = "Agent OS Valkey snapshot_retention_days must be between 0 and 35."
+    error_message = "Agent OS Valkey snapshot_retention_days must be between 0 and 35 when set."
   }
 }
 
 variable "agent_os_index_instance_types" {
-  description = "Instance types for the Agent OS index managed node group."
+  description = "Instance types for the Agent OS index managed node group / Karpenter NodePool."
   type        = list(string)
   default     = ["r6a.2xlarge", "r6i.2xlarge", "r5a.2xlarge"]
 }
@@ -575,15 +580,27 @@ variable "agent_os_index_min_count" {
 }
 
 variable "agent_os_index_max_count" {
-  description = "Maximum nodes in the Agent OS index managed node group."
+  description = "Maximum nodes in the Agent OS index managed node group / Karpenter nodes limit."
   type        = number
   default     = 4
 }
 
+variable "agent_os_index_cpu_limit" {
+  description = "Karpenter cpu limit for the Agent OS index NodePool (explicit, same pattern as karpenter_node_pools)."
+  type        = string
+  default     = "32"
+}
+
+variable "agent_os_index_memory_limit" {
+  description = "Karpenter memory limit for the Agent OS index NodePool (explicit, same pattern as karpenter_node_pools)."
+  type        = string
+  default     = "256Gi"
+}
+
 variable "agent_os_extract_instance_types" {
-  description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group. Use c6a.4xlarge for staging and c6a.8xlarge for production."
+  description = "Extract node instance types. Default c6a.4xlarge; bump max_count and Karpenter limits together if changed."
   type        = list(string)
-  default     = ["c6a.8xlarge"]
+  default     = ["c6a.4xlarge"]
 }
 
 variable "agent_os_extract_min_count" {
@@ -593,9 +610,21 @@ variable "agent_os_extract_min_count" {
 }
 
 variable "agent_os_extract_max_count" {
-  description = "Maximum nodes in the Agent OS extraction managed node group. Use 3 for staging and 8 for production."
+  description = "Max extract nodes / Karpenter nodes limit. Staging 3, production 8 (covers 30 pods at 4/node)."
   type        = number
   default     = 8
+}
+
+variable "agent_os_extract_cpu_limit" {
+  description = "Karpenter cpu limit for extract NodePool. Default 8× c6a.4xlarge (16 vCPU)."
+  type        = string
+  default     = "128"
+}
+
+variable "agent_os_extract_memory_limit" {
+  description = "Karpenter memory limit for extract NodePool. Default 8× c6a.4xlarge (32 GiB)."
+  type        = string
+  default     = "256Gi"
 }
 
 variable "msk_kafka_version" {
@@ -732,4 +761,38 @@ locals {
     var.eks_admin_arns,
     [local.caller_arn]
   )))
+
+  # Agent OS Valkey: catalog defaults + optional per-key overrides (same pattern as Azure redis_managed_instances).
+  agent_os_valkey_instance_defaults = {
+    node_type               = "cache.t4g.medium"
+    multi_az                = true
+    cluster_enabled         = false
+    engine_version          = "7.2"
+    snapshot_retention_days = 7
+    log_retention_days      = 30
+  }
+
+  agent_os_valkey_default = {
+    cache = {
+      node_type               = "cache.t4g.medium"
+      multi_az                = true
+      cluster_enabled         = false
+      engine_version          = "7.2"
+      snapshot_retention_days = 7
+      log_retention_days      = 30
+    }
+  }
+
+  agent_os_valkey_overrides = var.agent_os_valkey != null ? var.agent_os_valkey : {}
+
+  agent_os_valkey = merge(
+    local.agent_os_valkey_default,
+    {
+      for name, override in local.agent_os_valkey_overrides : name => merge(
+        lookup(local.agent_os_valkey_default, name, local.agent_os_valkey_instance_defaults),
+        # Partial tfvars objects set omitted optional attributes to null; drop them so defaults survive merge.
+        { for key, value in override : key => value if value != null },
+      )
+    },
+  )
 }
