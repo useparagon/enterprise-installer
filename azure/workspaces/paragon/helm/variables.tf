@@ -1,5 +1,6 @@
 variable "resource_group" {
   description = "The resource group to associate resources."
+  type        = any
 }
 
 variable "workspace" {
@@ -9,11 +10,6 @@ variable "workspace" {
 
 variable "cluster_name" {
   description = "The name of the EKS cluster."
-  type        = string
-}
-
-variable "docker_registry_server" {
-  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
 }
 
@@ -33,25 +29,6 @@ variable "create_docker_pull_secret" {
   description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
   type        = bool
   default     = true
-}
-
-variable "docker_username" {
-  description = "Docker username to pull images."
-  type        = string
-  default     = null
-}
-
-variable "docker_password" {
-  description = "Docker password to pull images."
-  type        = string
-  default     = null
-  sensitive   = true
-}
-
-variable "docker_email" {
-  description = "Docker email to pull images."
-  type        = string
-  default     = null
 }
 
 variable "env_secret_name" {
@@ -204,19 +181,6 @@ variable "agc_gateway_name" {
 
 variable "agc_subnet_cidr" {
   description = "CIDR of the AGC association subnet (used as nginx proxy-real-ip-cidr during transition)."
-  type        = string
-  default     = null
-}
-
-variable "azure_subscription_id" {
-  description = "Azure subscription ID for cert-manager azureDNS solver."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "domain" {
-  description = "Root domain for wildcard certificate."
   type        = string
   default     = null
 }

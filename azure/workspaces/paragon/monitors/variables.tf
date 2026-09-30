@@ -1,7 +1,3 @@
-variable "workspace" {
-  description = "The name of the resource group that all resources are associated with."
-  type        = string
-}
 
 variable "grafana_admin_email" {
   description = "Grafana admin login email."

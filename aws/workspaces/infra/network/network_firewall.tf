@@ -4,7 +4,6 @@ module "network_firewall" {
 
   workspace = var.workspace
   vpc_id    = aws_vpc.app.id
-  vpc_cidr  = var.vpc_cidr
   az_count  = var.az_count
 
   availability_zones      = data.aws_availability_zones.available.names

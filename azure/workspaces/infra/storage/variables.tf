@@ -1,5 +1,6 @@
 variable "resource_group" {
   description = "The resource group to associate resources."
+  type        = any
 }
 
 variable "virtual_network_subnet_ids" {

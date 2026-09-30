@@ -48,7 +48,7 @@ resource "random_string" "snapshot_identifier" {
 resource "aws_db_subnet_group" "postgres" {
   name        = "${var.workspace}-postgres-subnet"
   description = "${var.workspace} postgres subnet group"
-  subnet_ids  = var.private_subnet.*.id
+  subnet_ids  = var.private_subnet[*].id
 
   tags = {
     Name = "${var.workspace}-postgres-subnet"

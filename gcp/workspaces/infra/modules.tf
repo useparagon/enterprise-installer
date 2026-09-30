@@ -10,8 +10,6 @@ module "network" {
 module "postgres" {
   source = "./postgres"
 
-  auditlogs_lock_enabled         = var.auditlogs_lock_enabled
-  auditlogs_retention_days       = var.auditlogs_retention_days
   disable_deletion_protection    = var.disable_deletion_protection
   gcp_project_id                 = local.gcp_project_id
   managed_sync_enabled           = var.managed_sync_enabled
@@ -19,7 +17,6 @@ module "postgres" {
   postgres_disk_autoresize_limit = var.postgres_disk_autoresize_limit
   postgres_multiple_instances    = var.postgres_multiple_instances
   postgres_tier                  = var.postgres_tier
-  private_subnet                 = module.network.private_subnet
   region                         = var.region
   workspace                      = local.workspace
 }
@@ -30,7 +27,6 @@ module "redis" {
   gcp_project_id       = local.gcp_project_id
   multi_redis          = var.redis_multiple_instances
   network              = module.network.network
-  private_subnet       = module.network.private_subnet
   redis_memory_size    = var.redis_memory_size
   region               = var.region
   region_zone          = var.region_zone
@@ -51,9 +47,7 @@ module "kafka" {
   gmk_memory_bytes             = var.gmk_memory_gib * 1024 * 1024 * 1024
   gmk_disk_size_gib            = var.gmk_disk_size_gib
   gmk_auto_rebalance           = var.gmk_auto_rebalance
-  gmk_kafka_version            = var.gmk_kafka_version
   gmk_sasl_mechanism           = var.gmk_sasl_mechanism
-  gmk_sasl_plain_key_file_path = var.gmk_sasl_plain_key_file_path
 }
 
 module "storage" {

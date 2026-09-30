@@ -44,12 +44,8 @@ module "helm" {
   cluster_host                           = local.gke_connect_gateway_host
   cluster_name                           = local.cluster_name
   docker_cfg_secret_name                 = var.create_docker_pull_secret && var.docker_username != null && var.docker_password != null ? local.runtime_secret_names.docker_cfg : null
-  docker_email                           = var.docker_email
-  docker_password                        = var.docker_password
-  docker_registry_server                 = var.docker_registry_server
   docker_pull_secret_name                = var.docker_pull_secret_name
   create_docker_pull_secret              = var.create_docker_pull_secret
-  docker_username                        = var.docker_username
   domain                                 = var.domain
   env_secret_name                        = google_secret_manager_secret.env.secret_id
   external_secrets_service_account_email = google_service_account.eso.email
@@ -60,7 +56,6 @@ module "helm" {
   ]))
   feature_flags_content = local.feature_flags_content
   flipt_options         = local.flipt_options
-  gcp_creds             = local.gcp_creds
   gcp_project_id        = local.gcp_project_id
   helm_values           = local.helm_values_public
   secrets_revision = sha256(jsonencode({
@@ -90,7 +85,6 @@ module "helm" {
   redis_ca_cert_secret_name   = local.infra_secret_names.redis_ca_cert
   region                      = var.region
   storage_service_account     = local.storage_service_account
-  infra_vars                  = local.infra_vars
   waf_security_policy_name    = local.waf_active ? module.waf[0].security_policy_name : ""
   waf_logs_sample_rate        = var.waf_logs_sample_rate
   workspace                   = local.workspace
@@ -136,7 +130,6 @@ module "monitors" {
   grafana_admin_password = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
   pgadmin_admin_email    = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
   pgadmin_admin_password = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
-  workspace              = local.workspace
 }
 
 module "uptime" {

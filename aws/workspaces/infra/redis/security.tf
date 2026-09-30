@@ -8,7 +8,7 @@ resource "aws_security_group" "elasticache" {
     from_port   = 6379
     to_port     = 6379
     protocol    = "tcp"
-    cidr_blocks = var.public_subnet.*.cidr_block
+    cidr_blocks = var.public_subnet[*].cidr_block
   }
 
   ingress {
@@ -16,7 +16,7 @@ resource "aws_security_group" "elasticache" {
     from_port   = 6379
     to_port     = 6379
     protocol    = "tcp"
-    cidr_blocks = var.private_subnet.*.cidr_block
+    cidr_blocks = var.private_subnet[*].cidr_block
   }
 
   egress {

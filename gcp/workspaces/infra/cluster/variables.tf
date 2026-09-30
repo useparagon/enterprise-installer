@@ -5,10 +5,12 @@ variable "gcp_project_id" {
 
 variable "network" {
   description = "The Virtual network  where our resources will be deployed"
+  type        = any
 }
 
 variable "private_subnet" {
   description = "The private subnet in our virtual network"
+  type        = any
 }
 
 variable "region" {

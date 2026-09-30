@@ -10,10 +10,7 @@ variable "workspace" {
 
 variable "network" {
   description = "The Virtual network where our resources will be deployed"
-}
-
-variable "private_subnet" {
-  description = "The private subnet in our virtual network"
+  type        = any
 }
 
 variable "region" {
@@ -40,16 +37,6 @@ variable "postgres_disk_autoresize_limit" {
 
 variable "disable_deletion_protection" {
   description = "Used to disable deletion protection on RDS and S3 resources."
-  type        = bool
-}
-
-variable "auditlogs_retention_days" {
-  description = "The number of days to retain audit logs before deletion."
-  type        = number
-}
-
-variable "auditlogs_lock_enabled" {
-  description = "Whether to enable S3 Object Lock for the audit logs bucket."
   type        = bool
 }
 

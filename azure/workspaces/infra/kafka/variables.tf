@@ -1,13 +1,16 @@
 variable "resource_group" {
   description = "The resource group to associate resources."
+  type        = any
 }
 
 variable "virtual_network" {
   description = "The virtual network to deploy to."
+  type        = any
 }
 
 variable "private_subnet" {
   description = "Private subnet that can access Kafka."
+  type        = any
 }
 
 variable "workspace" {

@@ -42,11 +42,6 @@ variable "namespace" {
   type        = string
 }
 
-variable "domain" {
-  description = "Root domain used for the HTTPS listener hostname (*.domain)."
-  type        = string
-}
-
 variable "nginx_service_name" {
   description = "ingress-nginx controller Service name used as the AGC backend during transition."
   type        = string

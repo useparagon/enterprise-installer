@@ -10,14 +10,17 @@ variable "workspace" {
 
 variable "network" {
   description = "The Virtual network  where our resources will be deployed"
+  type        = any
 }
 
 variable "private_subnet" {
   description = "The private subnet in our virtual network"
+  type        = any
 }
 
 variable "region" {
   description = "The region where to host Google Cloud Organization resources."
+  type        = string
 }
 
 variable "region_zone" {
