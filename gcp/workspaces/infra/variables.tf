@@ -247,16 +247,19 @@ variable "agent_os_postgres" {
 }
 
 variable "agent_os_valkey" {
-  description = "Agent OS Memorystore for Valkey instances keyed by cache name. Each entry can be sized and changed independently."
+  description = <<-EOT
+    Overrides for Agent OS Memorystore for Valkey instances. Each key is a logical cache name (cache).
+    Merged per key with agent_os_valkey_default (node_type, multi_az, cluster_enabled, engine_version).
+    Null uses defaults only.
+  EOT
   type = map(object({
-    node_type       = optional(string, "STANDARD_SMALL")
-    multi_az        = optional(bool, true)
-    cluster_enabled = optional(bool, false)
-    engine_version  = optional(string, "VALKEY_7_2")
+    node_type       = optional(string)
+    multi_az        = optional(bool)
+    cluster_enabled = optional(bool)
+    engine_version  = optional(string)
   }))
-  default = {
-    cache = {}
-  }
+  default  = null
+  nullable = true
 }
 
 variable "agent_os_index_machine_type" {
@@ -276,9 +279,9 @@ variable "agent_os_index_max_count" {
 }
 
 variable "agent_os_extract_machine_type" {
-  description = "Compute-optimized AMD machine type for the Agent OS extraction GKE node pool. Use c2d-standard-16 for staging and c2d-standard-32 for production."
+  description = "Extract GKE machine type. Default c2d-standard-16 (16 vCPU; 4 pods/node)."
   type        = string
-  default     = "c2d-standard-32"
+  default     = "c2d-standard-16"
 }
 
 variable "agent_os_extract_min_count" {
@@ -288,7 +291,7 @@ variable "agent_os_extract_min_count" {
 }
 
 variable "agent_os_extract_max_count" {
-  description = "Maximum nodes in the Agent OS extraction GKE node pool. Use 3 for staging and 8 for production."
+  description = "Max extract nodes. Staging 3, production 8 (covers 30 pods at 4/node)."
   type        = number
   default     = 8
 }
@@ -439,4 +442,34 @@ locals {
 
   // get distinct values from comma-separated list, filter empty values and trim them
   ssh_whitelist = distinct([for value in split(",", var.ssh_whitelist) : "${trimspace(value)}${replace(value, "/", "") != value ? "" : "/32"}" if trimspace(value) != ""])
+
+  # Agent OS Valkey: catalog defaults + optional per-key overrides (same pattern as Azure redis_managed_instances).
+  agent_os_valkey_instance_defaults = {
+    node_type       = "STANDARD_SMALL"
+    multi_az        = true
+    cluster_enabled = false
+    engine_version  = "VALKEY_7_2"
+  }
+
+  agent_os_valkey_default = {
+    cache = {
+      node_type       = "STANDARD_SMALL"
+      multi_az        = true
+      cluster_enabled = false
+      engine_version  = "VALKEY_7_2"
+    }
+  }
+
+  agent_os_valkey_overrides = var.agent_os_valkey != null ? var.agent_os_valkey : {}
+
+  agent_os_valkey = merge(
+    local.agent_os_valkey_default,
+    {
+      for name, override in local.agent_os_valkey_overrides : name => merge(
+        lookup(local.agent_os_valkey_default, name, local.agent_os_valkey_instance_defaults),
+        # Partial tfvars objects set omitted optional attributes to null; drop them so defaults survive merge.
+        { for key, value in override : key => value if value != null },
+      )
+    },
+  )
 }

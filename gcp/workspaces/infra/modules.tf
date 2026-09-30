@@ -41,7 +41,7 @@ module "redis" {
   private_subnet              = module.network.private_subnet
   disable_deletion_protection = var.disable_deletion_protection
   agent_os_enabled            = var.agent_os_enabled
-  agent_os_valkey             = var.agent_os_valkey
+  agent_os_valkey             = local.agent_os_valkey
 }
 
 module "kafka" {
