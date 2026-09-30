@@ -1,6 +1,5 @@
 locals {
-  bastion_name           = "${var.workspace}-bastion"
-  only_cloudflare_tunnel = var.cloudflare_tunnel_enabled
+  bastion_name = "${var.workspace}-bastion"
   # Normalize k8s_version to major.minor (e.g. 1.33.5 -> 1.33, 1.33 -> 1.33)
   k8s_version_major_minor = join(".", slice(split(".", var.k8s_version), 0, 2))
 }

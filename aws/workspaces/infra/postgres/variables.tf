@@ -3,25 +3,24 @@ variable "workspace" {
   type        = string
 }
 
-variable "aws_region" {
-  description = "The AWS region resources are created in."
-  type        = string
-}
-
 variable "vpc" {
   description = "The VPC to create resources in."
+  type        = any
 }
 
 variable "public_subnet" {
   description = "The public subnets within the VPC."
+  type        = any
 }
 
 variable "private_subnet" {
   description = "The private subnets within the VPC."
+  type        = any
 }
 
 variable "availability_zones" {
   description = "The AWS zones that are currently availabile."
+  type        = any
 }
 
 variable "rds_postgres_version" {
@@ -31,6 +30,7 @@ variable "rds_postgres_version" {
 
 variable "rds_instance_class" {
   description = "The RDS instance class type used for Postgres."
+  type        = string
 }
 
 variable "rds_managed_sync_instance_class" {
@@ -133,7 +133,7 @@ locals {
     }
     } : {}) : {
     paragon = {
-      name = "${var.workspace}"
+      name = var.workspace
       size = var.rds_instance_class
       db   = "postgres"
     }

@@ -41,12 +41,6 @@ variable "gmk_auto_rebalance" {
   default     = false
 }
 
-variable "gmk_kafka_version" {
-  description = "Kafka version (informational; the service may use a fixed version)."
-  type        = string
-  default     = "3.7.1"
-}
-
 variable "gmk_sasl_mechanism" {
   description = "SASL mechanism: plain (module creates SA key and outputs in cluster_password) or oauthbearer (Workload Identity)."
   type        = string
@@ -56,11 +50,5 @@ variable "gmk_sasl_mechanism" {
     condition     = contains(["oauthbearer", "plain"], var.gmk_sasl_mechanism)
     error_message = "gmk_sasl_mechanism must be \"oauthbearer\" or \"plain\"."
   }
-}
-
-variable "gmk_sasl_plain_key_file_path" {
-  description = "Optional path to your own Kafka SA key JSON for SASL/PLAIN. When empty, the module creates the key and outputs it in cluster_password."
-  type        = string
-  default     = ""
 }
 

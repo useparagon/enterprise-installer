@@ -1,9 +1,11 @@
 variable "resource_group" {
   description = "The resource group to associate resources."
+  type        = any
 }
 
 variable "private_subnet" {
   description = "Private subnet accessible only within the virtual network to deploy to."
+  type        = any
 }
 
 variable "aks_nsg_id" {
@@ -24,12 +26,6 @@ variable "workspace" {
 variable "tags" {
   description = "Default tags to apply to resources"
   type        = map(string)
-}
-
-variable "agc_subnet_enabled" {
-  description = "When true, enable AKS OIDC issuer and workload identity for the AGC ALB controller. Left off so brownfield applies without AGC do not mutate the cluster."
-  type        = bool
-  default     = false
 }
 
 variable "k8s_version" {

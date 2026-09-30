@@ -24,7 +24,7 @@ resource "google_secret_manager_secret" "runtime_monitoring" {
 }
 
 resource "google_secret_manager_secret_version" "runtime_monitoring" {
-  secret      = google_secret_manager_secret.runtime_monitoring.id
+  secret = google_secret_manager_secret.runtime_monitoring.id
   secret_data = jsonencode({
     pg_config = module.postgres.pg_config
   })

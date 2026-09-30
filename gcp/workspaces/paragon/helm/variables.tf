@@ -30,11 +30,6 @@ variable "cluster_name" {
   type        = string
 }
 
-variable "docker_registry_server" {
-  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
-  type        = string
-}
-
 variable "docker_cfg_secret_name" {
   description = "Secret Manager secret name for docker credentials. Null when unused (e.g. pre-provisioned Artifactory pull secret)."
   type        = string
@@ -51,25 +46,6 @@ variable "create_docker_pull_secret" {
   description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
   type        = bool
   default     = true
-}
-
-variable "docker_username" {
-  description = "Docker username to pull images."
-  type        = string
-  default     = null
-}
-
-variable "docker_password" {
-  description = "Docker password to pull images."
-  type        = string
-  default     = null
-  sensitive   = true
-}
-
-variable "docker_email" {
-  description = "Docker email to pull images."
-  type        = string
-  default     = null
 }
 
 variable "domain" {
@@ -95,12 +71,6 @@ variable "eso_iam_ready" {
 variable "gcp_project_id" {
   description = "GCP project ID for Secret Manager (ClusterSecretStore provider.gcpsm.projectID)."
   type        = string
-}
-
-variable "gcp_creds" {
-  description = "GCP credentials for logging bucket access. Null when OpenObserve uses Workload Identity instead of HMAC-style GCS credentials."
-  type        = string
-  default     = null
 }
 
 variable "openobserve_email" {
@@ -234,13 +204,6 @@ variable "redis_ca_cert_secret_name" {
   description = "Secret Manager secret name for the Redis CA certificate bundle."
   type        = string
   default     = null
-}
-
-variable "infra_vars" {
-  description = "Infrastructure output variables (from infra workspace)."
-  type        = any
-  default     = {}
-  sensitive   = true
 }
 
 variable "waf_security_policy_name" {

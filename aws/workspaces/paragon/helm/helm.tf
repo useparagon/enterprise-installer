@@ -247,7 +247,7 @@ resource "kubernetes_secret" "docker_login" {
   data = {
     ".dockerconfigjson" = jsonencode({
       auths = {
-        "${var.docker_registry_server}" = {
+        (var.docker_registry_server) = {
           "username" = local.docker_username
           "password" = local.docker_password
           "email"    = var.docker_email != null ? var.docker_email : ""

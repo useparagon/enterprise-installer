@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.9.0"
+
   required_providers {
     betteruptime = {
       source  = "BetterStackHQ/better-uptime"
@@ -6,6 +8,7 @@ terraform {
     }
   }
 }
+
 
 provider "betteruptime" {
   api_token = coalesce(var.uptime_api_token, "dummy-token")

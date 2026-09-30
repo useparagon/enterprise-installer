@@ -570,7 +570,12 @@ locals {
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
   helm_yaml_path = abspath(var.helm_yaml_path)
-  helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
+  # Prefer TF_VAR_helm_yaml, then the values file, else empty global.env (CI / fresh checkout).
+  helm_vars = yamldecode(
+    var.helm_yaml != null ? var.helm_yaml : (
+      fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
+    )
+  )
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "AZURE")
 

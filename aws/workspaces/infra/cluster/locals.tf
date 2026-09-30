@@ -213,23 +213,4 @@ locals {
     http_put_response_hop_limit = 2
   }
 
-  is_assumed_role = can(regex("assumed-role", data.aws_caller_identity.current.arn))
-  assumed_role_parts = split(
-    "/",
-    replace(
-      replace(
-        data.aws_caller_identity.current.arn,
-        ":sts:",
-        ":iam:"
-      ),
-      ":assumed-role/",
-      local.is_assumed_role && strcontains(data.aws_caller_identity.current.arn, ":assumed-role/AWSReservedSSO") ? ":role__TEMPORARY_DIVIDER__aws-reserved__TEMPORARY_DIVIDER__sso.amazonaws.com/" : ":role/"
-    )
-  )
-  caller_arn = local.is_assumed_role ? replace(format("%s/%s", local.assumed_role_parts[0], local.assumed_role_parts[1]), "__TEMPORARY_DIVIDER__", "/") : data.aws_caller_identity.current.arn
-
-  eks_admin_arns = distinct(compact(concat(
-    var.eks_admin_arns,
-    [local.caller_arn]
-  )))
 }

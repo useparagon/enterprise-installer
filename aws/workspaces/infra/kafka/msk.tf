@@ -47,7 +47,7 @@ resource "aws_msk_cluster" "kafka" {
 
   broker_node_group_info {
     instance_type   = var.msk_instance_type
-    client_subnets  = var.private_subnet.*.id
+    client_subnets  = var.private_subnet[*].id
     security_groups = [aws_security_group.msk.id]
 
     storage_info {

@@ -30,6 +30,8 @@ Do not commit real credentials to git.
 | <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
 | <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 1.17.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
+| <a name="requirement_time"></a> [time](#requirement\_time) | >= 0.9.0 |
 
 ## Providers
 

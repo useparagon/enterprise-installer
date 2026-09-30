@@ -6,7 +6,7 @@ data "aws_ec2_instance_type_offerings" "cache_filter" {
   }
   filter {
     name   = "location"
-    values = var.private_subnet.*.availability_zone
+    values = var.private_subnet[*].availability_zone
   }
   location_type = "availability-zone"
 }

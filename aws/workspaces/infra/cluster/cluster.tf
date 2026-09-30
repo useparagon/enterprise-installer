@@ -47,7 +47,7 @@ module "eks" {
       principal_arn     = arn
 
       policy_associations = {
-        "${replace(arn, ":", "-")}" = {
+        (replace(arn, ":", "-")) = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
           access_scope = {
             type = "cluster"

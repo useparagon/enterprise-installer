@@ -8,11 +8,6 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "vpc_cidr" {
-  description = "VPC CIDR block."
-  type        = string
-}
-
 variable "az_count" {
   description = "Number of availability zones."
   type        = number

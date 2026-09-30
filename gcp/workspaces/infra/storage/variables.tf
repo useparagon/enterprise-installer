@@ -10,6 +10,7 @@ variable "workspace" {
 
 variable "region" {
   description = "The region where to host Google Cloud Organization resources."
+  type        = string
 }
 
 variable "disable_deletion_protection" {
