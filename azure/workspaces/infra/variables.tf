@@ -46,12 +46,6 @@ variable "environment" {
   default     = "enterprise"
 }
 
-variable "ssh_whitelist" {
-  description = "An optional list of IP addresses to whitelist SSH access."
-  type        = string
-  default     = ""
-}
-
 variable "bastion_vm_size" {
   description = "VM size for the bastion scale set (e.g. Standard_B1s). Must be available in the target region."
   type        = string
@@ -532,10 +526,6 @@ locals {
     Organization = var.organization
     Creator      = "Terraform"
   }
-
-  # get distinct values from comma-separated list, filter empty values and trim them
-  # for `ip_whitelist`, if an ip doesn't contain a range at the end (e.g. `<IP_ADDRESS>/32`), then add `/32` to the end. `1.1.1.1` becomes `1.1.1.1/32`; `2.2.2.2/24` remains unchanged
-  ssh_whitelist = distinct([for value in split(",", var.ssh_whitelist) : "${trimspace(value)}${replace(value, "/", "") != value ? "" : "/32"}" if trimspace(value) != ""])
 
   postgres_instances_defaults = {
     cerberus     = { sku = var.postgres_base_sku_name, redundant = false }
