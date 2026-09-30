@@ -190,32 +190,32 @@ locals {
     TOOLS_POSTGRES_SSL_ENABLED = "true"
     TOOLS_POSTGRES_SSL_CA      = ""
 
-    REDIS_HOST = local.agent_os_cache.host
-    REDIS_PORT = tostring(local.agent_os_cache.port)
-    REDIS_URL  = "rediss://${local.agent_os_cache.host}:${local.agent_os_cache.port}"
+    AOS_REDIS_HOST = local.agent_os_cache.host
+    AOS_REDIS_PORT = tostring(local.agent_os_cache.port)
+    AOS_REDIS_URL  = "rediss://${local.agent_os_cache.host}:${local.agent_os_cache.port}"
     # Memorystore for Valkey IAM auth has no static password. The workload identity
     # principal obtains a short-lived access token at runtime, so do not publish the
     # GSA email/password pair as if it were normal Redis AUTH credentials.
-    REDIS_AUTH_MODE           = "iam"
-    REDIS_IAM_SERVICE_ACCOUNT = module.storage.storage.agent_os_service_account
-    REDIS_TLS_ENABLED         = tostring(local.agent_os_cache.ssl)
-    REDIS_CLUSTER_ENABLED     = tostring(local.agent_os_cache.cluster)
-    REDIS_CA_CERT             = local.agent_os_cache.ca_certificate
+    AOS_REDIS_AUTH_MODE           = "iam"
+    AOS_REDIS_IAM_SERVICE_ACCOUNT = module.storage.storage.agent_os_service_account
+    AOS_REDIS_TLS_ENABLED         = tostring(local.agent_os_cache.ssl)
+    AOS_REDIS_CLUSTER_ENABLED     = tostring(local.agent_os_cache.cluster)
+    AOS_REDIS_CA_CERT             = local.agent_os_cache.ca_certificate
 
-    KAFKA_BROKER_URLS   = local.agent_os_kafka.cluster_bootstrap_brokers
-    KAFKA_SASL_USERNAME = coalesce(local.agent_os_kafka.agent_os_cluster_username, local.agent_os_kafka.agent_os_service_account_email)
+    AOS_KAFKA_BROKER_URLS   = local.agent_os_kafka.cluster_bootstrap_brokers
+    AOS_KAFKA_SASL_USERNAME = coalesce(local.agent_os_kafka.agent_os_cluster_username, local.agent_os_kafka.agent_os_service_account_email)
     # SASL/PLAIN carries the service account key JSON base64-encoded, same as
     # MANAGED_SYNC_KAFKA_SASL_PASSWORD in the Paragon helm config.
-    KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_cluster_password != null ? base64encode(local.agent_os_kafka.agent_os_cluster_password) : ""
-    KAFKA_SASL_MECHANISM = local.agent_os_kafka.cluster_mechanism
-    KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.cluster_tls_enabled)
+    AOS_KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_cluster_password != null ? base64encode(local.agent_os_kafka.agent_os_cluster_password) : ""
+    AOS_KAFKA_SASL_MECHANISM = local.agent_os_kafka.cluster_mechanism
+    AOS_KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.cluster_tls_enabled)
 
-    # GCS bucket, addressed through the S3_* keys the Agent OS config slices expect.
-    S3_BUCKET        = module.storage.storage.agent_os_bucket
-    S3_PARSED_BUCKET = module.storage.storage.agent_os_bucket
-    S3_PARSED_PREFIX = "parsed/"
-    S3_INDEX_BUCKET  = module.storage.storage.agent_os_bucket
-    S3_INDEX_AZ_ID   = ""
+    # GCS bucket, addressed through the AOS_S3_* keys the Agent OS config slices expect.
+    AOS_S3_BUCKET        = module.storage.storage.agent_os_bucket
+    AOS_S3_PARSED_BUCKET = module.storage.storage.agent_os_bucket
+    AOS_S3_PARSED_PREFIX = "parsed/"
+    AOS_S3_INDEX_BUCKET  = module.storage.storage.agent_os_bucket
+    AOS_S3_INDEX_AZ_ID   = ""
   } : null
 
   agent_os_admin_config = var.agent_os_enabled ? {
