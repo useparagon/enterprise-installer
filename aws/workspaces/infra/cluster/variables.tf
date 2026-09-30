@@ -153,16 +153,12 @@ variable "agent_os_enabled" {
 }
 
 variable "agent_os_index_instance_types" {
-  description = "Instance types for the Agent OS index managed node group."
+  description = "Instance types for the Agent OS index managed node group / Karpenter NodePool."
   type        = list(string)
 
   validation {
-    condition = length(var.agent_os_index_instance_types) > 0 && alltrue([
-      for t in var.agent_os_index_instance_types :
-      contains(["c", "m", "r", "i", "x"], substr(t, 0, 1)) &&
-      contains(["large", "xlarge", "2xlarge", "3xlarge", "4xlarge", "6xlarge", "8xlarge", "9xlarge", "10xlarge", "12xlarge", "16xlarge", "18xlarge", "24xlarge", "32xlarge", "48xlarge"], try(split(".", t)[1], ""))
-    ])
-    error_message = "Agent OS index instance types must use a supported c/m/r/i/x EC2 family and size."
+    condition     = length(var.agent_os_index_instance_types) > 0
+    error_message = "At least one Agent OS index instance type is required."
   }
 }
 
@@ -174,17 +170,23 @@ variable "agent_os_index_max_count" {
   type = number
 }
 
+variable "agent_os_index_cpu_limit" {
+  description = "Karpenter cpu limit for the Agent OS index NodePool."
+  type        = string
+}
+
+variable "agent_os_index_memory_limit" {
+  description = "Karpenter memory limit for the Agent OS index NodePool."
+  type        = string
+}
+
 variable "agent_os_extract_instance_types" {
-  description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group."
+  description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group / Karpenter NodePool."
   type        = list(string)
 
   validation {
-    condition = length(var.agent_os_extract_instance_types) > 0 && alltrue([
-      for t in var.agent_os_extract_instance_types :
-      contains(["c", "m", "r", "i", "x"], substr(t, 0, 1)) &&
-      contains(["large", "xlarge", "2xlarge", "3xlarge", "4xlarge", "6xlarge", "8xlarge", "9xlarge", "10xlarge", "12xlarge", "16xlarge", "18xlarge", "24xlarge", "32xlarge", "48xlarge"], try(split(".", t)[1], ""))
-    ])
-    error_message = "Agent OS extraction instance types must use a supported c/m/r/i/x EC2 family and size."
+    condition     = length(var.agent_os_extract_instance_types) > 0
+    error_message = "At least one Agent OS extraction instance type is required."
   }
 }
 
@@ -196,6 +198,16 @@ variable "agent_os_extract_min_count" {
 variable "agent_os_extract_max_count" {
   description = "Maximum nodes in the Agent OS extraction managed node group."
   type        = number
+}
+
+variable "agent_os_extract_cpu_limit" {
+  description = "Karpenter cpu limit for the Agent OS extract NodePool."
+  type        = string
+}
+
+variable "agent_os_extract_memory_limit" {
+  description = "Karpenter memory limit for the Agent OS extract NodePool."
+  type        = string
 }
 
 variable "egress_ready" {

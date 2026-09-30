@@ -83,7 +83,7 @@ module "redis" {
   elasticache_multiple_instances = var.elasticache_multiple_instances
   managed_sync_enabled           = var.managed_sync_enabled
   agent_os_enabled               = var.agent_os_enabled
-  agent_os_valkey                = var.agent_os_valkey
+  agent_os_valkey                = local.agent_os_valkey
   agent_os_kms_key_arn           = try(aws_kms_key.agent_os[0].arn, null)
 
   vpc            = module.network.vpc
@@ -167,9 +167,13 @@ module "cluster" {
   agent_os_index_instance_types   = var.agent_os_index_instance_types
   agent_os_index_min_count        = var.agent_os_index_min_count
   agent_os_index_max_count        = var.agent_os_index_max_count
+  agent_os_index_cpu_limit        = var.agent_os_index_cpu_limit
+  agent_os_index_memory_limit     = var.agent_os_index_memory_limit
   agent_os_extract_instance_types = var.agent_os_extract_instance_types
   agent_os_extract_min_count      = var.agent_os_extract_min_count
   agent_os_extract_max_count      = var.agent_os_extract_max_count
+  agent_os_extract_cpu_limit      = var.agent_os_extract_cpu_limit
+  agent_os_extract_memory_limit   = var.agent_os_extract_memory_limit
 
   vpc_id             = module.network.vpc.id
   private_subnet_ids = module.network.private_subnet[*].id
