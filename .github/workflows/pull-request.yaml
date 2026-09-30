@@ -55,6 +55,8 @@ jobs:
             echo "::group::${workspace}"
             (
               cd "${workspace}"
+              # main.tf is gitignored; required_providers live in main.tf.example
+              cp main.tf.example main.tf
               terraform init -backend=false -input=false
               terraform validate
               tflint --config "${GITHUB_WORKSPACE}/.tflint.hcl" --recursive
