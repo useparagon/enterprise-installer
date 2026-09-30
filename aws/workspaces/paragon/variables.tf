@@ -621,7 +621,12 @@ locals {
   auditlogs_bucket    = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
   helm_yaml_path = abspath(var.helm_yaml_path)
-  helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
+  # Prefer TF_VAR_helm_yaml, then the values file, else empty global.env (CI / fresh checkout).
+  helm_vars = yamldecode(
+    var.helm_yaml != null ? var.helm_yaml : (
+      fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
+    )
+  )
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "S3")
 
