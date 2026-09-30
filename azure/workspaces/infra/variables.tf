@@ -523,9 +523,9 @@ variable "agent_os_index_max_count" {
 }
 
 variable "agent_os_extract_vm_size" {
-  description = "Compute-optimized AMD VM size for the Agent OS extraction AKS node pool. Use Standard_F16as_v6 for staging and Standard_F32as_v6 for production."
+  description = "Extract AKS VM size. Default Standard_F16as_v6 (16 vCPU, ~4 pods/node)."
   type        = string
-  default     = "Standard_F32as_v6"
+  default     = "Standard_F16as_v6"
 }
 
 variable "agent_os_extract_min_count" {
@@ -535,7 +535,7 @@ variable "agent_os_extract_min_count" {
 }
 
 variable "agent_os_extract_max_count" {
-  description = "Maximum nodes in the Agent OS extraction AKS node pool. Use 3 for staging and 8 for production."
+  description = "Max extract nodes. Staging 3, production 8 (covers 30 pods at 4/node)."
   type        = number
   default     = 8
 }

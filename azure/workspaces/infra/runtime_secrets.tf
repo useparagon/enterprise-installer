@@ -209,33 +209,33 @@ locals {
     TOOLS_POSTGRES_SSL_ENABLED = "true"
     TOOLS_POSTGRES_SSL_CA      = ""
 
-    REDIS_HOST            = local.agent_os_cache.host
-    REDIS_PORT            = tostring(local.agent_os_cache.port)
-    REDIS_URL             = "${local.agent_os_cache_scheme}://:${urlencode(local.agent_os_cache.password)}@${local.agent_os_cache.host}:${local.agent_os_cache.port}"
-    REDIS_PASSWORD        = local.agent_os_cache.password
-    REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
-    REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
+    AOS_REDIS_HOST            = local.agent_os_cache.host
+    AOS_REDIS_PORT            = tostring(local.agent_os_cache.port)
+    AOS_REDIS_URL             = "${local.agent_os_cache_scheme}://:${urlencode(local.agent_os_cache.password)}@${local.agent_os_cache.host}:${local.agent_os_cache.port}"
+    AOS_REDIS_PASSWORD        = local.agent_os_cache.password
+    AOS_REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
+    AOS_REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
 
-    KAFKA_BROKER_URLS    = local.agent_os_kafka.bootstrap_servers
-    KAFKA_SASL_USERNAME  = local.agent_os_kafka.agent_os_kafka_credentials.username
-    KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_kafka_credentials.password
-    KAFKA_SASL_MECHANISM = local.agent_os_kafka.agent_os_kafka_credentials.mechanism
-    KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.tls_enabled)
+    AOS_KAFKA_BROKER_URLS    = local.agent_os_kafka.bootstrap_servers
+    AOS_KAFKA_SASL_USERNAME  = local.agent_os_kafka.agent_os_kafka_credentials.username
+    AOS_KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_kafka_credentials.password
+    AOS_KAFKA_SASL_MECHANISM = local.agent_os_kafka.agent_os_kafka_credentials.mechanism
+    AOS_KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.tls_enabled)
 
     # Event Hubs SAS rules cannot express read-on-source + write-on-DLT with one key.
     # Keep runtime consumption read-only and publish the DLT writer separately for the
     # application path that emits dead letters.
-    KAFKA_DLT_SASL_USERNAME  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.username
-    KAFKA_DLT_SASL_PASSWORD  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.password
-    KAFKA_DLT_SASL_MECHANISM = local.agent_os_kafka.agent_os_dlt_kafka_credentials.mechanism
+    AOS_KAFKA_DLT_SASL_USERNAME  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.username
+    AOS_KAFKA_DLT_SASL_PASSWORD  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.password
+    AOS_KAFKA_DLT_SASL_MECHANISM = local.agent_os_kafka.agent_os_dlt_kafka_credentials.mechanism
 
-    # Blob container, addressed through the S3_* keys the Agent OS config slices expect.
-    AZURE_STORAGE_ACCOUNT = module.storage.blob.name
-    S3_BUCKET             = module.storage.blob.agent_os_container
-    S3_PARSED_BUCKET      = module.storage.blob.agent_os_container
-    S3_PARSED_PREFIX      = "parsed/"
-    S3_INDEX_BUCKET       = module.storage.blob.agent_os_container
-    S3_INDEX_AZ_ID        = ""
+    # Blob container, addressed through the AOS_S3_* keys the Agent OS config slices expect.
+    AOS_AZURE_STORAGE_ACCOUNT = module.storage.blob.name
+    AOS_S3_BUCKET             = module.storage.blob.agent_os_container
+    AOS_S3_PARSED_BUCKET      = module.storage.blob.agent_os_container
+    AOS_S3_PARSED_PREFIX      = "parsed/"
+    AOS_S3_INDEX_BUCKET       = module.storage.blob.agent_os_container
+    AOS_S3_INDEX_AZ_ID        = ""
   } : null
 
   agent_os_admin_config = var.agent_os_enabled ? {
