@@ -908,7 +908,8 @@ locals {
   gcp_project_id = try(local.creds_json.project_id, var.gcp_project_id)
 
   # hash of project ID to help ensure uniqueness of resources like bucket names
-  hash              = substr(sha256(local.gcp_project_id), 0, 8)
+  # coalesce so tflint/validate can run when gcp_project_id is not set (e.g. no tfvars)
+  hash              = substr(sha256(coalesce(local.gcp_project_id, "tflint")), 0, 8)
   default_workspace = "paragon-${var.organization}-${local.hash}"
 
   default_labels = {
