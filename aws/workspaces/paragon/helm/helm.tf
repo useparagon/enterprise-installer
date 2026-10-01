@@ -26,7 +26,12 @@ locals {
           }
         }
       ),
-      try(nonsensitive(var.helm_values.subchart), {})
+      try(nonsensitive(var.helm_values.subchart), {}),
+      var.restrict_public_exposure ? {
+        health-checker = {
+          enabled = true
+        }
+      } : {}
     )
   })
 

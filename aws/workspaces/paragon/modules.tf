@@ -77,6 +77,7 @@ module "helm" {
   openobserve_secret_name       = local.runtime_openobserve_secret_name
   public_microservices          = local.public_microservices
   public_monitors               = local.public_monitors
+  restrict_public_exposure      = local.restrict_public_exposure
   waf_web_acl_arn               = local.waf_active ? module.waf[0].web_acl_arn : ""
   enable_legacy_mng_pools       = try(local.infra_vars.enable_legacy_mng_pools.value, true)
   karpenter_enabled             = try(local.infra_vars.enable_karpenter.value, false)

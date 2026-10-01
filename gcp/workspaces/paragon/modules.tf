@@ -81,6 +81,7 @@ module "helm" {
   openobserve_secret_name     = google_secret_manager_secret.openobserve[0].secret_id
   public_microservices        = local.public_microservices
   public_monitors             = local.public_monitors
+  restrict_public_exposure    = local.restrict_public_exposure
   public_services             = local.public_services
   redis_ca_cert_secret_name   = local.infra_secret_names.redis_ca_cert
   region                      = var.region
