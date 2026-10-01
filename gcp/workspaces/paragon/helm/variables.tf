@@ -20,6 +20,11 @@ variable "managed_sync_version" {
   default     = "0.0.131"
 }
 
+variable "managed_sync_helm_repository" {
+  description = "Helm repository URL used to install Managed Sync."
+  type        = string
+}
+
 variable "region" {
   description = "The region where to host Google Cloud Organization resources."
   type        = string

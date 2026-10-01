@@ -157,6 +157,12 @@ variable "managed_sync_version" {
   default     = "0.0.131"
 }
 
+variable "managed_sync_helm_repository" {
+  description = "Helm repository URL used to install Managed Sync. Override for sandbox/beta validation."
+  type        = string
+  default     = "https://paragon-helm-production.s3.amazonaws.com"
+}
+
 variable "excluded_microservices" {
   description = "The microservices that should be excluded from the deployment."
   type        = list(string)

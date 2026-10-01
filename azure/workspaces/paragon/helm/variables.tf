@@ -200,6 +200,11 @@ variable "managed_sync_version" {
   type        = string
 }
 
+variable "managed_sync_helm_repository" {
+  description = "Helm repository URL used to install Managed Sync."
+  type        = string
+}
+
 variable "key_vault_name" {
   description = "Key Vault name that stores Paragon runtime secrets."
   type        = string
