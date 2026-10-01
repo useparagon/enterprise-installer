@@ -218,12 +218,6 @@ variable "restrict_public_exposure" {
   default     = false
 }
 
-variable "health_checker_enabled" {
-  description = "Deprecated: use restrict_public_exposure. When true, enables the same behavior as restrict_public_exposure."
-  type        = bool
-  default     = false
-}
-
 variable "openobserve_email" {
   description = "OpenObserve admin login email."
   type        = string
@@ -1123,14 +1117,11 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
-  restrict_public_exposure = var.restrict_public_exposure || var.health_checker_enabled
+  restrict_public_exposure = var.restrict_public_exposure
 
-  # api-project and api-webhook use managed-sync path routes on the api-sync host (no dedicated ingress host).
   restricted_public_microservice_allowlist = toset([
-    "api-project",
     "api-sync",
     "api-triggerkit",
-    "api-webhook",
     "connect",
     "dashboard",
     "health-checker",
