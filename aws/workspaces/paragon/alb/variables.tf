@@ -47,16 +47,6 @@ variable "public_monitors" {
   }))
 }
 
-variable "release_ingress" {
-  description = "The helm release for the ingress."
-  type        = any
-}
-
-variable "release_paragon_on_prem" {
-  description = "The helm release for the Paragon microservices."
-  type        = any
-}
-
 variable "worker_security_group_ids" {
   description = "Security groups attached to EKS worker nodes."
   type        = list(string)

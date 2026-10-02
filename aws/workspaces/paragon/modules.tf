@@ -26,8 +26,6 @@ module "alb" {
   microservices            = local.microservices
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
-  release_ingress          = module.helm.release_ingress
-  release_paragon_on_prem  = module.helm.release_paragon_on_prem
   vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
   worker_security_group_ids = coalescelist(
     try(compact(local.infra_vars.worker_security_group_ids.value), []),
@@ -98,6 +96,18 @@ module "helm" {
   runtime_secrets_ready = terraform_data.runtime_secrets_populated.id
   # Hash SM version IDs (not terraform_data.id, which is stable across input updates).
   secrets_revision = sha256(jsonencode(terraform_data.runtime_secrets_populated.output))
+}
+
+module "dns" {
+  source = "./dns"
+
+  domain               = var.domain
+  public_microservices = local.public_microservices
+  public_monitors      = local.public_monitors
+  route53_zone_id      = module.alb.route53_zone_id
+  workspace            = local.workspace
+
+  depends_on = [module.helm]
 }
 
 module "managed_sync_config" {
