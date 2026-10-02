@@ -11,10 +11,25 @@ locals {
     { path = "/", service = "api-sync", port = 1800 },
   ]
 
+  path_public_services = var.path_based_routing_enabled ? {
+    for name, service in var.public_microservices :
+    name => service
+    if service.path_prefix != ""
+  } : {}
+
+  host_public_services = {
+    for name, service in var.public_services :
+    name => service
+    if try(service.path_prefix, "") == ""
+  }
+
   unique_domains = distinct(concat(
     [
       for service in values(var.public_services) :
-      replace(replace(service.public_url, "https://", ""), "http://", "")
+      coalesce(
+        try(service.origin_host, null),
+        replace(replace(service.public_url, "https://", ""), "http://", "")
+      )
     ],
     var.managed_sync_enabled ? [local.managed_sync_host] : []
   ))
@@ -100,8 +115,11 @@ resource "kubectl_manifest" "ingress" {
       loadBalancerIP   = google_compute_global_address.loadbalancer.address
       rules = concat(
         [
-          for name, svc in var.public_services : {
-            host = replace(svc.public_url, "https://", "")
+          for name, svc in local.host_public_services : {
+            host = coalesce(
+              try(svc.origin_host, null),
+              replace(replace(svc.public_url, "https://", ""), "http://", "")
+            )
             http = {
               paths = [{
                 path     = "/"
@@ -118,6 +136,24 @@ resource "kubectl_manifest" "ingress" {
             }
           }
         ],
+        length(local.path_public_services) > 0 ? [{
+          http = {
+            paths = [
+              for name, svc in local.path_public_services : {
+                path     = svc.path_prefix
+                pathType = "Prefix"
+                backend = {
+                  service = {
+                    name = name
+                    port = {
+                      number = svc.port
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }] : [],
         var.managed_sync_enabled ? [{
           host = local.managed_sync_host
           http = {
