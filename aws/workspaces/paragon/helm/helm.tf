@@ -63,11 +63,25 @@ locals {
   })
 
   microservice_values = yamlencode({
-    for microservice_name, microservice_config in var.microservices : microservice_name => {
-      env = {
-        SERVICE = microservice_name
-      }
-    }
+    for microservice_name, microservice_config in var.microservices : microservice_name => merge(
+      {
+        env = merge(
+          {
+            SERVICE = microservice_name
+          },
+          var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
+            HTTP_PATH_PREFIX = var.public_microservices[microservice_name].path_prefix
+          } : {}
+        )
+      },
+      # env.standard only emits keys listed in service-inputs envKeys or Values.envKeys.
+      var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
+        envKeys = distinct(concat(
+          try(nonsensitive(var.helm_values)[microservice_name].envKeys, []),
+          ["HTTP_PATH_PREFIX"]
+        ))
+      } : {}
+    )
   })
 
   public_microservice_values = yamlencode({
@@ -75,12 +89,28 @@ locals {
       ingress = merge(
         {
           className          = "alb"
-          host               = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
+          host               = microservice_config.public_host
           scheme             = var.ingress_scheme
           certificate        = var.certificate
           load_balancer_name = var.workspace
           logs_bucket        = var.logs_bucket
         },
+        var.path_based_routing_enabled && microservice_config.path_prefix != "" ? merge(
+          {
+            # Outrank legacy host-based rules if the external reverse proxy rewrites Host.
+            group_order = -100
+            hostless    = true
+            path        = microservice_config.path_prefix
+          },
+          microservice_name == "connect" ? {
+            # Connect SDK traffic is served by Hermes/worker-proxy. Keep those
+            # prefixed routes on the Connect Ingress so they outrank its catch-all.
+            connect_sdk_routes = {
+              hermes_port       = try(var.microservices["hermes"].port, 1702)
+              worker_proxy_port = try(var.microservices["worker-proxy"].port, 1715)
+            }
+          } : {}
+        ) : {},
         var.waf_web_acl_arn != "" ? { wafv2_acl_arn = var.waf_web_acl_arn } : {}
       )
     }

@@ -17,18 +17,19 @@ module "waf" {
 module "alb" {
   source = "./alb"
 
-  certificate              = var.certificate
-  cluster_name             = local.cluster_name
-  cloudflare_dns_api_token = var.cloudflare_dns_api_token
-  cloudflare_zone_id       = var.cloudflare_zone_id
-  dns_provider             = var.dns_provider
-  domain                   = var.domain
-  microservices            = local.microservices
-  public_microservices     = local.public_microservices
-  public_monitors          = local.public_monitors
-  release_ingress          = module.helm.release_ingress
-  release_paragon_on_prem  = module.helm.release_paragon_on_prem
-  vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
+  certificate                = var.certificate
+  cluster_name               = local.cluster_name
+  cloudflare_dns_api_token   = var.cloudflare_dns_api_token
+  cloudflare_zone_id         = var.cloudflare_zone_id
+  dns_provider               = var.dns_provider
+  domain                     = var.domain
+  path_based_routing_enabled = var.path_based_routing_enabled
+  microservices              = local.microservices
+  public_microservices       = local.public_microservices
+  public_monitors            = local.public_monitors
+  release_ingress            = module.helm.release_ingress
+  release_paragon_on_prem    = module.helm.release_paragon_on_prem
+  vpc_id                     = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
   worker_security_group_ids = coalescelist(
     try(compact(local.infra_vars.worker_security_group_ids.value), []),
     try(compact(local.infra_vars.karpenter.value.security_group_ids), []),
@@ -61,6 +62,7 @@ module "helm" {
   flipt_options                 = local.flipt_options
   helm_values                   = local.helm_values_public
   ingress_scheme                = var.ingress_scheme
+  path_based_routing_enabled    = var.path_based_routing_enabled
   install_external_secrets      = true
   k8s_version                   = var.k8s_version
   cluster_k8s_version           = local.cluster_k8s_version
