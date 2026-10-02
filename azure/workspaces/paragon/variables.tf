@@ -763,10 +763,14 @@ locals {
     )
   }
 
+  uptime_excluded_microservices = toset([
+    "cache-replay",
+  ])
+
   uptime_services = {
     for microservice, config in local.public_microservices :
     microservice => config
-    if var.ingress_scheme != "internal"
+    if var.ingress_scheme != "internal" && !contains(local.uptime_excluded_microservices, microservice)
   }
 
   monitors = {
