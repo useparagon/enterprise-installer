@@ -158,7 +158,7 @@ variable "managed_sync_version" {
 }
 
 variable "managed_sync_helm_repository" {
-  description = "Helm repository URL used to install Managed Sync. Override for sandbox/beta validation."
+  description = "Helm repository URL used to install Managed Sync. Override to consume charts from another repository."
   type        = string
   default     = "https://paragon-helm-production.s3.amazonaws.com"
 }
