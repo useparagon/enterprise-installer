@@ -196,6 +196,11 @@ variable "managed_sync_version" {
   type        = string
 }
 
+variable "managed_sync_helm_repository" {
+  description = "Helm repository URL used to install Managed Sync."
+  type        = string
+}
+
 variable "waf_web_acl_arn" {
   description = "Regional WAFv2 Web ACL ARN for the shared ALB. Empty disables WAF association."
   type        = string
