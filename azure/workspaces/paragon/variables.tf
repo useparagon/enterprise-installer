@@ -96,7 +96,7 @@ variable "excluded_microservices" {
 }
 
 variable "private_services" {
-  description = "Services that should not be publicly exposed (filtered from public_microservices and public_monitors)."
+  description = "Services that should not be publicly exposed (filtered from public_microservices and public_monitors). When restrict_public_exposure is true, allowlisted services can still be made private via this list."
   type        = list(string)
   default     = []
 }
@@ -304,8 +304,8 @@ variable "uptime_company" {
   default     = null
 }
 
-variable "health_checker_enabled" {
-  description = "Specifies that health checker is enabled."
+variable "restrict_public_exposure" {
+  description = "When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker; grafana when monitors are enabled). Use private_services to further restrict allowlisted endpoints."
   type        = bool
   default     = false
 }
@@ -738,16 +738,39 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
+  restrict_public_exposure = var.restrict_public_exposure
+
+  restricted_public_microservice_allowlist = toset([
+    "api-sync",
+    "api-triggerkit",
+    "connect",
+    "dashboard",
+    "health-checker",
+    "hermes",
+    "worker-proxy",
+    "zeus",
+  ])
+
+  restricted_public_monitor_allowlist = toset([
+    "grafana",
+  ])
+
   public_microservices = {
     for microservice, config in local.microservices :
     microservice => config
-    if lookup(config, "public_url", null) != null && !contains(var.private_services, microservice)
+    if lookup(config, "public_url", null) != null && lookup(config, "public_url", "") != "" && !contains(var.private_services, microservice) && (
+      !local.restrict_public_exposure || contains(local.restricted_public_microservice_allowlist, microservice)
+    )
   }
+
+  uptime_excluded_microservices = toset([
+    "cache-replay",
+  ])
 
   uptime_services = {
     for microservice, config in local.public_microservices :
     microservice => config
-    if var.ingress_scheme != "internal" && (microservice == "health-checker" || !var.health_checker_enabled)
+    if var.ingress_scheme != "internal" && !contains(local.uptime_excluded_microservices, microservice)
   }
 
   monitors = {
@@ -800,7 +823,9 @@ locals {
   public_monitors = var.monitors_enabled ? {
     for monitor, config in local.monitors :
     monitor => config
-    if lookup(config, "public_url", null) != null && !contains(var.private_services, monitor)
+    if lookup(config, "public_url", null) != null && lookup(config, "public_url", "") != "" && !contains(var.private_services, monitor) && (
+      !local.restrict_public_exposure || contains(local.restricted_public_monitor_allowlist, monitor)
+    )
   } : {}
 
   public_services = merge(local.public_microservices, local.public_monitors)

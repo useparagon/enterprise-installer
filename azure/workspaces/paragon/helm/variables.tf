@@ -190,6 +190,12 @@ variable "k8s_version" {
   type        = string
 }
 
+variable "restrict_public_exposure" {
+  description = "When true, force-enables the health-checker subchart even if customer values disable it."
+  type        = bool
+  default     = false
+}
+
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync."
   type        = bool

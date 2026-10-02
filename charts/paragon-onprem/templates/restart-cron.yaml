@@ -34,12 +34,10 @@ spec:
             - -c
             - |
               for kind in deployment statefulset; do
-                for filter in paragon-on-prem paragon-monitoring; do
-                  for name in $(kubectl get $kind -n paragon -l app.kubernetes.io/instance=$filter -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}'); do
-                    echo "Restarting $kind/$name"
-                    kubectl rollout restart "$kind/$name" -n paragon
-                    kubectl rollout status "$kind/$name" -n paragon --timeout=300s      
-                  done
+                for name in $(kubectl get $kind -n paragon -l app.kubernetes.io/instance=paragon-on-prem -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}'); do
+                  echo "Restarting $kind/$name"
+                  kubectl rollout restart "$kind/$name" -n paragon
+                  kubectl rollout status "$kind/$name" -n paragon --timeout=300s      
                 done
               done
           restartPolicy: OnFailure

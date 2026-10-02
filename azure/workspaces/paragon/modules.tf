@@ -43,6 +43,7 @@ module "helm" {
   openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
+  restrict_public_exposure = local.restrict_public_exposure
   resource_group           = local.infra_vars.resource_group.value
   workspace                = local.workspace
 }
@@ -128,6 +129,7 @@ locals {
   onprem_subchart_enabled = merge(
     { for name in keys(local.microservices) : name => { enabled = true } },
     try(local.helm_vars.subchart, {}),
+    local.restrict_public_exposure ? { health-checker = { enabled = true } } : {},
   )
 
   # Per-host backends and HTTPS listeners for AGC, limited to services Helm publishes.
