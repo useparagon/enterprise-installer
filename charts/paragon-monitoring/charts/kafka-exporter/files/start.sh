@@ -11,7 +11,7 @@ echo "Generated kafka server arguments: $KAFKA_SERVER_ARGS"
 
 # Respect configured mechanism (Azure Event Hubs uses plain + $ConnectionString).
 # Normalize dashed SCRAM spellings only; do not force scram-sha512.
-MECH="${MONITOR_MANAGED_SYNC_KAFKA_SASL_MECHANISM:-plain}"
+MECH="${MONITOR_MANAGED_SYNC_KAFKA_SASL_MECHANISM:-scram-sha512}"
 case "$MECH" in
   scram-sha-512|SCRAM-SHA-512) MECH=scram-sha512 ;;
   scram-sha-256|SCRAM-SHA-256) MECH=scram-sha256 ;;
