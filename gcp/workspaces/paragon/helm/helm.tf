@@ -102,6 +102,26 @@ locals {
     }
   })
 
+  # Chart defaults keep ingress.enabled=true for services with public URLs; when restrict_public_exposure
+  # shrinks public_microservices, leftover Ingresses would still render with the gce ingress class.
+  restricted_private_microservice_values = var.restrict_public_exposure ? yamlencode({
+    for microservice_name, microservice_config in var.microservices : microservice_name => {
+      ingress = {
+        enabled = false
+      }
+    }
+    if !contains(keys(var.public_microservices), microservice_name) && try(microservice_config.public_url, null) != null && microservice_config.public_url != ""
+  }) : yamlencode({})
+
+  restricted_private_monitor_values = var.restrict_public_exposure ? yamlencode({
+    for monitor_name, monitor_config in var.monitors : monitor_name => {
+      ingress = {
+        enabled = false
+      }
+    }
+    if !contains(keys(var.public_monitors), monitor_name) && try(monitor_config.public_url, null) != null && monitor_config.public_url != ""
+  }) : yamlencode({})
+
   flipt_values = yamlencode({
     flipt = {
       flipt = {
@@ -319,6 +339,7 @@ resource "helm_release" "paragon_on_prem" {
     local.flipt_values,
     local.microservice_values,
     local.public_microservice_values,
+    local.restricted_private_microservice_values,
     local.secret_hash
   ]
 
@@ -418,6 +439,7 @@ resource "helm_release" "paragon_monitoring" {
     local.global_values,
     local.monitor_values,
     local.public_monitor_values,
+    local.restricted_private_monitor_values,
     local.secret_hash
   ]
 

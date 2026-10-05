@@ -22,18 +22,13 @@ resources:
     cpu: 100m
     memory: 100Mi
 
-terminationGracePeriodSeconds: 120
-
 pdb:
   enabled: true
-  maxUnavailable: 0
+  # Single replica: allow voluntary disruption for rollouts, drains, and restart cron.
+  maxUnavailable: 1
 
 autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 1
-  targetCPUUtilizationPercentage: 75
-  targetMemoryUtilizationPercentage: 75
+  enabled: false
 
 secretName: "paragon-secrets"
 
