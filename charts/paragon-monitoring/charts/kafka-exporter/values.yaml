@@ -4,6 +4,11 @@
 
 replicaCount: 1
 
+# Mount chart start.sh over the image entrypoint. The kafka-exporter image forces
+# scram-sha512 in /start.sh, which breaks Azure Event Hubs Kafka (plain SASL).
+entrypointOverride:
+  enabled: true
+
 image:
   repository: useparagon/kafka-exporter
   pullPolicy: IfNotPresent

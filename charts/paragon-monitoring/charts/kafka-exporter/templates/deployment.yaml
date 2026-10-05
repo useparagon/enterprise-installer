@@ -1,1 +1,5 @@
-{{- include "deployment.standard" (dict "root" $) }}
+{{- $entrypointConfigMap := "" -}}
+{{- if .Values.entrypointOverride.enabled -}}
+{{- $entrypointConfigMap = printf "%s-entrypoint" (include "kafka-exporter.fullname" .) -}}
+{{- end -}}
+{{- include "deployment.standard" (dict "root" $ "entrypointConfigMap" $entrypointConfigMap) }}

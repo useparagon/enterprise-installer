@@ -10,6 +10,7 @@ Parameters:
 {{- $root := .root -}}
 {{- $command := .command -}}
 {{- $namespaceTemplate := .namespaceTemplate -}}
+{{- $entrypointConfigMap := .entrypointConfigMap | default "" -}}
 {{- $name := $root.Chart.Name -}}
 {{- $redisCaCertEnabled := and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "redisCaCert") (kindIs "map" $root.Values.global.redisCaCert) (hasKey $root.Values.global.redisCaCert "enabled") $root.Values.global.redisCaCert.enabled -}}
 {{- $podAnnotations := dict -}}
@@ -59,7 +60,9 @@ spec:
           securityContext:
             {{- toYaml $root.Values.securityContext | nindent 12 }}
           image: {{ include "paragon.containerImage" (dict "root" $root) | quote }}
-          {{- if $command }}
+          {{- if $entrypointConfigMap }}
+          command: ["/bin/sh", "/config/start.sh"]
+          {{- else if $command }}
           command: [{{ $command | quote }}]
           {{- end }}
           imagePullPolicy: {{ include "paragon.imagePullPolicy" (dict "root" $root) }}
@@ -95,17 +98,32 @@ spec:
             - name: NODE_EXTRA_CA_CERTS
               value: /etc/ssl/redis-ca/server-ca.pem
             {{- end }}
-          {{- if $redisCaCertEnabled }}
+          {{- if or $redisCaCertEnabled $entrypointConfigMap }}
           volumeMounts:
+            {{- if $entrypointConfigMap }}
+            - name: entrypoint
+              mountPath: /config
+              readOnly: true
+            {{- end }}
+            {{- if $redisCaCertEnabled }}
             - name: redis-ca-cert
               mountPath: /etc/ssl/redis-ca
               readOnly: true
+            {{- end }}
           {{- end }}
-      {{- if $redisCaCertEnabled }}
+      {{- if or $redisCaCertEnabled $entrypointConfigMap }}
       volumes:
+        {{- if $entrypointConfigMap }}
+        - name: entrypoint
+          configMap:
+            name: {{ $entrypointConfigMap }}
+            defaultMode: 0755
+        {{- end }}
+        {{- if $redisCaCertEnabled }}
         - name: redis-ca-cert
           secret:
             secretName: {{ $root.Values.global.redisCaCert.secretName | default "redis-ca-cert" }}
+        {{- end }}
       {{- end }}
       {{- $tsEnabled := true -}}
       {{- if $root.Values.topologySpread -}}
