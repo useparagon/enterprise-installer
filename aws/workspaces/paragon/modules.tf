@@ -24,7 +24,6 @@ module "alb" {
   dns_provider             = var.dns_provider
   domain                   = var.domain
   microservices            = local.microservices
-  public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
   vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
   worker_security_group_ids = coalescelist(

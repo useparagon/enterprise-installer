@@ -23,15 +23,6 @@ variable "certificate" {
   type        = string
 }
 
-variable "public_microservices" {
-  description = "The microservices running within the system exposed to the load balancer"
-  type = map(object({
-    port             = number
-    healthcheck_path = string
-    public_url       = string
-  }))
-}
-
 variable "microservices" {
   description = "The microservices running within the system, including those only reachable internally"
   type = map(object({
