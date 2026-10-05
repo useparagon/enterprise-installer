@@ -454,6 +454,12 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "platform_version" {
+  description = "Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML."
+  type        = string
+  default     = null
+}
+
 variable "waf_enabled" {
   description = "Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf_managed_rule_groups, rate limits, or IP lists in tfvars."
   type        = bool
@@ -626,6 +632,12 @@ locals {
     var.helm_yaml != null ? var.helm_yaml : (
       fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
     )
+  )
+
+  installer_chart_version = trimspace(file("${path.module}/../../../scripts/installer-chart-version.txt"))
+  effective_platform_version = coalesce(
+    var.platform_version,
+    try(local.helm_vars.global.env.VERSION, null),
   )
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "S3")
@@ -905,6 +917,7 @@ locals {
           PARAGON_DOMAIN         = var.domain
           PLATFORM_ENV           = "enterprise"
           REGION                 = var.aws_region
+          VERSION                = local.effective_platform_version
 
           # Service ports
           ACCOUNT_PORT            = try(local.microservices.account.port, null)
