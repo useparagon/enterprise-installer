@@ -526,7 +526,7 @@ variable "agent_os_postgres" {
   validation {
     condition = alltrue([
       for _, cfg in var.agent_os_postgres :
-      cfg.iops == null || (
+      (cfg.iops == null || cfg.storage_throughput == null) ? true : (
         cfg.storage_type == "gp3" &&
         cfg.allocated_storage >= 400 &&
         cfg.iops >= 12000 &&
