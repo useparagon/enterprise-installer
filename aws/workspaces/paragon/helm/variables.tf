@@ -212,10 +212,6 @@ variable "agent_os_enabled" {
   }
 }
 
-variable "agent_os_version" {
-  description = "The version of the Agent OS helm chart to install."
-  type        = string
-}
 
 variable "agent_os_app_secret_name" {
   description = "Secrets Manager name for Agent OS application configuration."

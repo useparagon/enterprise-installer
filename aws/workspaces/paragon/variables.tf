@@ -459,11 +459,6 @@ variable "agent_os_enabled" {
   }
 }
 
-variable "agent_os_version" {
-  description = "The version of the Agent OS helm chart to install."
-  type        = string
-  default     = "latest"
-}
 
 variable "agent_os_app_config" {
   description = "Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload."
