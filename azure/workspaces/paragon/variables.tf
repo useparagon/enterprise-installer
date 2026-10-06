@@ -96,7 +96,7 @@ variable "excluded_microservices" {
 }
 
 variable "private_services" {
-  description = "Services that should not be publicly exposed (filtered from public_microservices and public_monitors). When restrict_public_exposure is true, allowlisted services can still be made private via this list."
+  description = "Services that get no Ingress. Removed from public_microservices and public_monitors on both internet-facing and internal load balancers. ingress_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict_public_exposure is true, allowlisted services can still be listed here."
   type        = list(string)
   default     = []
 }

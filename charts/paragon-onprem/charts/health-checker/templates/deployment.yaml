@@ -1,1 +1,1 @@
-{{- include "deployment.standard" (dict "root" $) }}
+{{- include "deployment.standard" (dict "root" $ "probes" true "tag" .Values.image.tag) }}
