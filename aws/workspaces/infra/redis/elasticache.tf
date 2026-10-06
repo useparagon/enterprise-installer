@@ -202,29 +202,27 @@ resource "aws_appautoscaling_policy" "cache_cpu" {
   }
 }
 
-# Agent OS caches are driven by the workspace-level map so each Valkey instance can
-# be sized and tuned independently from Paragon/Managed Sync Redis.
+# Shared Valkey implementation. The workspace root owns the catalog and feature
+# enablement. Today it contains only agent_os; future Redis migrations can add
+# cache, queue, system, and managed_sync without introducing parallel resources.
 locals {
-  agent_os_valkey_instances = var.agent_os_enabled ? var.agent_os_valkey : {}
-
-  agent_os_valkey_names = {
-    for key, _ in local.agent_os_valkey_instances :
-    key => key == "cache" ? "${var.workspace}-agent-os" : "${var.workspace}-agent-os-${replace(key, "_", "-")}"
+  valkey_names = {
+    for key, _ in var.valkey_instances :
+    key => "${var.workspace}-${replace(key, "_", "-")}"
   }
 
-  # ElastiCache IDs have short length limits. These strings are the resource
-  # identity after first apply; changing them replaces the replication group.
-  # Keep a stable cache ID, and make additional map entries collision-safe.
-  agent_os_valkey_resource_ids = {
-    for key, _ in local.agent_os_valkey_instances :
-    key => key == "cache"
-    ? substr(replace("${var.workspace}-agent-os", "_", "-"), 0, 32)
-    : "${substr(replace("${var.workspace}-agent-os", "_", "-"), 0, 19)}-${substr(replace(key, "_", "-"), 0, 6)}-${substr(sha1(key), 0, 6)}"
+  # Replication group IDs are capped at 40 characters. Keep readable IDs when
+  # possible and append a stable hash when truncation is required.
+  valkey_resource_ids = {
+    for key, _ in var.valkey_instances :
+    key => length(local.valkey_names[key]) <= 32
+    ? local.valkey_names[key]
+    : "${substr(local.valkey_names[key], 0, 25)}-${substr(sha1(local.valkey_names[key]), 0, 6)}"
   }
 }
 
-data "aws_ec2_instance_type_offerings" "agent_os_cache_filter" {
-  for_each = local.agent_os_valkey_instances
+data "aws_ec2_instance_type_offerings" "valkey" {
+  for_each = var.valkey_instances
 
   filter {
     name   = "instance-type"
@@ -240,34 +238,40 @@ data "aws_ec2_instance_type_offerings" "agent_os_cache_filter" {
 }
 
 locals {
-  agent_os_cache_subnet_ids = {
-    for key, _ in local.agent_os_valkey_instances :
+  valkey_subnet_ids = {
+    for key, _ in var.valkey_instances :
     key => [
       for subnet in var.private_subnet : subnet.id
-      if contains(data.aws_ec2_instance_type_offerings.agent_os_cache_filter[key].locations, subnet.availability_zone)
+      if contains(data.aws_ec2_instance_type_offerings.valkey[key].locations, subnet.availability_zone)
     ]
+  }
+
+  valkey_tls_instances = {
+    for key, config in var.valkey_instances :
+    key => config
+    if config.tls_enabled
   }
 }
 
-resource "random_password" "agent_os_valkey_auth" {
-  for_each = local.agent_os_valkey_instances
+resource "random_password" "valkey_auth" {
+  for_each = local.valkey_tls_instances
 
   length           = 64
   special          = true
   override_special = "!&#$^<>-"
 }
 
-resource "aws_elasticache_subnet_group" "agent_os" {
-  for_each = local.agent_os_valkey_instances
+resource "aws_elasticache_subnet_group" "valkey" {
+  for_each = var.valkey_instances
 
-  name       = "${local.agent_os_valkey_resource_ids[each.key]}-vk-subnet"
-  subnet_ids = local.agent_os_cache_subnet_ids[each.key]
+  name       = "${local.valkey_resource_ids[each.key]}-vk-subnet"
+  subnet_ids = local.valkey_subnet_ids[each.key]
 }
 
-resource "aws_elasticache_parameter_group" "agent_os" {
-  for_each = local.agent_os_valkey_instances
+resource "aws_elasticache_parameter_group" "valkey" {
+  for_each = var.valkey_instances
 
-  name   = "${local.agent_os_valkey_resource_ids[each.key]}-vk${split(".", each.value.engine_version)[0]}"
+  name   = "${local.valkey_resource_ids[each.key]}-vk${split(".", each.value.engine_version)[0]}"
   family = "valkey${split(".", each.value.engine_version)[0]}"
 
   parameter {
@@ -295,29 +299,28 @@ resource "aws_elasticache_parameter_group" "agent_os" {
   }
 
   tags = {
-    Name = "${local.agent_os_valkey_names[each.key]}-valkey"
+    Name = "${local.valkey_names[each.key]}-valkey"
   }
 }
 
-resource "aws_elasticache_replication_group" "agent_os" {
-  for_each = local.agent_os_valkey_instances
+resource "aws_elasticache_replication_group" "valkey" {
+  for_each = var.valkey_instances
 
-  # Replication group IDs are capped at 40 characters.
-  replication_group_id = "${local.agent_os_valkey_resource_ids[each.key]}-vk"
-  description          = "Agent OS Valkey cache ${each.key}."
+  replication_group_id = "${local.valkey_resource_ids[each.key]}-vk"
+  description          = "Valkey instance for ${each.key}."
   apply_immediately    = true
   node_type            = each.value.node_type
   engine               = "valkey"
   engine_version       = each.value.engine_version
   port                 = 6379
-  parameter_group_name = aws_elasticache_parameter_group.agent_os[each.key].name
+  parameter_group_name = aws_elasticache_parameter_group.valkey[each.key].name
 
   snapshot_retention_limit = each.value.snapshot_retention_days
   snapshot_window          = "12:00-13:00"
   maintenance_window       = "tue:16:00-tue:17:00"
 
-  subnet_group_name          = aws_elasticache_subnet_group.agent_os[each.key].name
-  security_group_ids         = [aws_security_group.agent_os[0].id]
+  subnet_group_name          = aws_elasticache_subnet_group.valkey[each.key].name
+  security_group_ids         = [aws_security_group.valkey[0].id]
   multi_az_enabled           = each.value.multi_az
   automatic_failover_enabled = each.value.multi_az
 
@@ -325,35 +328,36 @@ resource "aws_elasticache_replication_group" "agent_os" {
   replicas_per_node_group = each.value.cluster_enabled ? (each.value.multi_az ? 1 : 0) : null
   num_cache_clusters      = each.value.cluster_enabled ? null : (each.value.multi_az ? 2 : 1)
 
-  transit_encryption_enabled = true
+  transit_encryption_enabled = each.value.tls_enabled
   at_rest_encryption_enabled = true
-  kms_key_id                 = var.agent_os_kms_key_arn
-  auth_token                 = random_password.agent_os_valkey_auth[each.key].result
+  kms_key_id                 = var.valkey_kms_key_arn
+  auth_token                 = each.value.tls_enabled ? random_password.valkey_auth[each.key].result : null
 
   log_delivery_configuration {
-    destination      = aws_cloudwatch_log_group.agent_os[each.key].name
+    destination      = aws_cloudwatch_log_group.valkey[each.key].name
     destination_type = "cloudwatch-logs"
     log_format       = "json"
     log_type         = "slow-log"
   }
 
   log_delivery_configuration {
-    destination      = aws_cloudwatch_log_group.agent_os[each.key].name
+    destination      = aws_cloudwatch_log_group.valkey[each.key].name
     destination_type = "cloudwatch-logs"
     log_format       = "json"
     log_type         = "engine-log"
   }
 
   tags = {
-    Name    = "${local.agent_os_valkey_names[each.key]}-valkey"
+    Name    = "${local.valkey_names[each.key]}-valkey"
+    Service = each.key
     Cluster = each.value.cluster_enabled ? "true" : "false"
   }
 }
 
-resource "aws_cloudwatch_log_group" "agent_os" {
-  for_each = local.agent_os_valkey_instances
+resource "aws_cloudwatch_log_group" "valkey" {
+  for_each = var.valkey_instances
 
-  name              = "/aws/elasticache/${local.agent_os_valkey_names[each.key]}"
+  name              = "/aws/elasticache/${local.valkey_names[each.key]}-valkey"
   retention_in_days = each.value.log_retention_days
-  kms_key_id        = var.agent_os_kms_key_arn
+  kms_key_id        = var.valkey_kms_key_arn
 }

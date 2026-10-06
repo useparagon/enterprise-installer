@@ -539,31 +539,36 @@ variable "agent_os_postgres" {
   }
 }
 
-variable "agent_os_valkey" {
+variable "valkey_instances" {
   description = <<-EOT
-    Overrides for Agent OS Valkey instances. Each key is a logical cache name (cache).
-    Merged per key with agent_os_valkey_default (node_type, multi_az, cluster_enabled, engine_version, snapshot_retention_days, log_retention_days).
-    Null uses defaults only.
+    Per-instance overrides for the shared Valkey catalog. Only agent_os is supported today.
+    Future Redis migrations can add cache, queue, system, and managed_sync to the catalog without changing the Valkey implementation.
+    Enablement is owned by each product feature flag; agent_os is created only when agent_os_enabled is true.
   EOT
   type = map(object({
     node_type               = optional(string)
     multi_az                = optional(bool)
     cluster_enabled         = optional(bool)
     engine_version          = optional(string)
+    tls_enabled             = optional(bool)
     snapshot_retention_days = optional(number)
     log_retention_days      = optional(number)
   }))
-  default  = null
-  nullable = true
+  default = {}
 
   validation {
-    condition = var.agent_os_valkey == null ? true : alltrue([
-      for _, cfg in var.agent_os_valkey :
+    condition     = length(setsubtract(toset(keys(var.valkey_instances)), toset(["agent_os"]))) == 0
+    error_message = "valkey_instances currently supports only the agent_os key. cache, queue, system, and managed_sync will be added with the Redis-to-Valkey migration."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.valkey_instances :
       cfg.snapshot_retention_days == null || (
         cfg.snapshot_retention_days >= 0 && cfg.snapshot_retention_days <= 35
       )
     ])
-    error_message = "Agent OS Valkey snapshot_retention_days must be between 0 and 35 when set."
+    error_message = "Valkey snapshot_retention_days must be between 0 and 35 when set."
   }
 }
 
@@ -762,37 +767,43 @@ locals {
     [local.caller_arn]
   )))
 
-  # Agent OS Valkey: catalog defaults + optional per-key overrides (same pattern as Azure redis_managed_instances).
-  agent_os_valkey_instance_defaults = {
+  # Shared Valkey catalog. Only Agent OS is enabled today. Future Redis migrations
+  # add cache/queue/system/managed_sync entries here and keep the same module/resources.
+  valkey_instance_defaults = {
     node_type               = "cache.t4g.medium"
     multi_az                = true
     cluster_enabled         = false
     engine_version          = "7.2"
+    tls_enabled             = false
     snapshot_retention_days = 7
     log_retention_days      = 30
   }
 
-  agent_os_valkey_default = {
-    cache = {
-      node_type               = "cache.t4g.medium"
-      multi_az                = true
-      cluster_enabled         = false
-      engine_version          = "7.2"
-      snapshot_retention_days = 7
-      log_retention_days      = 30
-    }
+  valkey_instance_overrides = {
+    for name, override in var.valkey_instances :
+    name => { for key, value in override : key => value if value != null }
   }
 
-  agent_os_valkey_overrides = var.agent_os_valkey != null ? var.agent_os_valkey : {}
+  valkey_catalog = {
+    agent_os = merge(
+      local.valkey_instance_defaults,
+      {
+        # Agent OS already consumes an authenticated rediss:// connection.
+        tls_enabled = true
+      },
+      lookup(local.valkey_instance_overrides, "agent_os", {}),
+    )
+  }
 
-  agent_os_valkey = merge(
-    local.agent_os_valkey_default,
-    {
-      for name, override in local.agent_os_valkey_overrides : name => merge(
-        lookup(local.agent_os_valkey_default, name, local.agent_os_valkey_instance_defaults),
-        # Partial tfvars objects set omitted optional attributes to null; drop them so defaults survive merge.
-        { for key, value in override : key => value if value != null },
-      )
-    },
-  )
+  valkey_instance_enabled = {
+    agent_os = var.agent_os_enabled
+  }
+
+  valkey_instances = {
+    for name, config in local.valkey_catalog :
+    name => config
+    if local.valkey_instance_enabled[name]
+  }
+
+  valkey_enabled = length(local.valkey_instances) > 0
 }

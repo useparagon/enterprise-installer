@@ -80,9 +80,8 @@ module "redis" {
   elasticache_multi_az           = var.elasticache_multi_az
   elasticache_multiple_instances = var.elasticache_multiple_instances
   managed_sync_enabled           = var.managed_sync_enabled
-  agent_os_enabled               = var.agent_os_enabled
-  agent_os_valkey                = local.agent_os_valkey
-  agent_os_kms_key_arn           = try(aws_kms_key.agent_os[0].arn, null)
+  valkey_instances               = local.valkey_instances
+  valkey_kms_key_arn             = try(aws_kms_key.valkey[0].arn, null)
 
   vpc            = module.network.vpc
   public_subnet  = module.network.public_subnet
@@ -217,8 +216,7 @@ module "secrets" {
   recovery_window_in_days = var.secrets_recovery_window_in_days
 }
 
-# Agent OS uses this dedicated key for its RDS, Valkey, logs, and S3 data.
-# The key remains cross-service, so it is owned by the infra workspace root.
+# Agent OS keeps a dedicated key for its RDS, S3, and Secrets Manager data.
 data "aws_iam_policy_document" "agent_os_kms" {
   statement {
     sid       = "RootAccount"
@@ -250,7 +248,6 @@ data "aws_iam_policy_document" "agent_os_kms" {
     principals {
       type = "Service"
       identifiers = [
-        "elasticache.amazonaws.com",
         "rds.amazonaws.com",
         "s3.amazonaws.com",
       ]
@@ -260,34 +257,6 @@ data "aws_iam_policy_document" "agent_os_kms" {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
       values   = [data.aws_caller_identity.current.account_id]
-    }
-  }
-
-  # CloudWatch Logs supplies the log group ARN as KMS encryption context. It
-  # does not authorize log-group encryption with aws:SourceAccount alone.
-  statement {
-    sid    = "CloudWatchLogsUse"
-    effect = "Allow"
-    actions = [
-      "kms:Decrypt",
-      "kms:DescribeKey",
-      "kms:Encrypt",
-      "kms:GenerateDataKey*",
-      "kms:ReEncrypt*",
-    ]
-    resources = ["*"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["logs.${var.aws_region}.amazonaws.com"]
-    }
-
-    condition {
-      test     = "ArnLike"
-      variable = "kms:EncryptionContext:aws:logs:arn"
-      values = [
-        "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/elasticache/${local.workspace}-agent-os*"
-      ]
     }
   }
 }
@@ -310,4 +279,72 @@ resource "aws_kms_alias" "agent_os" {
 
   name          = "alias/${local.workspace}-agent-os"
   target_key_id = aws_kms_key.agent_os[0].key_id
+}
+
+# One workspace-level KMS key protects every Valkey replication group and its
+# CloudWatch logs. Today only agent_os exists in the Valkey catalog; future
+# Redis migrations reuse this key for cache/queue/system/managed_sync.
+data "aws_iam_policy_document" "valkey_kms" {
+  count = local.valkey_enabled ? 1 : 0
+
+  statement {
+    sid       = "RootAccount"
+    effect    = "Allow"
+    actions   = ["kms:*"]
+    resources = ["*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
+
+
+  # CloudWatch Logs authorizes CMK use through the log-group ARN encryption
+  # context, so scope the shared key to this workspace's ElastiCache logs.
+  statement {
+    sid    = "CloudWatchLogsUse"
+    effect = "Allow"
+    actions = [
+      "kms:Decrypt",
+      "kms:DescribeKey",
+      "kms:Encrypt",
+      "kms:GenerateDataKey*",
+      "kms:ReEncrypt*",
+    ]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${var.aws_region}.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values = [
+        "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/elasticache/${local.workspace}-*-valkey",
+      ]
+    }
+  }
+}
+
+resource "aws_kms_key" "valkey" {
+  count = local.valkey_enabled ? 1 : 0
+
+  description             = "Valkey data encryption for ${local.workspace}"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.valkey_kms[0].json
+
+  tags = {
+    Name = "${local.workspace}-valkey"
+  }
+}
+
+resource "aws_kms_alias" "valkey" {
+  count = local.valkey_enabled ? 1 : 0
+
+  name          = "alias/${local.workspace}-valkey"
+  target_key_id = aws_kms_key.valkey[0].key_id
 }
