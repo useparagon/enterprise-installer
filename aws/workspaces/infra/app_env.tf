@@ -125,10 +125,6 @@ locals {
 
   agent_os_s3_parsed_prefix = "parsed/"
 
-  # TODO(PARA-26889): migrate the generic Agent OS runtime keys below to the
-  # AOS_* contract once Agent OS/chart support lands. In particular REDIS_*,
-  # KAFKA_*, AWS_REGION, and S3_* must stop being generic so they cannot
-  # collide with Paragon/Managed Sync environment variables.
   agent_os_app_config = var.agent_os_enabled ? {
     CONTEXT_POSTGRES_HOST        = local.agent_os_db.host
     CONTEXT_POSTGRES_PORT        = tostring(local.agent_os_db.port)
@@ -146,30 +142,30 @@ locals {
     TOOLS_POSTGRES_SSL_ENABLED = "true"
     TOOLS_POSTGRES_SSL_CA      = ""
 
-    REDIS_HOST = local.agent_os_cache.host
-    REDIS_PORT = tostring(local.agent_os_cache.port)
-    REDIS_URL = (
+    AOS_REDIS_HOST = local.agent_os_cache.host
+    AOS_REDIS_PORT = tostring(local.agent_os_cache.port)
+    AOS_REDIS_URL = (
       local.agent_os_cache.ssl
       ? "rediss://:${urlencode(local.agent_os_cache.password)}@${local.agent_os_cache.host}:${local.agent_os_cache.port}"
       : "redis://${local.agent_os_cache.host}:${local.agent_os_cache.port}"
     )
-    REDIS_PASSWORD        = coalesce(local.agent_os_cache.password, "")
-    REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
-    REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
+    AOS_REDIS_PASSWORD        = coalesce(local.agent_os_cache.password, "")
+    AOS_REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
+    AOS_REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
 
-    KAFKA_BROKER_URLS    = local.agent_os_kafka.cluster_bootstrap_brokers_sasl_scram
-    KAFKA_SASL_USERNAME  = local.agent_os_kafka.agent_os_kafka_credentials.username
-    KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_kafka_credentials.password
-    KAFKA_SASL_MECHANISM = local.agent_os_kafka.agent_os_kafka_credentials.mechanism
-    KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.cluster_tls_enabled)
+    AOS_KAFKA_BROKER_URLS    = local.agent_os_kafka.cluster_bootstrap_brokers_sasl_scram
+    AOS_KAFKA_SASL_USERNAME  = local.agent_os_kafka.agent_os_kafka_credentials.username
+    AOS_KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_kafka_credentials.password
+    AOS_KAFKA_SASL_MECHANISM = local.agent_os_kafka.agent_os_kafka_credentials.mechanism
+    AOS_KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.cluster_tls_enabled)
 
-    AWS_REGION       = var.aws_region
-    S3_BUCKET        = module.storage.s3.agent_os_bucket
-    S3_PARSED_BUCKET = module.storage.s3.agent_os_bucket
-    S3_PARSED_PREFIX = local.agent_os_s3_parsed_prefix
-    S3_INDEX_BUCKET  = module.storage.s3.agent_os_bucket
+    AOS_AWS_REGION       = var.aws_region
+    AOS_S3_BUCKET        = module.storage.s3.agent_os_bucket
+    AOS_S3_PARSED_BUCKET = module.storage.s3.agent_os_bucket
+    AOS_S3_PARSED_PREFIX = local.agent_os_s3_parsed_prefix
+    AOS_S3_INDEX_BUCKET  = module.storage.s3.agent_os_bucket
     # S3 Express is not provisioned on enterprise, so the index bucket has no AZ affinity.
-    S3_INDEX_AZ_ID = ""
+    AOS_S3_INDEX_AZ_ID = ""
   } : null
 
   agent_os_admin_config = var.agent_os_enabled ? {
