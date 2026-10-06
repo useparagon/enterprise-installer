@@ -454,14 +454,25 @@ variable "managed_sync_enabled" {
   default     = false
 }
 
+variable "valkey_enabled" {
+  description = "Whether to enable creation of Valkey instances from valkey_instances. Independent from legacy Redis so both can run in parallel during migrations."
+  type        = bool
+  default     = false
+}
+
 variable "agent_os_enabled" {
-  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive."
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled and valkey_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive."
   type        = bool
   default     = false
 
   validation {
     condition     = !var.agent_os_enabled || var.managed_sync_enabled
     error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+
+  validation {
+    condition     = !var.agent_os_enabled || var.valkey_enabled
+    error_message = "Agent OS requires Valkey. Set valkey_enabled = true when agent_os_enabled is true."
   }
 }
 
@@ -538,7 +549,7 @@ variable "valkey_instances" {
   description = <<-EOT
     Per-instance overrides for the shared Valkey catalog. Only agent_os is supported today.
     Future Redis migrations can add cache, queue, system, and managed_sync to the catalog without changing the Valkey implementation.
-    Enablement is owned by each product feature flag; agent_os is created only when agent_os_enabled is true.
+    Creation requires valkey_enabled plus the product feature flag; today agent_os is created only when both valkey_enabled and agent_os_enabled are true.
   EOT
   type = map(object({
     node_type               = optional(string)
@@ -797,8 +808,8 @@ locals {
   valkey_instances = {
     for name, config in local.valkey_catalog :
     name => config
-    if local.valkey_instance_enabled[name]
+    if var.valkey_enabled && local.valkey_instance_enabled[name]
   }
 
-  valkey_enabled = length(local.valkey_instances) > 0
+  valkey_enabled = var.valkey_enabled && length(local.valkey_instances) > 0
 }

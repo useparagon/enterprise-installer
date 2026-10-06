@@ -125,6 +125,10 @@ locals {
 
   agent_os_s3_parsed_prefix = "parsed/"
 
+  # TODO(PARA-26889): migrate the generic Agent OS runtime keys below to the
+  # AOS_* contract once Agent OS/chart support lands. In particular REDIS_*,
+  # KAFKA_*, AWS_REGION, and S3_* must stop being generic so they cannot
+  # collide with Paragon/Managed Sync environment variables.
   agent_os_app_config = var.agent_os_enabled ? {
     CONTEXT_POSTGRES_HOST        = local.agent_os_db.host
     CONTEXT_POSTGRES_PORT        = tostring(local.agent_os_db.port)
