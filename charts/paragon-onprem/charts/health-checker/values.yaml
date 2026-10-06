@@ -7,9 +7,7 @@ replicaCount: 1
 image:
   repository: useparagon/health-checker
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  # TODO update with production tag once changes are merged and released
-  tag: '2026.1001.5000-canary'
+  tag: '2026.1006.1943-a7252668'
 
 service:
   type: ClusterIP
