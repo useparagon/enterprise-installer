@@ -36,16 +36,17 @@ resource "aws_security_group" "elasticache" {
   }
 }
 
-# Agent OS Valkey accepts traffic only from private workload subnets.
-resource "aws_security_group" "agent_os" {
-  count = var.agent_os_enabled ? 1 : 0
+# Shared Valkey security group. Today Agent OS is the only consumer; future
+# migrated Valkey instances reuse the same private-subnet ingress policy.
+resource "aws_security_group" "valkey" {
+  count = length(var.valkey_instances) > 0 ? 1 : 0
 
-  name_prefix = "${var.workspace}-agent-os-valkey"
-  description = "Security access rules for Agent OS Valkey."
+  name_prefix = "${var.workspace}-valkey"
+  description = "Security access rules for Valkey."
   vpc_id      = var.vpc.id
 
   ingress {
-    description = "Allow Agent OS workloads on port 6379."
+    description = "Allow private workloads on port 6379."
     from_port   = 6379
     to_port     = 6379
     protocol    = "tcp"
@@ -65,6 +66,6 @@ resource "aws_security_group" "agent_os" {
   }
 
   tags = {
-    Name = "${var.workspace}-agent-os-valkey"
+    Name = "${var.workspace}-valkey"
   }
 }

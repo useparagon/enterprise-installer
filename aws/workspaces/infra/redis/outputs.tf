@@ -1,15 +1,18 @@
-output "agent_os" {
-  value = var.agent_os_enabled && contains(keys(local.agent_os_valkey_instances), "cache") ? {
-    host = (
-      local.agent_os_valkey_instances["cache"].cluster_enabled
-      ? aws_elasticache_replication_group.agent_os["cache"].configuration_endpoint_address
-      : aws_elasticache_replication_group.agent_os["cache"].primary_endpoint_address
-    )
-    port     = aws_elasticache_replication_group.agent_os["cache"].port
-    password = random_password.agent_os_valkey_auth["cache"].result
-    ssl      = true
-    cluster  = local.agent_os_valkey_instances["cache"].cluster_enabled
-  } : null
+output "valkey" {
+  value = {
+    for key, config in var.valkey_instances :
+    key => {
+      host = (
+        config.cluster_enabled
+        ? aws_elasticache_replication_group.valkey[key].configuration_endpoint_address
+        : aws_elasticache_replication_group.valkey[key].primary_endpoint_address
+      )
+      port     = aws_elasticache_replication_group.valkey[key].port
+      password = config.tls_enabled ? random_password.valkey_auth[key].result : null
+      ssl      = config.tls_enabled
+      cluster  = config.cluster_enabled
+    }
+  }
   sensitive = true
 }
 

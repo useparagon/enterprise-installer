@@ -38,23 +38,19 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
-variable "agent_os_enabled" {
-  description = "Whether to create the Agent OS Valkey caches."
-  type        = bool
-}
-
-variable "agent_os_kms_key_arn" {
-  description = "KMS key ARN used to encrypt Agent OS Valkey data and logs."
+variable "valkey_kms_key_arn" {
+  description = "KMS key ARN shared by all Valkey instances for at-rest encryption and CloudWatch logs."
   type        = string
 }
 
-variable "agent_os_valkey" {
-  description = "Resolved Agent OS Valkey instances keyed by cache name. Defaults are owned by the workspace root."
+variable "valkey_instances" {
+  description = "Resolved shared Valkey instances keyed by logical service name."
   type = map(object({
     node_type               = string
     multi_az                = bool
     cluster_enabled         = bool
     engine_version          = string
+    tls_enabled             = bool
     snapshot_retention_days = number
     log_retention_days      = number
   }))

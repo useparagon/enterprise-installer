@@ -120,7 +120,7 @@ locals {
 
 locals {
   agent_os_db    = module.postgres.agent_os
-  agent_os_cache = module.redis.agent_os
+  agent_os_cache = try(module.redis.valkey["agent_os"], null)
   agent_os_kafka = one(module.kafka)
 
   agent_os_s3_parsed_prefix = "parsed/"
@@ -142,10 +142,14 @@ locals {
     TOOLS_POSTGRES_SSL_ENABLED = "true"
     TOOLS_POSTGRES_SSL_CA      = ""
 
-    REDIS_HOST            = local.agent_os_cache.host
-    REDIS_PORT            = tostring(local.agent_os_cache.port)
-    REDIS_URL             = "rediss://:${urlencode(local.agent_os_cache.password)}@${local.agent_os_cache.host}:${local.agent_os_cache.port}"
-    REDIS_PASSWORD        = local.agent_os_cache.password
+    REDIS_HOST = local.agent_os_cache.host
+    REDIS_PORT = tostring(local.agent_os_cache.port)
+    REDIS_URL = (
+      local.agent_os_cache.ssl
+      ? "rediss://:${urlencode(local.agent_os_cache.password)}@${local.agent_os_cache.host}:${local.agent_os_cache.port}"
+      : "redis://${local.agent_os_cache.host}:${local.agent_os_cache.port}"
+    )
+    REDIS_PASSWORD        = coalesce(local.agent_os_cache.password, "")
     REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
     REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
 
