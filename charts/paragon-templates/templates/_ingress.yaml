@@ -73,13 +73,7 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     {{- end }}
 spec:
-  {{- if eq .Values.global.env.HOST_ENV "AWS_K8" }}
-  ingressClassName: {{ .Values.ingress.className | default "alb" }}
-  {{- else if eq .Values.global.env.HOST_ENV "GCP_K8" }}
-  ingressClassName: {{ .Values.ingress.className | default "gce" }}
-  {{- else }}
   ingressClassName: {{ .Values.ingress.className | default "nginx" }}
-  {{- end }}
   {{- if or (eq .Values.global.env.HOST_ENV "AZURE_K8") (not (or (eq .Values.global.env.HOST_ENV "AWS_K8") (eq .Values.global.env.HOST_ENV "GCP_K8"))) }}
   tls:
     - hosts:

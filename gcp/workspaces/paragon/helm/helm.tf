@@ -103,7 +103,7 @@ locals {
   })
 
   # Chart defaults keep ingress.enabled=true for services with public URLs; when restrict_public_exposure
-  # shrinks public_microservices, leftover Ingresses would still render with the gce ingress class.
+  # shrinks public_microservices, leftover Ingresses would still render with ingressClassName nginx.
   restricted_private_microservice_values = var.restrict_public_exposure ? yamlencode({
     for microservice_name, microservice_config in var.microservices : microservice_name => {
       ingress = {
