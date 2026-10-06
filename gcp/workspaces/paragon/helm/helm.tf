@@ -129,9 +129,10 @@ locals {
     }
   })
 
-  # Managed-sync services only when enabled (avoids IAM bindings for SAs that don't exist).
+  # Managed-sync services that need the GCP service account for GCS or Kafka ADC.
+  # Include them only when managed-sync is enabled so their Kubernetes SAs exist.
   cloud_storage_services = concat(
-    var.managed_sync_enabled ? ["api-sync", "worker-sync", "worker-history-sync"] : [],
+    var.managed_sync_enabled ? ["api-sync", "api-webhook", "worker-sync", "worker-history-sync"] : [],
     [
       "api-triggerkit",
       "cache-replay",
@@ -232,18 +233,25 @@ locals {
             try(nonsensitive(var.helm_values).global.podAnnotations, {}),
             { "reloader.stakater.com/auto" = "true" }
           )
-          env = { HOST_ENV = "GCP_K8" }
+          env = merge(
+            { HOST_ENV = "GCP_K8" },
+            {
+              for key, value in try(nonsensitive(var.helm_values).global.env, {}) :
+              key => value
+              if strcontains(key, "SYNC") && value != null
+            },
+          )
         },
         local.docker_pull_secret_global_values
       )
     }
   ))
 
-  # Workload Identity (GCS) for services deployed by the managed-sync chart. Without this,
-  # api-sync, worker-sync, worker-history-sync get "storage.buckets.get denied".
+  # Workload Identity for managed-sync services that access GCS or authenticate to
+  # Google Managed Kafka through ADC.
   # Use for+if so both branches have the same map type (avoids "inconsistent conditional result types").
   managed_sync_storage_values = {
-    for k in ["api-sync", "worker-sync", "worker-history-sync"] :
+    for k in ["api-sync", "api-webhook", "worker-sync", "worker-history-sync"] :
     k => local.service_account_values[k]
     if var.storage_service_account != null && var.managed_sync_enabled
   }

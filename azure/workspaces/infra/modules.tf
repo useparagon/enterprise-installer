@@ -28,7 +28,6 @@ module "bastion" {
   k8s_version    = var.k8s_version
   private_subnet = module.network.private_subnet
   resource_group = module.network.resource_group
-  ssh_whitelist  = local.ssh_whitelist
   tags           = local.default_tags
   workspace      = local.workspace
 }
@@ -99,7 +98,6 @@ module "storage" {
 module "cluster" {
   source = "./cluster"
 
-  agc_subnet_enabled              = var.agc_subnet_enabled
   k8s_default_node_pool_vm_size   = var.k8s_default_node_pool_vm_size
   k8s_dns_service_ip              = var.k8s_dns_service_ip
   k8s_load_balancer_sku           = var.k8s_load_balancer_sku

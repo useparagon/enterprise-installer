@@ -35,7 +35,7 @@ output "cluster_password" {
 }
 
 output "cluster_password_file_path" {
-  description = "SASL/PLAIN: null when key is created by module (use cluster_password). Set gmk_sasl_plain_key_file_path only if you provide your own key file. Null when oauthbearer."
+  description = "SASL/PLAIN: always null; the module creates the key and exposes it via cluster_password. Null when oauthbearer."
   value       = null
 }
 

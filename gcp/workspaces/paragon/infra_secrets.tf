@@ -88,9 +88,9 @@ locals {
           : {}
         )
       }
-      redis            = { value = jsondecode(data.google_secret_manager_secret_version.infra_redis[0].secret_data) }
-      storage          = { value = jsondecode(data.google_secret_manager_secret_version.infra_storage[0].secret_data) }
-      k8s_version      = { value = try(local.provider_cluster.k8s_version, null) }
+      redis       = { value = jsondecode(data.google_secret_manager_secret_version.infra_redis[0].secret_data) }
+      storage     = { value = jsondecode(data.google_secret_manager_secret_version.infra_storage[0].secret_data) }
+      k8s_version = { value = try(local.provider_cluster.k8s_version, null) }
     },
     var.managed_sync_enabled ? {
       kafka = { value = jsondecode(data.google_secret_manager_secret_version.infra_kafka[0].secret_data) }

@@ -6,6 +6,7 @@ variable "azure_subscription_id" {
 
 variable "resource_group" {
   description = "The resource group to associate resources."
+  type        = any
 }
 
 variable "workspace" {
@@ -15,11 +16,7 @@ variable "workspace" {
 
 variable "private_subnet" {
   description = "Private subnet accessible only within the virtual network to deploy to."
-}
-
-variable "ssh_whitelist" {
-  description = "An optional list of IP addresses to whitelist SSH access."
-  type        = list(string)
+  type        = any
 }
 
 # Cloudflare variables

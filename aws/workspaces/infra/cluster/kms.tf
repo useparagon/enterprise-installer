@@ -6,8 +6,6 @@ locals {
   )))
 }
 
-data "aws_partition" "current" {}
-
 module "ebs_kms_key" {
   source  = "terraform-aws-modules/kms/aws"
   version = "3.1.0"

@@ -3,12 +3,8 @@ module "helm" {
 
   cluster_name               = local.cluster_name
   docker_cfg_secret_name     = var.create_docker_pull_secret && length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].name : null
-  docker_email               = var.docker_email
-  docker_password            = var.docker_password
-  docker_registry_server     = var.docker_registry_server
   docker_pull_secret_name    = var.docker_pull_secret_name
   create_docker_pull_secret  = var.create_docker_pull_secret
-  docker_username            = var.docker_username
   env_secret_name            = azurerm_key_vault_secret.env.name
   external_secrets_client_id = azurerm_user_assigned_identity.external_secrets.client_id
   external_secrets_tenant_id = data.azurerm_client_config.current.tenant_id
@@ -32,8 +28,6 @@ module "helm" {
   agc_active               = local.agc_active
   agc_direct               = local.agc_direct
   agc_subnet_cidr          = try(local.infra_vars.network.value.agc_subnet_cidr, null)
-  azure_subscription_id    = var.azure_subscription_id
-  domain                   = var.domain
   key_vault_name           = data.azurerm_key_vault.paragon.name
   k8s_version              = var.k8s_version
   logs_bucket              = local.logs_bucket
@@ -110,7 +104,6 @@ module "monitors" {
   grafana_admin_password = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
   pgadmin_admin_email    = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
   pgadmin_admin_password = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
-  workspace              = local.workspace
 }
 
 module "uptime" {
@@ -154,7 +147,6 @@ module "dns" {
   enabled              = local.cloudflare_dns_enabled
   cloudflare_api_token = var.cloudflare_api_token
   cloudflare_zone_id   = var.cloudflare_zone_id
-  domain               = var.domain
   ingress_loadbalancer = local.dns_ingress_target
   public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
   ttl                  = local.dns_record_ttl
@@ -164,7 +156,6 @@ module "dns_zone" {
   source = "./dns-zone"
 
   enabled              = local.azure_dns_enabled
-  workspace            = local.workspace
   resource_group_name  = local.infra_vars.resource_group.value.name
   domain               = var.domain
   dns_provider         = local.has_cloudflare_credentials ? "cloudflare" : "none"
@@ -232,7 +223,6 @@ module "agc" {
   cluster_name           = local.cluster_name
   subnet_id              = try(local.infra_vars.network.value.agc_subnet_id, null)
   namespace              = module.helm.namespace_paragon.metadata[0].name
-  domain                 = var.domain
   public_services        = local.agc_public_routes
   waf_enabled            = local.waf_active
   waf_policy_id          = local.waf_active ? module.waf[0].policy_id : null

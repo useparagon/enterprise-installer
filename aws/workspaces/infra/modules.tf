@@ -48,7 +48,6 @@ module "postgres" {
   source = "./postgres"
 
   workspace                       = local.workspace
-  aws_region                      = var.aws_region
   rds_instance_class              = var.rds_instance_class
   rds_managed_sync_instance_class = var.rds_managed_sync_instance_class
   rds_gp3_iops                    = var.rds_gp3_iops
@@ -77,7 +76,6 @@ module "redis" {
   source = "./redis"
 
   workspace                      = local.workspace
-  aws_region                     = var.aws_region
   elasticache_node_type          = var.elasticache_node_type
   elasticache_multi_az           = var.elasticache_multi_az
   elasticache_multiple_instances = var.elasticache_multiple_instances
@@ -96,7 +94,6 @@ module "kafka" {
   count  = var.managed_sync_enabled ? 1 : 0
 
   workspace                  = local.workspace
-  force_destroy              = var.disable_deletion_protection
   msk_autoscaling_enabled    = var.msk_autoscaling_enabled
   msk_kafka_version          = var.msk_kafka_version
   msk_instance_type          = var.msk_instance_type

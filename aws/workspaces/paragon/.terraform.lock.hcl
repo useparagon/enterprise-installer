@@ -191,9 +191,13 @@ provider "registry.terraform.io/hashicorp/tls" {
 
 provider "registry.terraform.io/hoophq/hoop" {
   version     = "0.0.21"
-  constraints = ">= 0.0.19"
+  constraints = "0.0.21"
   hashes = [
+    "h1:KpZK3rQFoX4n2lHtuvyKmhJcWxun+hDio25CA8abgnM=",
+    "h1:QIbUbUFGfH9UPhkI7kCgm3AtPolJZSTFiWiwdQD7kK8=",
+    "h1:q+ai4+GiAgK2gbHNkgk7zfOOcE69KfWHiA7qi5PdXi4=",
     "h1:virpYXL7lSerHdly8Qdr2KAat13o272hYo3YyOhUOWo=",
+    "h1:zGwzP3sl2Rr5jTiOGpjXMjRD01Odfs51DrB/Rxu33Bc=",
     "zh:58a97bbf003b6954ffce63d2da84bf05d6f3cfb7bcf2d33d66875a3a989e853c",
     "zh:890df766e9b839623b1f0437355032a3c006226a6c200cd911e15ee1a9014e9f",
     "zh:9ab6bb6c99d9223eef57d1a28c13dd7623f4012ed1271688223f9ecf6142080e",

@@ -57,6 +57,7 @@ private runner or public endpoint.
 | Name | Type |
 | ---- | ---- |
 | [google_gke_hub_membership.cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/gke_hub_membership) | resource |
+| [google_project_iam_member.storage_managedkafka_client](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
 | [google_secret_manager_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
@@ -99,10 +100,8 @@ private runner or public endpoint.
 | <a name="input_gcp_project_id"></a> [gcp\_project\_id](#input\_gcp\_project\_id) | The id of the Google Cloud Project. Required if not using `gcp_credential_json_file`. | `string` | `null` | no |
 | <a name="input_gmk_auto_rebalance"></a> [gmk\_auto\_rebalance](#input\_gmk\_auto\_rebalance) | Whether to enable automatic partition rebalancing across brokers (can add load). | `bool` | `false` | no |
 | <a name="input_gmk_disk_size_gib"></a> [gmk\_disk\_size\_gib](#input\_gmk\_disk\_size\_gib) | Disk size in GiB per broker for the GMK cluster. | `number` | `100` | no |
-| <a name="input_gmk_kafka_version"></a> [gmk\_kafka\_version](#input\_gmk\_kafka\_version) | Kafka version for the Google Managed Kafka cluster (version offered by the service). | `string` | `"3.7.1"` | no |
 | <a name="input_gmk_memory_gib"></a> [gmk\_memory\_gib](#input\_gmk\_memory\_gib) | Memory in GiB for the GMK cluster (1-8 GiB per vCPU). | `number` | `6` | no |
 | <a name="input_gmk_sasl_mechanism"></a> [gmk\_sasl\_mechanism](#input\_gmk\_sasl\_mechanism) | SASL mechanism: plain (module creates SA key and outputs in kafka.cluster\_password) or oauthbearer (Workload Identity). | `string` | `"plain"` | no |
-| <a name="input_gmk_sasl_plain_key_file_path"></a> [gmk\_sasl\_plain\_key\_file\_path](#input\_gmk\_sasl\_plain\_key\_file\_path) | Optional path to your own Kafka SA key JSON for SASL/PLAIN. When empty, the module creates the key and outputs it in kafka.cluster\_password. | `string` | `""` | no |
 | <a name="input_gmk_vcpu_count"></a> [gmk\_vcpu\_count](#input\_gmk\_vcpu\_count) | Number of vCPUs for the GMK cluster (minimum 3 in GCP). | `number` | `3` | no |
 | <a name="input_k8s_disable_public_endpoint"></a> [k8s\_disable\_public\_endpoint](#input\_k8s\_disable\_public\_endpoint) | Used to disable public endpoint on GKE cluster. | `bool` | `true` | no |
 | <a name="input_k8s_master_authorized_networks"></a> [k8s\_master\_authorized\_networks](#input\_k8s\_master\_authorized\_networks) | List of CIDRs allowed to reach the GKE control plane (Master Authorized Networks). Use [{ cidr\_block = "0.0.0.0/0", display\_name = "all" }] to allow all IPs (e.g. from any country). Empty list = only cluster nodes (restricted). | <pre>list(object({<br/>    cidr_block   = string<br/>    display_name = optional(string, "")<br/>  }))</pre> | `[]` | no |

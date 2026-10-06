@@ -8,13 +8,9 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "force_destroy" {
-  description = "Whether to enable force destroy."
-  type        = bool
-}
-
 variable "private_subnet" {
   description = "The private subnets within the VPC."
+  type        = any
 }
 
 variable "msk_instance_type" {

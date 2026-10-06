@@ -66,6 +66,6 @@ resource "azurerm_redis_cache" "redis" {
   }
 
   lifecycle {
-    ignore_changes = [redis_configuration.0.rdb_storage_connection_string]
+    ignore_changes = [redis_configuration[0].rdb_storage_connection_string]
   }
 }

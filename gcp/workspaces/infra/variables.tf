@@ -204,12 +204,6 @@ variable "managed_sync_enabled" {
   default     = false
 }
 
-variable "gmk_kafka_version" {
-  description = "Kafka version for the Google Managed Kafka cluster (version offered by the service)."
-  type        = string
-  default     = "3.7.1"
-}
-
 variable "gmk_vcpu_count" {
   description = "Number of vCPUs for the GMK cluster (minimum 3 in GCP)."
   type        = number
@@ -243,12 +237,6 @@ variable "gmk_sasl_mechanism" {
     condition     = contains(["oauthbearer", "plain"], var.gmk_sasl_mechanism)
     error_message = "gmk_sasl_mechanism must be \"oauthbearer\" or \"plain\"."
   }
-}
-
-variable "gmk_sasl_plain_key_file_path" {
-  description = "Optional path to your own Kafka SA key JSON for SASL/PLAIN. When empty, the module creates the key and outputs it in kafka.cluster_password."
-  type        = string
-  default     = ""
 }
 
 # kubernetes

@@ -45,8 +45,8 @@ resource "aws_subnet" "private" {
 
 # Dedicated /28 subnets for AWS Network Firewall endpoints (block index 0 of the VPC CIDR plan).
 resource "aws_subnet" "firewall" {
-  count      = var.network_firewall_enabled ? var.az_count : 0
-  cidr_block = cidrsubnet(local.firewall_parent_cidr, local.firewall_subnet_bits, count.index)
+  count                   = var.network_firewall_enabled ? var.az_count : 0
+  cidr_block              = cidrsubnet(local.firewall_parent_cidr, local.firewall_subnet_bits, count.index)
   availability_zone       = data.aws_availability_zones.available.names[count.index]
   vpc_id                  = aws_vpc.app.id
   map_public_ip_on_launch = false
@@ -85,8 +85,8 @@ resource "aws_route" "internet_access" {
 # Create a NAT gateway with an Elastic IP for each private subnet to get internet connectivity
 resource "aws_nat_gateway" "gw" {
   count         = var.az_count
-  subnet_id     = element(aws_subnet.public.*.id, count.index)
-  allocation_id = element(aws_eip.gw.*.id, count.index)
+  subnet_id     = element(aws_subnet.public[*].id, count.index)
+  allocation_id = element(aws_eip.gw[*].id, count.index)
 
   tags = {
     Name = "${var.workspace}-nat-gw"
@@ -127,8 +127,8 @@ removed {
 # Explicitly associate the newly created route tables to the private subnets (so they don't default to the main route table)
 resource "aws_route_table_association" "private" {
   count          = var.az_count
-  subnet_id      = element(aws_subnet.private.*.id, count.index)
-  route_table_id = element(aws_route_table.private.*.id, count.index)
+  subnet_id      = element(aws_subnet.private[*].id, count.index)
+  route_table_id = element(aws_route_table.private[*].id, count.index)
 }
 
 # VPC endpoint for S3 to bypass NAT Gateway for cost savings
@@ -137,7 +137,7 @@ resource "aws_vpc_endpoint" "s3" {
   service_name = "com.amazonaws.${var.aws_region}.s3"
 
   route_table_ids = concat(
-    aws_route_table.private.*.id,
+    aws_route_table.private[*].id,
     [aws_vpc.app.main_route_table_id]
   )
 

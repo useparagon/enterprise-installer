@@ -4,11 +4,6 @@ variable "enabled" {
   default     = true
 }
 
-variable "workspace" {
-  description = "Workspace prefix for resource names."
-  type        = string
-}
-
 variable "resource_group_name" {
   description = "Resource group that owns the DNS zone."
   type        = string

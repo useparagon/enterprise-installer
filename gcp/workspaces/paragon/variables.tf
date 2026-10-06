@@ -315,7 +315,7 @@ variable "hoop_enabled" {
 variable "hoop_version" {
   description = "Hoopagent Helm chart version."
   type        = string
-  default     = "1.49.4"
+  default     = "1.184.2"
 }
 
 variable "hoop_image_repository" {
@@ -327,7 +327,7 @@ variable "hoop_image_repository" {
 variable "hoop_image_tag" {
   description = "Container image tag for the Hoop agent."
   type        = string
-  default     = "1.0.1"
+  default     = "1.2.1"
 }
 
 variable "hoop_grafana_connection" {
@@ -908,7 +908,8 @@ locals {
   gcp_project_id = try(local.creds_json.project_id, var.gcp_project_id)
 
   # hash of project ID to help ensure uniqueness of resources like bucket names
-  hash              = substr(sha256(local.gcp_project_id), 0, 8)
+  # coalesce so tflint/validate can run when gcp_project_id is not set (e.g. no tfvars)
+  hash              = substr(sha256(coalesce(local.gcp_project_id, "tflint")), 0, 8)
   default_workspace = "paragon-${var.organization}-${local.hash}"
 
   default_labels = {
@@ -956,7 +957,12 @@ locals {
   auditlogs_bucket = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
   helm_yaml_path = abspath(var.helm_yaml_path)
-  helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
+  # Prefer TF_VAR_helm_yaml, then the values file, else empty global.env (CI / fresh checkout).
+  helm_vars = yamldecode(
+    var.helm_yaml != null ? var.helm_yaml : (
+      fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
+    )
+  )
 
   gcp_provider_credentials = jsonencode({
     type                        = "service_account",

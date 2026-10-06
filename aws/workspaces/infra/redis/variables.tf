@@ -3,21 +3,19 @@ variable "workspace" {
   type        = string
 }
 
-variable "aws_region" {
-  description = "The AWS region resources are created in."
-  type        = string
-}
-
 variable "vpc" {
   description = "The VPC to create resources in."
+  type        = any
 }
 
 variable "public_subnet" {
   description = "The public subnets within the VPC."
+  type        = any
 }
 
 variable "private_subnet" {
   description = "The private subnets within the VPC."
+  type        = any
 }
 
 variable "elasticache_node_type" {
