@@ -77,7 +77,11 @@ resource "time_sleep" "wait_for_gitops_secrets" {
 }
 
 resource "terraform_data" "eso_secrets_gate" {
-  input = local.eso_sync_triggers
+  input = join(",", compact([
+    local.eso_sync_triggers,
+    var.agent_os_enabled ? try(data.kubernetes_secret.agent_os_app[0].metadata[0].uid, null) : null,
+    var.agent_os_enabled ? try(data.kubernetes_secret.agent_os_admin[0].metadata[0].uid, null) : null,
+  ]))
 
   depends_on = [
     time_sleep.wait_for_eso_core_secrets,
@@ -138,7 +142,7 @@ data "kubernetes_secret" "agent_os_app" {
     namespace = local.paragon_namespace
   }
 
-  depends_on = [terraform_data.eso_secrets_gate]
+  depends_on = [time_sleep.wait_for_eso_agent_os]
 }
 
 data "kubernetes_secret" "agent_os_admin" {
@@ -149,5 +153,5 @@ data "kubernetes_secret" "agent_os_admin" {
     namespace = local.paragon_namespace
   }
 
-  depends_on = [terraform_data.eso_secrets_gate]
+  depends_on = [time_sleep.wait_for_eso_agent_os]
 }

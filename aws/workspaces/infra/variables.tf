@@ -465,11 +465,6 @@ variable "agent_os_enabled" {
   }
 }
 
-variable "agent_os_version" {
-  description = "The version of the Agent OS helm chart to install (consumed by the paragon workspace in PARA-25775)."
-  type        = string
-  default     = "latest"
-}
 
 variable "agent_os_postgres" {
   description = "Agent OS Postgres instances keyed by instance name. Each entry can be sized and tuned independently."
