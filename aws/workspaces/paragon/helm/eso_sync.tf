@@ -51,7 +51,7 @@ resource "time_sleep" "wait_for_eso_managed_sync" {
 resource "time_sleep" "wait_for_eso_agent_os" {
   count = var.install_external_secrets && var.agent_os_enabled ? 1 : 0
 
-  create_duration = "30s"
+  create_duration = "90s"
 
   depends_on = [
     kubectl_manifest.external_secret_agent_os_app[0],
