@@ -879,6 +879,19 @@ locals {
     )
   } : {}
 
+  # Managed Sync publishes sync.${domain} via its own Helm ingress, not paragon-onprem.
+  # When restrict_public_exposure drops api-sync from public_microservices, Route53 must
+  # still point sync at the shared ALB (same host the managed-sync chart uses).
+  managed_sync_public_dns = var.managed_sync_enabled && contains(keys(local.microservices), "api-sync") && !contains(keys(local.public_microservices), "api-sync") && !contains(var.private_services, "api-sync") ? {
+    "api-sync" = local.microservices["api-sync"]
+  } : {}
+
+  public_services = merge(
+    local.public_microservices,
+    local.public_monitors,
+    local.managed_sync_public_dns,
+  )
+
   helm_keys_to_remove = [
     "POSTGRES_HOST",
     "POSTGRES_PORT",

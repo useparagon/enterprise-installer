@@ -24,8 +24,7 @@ module "alb" {
   dns_provider             = var.dns_provider
   domain                   = var.domain
   microservices            = local.microservices
-  public_microservices     = local.public_microservices
-  public_monitors          = local.public_monitors
+  public_services          = local.public_services
   release_ingress          = module.helm.release_ingress
   release_paragon_on_prem  = module.helm.release_paragon_on_prem
   vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
