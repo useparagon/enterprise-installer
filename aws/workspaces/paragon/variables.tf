@@ -793,7 +793,6 @@ locals {
   restrict_public_exposure = var.restrict_public_exposure
 
   restricted_public_microservice_allowlist = toset([
-    "api-sync",
     "api-triggerkit",
     "connect",
     "dashboard",
