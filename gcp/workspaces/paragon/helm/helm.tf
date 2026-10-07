@@ -166,6 +166,8 @@ locals {
       "hades",
       "health-checker",
       "hermes",
+      # Knative runner: GCS via Workload Identity when envelope keys are omitted.
+      "ocs-code-runner",
       "openobserve",
       "release",
       "worker-actionkit",
@@ -348,6 +350,7 @@ resource "helm_release" "paragon_on_prem" {
   depends_on = [
     # Serialize large Helm discovery passes through Connect Gateway.
     helm_release.paragon_logging,
+    terraform_data.knative_serving_ready,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
     data.kubernetes_secret.redis_ca,

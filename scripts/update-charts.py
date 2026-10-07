@@ -22,6 +22,7 @@ IGNORED_SERVICES = [
     "prometheus-ecs-discovery",
     "alb-log-parser",
     "minio",
+    "ocs-code-runner",
 ]
 
 CHART_CATEGORIES = {
