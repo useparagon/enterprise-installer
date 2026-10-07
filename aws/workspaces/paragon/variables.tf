@@ -247,7 +247,7 @@ variable "uptime_company" {
 }
 
 variable "restrict_public_exposure" {
-  description = "When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker; grafana when monitors are enabled). Use private_services to further restrict allowlisted endpoints. Removing many Ingresses from the shared ALB group requires elasticloadbalancing:SetRulePriorities on the load balancer controller IAM principal (see infra eks-worker-policy); without it, deleted Ingress objects can remain Terminating while ALB rules stay active until the controller reconciles."
+  description = "When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private_services to further restrict allowlisted endpoints. Removing many Ingresses from the shared ALB group requires elasticloadbalancing:SetRulePriorities on the load balancer controller IAM principal (see infra eks-worker-policy); without it, deleted Ingress objects can remain Terminating while ALB rules stay active until the controller reconciles."
   type        = bool
   default     = false
 }
@@ -884,12 +884,6 @@ locals {
     local.public_microservices,
     local.public_monitors,
     local.managed_sync_public_dns,
-  )
-
-  route53_public_services = merge(
-    local.public_microservices,
-    local.managed_sync_public_dns,
-    local.public_monitors,
   )
 
   helm_keys_to_remove = [
