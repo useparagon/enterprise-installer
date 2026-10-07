@@ -4,6 +4,7 @@ locals {
   eso_secret_arns = compact([
     var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_admin[0].arn : "",
     var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_app[0].arn : "",
+    var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_broker[0].arn : "",
     var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_vendor[0].arn : "",
     local.runtime_docker_cfg_sync_enabled ? data.aws_secretsmanager_secret.docker_cfg.arn : "",
     data.aws_secretsmanager_secret.env.arn,

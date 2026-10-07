@@ -206,14 +206,15 @@ module "secrets" {
     })
   }) : null
 
-  managed_sync_config     = var.managed_sync_enabled ? coalesce(var.paragon_managed_sync_config, {}) : null
-  agent_os_enabled        = var.agent_os_enabled
-  agent_os_kms_key_arn    = try(aws_kms_key.agent_os[0].arn, null)
-  agent_os_app_config     = local.agent_os_app_config
-  agent_os_admin_config   = local.agent_os_admin_config
-  create_openobserve      = true
-  openobserve_email       = var.openobserve_email
-  recovery_window_in_days = var.secrets_recovery_window_in_days
+  managed_sync_config               = var.managed_sync_enabled ? coalesce(var.paragon_managed_sync_config, {}) : null
+  agent_os_enabled                  = var.agent_os_enabled
+  agent_os_kms_key_arn              = try(aws_kms_key.agent_os[0].arn, null)
+  agent_os_app_config               = local.agent_os_app_config
+  agent_os_capability_broker_config = local.agent_os_capability_broker_config
+  agent_os_admin_config             = local.agent_os_admin_config
+  create_openobserve                = true
+  openobserve_email                 = var.openobserve_email
+  recovery_window_in_days           = var.secrets_recovery_window_in_days
 }
 
 # Agent OS keeps a dedicated key for its RDS, S3, and Secrets Manager data.

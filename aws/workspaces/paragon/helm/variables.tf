@@ -207,8 +207,38 @@ variable "agent_os_enabled" {
 }
 
 
+variable "agent_os_version" {
+  description = "Version of the Agent OS Helm chart to install."
+  type        = string
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL used to install Agent OS."
+  type        = string
+}
+
+variable "agent_os_helm_values" {
+  description = "Additional Agent OS chart values supplied through Terraform."
+  type        = any
+  default     = {}
+  sensitive   = true
+}
+
+variable "agent_os_file_values" {
+  description = "Agent OS chart-root overrides loaded from .secure/values.yaml agentOs.values."
+  type        = any
+  default     = {}
+  sensitive   = true
+}
+
 variable "agent_os_app_secret_name" {
   description = "Secrets Manager name for Agent OS application configuration."
+  type        = string
+  default     = null
+}
+
+variable "agent_os_broker_secret_name" {
+  description = "Secrets Manager name for Agent OS capability broker configuration."
   type        = string
   default     = null
 }

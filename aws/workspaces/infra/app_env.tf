@@ -132,7 +132,6 @@ locals {
     CONTEXT_POSTGRES_USERNAME    = local.agent_os_db.databases.context.user
     CONTEXT_POSTGRES_PASSWORD    = local.agent_os_db.databases.context.password
     CONTEXT_POSTGRES_SSL_ENABLED = "true"
-    CONTEXT_POSTGRES_SSL_CA      = ""
 
     TOOLS_POSTGRES_HOST        = local.agent_os_db.host
     TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
@@ -140,7 +139,6 @@ locals {
     TOOLS_POSTGRES_USERNAME    = local.agent_os_db.databases.tools.user
     TOOLS_POSTGRES_PASSWORD    = local.agent_os_db.databases.tools.password
     TOOLS_POSTGRES_SSL_ENABLED = "true"
-    TOOLS_POSTGRES_SSL_CA      = ""
 
     AOS_REDIS_HOST = local.agent_os_cache.host
     AOS_REDIS_PORT = tostring(local.agent_os_cache.port)
@@ -168,6 +166,17 @@ locals {
     AOS_S3_INDEX_AZ_ID = ""
   } : null
 
+  agent_os_capability_broker_config = var.agent_os_enabled ? {
+    TOOLS_POSTGRES_HOST        = local.agent_os_db.host
+    TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    TOOLS_POSTGRES_DATABASE    = local.agent_os_db.databases.tools.database
+    TOOLS_POSTGRES_USERNAME    = local.agent_os_db.capability_broker.user
+    TOOLS_POSTGRES_PASSWORD    = local.agent_os_db.capability_broker.password
+    TOOLS_POSTGRES_SSL_ENABLED = "true"
+
+    CAPABILITY_BROKER_SIGNING_KID = "capability-broker-v1"
+  } : null
+
   agent_os_admin_config = var.agent_os_enabled ? {
     ADMIN_POSTGRES_HOST        = local.agent_os_db.host
     ADMIN_POSTGRES_PORT        = tostring(local.agent_os_db.port)
@@ -175,7 +184,9 @@ locals {
     ADMIN_POSTGRES_USERNAME    = local.agent_os_db.admin_user
     ADMIN_POSTGRES_PASSWORD    = local.agent_os_db.admin_password
     ADMIN_POSTGRES_SSL_ENABLED = "true"
-    ADMIN_POSTGRES_SSL_CA      = ""
+
+    CAPABILITY_BROKER_POSTGRES_USERNAME = local.agent_os_db.capability_broker.user
+    CAPABILITY_BROKER_POSTGRES_PASSWORD = local.agent_os_db.capability_broker.password
 
     ADMIN_KAFKA_BROKER_URLS    = local.agent_os_kafka.cluster_bootstrap_brokers_sasl_scram
     ADMIN_KAFKA_SASL_USERNAME  = local.agent_os_kafka.acl_admin_kafka_credentials.username
