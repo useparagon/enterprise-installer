@@ -1,10 +1,12 @@
 locals {
   api_sync_host = replace(replace(try(var.microservices["api-sync"].public_url, ""), "https://", ""), "http://", "")
 
-  # openfga-migrate is a post-install hook while the openfga ServiceAccount is normally
-  # a regular resource. On first install, the cluster can create the Job before the SA is
-  # visible, producing: serviceaccount "openfga" not found.
-  managed_sync_openfga_values = yamlencode({
+  # Single values document for chart-specific overrides (keep one entry in helm_release.values
+  # so plan/apply does not churn on yaml fragment ordering).
+  managed_sync_chart_values = yamlencode({
+    # openfga-migrate is a post-install hook while the openfga ServiceAccount is normally
+    # a regular resource. On first install, the cluster can create the Job before the SA is
+    # visible, producing: serviceaccount "openfga" not found.
     openfga = {
       enabled = true
       serviceAccount = {
@@ -14,12 +16,9 @@ locals {
         }
       }
     }
-  })
-
-  # queue-exporter.common defaults to shared: false and renders a standalone Ingress
-  # (chart-example.local, internal NLB group). Disable it on AWS; sync traffic uses the
-  # parent chart Ingress on the shared paragon ALB group (ingress.loadBalancerName).
-  managed_sync_aws_values = yamlencode({
+    # queue-exporter.common defaults to shared: false and renders a standalone Ingress
+    # (chart-example.local, internal NLB group). Disable it on AWS; sync traffic uses the
+    # parent chart Ingress on the shared paragon ALB group (ingress.loadBalancerName).
     queue-exporter = {
       common = {
         ingress = {
@@ -68,15 +67,13 @@ resource "helm_release" "managed_sync" {
   atomic           = true
   verify           = false
   timeout          = 900 # 15 minutes
-  force_update     = true
   # Parent chart renders ScaledObject; KEDA CRDs come from the subchart. OpenAPI
   # validation runs before subchart CRDs exist (and manual CRD fixes break Helm ownership).
   disable_openapi_validation = true
 
   values = [
     local.global_values_minus_env,
-    local.managed_sync_openfga_values,
-    local.managed_sync_aws_values,
+    local.managed_sync_chart_values,
     local.secret_hash,
   ]
 
