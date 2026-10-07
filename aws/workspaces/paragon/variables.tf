@@ -457,7 +457,7 @@ variable "managed_sync_version" {
 variable "paragon_helm_repository" {
   description = "Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository."
   type        = string
-  default     = "https://paragon-helm-production.s3.amazonaws.com"
+  default     = "https://helm.useparagon.com"
 }
 
 variable "waf_enabled" {
