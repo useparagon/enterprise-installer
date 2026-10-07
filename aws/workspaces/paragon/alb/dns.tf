@@ -1,11 +1,3 @@
-# Lookup by stable ALB name only — do not depends_on Helm releases here. That
-# defers dns_name to apply time whenever ingress/on-prem chart versions change,
-# which makes every aws_route53_record.microservice look like drift (records ->
-# known after apply). Same class of issue as alb/security_groups.tf.
-data "aws_lb" "load_balancer" {
-  name = var.workspace
-}
-
 resource "aws_route53_zone" "paragon" {
   name          = var.domain
   force_destroy = false

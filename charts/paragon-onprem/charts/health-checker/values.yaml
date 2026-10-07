@@ -7,9 +7,7 @@ replicaCount: 1
 image:
   repository: useparagon/health-checker
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  # TODO update with production tag once changes are merged and released
-  tag: '2026.1001.5000-canary'
+  tag: '2026.1006.1943-a7252668'
 
 service:
   type: ClusterIP
@@ -22,18 +20,13 @@ resources:
     cpu: 100m
     memory: 100Mi
 
-terminationGracePeriodSeconds: 120
-
 pdb:
   enabled: true
-  maxUnavailable: 0
+  # Single replica: allow voluntary disruption for rollouts, drains, and restart cron.
+  maxUnavailable: 1
 
 autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 1
-  targetCPUUtilizationPercentage: 75
-  targetMemoryUtilizationPercentage: 75
+  enabled: false
 
 secretName: "paragon-secrets"
 

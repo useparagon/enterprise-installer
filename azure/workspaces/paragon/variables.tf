@@ -96,7 +96,7 @@ variable "excluded_microservices" {
 }
 
 variable "private_services" {
-  description = "Services that should not be publicly exposed (filtered from public_microservices and public_monitors). When restrict_public_exposure is true, allowlisted services can still be made private via this list."
+  description = "Services that get no Ingress. Removed from public_microservices and public_monitors on both internet-facing and internal load balancers. ingress_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict_public_exposure is true, allowlisted services can still be listed here."
   type        = list(string)
   default     = []
 }
@@ -741,7 +741,6 @@ locals {
   restrict_public_exposure = var.restrict_public_exposure
 
   restricted_public_microservice_allowlist = toset([
-    "api-sync",
     "api-triggerkit",
     "connect",
     "dashboard",
@@ -828,7 +827,17 @@ locals {
     )
   } : {}
 
-  public_services = merge(local.public_microservices, local.public_monitors)
+  # Managed Sync uses sync.${domain} via its Helm ingress; keep DNS/AGC listeners when
+  # restrict_public_exposure omits api-sync from public_microservices (key api-sync → api-sync-secret).
+  managed_sync_public_dns = var.managed_sync_enabled && contains(keys(local.microservices), "api-sync") && !contains(keys(local.public_microservices), "api-sync") && !contains(var.private_services, "api-sync") ? {
+    "api-sync" = local.microservices["api-sync"]
+  } : {}
+
+  public_services = merge(
+    local.public_microservices,
+    local.public_monitors,
+    local.managed_sync_public_dns,
+  )
 
   helm_keys_to_remove = [
     "POSTGRES_HOST",

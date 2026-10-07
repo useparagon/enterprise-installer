@@ -30,11 +30,12 @@ variable "microservices" {
   }))
 }
 
-variable "public_monitors" {
-  description = "The monitors running within the system exposed to the load balancer"
+variable "public_services" {
+  description = "Hosts on the shared load balancer (public microservices, monitors, and managed-sync when not on the restrict allowlist)."
   type = map(object({
-    port       = number
-    public_url = string
+    port             = optional(number)
+    healthcheck_path = optional(string)
+    public_url       = string
   }))
 }
 
