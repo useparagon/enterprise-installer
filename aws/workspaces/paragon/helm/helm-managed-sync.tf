@@ -3,7 +3,7 @@ resource "helm_release" "managed_sync" {
 
   name             = "paragon-managed-sync"
   description      = "Managed Sync"
-  repository       = var.managed_sync_helm_repository
+  repository       = var.paragon_helm_repository
   chart            = "managed-sync"
   version          = var.managed_sync_version
   namespace        = local.paragon_namespace

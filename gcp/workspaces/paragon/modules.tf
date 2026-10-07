@@ -65,30 +65,30 @@ module "helm" {
     openobserve     = google_secret_manager_secret_version.openobserve[0].name
     openobserve_gcs = local.openobserve_gcs_enabled ? google_secret_manager_secret_version.openobserve_gcs[0].name : null
   }))
-  ingress_scheme               = var.ingress_scheme
-  k8s_version                  = var.k8s_version
-  logs_bucket                  = local.logs_bucket
-  managed_sync_enabled         = var.managed_sync_enabled
-  managed_sync_secret_name     = var.managed_sync_enabled ? local.runtime_secret_names.managed_sync : null
-  managed_sync_version         = var.managed_sync_version
-  managed_sync_helm_repository = var.managed_sync_helm_repository
-  microservices                = local.microservices
-  monitor_version              = local.monitor_version
-  monitors                     = local.monitors
-  monitors_enabled             = var.monitors_enabled
-  openobserve_email            = local.openobserve_email
-  openobserve_gcs_secret_name  = local.openobserve_gcs_enabled ? local.runtime_secret_names.openobserve_gcs : null
-  openobserve_password         = local.openobserve_password
-  openobserve_secret_name      = google_secret_manager_secret.openobserve[0].secret_id
-  public_microservices         = local.public_microservices
-  public_monitors              = local.public_monitors
-  public_services              = local.public_services
-  redis_ca_cert_secret_name    = local.infra_secret_names.redis_ca_cert
-  region                       = var.region
-  storage_service_account      = local.storage_service_account
-  waf_security_policy_name     = local.waf_active ? module.waf[0].security_policy_name : ""
-  waf_logs_sample_rate         = var.waf_logs_sample_rate
-  workspace                    = local.workspace
+  ingress_scheme              = var.ingress_scheme
+  k8s_version                 = var.k8s_version
+  logs_bucket                 = local.logs_bucket
+  managed_sync_enabled        = var.managed_sync_enabled
+  managed_sync_secret_name    = var.managed_sync_enabled ? local.runtime_secret_names.managed_sync : null
+  managed_sync_version        = var.managed_sync_version
+  paragon_helm_repository     = var.paragon_helm_repository
+  microservices               = local.microservices
+  monitor_version             = local.monitor_version
+  monitors                    = local.monitors
+  monitors_enabled            = var.monitors_enabled
+  openobserve_email           = local.openobserve_email
+  openobserve_gcs_secret_name = local.openobserve_gcs_enabled ? local.runtime_secret_names.openobserve_gcs : null
+  openobserve_password        = local.openobserve_password
+  openobserve_secret_name     = google_secret_manager_secret.openobserve[0].secret_id
+  public_microservices        = local.public_microservices
+  public_monitors             = local.public_monitors
+  public_services             = local.public_services
+  redis_ca_cert_secret_name   = local.infra_secret_names.redis_ca_cert
+  region                      = var.region
+  storage_service_account     = local.storage_service_account
+  waf_security_policy_name    = local.waf_active ? module.waf[0].security_policy_name : ""
+  waf_logs_sample_rate        = var.waf_logs_sample_rate
+  workspace                   = local.workspace
 }
 
 module "hoop" {

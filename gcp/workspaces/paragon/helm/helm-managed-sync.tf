@@ -66,7 +66,7 @@ resource "helm_release" "managed_sync" {
 
   name             = "paragon-managed-sync"
   namespace        = kubernetes_namespace_v1.paragon.id
-  repository       = var.managed_sync_helm_repository
+  repository       = var.paragon_helm_repository
   chart            = "managed-sync"
   version          = var.managed_sync_version
   create_namespace = false

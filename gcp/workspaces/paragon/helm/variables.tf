@@ -20,8 +20,8 @@ variable "managed_sync_version" {
   default     = "0.0.131"
 }
 
-variable "managed_sync_helm_repository" {
-  description = "Helm repository URL used to install Managed Sync."
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts."
   type        = string
 }
 
