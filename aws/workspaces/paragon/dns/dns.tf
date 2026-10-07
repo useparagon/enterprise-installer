@@ -1,9 +1,9 @@
-# Discover the ingress ALB via Resource Groups Tagging API first (empty on greenfield
-# before Helm creates the load balancer). When tagging misses an existing ALB (tags,
-# eventual consistency, ARN shape), fall back to a name lookup without Helm depends_on
-# so dns_name stays plan-stable on chart bumps (PARA-26180). Service CNAME for_each
-# keys always track public_services so a tagging miss cannot plan destroys. Record-level
-# depends_on keeps apply order when the ALB first becomes visible.
+# Discover the ingress ALB via Resource Groups Tagging API (empty on greenfield before
+# Helm creates the load balancer). Prefer the cluster tag; if that misses an existing
+# ALB, scan load balancers by ARN name segment without failing plan. Do not depends_on
+# Helm on aws_lb — that defers dns_name on chart bumps (PARA-26180). Manage service
+# CNAMEs only once an ALB ARN is resolved so greenfield plans succeed; record-level
+# depends_on keeps apply order when CNAMEs first appear.
 data "aws_resourcegroupstaggingapi_resources" "ingress_alb" {
   count = var.enabled ? 1 : 0
 
@@ -15,30 +15,41 @@ data "aws_resourcegroupstaggingapi_resources" "ingress_alb" {
 }
 
 locals {
-  ingress_alb_arns = var.enabled ? [
+  ingress_alb_arns_tagged = var.enabled ? [
     for arn in coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb[0].resource_arn_list, []) :
     arn
     if strcontains(arn, "loadbalancer/app/${var.workspace}/")
   ] : []
+}
+
+data "aws_resourcegroupstaggingapi_resources" "ingress_alb_untagged" {
+  count = var.enabled && length(local.ingress_alb_arns_tagged) == 0 ? 1 : 0
+
+  resource_type_filters = ["elasticloadbalancing:loadbalancer"]
+}
+
+locals {
+  ingress_alb_arns_untagged = var.enabled && length(local.ingress_alb_arns_tagged) == 0 ? [
+    for arn in coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb_untagged[0].resource_arn_list, []) :
+    arn
+    if strcontains(arn, "loadbalancer/app/${var.workspace}/")
+  ] : []
+
+  ingress_alb_arns             = coalescelist(local.ingress_alb_arns_tagged, local.ingress_alb_arns_untagged)
   ingress_alb_dns_target_ready = length(local.ingress_alb_arns) > 0
 }
 
-data "aws_lb" "ingress_dns_target_by_arn" {
+data "aws_lb" "ingress_dns_target" {
   count = local.ingress_alb_dns_target_ready ? 1 : 0
   arn   = local.ingress_alb_arns[0]
 }
 
-data "aws_lb" "ingress_dns_target_by_name" {
-  count = var.enabled && !local.ingress_alb_dns_target_ready ? 1 : 0
-  name  = var.workspace
-}
-
 locals {
-  ingress_alb_dns_name = local.ingress_alb_dns_target_ready ? data.aws_lb.ingress_dns_target_by_arn[0].dns_name : data.aws_lb.ingress_dns_target_by_name[0].dns_name
+  ingress_alb_dns_name = local.ingress_alb_dns_target_ready ? data.aws_lb.ingress_dns_target[0].dns_name : null
 }
 
 resource "aws_route53_record" "microservice" {
-  for_each = var.enabled ? var.public_services : {}
+  for_each = var.enabled && local.ingress_alb_dns_target_ready ? var.public_services : {}
 
   zone_id = var.route53_zone_id
   name = replace(
