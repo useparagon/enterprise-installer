@@ -16,8 +16,12 @@ data "aws_resourcegroupstaggingapi_resources" "ingress_alb" {
 }
 
 locals {
+  # Prefer resource_tag_mapping_list; resource_arn_list is often null or a set and may be empty.
   ingress_alb_arns_tagged = var.enabled ? [
-    for arn in coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb[0].resource_arn_list, []) :
+    for arn in distinct(concat(
+      tolist(coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb[0].resource_arn_list, toset([]))),
+      [for m in coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb[0].resource_tag_mapping_list, []) : m.resource_arn],
+    )) :
     arn
     if strcontains(arn, "loadbalancer/app/${var.workspace}/")
   ] : []
@@ -31,7 +35,10 @@ data "aws_resourcegroupstaggingapi_resources" "ingress_alb_untagged" {
 
 locals {
   ingress_alb_arns_untagged = var.enabled && length(local.ingress_alb_arns_tagged) == 0 ? [
-    for arn in coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb_untagged[0].resource_arn_list, []) :
+    for arn in distinct(concat(
+      tolist(coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb_untagged[0].resource_arn_list, toset([]))),
+      [for m in coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb_untagged[0].resource_tag_mapping_list, []) : m.resource_arn],
+    )) :
     arn
     if strcontains(arn, "loadbalancer/app/${var.workspace}/")
   ] : []

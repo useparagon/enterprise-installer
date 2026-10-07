@@ -101,7 +101,7 @@ module "dns" {
   source = "./dns"
 
   domain                  = var.domain
-  public_services         = local.public_services
+  public_services         = local.route53_public_services
   route53_zone_id         = module.alb.route53_zone_id
   workspace               = local.workspace
   cluster_name            = local.cluster_name
@@ -181,7 +181,6 @@ module "hoop" {
   hoop_postgres_guardrail_rules = var.hoop_postgres_guardrail_rules
   hoop_redis_guardrail_rules    = var.hoop_redis_guardrail_rules
   customer_facing               = var.customer_facing
-  hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections

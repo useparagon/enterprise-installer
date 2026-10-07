@@ -80,7 +80,6 @@ module "hoop" {
   hoop_postgres_guardrail_rules = var.hoop_postgres_guardrail_rules
   hoop_redis_guardrail_rules    = var.hoop_redis_guardrail_rules
   customer_facing               = var.customer_facing
-  hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   azure_subscription_id         = var.azure_subscription_id
   azure_tenant_id               = coalesce(var.azure_tenant_id, data.azurerm_client_config.current.tenant_id)

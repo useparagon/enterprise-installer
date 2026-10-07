@@ -352,12 +352,6 @@ variable "hoop_image_tag" {
   default     = "1.2.1"
 }
 
-variable "hoop_grafana_connection" {
-  description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
-  type        = bool
-  default     = false
-}
-
 variable "hoop_k8s_connections" {
   description = "Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created."
   type = map(object({
@@ -807,10 +801,6 @@ locals {
     "zeus",
   ])
 
-  restricted_public_monitor_allowlist = toset([
-    "grafana",
-  ])
-
   public_microservices = {
     for microservice, config in local.microservices :
     microservice => config
@@ -876,12 +866,11 @@ locals {
     }
   }
 
-  public_monitors = var.monitors_enabled ? {
+  # Internet-facing monitor Ingress (Grafana when it has a public_url). Restrict mode keeps monitors internal (Hoop).
+  public_monitors = var.monitors_enabled && !local.restrict_public_exposure ? {
     for monitor, config in local.monitors :
     monitor => config
-    if lookup(config, "public_url", null) != null && lookup(config, "public_url", null) != "" && !contains(var.private_services, monitor) && (
-      !local.restrict_public_exposure || contains(local.restricted_public_monitor_allowlist, monitor)
-    )
+    if lookup(config, "public_url", null) != null && lookup(config, "public_url", "") != "" && !contains(var.private_services, monitor)
   } : {}
 
   # Managed Sync publishes sync.${domain} via its own Helm ingress, not paragon-onprem.
@@ -895,6 +884,12 @@ locals {
     local.public_microservices,
     local.public_monitors,
     local.managed_sync_public_dns,
+  )
+
+  route53_public_services = merge(
+    local.public_microservices,
+    local.managed_sync_public_dns,
+    local.public_monitors,
   )
 
   helm_keys_to_remove = [
