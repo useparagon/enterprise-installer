@@ -287,6 +287,12 @@ resource "kubernetes_secret" "docker_login" {
 
 # ingress controller; provisions load balancer
 #
+# The controller runs on worker nodes (no IRSA) and uses the infra eks-worker-policy.
+# Ingress group membership changes (e.g. restrict_public_exposure) call
+# elasticloadbalancing:SetRulePriorities; missing that action leaves Ingress
+# objects Terminating and stale listener rules until IAM is fixed and the
+# controller reconciles the group.
+#
 # Upgrade order (per cluster, before paragon terraform apply):
 #   1. kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
 #   2. terraform apply (paragon workspace)

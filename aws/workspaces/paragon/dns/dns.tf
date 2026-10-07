@@ -1,6 +1,6 @@
 # Resolve the ingress ALB without a name-only aws_lb read at plan time (that fails
 # greenfield before Helm creates the load balancer). Tagging API returns an empty
-# list when no ALB exists yet; do not depends_on Helm on the aws_lb data source —
+# empty list (or null from the provider) when no ALB exists yet; do not depends_on Helm on the aws_lb data source —
 # that defers dns_name on chart bumps (PARA-26180). Record-level depends_on keeps
 # apply order when CNAMEs are created on the first plan where the ALB is visible.
 data "aws_resourcegroupstaggingapi_resources" "ingress_alb" {
@@ -15,7 +15,7 @@ data "aws_resourcegroupstaggingapi_resources" "ingress_alb" {
 
 locals {
   ingress_alb_arns = var.enabled ? [
-    for arn in data.aws_resourcegroupstaggingapi_resources.ingress_alb[0].resource_arn_list :
+    for arn in coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb[0].resource_arn_list, []) :
     arn
     if strcontains(arn, "loadbalancer/app/${var.workspace}/")
   ] : []
