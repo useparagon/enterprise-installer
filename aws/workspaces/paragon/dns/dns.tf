@@ -82,7 +82,7 @@ locals {
 
   ingress_alb_dns_name = (
     local.ingress_alb_dns_name_live != null && local.ingress_alb_dns_name_live != ""
-  ) ? local.ingress_alb_dns_name_live : (
+    ) ? local.ingress_alb_dns_name_live : (
     local.route53_cname_anchor_target != null && local.route53_cname_anchor_target != ""
   ) ? local.route53_cname_anchor_target : null
 
