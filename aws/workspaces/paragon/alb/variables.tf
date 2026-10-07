@@ -23,15 +23,6 @@ variable "certificate" {
   type        = string
 }
 
-variable "public_services" {
-  description = "Hosts that need DNS records on the shared load balancer (public microservices, monitors, and managed-sync when not on the restrict allowlist)."
-  type = map(object({
-    port             = optional(number)
-    healthcheck_path = optional(string)
-    public_url       = string
-  }))
-}
-
 variable "microservices" {
   description = "The microservices running within the system, including those only reachable internally"
   type = map(object({
@@ -39,14 +30,13 @@ variable "microservices" {
   }))
 }
 
-variable "release_ingress" {
-  description = "The helm release for the ingress."
-  type        = any
-}
-
-variable "release_paragon_on_prem" {
-  description = "The helm release for the Paragon microservices."
-  type        = any
+variable "public_services" {
+  description = "Hosts on the shared load balancer (public microservices, monitors, and managed-sync when not on the restrict allowlist)."
+  type = map(object({
+    port             = optional(number)
+    healthcheck_path = optional(string)
+    public_url       = string
+  }))
 }
 
 variable "worker_security_group_ids" {

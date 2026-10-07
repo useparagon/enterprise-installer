@@ -3,14 +3,14 @@ output "nameservers" {
   value       = aws_route53_zone.paragon.name_servers
 }
 
+output "route53_zone_id" {
+  description = "Route 53 hosted zone for the Paragon deployment domain."
+  value       = aws_route53_zone.paragon.zone_id
+}
+
 output "certificate" {
   description = "The ARN of the ACM certificate."
   value       = var.certificate == null ? module.acm_request_certificate[0].arn : var.certificate
-}
-
-output "alb_arn" {
-  description = "The ARN of the application load balancer."
-  value       = data.aws_lb.load_balancer.arn
 }
 
 output "backend_security_group_id" {
