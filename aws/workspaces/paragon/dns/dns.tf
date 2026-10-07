@@ -1,8 +1,9 @@
-# Resolve the ingress ALB without a name-only aws_lb read at plan time (that fails
-# greenfield before Helm creates the load balancer). Tagging API returns an empty
-# empty list (or null from the provider) when no ALB exists yet; do not depends_on Helm on the aws_lb data source —
-# that defers dns_name on chart bumps (PARA-26180). Record-level depends_on keeps
-# apply order when CNAMEs are created on the first plan where the ALB is visible.
+# Discover the ingress ALB via Resource Groups Tagging API first (empty on greenfield
+# before Helm creates the load balancer). When tagging misses an existing ALB (tags,
+# eventual consistency, ARN shape), fall back to a name lookup without Helm depends_on
+# so dns_name stays plan-stable on chart bumps (PARA-26180). Service CNAME for_each
+# keys always track public_services so a tagging miss cannot plan destroys. Record-level
+# depends_on keeps apply order when the ALB first becomes visible.
 data "aws_resourcegroupstaggingapi_resources" "ingress_alb" {
   count = var.enabled ? 1 : 0
 
@@ -22,13 +23,22 @@ locals {
   ingress_alb_dns_target_ready = length(local.ingress_alb_arns) > 0
 }
 
-data "aws_lb" "ingress_dns_target" {
+data "aws_lb" "ingress_dns_target_by_arn" {
   count = local.ingress_alb_dns_target_ready ? 1 : 0
   arn   = local.ingress_alb_arns[0]
 }
 
+data "aws_lb" "ingress_dns_target_by_name" {
+  count = var.enabled && !local.ingress_alb_dns_target_ready ? 1 : 0
+  name  = var.workspace
+}
+
+locals {
+  ingress_alb_dns_name = local.ingress_alb_dns_target_ready ? data.aws_lb.ingress_dns_target_by_arn[0].dns_name : data.aws_lb.ingress_dns_target_by_name[0].dns_name
+}
+
 resource "aws_route53_record" "microservice" {
-  for_each = var.enabled && local.ingress_alb_dns_target_ready ? var.public_services : {}
+  for_each = var.enabled ? var.public_services : {}
 
   zone_id = var.route53_zone_id
   name = replace(
@@ -42,7 +52,7 @@ resource "aws_route53_record" "microservice" {
   )
   type    = "CNAME"
   ttl     = var.record_ttl
-  records = [data.aws_lb.ingress_dns_target[0].dns_name]
+  records = [local.ingress_alb_dns_name]
 
   depends_on = [
     var.release_ingress,
