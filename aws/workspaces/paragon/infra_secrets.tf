@@ -86,6 +86,11 @@ data "aws_secretsmanager_secret" "agent_os_app" {
   name  = try(local.agent_os_handoff.app, null)
 }
 
+data "aws_secretsmanager_secret" "agent_os_broker" {
+  count = var.agent_os_enabled ? 1 : 0
+  name  = try(local.agent_os_handoff.broker, null)
+}
+
 data "aws_secretsmanager_secret" "agent_os_admin" {
   count = var.agent_os_enabled ? 1 : 0
   name  = try(local.agent_os_handoff.admin, null)
@@ -99,6 +104,11 @@ data "aws_secretsmanager_secret" "agent_os_vendor" {
 data "aws_secretsmanager_secret_version" "agent_os_app" {
   count     = var.agent_os_enabled ? 1 : 0
   secret_id = data.aws_secretsmanager_secret.agent_os_app[0].id
+}
+
+data "aws_secretsmanager_secret_version" "agent_os_broker" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = data.aws_secretsmanager_secret.agent_os_broker[0].id
 }
 
 data "aws_secretsmanager_secret_version" "agent_os_admin" {

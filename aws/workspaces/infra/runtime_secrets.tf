@@ -157,6 +157,7 @@ resource "aws_secretsmanager_secret_version" "runtime_agent_os" {
   secret_id = aws_secretsmanager_secret.runtime_agent_os[0].id
   secret_string = jsonencode({
     app                   = module.secrets.agent_os_secret_names.app
+    broker                = module.secrets.agent_os_secret_names.broker
     admin                 = module.secrets.agent_os_secret_names.admin
     vendor                = module.secrets.agent_os_secret_names.vendor
     bucket                = module.storage.s3.agent_os_bucket

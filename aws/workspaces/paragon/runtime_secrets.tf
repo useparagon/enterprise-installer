@@ -123,6 +123,27 @@ resource "aws_secretsmanager_secret_version" "managed_sync_paragon_overlay" {
   ))
 }
 
+# Agent OS consumes a few credentials already owned by the Paragon / Managed Sync
+# values contract. Keep those in Secrets Manager rather than passing them through
+# Helm values. Explicit Agent OS config and .secure agentOs.secrets.app can override
+# these defaults when a customer uses dedicated credentials.
+locals {
+  agent_os_app_config_from_paragon = var.agent_os_enabled ? merge(
+    try(local.helm_vars.global.env["API_SYNC_ACCESS_TOKEN"], null) != null ? {
+      MANAGED_SYNC_ACCESS_TOKEN = tostring(local.helm_vars.global.env["API_SYNC_ACCESS_TOKEN"])
+    } : {},
+    try(local.helm_vars.global.env["ZEUS_ACCESS_TOKEN"], null) != null ? {
+      ZEUS_ACCESS_TOKEN = tostring(local.helm_vars.global.env["ZEUS_ACCESS_TOKEN"])
+    } : {},
+    try(local.helm_vars.global.env["WORKER_ACTIONKIT_ACCESS_TOKEN"], null) != null ? {
+      WORKER_ACTIONKIT_ACCESS_TOKEN = tostring(local.helm_vars.global.env["WORKER_ACTIONKIT_ACCESS_TOKEN"])
+    } : {},
+    try(local.helm_vars.global.env["LICENSE"], null) != null ? {
+      LICENSE = tostring(local.helm_vars.global.env["LICENSE"])
+    } : {},
+  ) : {}
+}
+
 # Match the Managed Sync flow: infra owns/initially populates these secrets,
 # while the paragon workspace overlays app-level values that infra cannot know.
 resource "aws_secretsmanager_secret_version" "agent_os_app_paragon_overlay" {
@@ -131,7 +152,9 @@ resource "aws_secretsmanager_secret_version" "agent_os_app_paragon_overlay" {
   secret_id = data.aws_secretsmanager_secret.agent_os_app[0].id
   secret_string = jsonencode(merge(
     jsondecode(data.aws_secretsmanager_secret_version.agent_os_app[0].secret_string),
+    local.agent_os_app_config_from_paragon,
     var.agent_os_app_config,
+    local.agent_os_file_app_config,
   ))
 }
 
@@ -142,6 +165,7 @@ resource "aws_secretsmanager_secret_version" "agent_os_admin_paragon_overlay" {
   secret_string = jsonencode(merge(
     jsondecode(data.aws_secretsmanager_secret_version.agent_os_admin[0].secret_string),
     var.agent_os_admin_config,
+    local.agent_os_file_admin_config,
   ))
 }
 
@@ -153,6 +177,7 @@ resource "aws_secretsmanager_secret_version" "agent_os_vendor_paragon_overlay" {
   secret_string = jsonencode(merge(
     jsondecode(data.aws_secretsmanager_secret_version.agent_os_vendor[0].secret_string),
     var.agent_os_vendor_config,
+    local.agent_os_file_vendor_config,
   ))
 }
 
@@ -181,6 +206,7 @@ resource "terraform_data" "runtime_secrets_populated" {
     docker_cfg      = local.runtime_docker_cfg_sync_enabled ? local.runtime_docker_cfg_version_id : null
     openobserve     = data.aws_secretsmanager_secret_version.openobserve.version_id
     agent_os_app    = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_app_paragon_overlay[0].version_id : null
+    agent_os_broker = var.agent_os_enabled ? data.aws_secretsmanager_secret_version.agent_os_broker[0].version_id : null
     agent_os_admin  = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_admin_paragon_overlay[0].version_id : null
     agent_os_vendor = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_vendor_paragon_overlay[0].version_id : null
     managed_sync = var.managed_sync_enabled ? (

@@ -227,6 +227,26 @@ resource "random_password" "agent_os_app_password" {
   special = false
 }
 
+resource "random_string" "agent_os_capability_broker_username" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 16
+  lower   = true
+  upper   = true
+  numeric = false
+  special = false
+}
+
+resource "random_password" "agent_os_capability_broker_password" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 32
+  lower   = true
+  upper   = true
+  numeric = true
+  special = false
+}
+
 resource "aws_db_subnet_group" "agent_os" {
   count = var.agent_os_enabled && length(local.agent_os_postgres_instances) > 0 ? 1 : 0
 

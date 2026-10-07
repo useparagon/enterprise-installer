@@ -460,6 +460,30 @@ variable "agent_os_enabled" {
 }
 
 
+variable "agent_os_version" {
+  description = "Version of the Agent OS Helm chart to install when Agent OS is enabled."
+  type        = string
+  default     = "0.1.0"
+
+  validation {
+    condition     = length(trimspace(var.agent_os_version)) > 0
+    error_message = "agent_os_version must not be empty."
+  }
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL used to install Agent OS."
+  type        = string
+  default     = "https://paragon-helm-production.s3.amazonaws.com"
+}
+
+variable "agent_os_helm_values" {
+  description = "Additional Agent OS chart values supplied through Terraform. Applied after generated AWS defaults and before .secure/values.yaml agentOs.values."
+  type        = any
+  default     = {}
+  sensitive   = true
+}
+
 variable "agent_os_app_config" {
   description = "Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload."
   type        = map(string)
@@ -661,6 +685,41 @@ locals {
       fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
     )
   )
+
+  # Agent OS shares .secure/values.yaml with Paragon but owns an isolated chart.
+  # agentOs is installer metadata/overrides and must never be forwarded to the
+  # Paragon chart itself. The chart-root override lives at agentOs.values.
+  agent_os_file_config  = try(local.helm_vars.agentOs, {})
+  agent_os_file_values  = try(local.agent_os_file_config.values, {})
+  agent_os_file_secrets = try(local.agent_os_file_config.secrets, {})
+  agent_os_file_app_config = {
+    for key, value in try(local.agent_os_file_secrets.app, {}) :
+    key => tostring(value)
+    if value != null
+  }
+  agent_os_file_admin_config = {
+    for key, value in try(local.agent_os_file_secrets.admin, {}) :
+    key => tostring(value)
+    if value != null
+  }
+  agent_os_file_vendor_config = {
+    for key, value in try(local.agent_os_file_secrets.vendor, {}) :
+    key => tostring(value)
+    if value != null
+  }
+  agent_os_chart_version = nonsensitive(coalesce(
+    try(local.agent_os_file_config.version, null),
+    var.agent_os_version,
+  ))
+  agent_os_chart_repository = nonsensitive(coalesce(
+    try(local.agent_os_file_config.repository, null),
+    var.agent_os_helm_repository,
+  ))
+  paragon_helm_vars = {
+    for key, value in local.helm_vars :
+    key => value
+    if key != "agentOs"
+  }
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "S3")
 
@@ -962,7 +1021,7 @@ locals {
 
   pg_config = try(local.infra_vars.monitoring.value.pg_config, {})
 
-  helm_values = merge(local.helm_vars, {
+  helm_values = merge(local.paragon_helm_vars, {
     global = merge(local.helm_vars.global, {
       env = merge(
         {

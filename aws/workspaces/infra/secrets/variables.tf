@@ -52,6 +52,13 @@ variable "agent_os_app_config" {
   default     = null
 }
 
+variable "agent_os_capability_broker_config" {
+  description = "Agent OS capability broker secret payload excluding generated signing/service tokens. Null when Agent OS is disabled."
+  type        = map(string)
+  sensitive   = true
+  default     = null
+}
+
 variable "agent_os_admin_config" {
   description = "Agent OS admin secret payload for the migration Job. Null when Agent OS is disabled."
   type        = map(string)

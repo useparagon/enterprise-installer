@@ -108,6 +108,27 @@ resource "aws_secretsmanager_secret_version" "openobserve" {
   })
 }
 
+resource "random_password" "agent_os_capability_broker_signing_key" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 64
+  special = false
+}
+
+resource "random_password" "agent_os_capability_broker_service_token" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 64
+  special = false
+}
+
+resource "random_password" "agent_os_extraction_api_key" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 64
+  special = false
+}
+
 # Agent OS secrets: app (mounted by every service), admin (migration Job only) and vendor
 # (operator-owned API keys). Infra creates the secret paths and seeds app/admin.
 # The paragon workspace overlays extra keys. Vendor is created empty here and
@@ -130,8 +151,41 @@ resource "aws_secretsmanager_secret" "agent_os_app" {
 resource "aws_secretsmanager_secret_version" "agent_os_app" {
   count = var.agent_os_enabled ? 1 : 0
 
-  secret_id     = aws_secretsmanager_secret.agent_os_app[0].id
-  secret_string = jsonencode(var.agent_os_app_config)
+  secret_id = aws_secretsmanager_secret.agent_os_app[0].id
+  secret_string = jsonencode(merge(
+    var.agent_os_app_config,
+    {
+      AGENT_OS_CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
+      EXTRACTION_API_KEY                       = random_password.agent_os_extraction_api_key[0].result
+    }
+  ))
+}
+
+resource "aws_secretsmanager_secret" "agent_os_capability_broker" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                    = "${local.secret_prefix}/agent-os/capability-broker"
+  description             = "Agent OS capability broker database and signing credentials for ${var.organization}"
+  kms_key_id              = var.agent_os_kms_key_arn
+  recovery_window_in_days = var.recovery_window_in_days
+
+  tags = {
+    Name         = "${local.secret_prefix}/agent-os/capability-broker"
+    Organization = var.organization
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "agent_os_capability_broker" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.agent_os_capability_broker[0].id
+  secret_string = jsonencode(merge(
+    var.agent_os_capability_broker_config,
+    {
+      CAPABILITY_BROKER_SIGNING_KEY   = random_password.agent_os_capability_broker_signing_key[0].result
+      CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
+    }
+  ))
 }
 
 resource "aws_secretsmanager_secret" "agent_os_admin" {
