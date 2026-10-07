@@ -33,6 +33,7 @@ locals {
     }
     "api-sync" = {
       ingress = {
+        enabled   = !var.agc_direct
         class     = "nginx"
         className = "nginx"
         host      = local.api_sync_host

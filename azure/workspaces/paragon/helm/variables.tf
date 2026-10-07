@@ -150,6 +150,15 @@ variable "public_monitors" {
   }))
 }
 
+variable "public_services" {
+  description = "Hosts on the shared front door (public microservices, monitors, and managed-sync when restrict drops api-sync from public_microservices)."
+  type = map(object({
+    port             = optional(number)
+    healthcheck_path = optional(string)
+    public_url       = string
+  }))
+}
+
 variable "ingress_scheme" {
   description = "Whether the load balancer is 'internet-facing' (public) or 'internal' (private)"
   type        = string

@@ -43,6 +43,7 @@ module "helm" {
   openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
+  public_services          = local.public_services
   restrict_public_exposure = local.restrict_public_exposure
   resource_group           = local.infra_vars.resource_group.value
   workspace                = local.workspace
