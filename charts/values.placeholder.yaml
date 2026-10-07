@@ -24,6 +24,15 @@ global:
 #     enabled: false
 #   kafka-exporter:
 #     enabled: false
+#   ocs-code-runner:
+#     enabled: false
+#
+# OCS knative code-runner (on-prem custom-code runtime). Deploys
+# useparagon/ocs-code-runner-knative as a serving.knative.dev/v1 Service.
+# Requires Knative Serving + Kourier.
+# ocs-code-runner:
+#   image:
+#     tag: latest
 
 # Optional example for per-service resource tuning.
 # hades:

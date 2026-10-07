@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ocs-code-runner
+description: Helm Chart for the OCS knative node-script code runner
+type: application
+version: __PARAGON_VERSION__
+appVersion: '1.16.0'
