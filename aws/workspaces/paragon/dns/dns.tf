@@ -1,8 +1,10 @@
-# Resolve the ingress ALB without a name-only aws_lb read at plan time (that fails
-# greenfield before Helm creates the load balancer). Tagging API returns an empty
-# list (or null from the provider) when no ALB exists yet; do not depends_on Helm on the aws_lb data source —
-# that defers dns_name on chart bumps (PARA-26180). Record-level depends_on keeps
-# apply order when CNAMEs are created on the first plan where the ALB is visible.
+# Discover the ingress ALB via Resource Groups Tagging API (empty on greenfield before
+# Helm creates the load balancer). Prefer the cluster tag; if that misses an existing
+# ALB, scan load balancers by ARN name segment without a name-only aws_lb read (that
+# fails greenfield plan). Do not depends_on Helm on aws_lb — that defers dns_name on
+# chart bumps (PARA-26180). When the ALB still cannot be resolved, read an existing
+# anchor CNAME so for_each does not drop and plan a mass destroy. Record-level
+# depends_on keeps apply order when CNAMEs first appear.
 data "aws_resourcegroupstaggingapi_resources" "ingress_alb" {
   count = var.enabled ? 1 : 0
 
@@ -14,20 +16,37 @@ data "aws_resourcegroupstaggingapi_resources" "ingress_alb" {
 }
 
 locals {
-  ingress_alb_arns = var.enabled ? [
+  ingress_alb_arns_tagged = var.enabled ? [
     for arn in coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb[0].resource_arn_list, []) :
     arn
     if strcontains(arn, "loadbalancer/app/${var.workspace}/")
   ] : []
 }
 
+data "aws_resourcegroupstaggingapi_resources" "ingress_alb_untagged" {
+  count = var.enabled && length(local.ingress_alb_arns_tagged) == 0 ? 1 : 0
+
+  resource_type_filters = ["elasticloadbalancing:loadbalancer"]
+}
+
+locals {
+  ingress_alb_arns_untagged = var.enabled && length(local.ingress_alb_arns_tagged) == 0 ? [
+    for arn in coalesce(data.aws_resourcegroupstaggingapi_resources.ingress_alb_untagged[0].resource_arn_list, []) :
+    arn
+    if strcontains(arn, "loadbalancer/app/${var.workspace}/")
+  ] : []
+
+  ingress_alb_arns             = coalescelist(local.ingress_alb_arns_tagged, local.ingress_alb_arns_untagged)
+  ingress_alb_dns_target_ready = length(local.ingress_alb_arns) > 0
+}
+
 data "aws_lb" "ingress_dns_target" {
-  count = length(local.ingress_alb_arns) > 0 ? 1 : 0
+  count = local.ingress_alb_dns_target_ready ? 1 : 0
   arn   = local.ingress_alb_arns[0]
 }
 
 locals {
-  ingress_alb_dns_name_live = try(data.aws_lb.ingress_dns_target[0].dns_name, null)
+  ingress_alb_dns_name_live = local.ingress_alb_dns_target_ready ? data.aws_lb.ingress_dns_target[0].dns_name : null
 
   # Prefer api-sync (managed sync host); otherwise first public service lexicographically.
   route53_anchor_service = var.enabled && length(var.public_services) > 0 ? (
@@ -45,9 +64,6 @@ locals {
   ), ".")}.${var.domain}." : ""
 }
 
-# When tagging misses the ALB but service CNAMEs already exist (brownfield), read the
-# anchor record target so plan does not drop for_each and schedule a mass destroy.
-# Empty result on greenfield (no record yet) is normal — coalesce stays null until the ALB is visible.
 data "aws_route53_records" "cname_anchor" {
   count = var.enabled && local.ingress_alb_dns_name_live == null && local.route53_anchor_fqdn != "" ? 1 : 0
 
@@ -63,12 +79,13 @@ locals {
     ]
   ]), [])
   route53_cname_anchor_target = length(local.route53_cname_anchor_matches) > 0 ? trimsuffix(local.route53_cname_anchor_matches[0], ".") : null
-  # coalesce() errors when every argument is null or ""; greenfield has no ALB or anchor yet.
+
   ingress_alb_dns_name = (
     local.ingress_alb_dns_name_live != null && local.ingress_alb_dns_name_live != ""
   ) ? local.ingress_alb_dns_name_live : (
     local.route53_cname_anchor_target != null && local.route53_cname_anchor_target != ""
   ) ? local.route53_cname_anchor_target : null
+
   manage_route53_cnames = var.enabled && local.ingress_alb_dns_name != null
 }
 
