@@ -43,7 +43,8 @@ locals {
     if strcontains(arn, "loadbalancer/app/${var.workspace}/")
   ] : []
 
-  ingress_alb_arns             = coalescelist(local.ingress_alb_arns_tagged, local.ingress_alb_arns_untagged)
+  # concat (not coalescelist): both lists can be empty during teardown when the ALB is gone.
+  ingress_alb_arns = concat(local.ingress_alb_arns_tagged, local.ingress_alb_arns_untagged)
   ingress_alb_dns_target_ready = length(local.ingress_alb_arns) > 0
 }
 
@@ -92,12 +93,12 @@ locals {
     ) ? local.ingress_alb_dns_name_live : (
     local.route53_cname_anchor_target != null && local.route53_cname_anchor_target != ""
   ) ? local.route53_cname_anchor_target : null
-
-  manage_route53_cnames = var.enabled && local.ingress_alb_dns_name != null
 }
 
 resource "aws_route53_record" "microservice" {
-  for_each = local.manage_route53_cnames ? var.public_services : {}
+  # Keys must be static at plan time (var.public_services). Do not gate for_each on
+  # ingress_alb_dns_name — that value can be unknown until apply and breaks destroy.
+  for_each = var.enabled ? var.public_services : {}
 
   zone_id = var.route53_zone_id
   name = replace(

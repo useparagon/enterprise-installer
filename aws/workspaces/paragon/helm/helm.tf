@@ -10,6 +10,14 @@ locals {
   # instead of failing the apply, so blank is treated the same as unset.
   docker_credentials_set = local.docker_username != "" && local.docker_password != ""
 
+  # Plan-time gate for docker-cfg (ESO sync or TF-managed secret). Do not infer from
+  # kubernetes_secret.data length — that is unknown during destroy when the cluster
+  # secret is already gone.
+  docker_pull_credentials_available = (
+    (var.install_external_secrets && var.docker_cfg_secret_name != null) ||
+    (!var.install_external_secrets && local.docker_credentials_set)
+  )
+
   helm_values_yaml = yamlencode(nonsensitive(var.helm_values))
 
   subchart_values = yamlencode({
@@ -235,6 +243,10 @@ resource "kubernetes_namespace" "paragon" {
       "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
     }
   }
+
+  timeouts {
+    delete = "15m"
+  }
 }
 
 locals {
@@ -261,7 +273,7 @@ resource "kubernetes_secret" "docker_login" {
   count = (
     var.create_docker_pull_secret &&
     !var.install_external_secrets &&
-    local.docker_credentials_set
+    local.docker_pull_credentials_available
   ) ? 1 : 0
 
   metadata {
