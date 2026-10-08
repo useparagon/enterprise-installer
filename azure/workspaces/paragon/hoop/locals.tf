@@ -181,8 +181,8 @@ locals {
         }
       }
     },
-    # grafana (private monitoring UI; not exposed when listed in private_services)
-    var.hoop_grafana_connection ? {
+    # grafana (cluster-internal monitoring UI; Hoop TCP when the hoop module is enabled)
+    {
       "grafana" = {
         name    = "${local.connection_prefix}-grafana"
         type    = "application"
@@ -206,7 +206,7 @@ locals {
           cloud           = local.detected_cloud
         }
       }
-    } : {},
+    },
     # redis-insight
     try(var.infra_vars.redis.value, null) != null ? {
       "redis-insight" = {

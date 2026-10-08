@@ -1,9 +1,21 @@
 output "release_ingress" {
-  value = helm_release.ingress
+  description = "Ingress controller Helm release (ALB creation ordering for service DNS)."
+  value       = helm_release.ingress
+}
+
+output "release_paragon_logging" {
+  description = "Logging Helm release (ALB creation ordering for service DNS)."
+  value       = helm_release.paragon_logging
 }
 
 output "release_paragon_on_prem" {
-  value = helm_release.paragon_on_prem
+  description = "Paragon on-prem Helm release (ALB creation ordering for service DNS)."
+  value       = helm_release.paragon_on_prem
+}
+
+output "alb_arn" {
+  description = "The ARN of the application load balancer."
+  value       = data.aws_lb.load_balancer.arn
 }
 
 output "namespace_paragon" {

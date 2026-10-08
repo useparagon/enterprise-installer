@@ -29,7 +29,7 @@ output "pgadmin_admin_password" {
 
 output "alb_arn" {
   description = "The ARN of the application load balancer."
-  value       = module.alb.alb_arn
+  value       = module.helm.alb_arn
 }
 
 output "waf_web_acl_arn" {

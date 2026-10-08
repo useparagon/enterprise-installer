@@ -33,6 +33,7 @@ locals {
     }
     "api-sync" = {
       ingress = {
+        enabled   = !var.agc_direct
         class     = "nginx"
         className = "nginx"
         host      = local.api_sync_host
@@ -81,6 +82,9 @@ resource "helm_release" "managed_sync" {
   atomic           = true
   verify           = false
   timeout          = 600 # 10 minutes
+  # Parent chart renders ScaledObject; KEDA CRDs come from the subchart. OpenAPI
+  # validation runs before subchart CRDs exist (and manual CRD fixes break Helm ownership).
+  disable_openapi_validation = true
 
   values = [
     local.global_values_minus_env,

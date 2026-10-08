@@ -24,10 +24,7 @@ module "alb" {
   dns_provider             = var.dns_provider
   domain                   = var.domain
   microservices            = local.microservices
-  public_microservices     = local.public_microservices
-  public_monitors          = local.public_monitors
-  release_ingress          = module.helm.release_ingress
-  release_paragon_on_prem  = module.helm.release_paragon_on_prem
+  public_services          = local.public_services
   vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
   worker_security_group_ids = coalescelist(
     try(compact(local.infra_vars.worker_security_group_ids.value), []),
@@ -77,6 +74,7 @@ module "helm" {
   openobserve_secret_name       = local.runtime_openobserve_secret_name
   public_microservices          = local.public_microservices
   public_monitors               = local.public_monitors
+  restrict_public_exposure      = local.restrict_public_exposure
   waf_web_acl_arn               = local.waf_active ? module.waf[0].web_acl_arn : ""
   enable_legacy_mng_pools       = try(local.infra_vars.enable_legacy_mng_pools.value, true)
   karpenter_enabled             = try(local.infra_vars.enable_karpenter.value, false)
@@ -99,6 +97,19 @@ module "helm" {
   secrets_revision = sha256(jsonencode(terraform_data.runtime_secrets_populated.output))
 }
 
+module "dns" {
+  source = "./dns"
+
+  domain                  = var.domain
+  public_services         = local.public_services
+  route53_zone_id         = module.alb.route53_zone_id
+  workspace               = local.workspace
+  cluster_name            = local.cluster_name
+  release_ingress         = module.helm.release_ingress
+  release_paragon_logging = module.helm.release_paragon_logging
+  release_paragon_on_prem = module.helm.release_paragon_on_prem
+}
+
 module "managed_sync_config" {
   source = "./helm-config"
   count  = var.managed_sync_enabled ? 1 : 0
@@ -112,6 +123,8 @@ module "managed_sync_config" {
 
 # EKS Pod Identity: associate every Paragon onprem ServiceAccount with the S3 role.
 # CLOUD_STORAGE_* is injected globally, so associations match that (no curated subset).
+# ocs-code-runner is listed explicitly: Knative execute can omit envelope access
+# keys and use the default AWS chain (Pod Identity) for object storage.
 module "pod_identity" {
   source = "./pod-identity"
   count  = try(local.storage_output.role_arn, null) != null ? 1 : 0
@@ -121,6 +134,7 @@ module "pod_identity" {
   s3_role_arn  = local.storage_output.role_arn
   service_accounts = setunion(
     toset(keys(local.monorepo_microservices)),
+    toset(["ocs-code-runner"]),
     var.managed_sync_enabled ? toset(["managed-sync-service-account"]) : toset([]),
   )
 }
@@ -167,7 +181,6 @@ module "hoop" {
   hoop_postgres_guardrail_rules = var.hoop_postgres_guardrail_rules
   hoop_redis_guardrail_rules    = var.hoop_redis_guardrail_rules
   customer_facing               = var.customer_facing
-  hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections

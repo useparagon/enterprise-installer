@@ -43,6 +43,8 @@ module "helm" {
   openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
+  public_services          = local.public_services
+  restrict_public_exposure = local.restrict_public_exposure
   resource_group           = local.infra_vars.resource_group.value
   workspace                = local.workspace
 }
@@ -78,7 +80,6 @@ module "hoop" {
   hoop_postgres_guardrail_rules = var.hoop_postgres_guardrail_rules
   hoop_redis_guardrail_rules    = var.hoop_redis_guardrail_rules
   customer_facing               = var.customer_facing
-  hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   azure_subscription_id         = var.azure_subscription_id
   azure_tenant_id               = coalesce(var.azure_tenant_id, data.azurerm_client_config.current.tenant_id)
@@ -128,6 +129,7 @@ locals {
   onprem_subchart_enabled = merge(
     { for name in keys(local.microservices) : name => { enabled = true } },
     try(local.helm_vars.subchart, {}),
+    local.restrict_public_exposure ? { health-checker = { enabled = true } } : {},
   )
 
   # Per-host backends and HTTPS listeners for AGC, limited to services Helm publishes.
