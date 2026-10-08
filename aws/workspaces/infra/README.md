@@ -2,10 +2,42 @@
 
 See [setup-policy.json](../../setup-policy.json) for permissions that are required to execute this. Note that `<AWS_ACCOUNT_ID>` must be replaced to match target account.
 
+## PostgreSQL RDS instance catalog
+
+The root workspace's `rds_postgres` map defines independent RDS PostgreSQL
+instances. Defaults and the Agent OS enablement condition live in the root,
+not in the `postgres` child module. Each map entry can override its
+instance class, database name, Multi-AZ, storage type/size, performance,
+replicas, encryption, monitoring, access CIDRs, backups and maintenance.
+
+```hcl
+rds_postgres = {
+  agent_os = {
+    multi_az = false # Temporary single-AZ test override
+  }
+  # Future standalone workload, opt-in:
+  airflow = {
+    enabled        = false
+    database_name  = "airflow"
+    instance_class = "db.t4g.small"
+    multi_az       = true
+  }
+}
+```
+
+The `agent_os` entry is gated by `agent_os_enabled` and retains the
+existing Agent OS secret handoff and logical `context`/`tools` databases.
+The legacy Paragon/Managed Sync RDS resources continue unchanged; adding
+a legacy workload to the new map is **not** an automatic migration.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
+| <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
 
 ## Providers
 
@@ -69,7 +101,6 @@ No requirements.
 | <a name="input_agent_os_index_max_count"></a> [agent\_os\_index\_max\_count](#input\_agent\_os\_index\_max\_count) | Maximum nodes in the Agent OS index managed node group / Karpenter nodes limit. | `number` | `4` | no |
 | <a name="input_agent_os_index_memory_limit"></a> [agent\_os\_index\_memory\_limit](#input\_agent\_os\_index\_memory\_limit) | Karpenter memory limit for the Agent OS index NodePool (explicit, same pattern as karpenter\_node\_pools). | `string` | `"256Gi"` | no |
 | <a name="input_agent_os_index_min_count"></a> [agent\_os\_index\_min\_count](#input\_agent\_os\_index\_min\_count) | Minimum nodes in the Agent OS index managed node group. | `number` | `2` | no |
-| <a name="input_agent_os_postgres"></a> [agent\_os\_postgres](#input\_agent\_os\_postgres) | Agent OS Postgres instances keyed by instance name. Each entry can be sized and tuned independently. | <pre>map(object({<br/>    instance_class             = optional(string, "db.t4g.medium")<br/>    allocated_storage          = optional(number, 100)<br/>    max_allocated_storage      = optional(number, 1000)<br/>    engine_version             = optional(string, "16")<br/>    multi_az                   = optional(bool, true)<br/>    read_replica               = optional(bool, false)<br/>    replica_instance_class     = optional(string, "db.t4g.small")<br/>    storage_type               = optional(string, "gp3")<br/>    iops                       = optional(number)<br/>    storage_throughput         = optional(number)<br/>    backup_retention_days      = optional(number, 7)<br/>    log_statement              = optional(string, "ddl")<br/>    log_min_duration_statement = optional(number, 1000)<br/>  }))</pre> | <pre>{<br/>  "agent_os": {}<br/>}</pre> | no |
 | <a name="input_ami_release_version"></a> [ami\_release\_version](#input\_ami\_release\_version) | Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2023 legacy coexistence, use ami\_release\_versions instead. | `string` | `null` | no |
 | <a name="input_ami_release_versions"></a> [ami\_release\_versions](#input\_ami\_release\_versions) | Optional map of managed node group key (system, ondemand, spot) to AMI release version pin. When non-empty, overrides ami\_release\_version and pins only the listed groups. | `map(string)` | `{}` | no |
 | <a name="input_app_bucket_expiration"></a> [app\_bucket\_expiration](#input\_app\_bucket\_expiration) | The number of days to retain S3 app data before deleting | `number` | `90` | no |
@@ -105,6 +136,7 @@ No requirements.
 | <a name="input_eks_spot_instance_percent"></a> [eks\_spot\_instance\_percent](#input\_eks\_spot\_instance\_percent) | The percentage of spot instances to use for Kubernetes nodes. | `number` | `75` | no |
 | <a name="input_eks_spot_node_instance_type"></a> [eks\_spot\_node\_instance\_type](#input\_eks\_spot\_node\_instance\_type) | The compute instance type to use for Kubernetes spot nodes. | `string` | `"t3a.xlarge,t3.xlarge,m5a.xlarge,m5.xlarge,m6a.xlarge,m6i.xlarge,m7a.xlarge,m7i.xlarge,r5a.xlarge,m4.xlarge"` | no |
 | <a name="input_eks_system_managed_node_group"></a> [eks\_system\_managed\_node\_group](#input\_eks\_system\_managed\_node\_group) | System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default). | <pre>object({<br/>    map_key         = optional(string, "node-default")<br/>    name            = optional(string)<br/>    use_name_prefix = optional(bool, false)<br/>    ec2_name_tag    = optional(string)<br/>    instance_types  = optional(list(string))<br/>    min_size        = optional(number, 2)<br/>    max_size        = optional(number, 3)<br/>    desired_size    = optional(number, 2)<br/>    labels          = optional(map(string), { "karpenter.sh/controller" = "true" })<br/>  })</pre> | `{}` | no |
+| <a name="input_eks_view_arns"></a> [eks\_view\_arns](#input\_eks\_view\_arns) | IAM role ARNs allowed to view EKS resources, pod logs and events without modifying workloads or reading Kubernetes Secrets. Use for QA/SSO roles; never add these to eks\_admin\_arns. | `list(string)` | `[]` | no |
 | <a name="input_elasticache_multi_az"></a> [elasticache\_multi\_az](#input\_elasticache\_multi\_az) | Whether or not to enable multi-AZ in each ElastiCache instance. | `bool` | `true` | no |
 | <a name="input_elasticache_multiple_instances"></a> [elasticache\_multiple\_instances](#input\_elasticache\_multiple\_instances) | Whether or not to create multiple ElastiCache instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_elasticache_node_type"></a> [elasticache\_node\_type](#input\_elasticache\_node\_type) | The ElastiCache node type used for Redis. | `string` | `"cache.r6g.large"` | no |
@@ -136,6 +168,7 @@ No requirements.
 | <a name="input_rds_max_allocated_storage"></a> [rds\_max\_allocated\_storage](#input\_rds\_max\_allocated\_storage) | Maximum storage (GiB) for autoscaling on each Postgres RDS instance. | `number` | `1000` | no |
 | <a name="input_rds_multi_az"></a> [rds\_multi\_az](#input\_rds\_multi\_az) | Whether or not to enable multi-AZ in each RDS instance. | `bool` | `true` | no |
 | <a name="input_rds_multiple_instances"></a> [rds\_multiple\_instances](#input\_rds\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
+| <a name="input_rds_postgres"></a> [rds\_postgres](#input\_rds\_postgres) | Independent PostgreSQL RDS instances keyed by workload (agent\_os, airflow, etc.). Legacy Paragon/Managed Sync databases remain managed by rds\_multiple\_instances until explicitly migrated. | <pre>map(object({<br/>    enabled                             = optional(bool, true)<br/>    identifier                          = optional(string)<br/>    database_name                       = optional(string, "postgres")<br/>    port                                = optional(number, 5432)<br/>    instance_class                      = optional(string, "db.t4g.medium")<br/>    allocated_storage                   = optional(number, 100)<br/>    max_allocated_storage               = optional(number, 1000)<br/>    engine_version                      = optional(string, "16")<br/>    multi_az                            = optional(bool, true)<br/>    availability_zone                   = optional(string)<br/>    read_replica                        = optional(bool, false)<br/>    replica_instance_class              = optional(string, "db.t4g.small")<br/>    storage_type                        = optional(string, "gp3")<br/>    iops                                = optional(number)<br/>    storage_throughput                  = optional(number)<br/>    backup_retention_days               = optional(number, 7)<br/>    backup_window                       = optional(string, "06:00-07:00")<br/>    maintenance_window                  = optional(string, "Tue:04:00-Tue:05:00")<br/>    log_statement                       = optional(string, "ddl")<br/>    log_min_duration_statement          = optional(number, 1000)<br/>    enabled_cloudwatch_logs_exports     = optional(list(string), ["postgresql", "upgrade"])<br/>    monitoring_interval                 = optional(number, 15)<br/>    performance_insights_enabled        = optional(bool, true)<br/>    performance_insights_retention_days = optional(number, 31)<br/>    ca_cert_identifier                  = optional(string, "rds-ca-rsa2048-g1")<br/>    auto_minor_version_upgrade          = optional(bool, true)<br/>    allow_major_version_upgrade         = optional(bool, false)<br/>    apply_immediately                   = optional(bool, true)<br/>    deletion_protection                 = optional(bool)<br/>    kms_key_arn                         = optional(string)<br/>    ingress_cidr_blocks                 = optional(list(string))<br/>    tags                                = optional(map(string), {})<br/>  }))</pre> | <pre>{<br/>  "agent_os": {}<br/>}</pre> | no |
 | <a name="input_rds_postgres_version"></a> [rds\_postgres\_version](#input\_rds\_postgres\_version) | Postgres version for the database. | `string` | `"14"` | no |
 | <a name="input_rds_restore_from_snapshot"></a> [rds\_restore\_from\_snapshot](#input\_rds\_restore\_from\_snapshot) | Specifies that RDS instances should be restored from a snapshot. | `bool` | `false` | no |
 | <a name="input_s3_kms_encryption_enabled"></a> [s3\_kms\_encryption\_enabled](#input\_s3\_kms\_encryption\_enabled) | Encrypt the app, CDN, audit logs, and managed sync S3 buckets with AWS KMS (SSE-KMS) instead of S3-managed keys (SSE-S3). Existing deployments default to SSE-S3; enable for new installs or to migrate existing buckets to KMS. The logs bucket always uses SSE-S3 because ALB and S3 server access logs do not support SSE-KMS. | `bool` | `false` | no |
@@ -163,6 +196,7 @@ No requirements.
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | The bucket used to store system logs. |
 | <a name="output_monitoring"></a> [monitoring](#output\_monitoring) | Non-sensitive monitoring settings (includes pg\_config.max\_storage\_bytes for Grafana storage alerts). |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
+| <a name="output_rds_postgres"></a> [rds\_postgres](#output\_rds\_postgres) | Independently configured PostgreSQL RDS connections (agent\_os and future workloads). Does not change the legacy postgres output. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
 | <a name="output_secrets_manager_env_secret"></a> [secrets\_manager\_env\_secret](#output\_secrets\_manager\_env\_secret) | Name of the Secrets Manager secret containing Paragon env config. |
 | <a name="output_secrets_manager_secret_arns"></a> [secrets\_manager\_secret\_arns](#output\_secrets\_manager\_secret\_arns) | ARNs of application Secrets Manager secrets. |

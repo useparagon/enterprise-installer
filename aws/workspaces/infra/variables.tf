@@ -490,22 +490,45 @@ variable "agent_os_enabled" {
 }
 
 
-variable "agent_os_postgres" {
-  description = "Agent OS Postgres instances keyed by instance name. Each entry can be sized and tuned independently."
+# Per-instance PostgreSQL catalog. Defaults live here in the root workspace;
+# the child postgres module receives a fully resolved map without defaults.
+# The agent_os entry is created only when agent_os_enabled=true. Other entries
+# can be introduced independently (without activating Agent OS).
+variable "rds_postgres" {
+  description = "Independent PostgreSQL RDS instances keyed by workload (agent_os, airflow, etc.). Legacy Paragon/Managed Sync databases remain managed by rds_multiple_instances until explicitly migrated."
   type = map(object({
-    instance_class             = optional(string, "db.t4g.medium")
-    allocated_storage          = optional(number, 100)
-    max_allocated_storage      = optional(number, 1000)
-    engine_version             = optional(string, "16")
-    multi_az                   = optional(bool, true)
-    read_replica               = optional(bool, false)
-    replica_instance_class     = optional(string, "db.t4g.small")
-    storage_type               = optional(string, "gp3")
-    iops                       = optional(number)
-    storage_throughput         = optional(number)
-    backup_retention_days      = optional(number, 7)
-    log_statement              = optional(string, "ddl")
-    log_min_duration_statement = optional(number, 1000)
+    enabled                             = optional(bool, true)
+    identifier                          = optional(string)
+    database_name                       = optional(string, "postgres")
+    port                                = optional(number, 5432)
+    instance_class                      = optional(string, "db.t4g.medium")
+    allocated_storage                   = optional(number, 100)
+    max_allocated_storage               = optional(number, 1000)
+    engine_version                      = optional(string, "16")
+    multi_az                            = optional(bool, true)
+    availability_zone                   = optional(string)
+    read_replica                        = optional(bool, false)
+    replica_instance_class              = optional(string, "db.t4g.small")
+    storage_type                        = optional(string, "gp3")
+    iops                                = optional(number)
+    storage_throughput                  = optional(number)
+    backup_retention_days               = optional(number, 7)
+    backup_window                       = optional(string, "06:00-07:00")
+    maintenance_window                  = optional(string, "Tue:04:00-Tue:05:00")
+    log_statement                       = optional(string, "ddl")
+    log_min_duration_statement          = optional(number, 1000)
+    enabled_cloudwatch_logs_exports     = optional(list(string), ["postgresql", "upgrade"])
+    monitoring_interval                 = optional(number, 15)
+    performance_insights_enabled        = optional(bool, true)
+    performance_insights_retention_days = optional(number, 31)
+    ca_cert_identifier                  = optional(string, "rds-ca-rsa2048-g1")
+    auto_minor_version_upgrade          = optional(bool, true)
+    allow_major_version_upgrade         = optional(bool, false)
+    apply_immediately                   = optional(bool, true)
+    deletion_protection                 = optional(bool)
+    kms_key_arn                         = optional(string)
+    ingress_cidr_blocks                 = optional(list(string))
+    tags                                = optional(map(string), {})
   }))
   default = {
     agent_os = {}
@@ -513,32 +536,41 @@ variable "agent_os_postgres" {
 
   validation {
     condition = alltrue([
-      for _, cfg in var.agent_os_postgres :
+      for key, cfg in var.rds_postgres :
+      can(regex("^[a-z][a-z0-9_]*$", key)) &&
+      (cfg.identifier == null || can(regex("^[a-z][a-z0-9-]*[a-z0-9]$", cfg.identifier))) &&
+      cfg.port >= 1 && cfg.port <= 65535
+    ])
+    error_message = "rds_postgres map keys must use lowercase letters/numbers/underscores, and custom identifiers must be valid RDS identifiers. Port must be between 1 and 65535."
+  }
+
+  validation {
+    condition     = !var.agent_os_enabled || try(var.rds_postgres["agent_os"].enabled, false)
+    error_message = "When agent_os_enabled=true, rds_postgres must contain an enabled agent_os entry."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.rds_postgres :
+      cfg.allocated_storage >= 20 &&
       cfg.max_allocated_storage >= 100 &&
       cfg.max_allocated_storage >= ceil(cfg.allocated_storage * 1.1)
     ])
-    error_message = "Agent OS Postgres max_allocated_storage must be at least 100 GiB and at least 10% greater than allocated_storage."
+    error_message = "rds_postgres allocated_storage must be at least 20 GiB; max_allocated_storage must be at least 100 GiB and 10% greater than allocated_storage."
   }
 
   validation {
     condition = alltrue([
-      for _, cfg in var.agent_os_postgres :
-      contains(["gp2", "gp3"], cfg.storage_type)
-    ])
-    error_message = "Agent OS Postgres storage_type must be gp2 or gp3."
-  }
-
-  validation {
-    condition = alltrue([
-      for _, cfg in var.agent_os_postgres :
+      for _, cfg in var.rds_postgres :
+      contains(["gp2", "gp3"], cfg.storage_type) &&
       (cfg.iops == null) == (cfg.storage_throughput == null)
     ])
-    error_message = "Agent OS Postgres iops and storage_throughput must be set together."
+    error_message = "rds_postgres storage_type must be gp2 or gp3; iops and storage_throughput must be set together."
   }
 
   validation {
     condition = alltrue([
-      for _, cfg in var.agent_os_postgres :
+      for _, cfg in var.rds_postgres :
       (cfg.iops == null || cfg.storage_throughput == null) ? true : (
         cfg.storage_type == "gp3" &&
         cfg.allocated_storage >= 400 &&
@@ -546,15 +578,16 @@ variable "agent_os_postgres" {
         cfg.storage_throughput >= 500
       )
     ])
-    error_message = "Custom Agent OS Postgres gp3 performance requires at least 400 GiB, 12000 IOPS, and 500 MiB/s throughput."
+    error_message = "Custom rds_postgres gp3 performance requires >=400 GiB, >=12000 IOPS and >=500 MiB/s throughput."
   }
 
   validation {
     condition = alltrue([
-      for _, cfg in var.agent_os_postgres :
-      cfg.backup_retention_days >= 0 && cfg.backup_retention_days <= 35
+      for _, cfg in var.rds_postgres :
+      cfg.backup_retention_days >= 0 && cfg.backup_retention_days <= 35 &&
+      (!cfg.multi_az || cfg.availability_zone == null)
     ])
-    error_message = "Agent OS Postgres backup_retention_days must be between 0 and 35."
+    error_message = "rds_postgres backup_retention_days must be 0-35 and availability_zone may only be set when multi_az=false."
   }
 }
 

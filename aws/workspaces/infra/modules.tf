@@ -44,6 +44,27 @@ module "cloudtrail" {
   force_destroy               = var.disable_deletion_protection
 }
 
+# Materialize the generic PostgreSQL catalog in the root; the child
+# module does not decide whether Agent OS is enabled or what defaults to use.
+locals {
+  rds_postgres_instances = {
+    for name, cfg in var.rds_postgres : name => merge(cfg, {
+      identifier = cfg.identifier != null ? cfg.identifier : (
+        name == "agent_os" ? "${local.workspace}-agent-os" : "${local.workspace}-${replace(name, "_", "-")}"
+      )
+      kms_key_arn = cfg.kms_key_arn != null ? cfg.kms_key_arn : (
+        name == "agent_os" ? try(aws_kms_key.agent_os[0].arn, null) : null
+      )
+      deletion_protection = cfg.deletion_protection != null ? cfg.deletion_protection : !var.disable_deletion_protection
+      ingress_cidr_blocks = cfg.ingress_cidr_blocks != null ? cfg.ingress_cidr_blocks : module.network.private_subnet[*].cidr_block
+      availability_zone = cfg.availability_zone != null ? cfg.availability_zone : (
+        cfg.multi_az ? null : module.network.availability_zones.names[0]
+      )
+    })
+    if cfg.enabled && (name != "agent_os" || var.agent_os_enabled)
+  }
+}
+
 module "postgres" {
   source = "./postgres"
 
@@ -62,8 +83,7 @@ module "postgres" {
   disable_deletion_protection     = var.disable_deletion_protection
   managed_sync_enabled            = var.managed_sync_enabled
   agent_os_enabled                = var.agent_os_enabled
-  agent_os_postgres               = var.agent_os_postgres
-  agent_os_kms_key_arn            = try(aws_kms_key.agent_os[0].arn, null)
+  rds_postgres                    = local.rds_postgres_instances
   migrated_passwords              = var.migrated_passwords
 
   vpc                = module.network.vpc
