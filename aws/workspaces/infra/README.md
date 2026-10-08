@@ -183,6 +183,39 @@ cdn_bucket_acl_reset = true
 
 After `BucketOwnerEnforced` is active, ACL updates are ignored via `lifecycle.ignore_changes` to avoid S3 API errors on subsequent applies.
 
+## QA / AWS SSO access to EKS
+
+The EKS module provisions access entries through `module.eks.access_entries`.
+Use `eks_view_arns` for QA and other SSO principals that need to inspect pod
+health, events and logs. The associated **AmazonEKSViewPolicy** grants
+read-only cluster visibility, including `pods/log`, but does **not**
+allow Kubernetes Secrets, `kubectl exec`, or modifications.
+
+For an Enterprise test account, resolve the exact IAM role ARNs using
+`aws iam list-roles` (filter `AWSReservedSSO_*`) and set them in the
+**infra workspace's** `vars.auto.tfvars`:
+
+```hcl
+eks_view_arns = [
+  "arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AWSReadOnlyAccess_ROLE_SUFFIX",
+  "arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AWSPowerUserAccess_ROLE_SUFFIX",
+]
+```
+
+This applies only to the current EKS cluster. For a Spacelift-managed
+workspace, configure the same `eks_view_arns` list on that infra stack or
+context (for example, via `TF_VAR_eks_view_arns` as a JSON array). A local
+`vars.auto.tfvars` is ignored by Git: if the next Spacelift apply omits the
+variable, Terraform will plan to **remove** these two access entries.
+The IAM Identity Center permission set must also be assigned to the
+relevant QA users in AWS. Users must select the same SSO role and region
+in their AWS CLI credentials.
+SSO role suffixes can change if assignments are recreated; refresh the ARNs
+rather than hardcoding them in shared Terraform.
+
+**Do not put QA roles in `eks_admin_arns`**. That input also grants
+Kubernetes cluster-admin and KMS administrator access.
+
 ## S3 bucket encryption (SSE-S3 vs SSE-KMS)
 
 By default the S3 buckets use server-side encryption with S3-managed keys (SSE-S3 / `AES256`). This preserves the behavior of existing deployments.

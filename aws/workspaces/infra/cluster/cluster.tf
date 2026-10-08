@@ -54,7 +54,23 @@ module "eks" {
           }
         }
       }
-    } if arn != "" }
+    } if arn != "" },
+    # Non-admin AWS SSO roles can inspect pods, events, workloads and logs.
+    # AmazonEKSViewPolicy excludes Kubernetes Secrets and workload mutation.
+    # Do not reuse eks_admin_arns: those entries receive cluster-admin and KMS privileges.
+    {
+      for arn in distinct(var.eks_view_arns) : "view-${substr(sha1(arn), 0, 12)}" => {
+        principal_arn = arn
+        policy_associations = {
+          view = {
+            policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+            access_scope = {
+              type = "cluster"
+            }
+          }
+        }
+      } if arn != ""
+    }
   )
 
   cluster_security_group_additional_rules = var.bastion_enabled ? {

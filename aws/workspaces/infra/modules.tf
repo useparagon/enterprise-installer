@@ -143,6 +143,7 @@ module "cluster" {
 
   create_autoscaling_linked_role  = var.create_autoscaling_linked_role
   eks_admin_arns                  = local.admin_arns
+  eks_view_arns                   = var.eks_view_arns
   eks_max_node_count              = var.eks_max_node_count
   eks_min_node_count              = var.eks_min_node_count
   eks_ondemand_node_instance_type = local.eks_ondemand_node_instance_type

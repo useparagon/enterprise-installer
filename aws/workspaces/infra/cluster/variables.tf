@@ -23,6 +23,11 @@ variable "eks_admin_arns" {
   type        = list(string)
 }
 
+variable "eks_view_arns" {
+  description = "IAM roles to associate with AmazonEKSViewPolicy, cluster-scoped for QA visibility into pods, events and logs (no Kubernetes Secrets)."
+  type        = list(string)
+}
+
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster. Supported: 1.34, 1.35."
   type        = string

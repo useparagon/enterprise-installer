@@ -210,6 +210,19 @@ variable "eks_admin_arns" {
   default     = []
 }
 
+variable "eks_view_arns" {
+  description = "IAM role ARNs allowed to view EKS resources, pod logs and events without modifying workloads or reading Kubernetes Secrets. Use for QA/SSO roles; never add these to eks_admin_arns."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for arn in var.eks_view_arns : can(regex("^arn:[^:]+:iam::[0-9]{12}:role/", arn))
+    ])
+    error_message = "eks_view_arns must contain IAM role ARNs (not STS assumed-role session ARNs)."
+  }
+}
+
 variable "create_autoscaling_linked_role" {
   description = "Whether or not to create an IAM role for autoscaling."
   type        = bool
