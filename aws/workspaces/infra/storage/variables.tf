@@ -31,13 +31,11 @@ variable "managed_sync_enabled" {
 variable "agent_os_enabled" {
   description = "Whether to create the Agent OS bucket."
   type        = bool
-  default     = false
 }
 
 variable "agent_os_kms_key_arn" {
   description = "KMS key ARN used to encrypt the Agent OS bucket."
   type        = string
-  default     = null
 }
 
 variable "s3_kms_encryption_enabled" {

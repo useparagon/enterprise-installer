@@ -226,39 +226,33 @@ variable "agent_os_helm_repository" {
 variable "agent_os_helm_values" {
   description = "Additional Agent OS chart values supplied through Terraform."
   type        = any
-  default     = {}
   sensitive   = true
 }
 
 variable "agent_os_file_values" {
   description = "Agent OS chart-root overrides loaded from .secure/values.yaml agentOs.values."
   type        = any
-  default     = {}
   sensitive   = true
 }
 
 variable "agent_os_app_secret_name" {
   description = "Secrets Manager name for Agent OS application configuration."
   type        = string
-  default     = null
 }
 
 variable "agent_os_broker_secret_name" {
   description = "Secrets Manager name for Agent OS capability broker configuration."
   type        = string
-  default     = null
 }
 
 variable "agent_os_admin_secret_name" {
   description = "Secrets Manager name for Agent OS migration-only administration configuration."
   type        = string
-  default     = null
 }
 
 variable "agent_os_vendor_secret_name" {
   description = "Secrets Manager name for operator-managed Agent OS vendor configuration."
   type        = string
-  default     = null
 }
 
 variable "waf_web_acl_arn" {
