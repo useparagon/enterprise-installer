@@ -202,6 +202,11 @@ variable "managed_sync_version" {
   type        = string
 }
 
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts."
+  type        = string
+}
+
 variable "waf_web_acl_arn" {
   description = "Regional WAFv2 Web ACL ARN for the shared ALB. Empty disables WAF association."
   type        = string

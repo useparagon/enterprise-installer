@@ -71,6 +71,7 @@ module "helm" {
   managed_sync_enabled        = var.managed_sync_enabled
   managed_sync_secret_name    = var.managed_sync_enabled ? local.runtime_secret_names.managed_sync : null
   managed_sync_version        = var.managed_sync_version
+  paragon_helm_repository     = var.paragon_helm_repository
   microservices               = local.microservices
   monitor_version             = local.monitor_version
   monitors                    = local.monitors
