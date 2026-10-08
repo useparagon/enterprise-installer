@@ -16,7 +16,7 @@ subchart:
   hades:
     enabled: true
   health-checker:
-    enabled: false
+    enabled: true
   hermes:
     enabled: true
   ocs-code-runner:

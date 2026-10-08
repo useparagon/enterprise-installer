@@ -23,15 +23,6 @@ variable "certificate" {
   type        = string
 }
 
-variable "public_microservices" {
-  description = "The microservices running within the system exposed to the load balancer"
-  type = map(object({
-    port             = number
-    healthcheck_path = string
-    public_url       = string
-  }))
-}
-
 variable "microservices" {
   description = "The microservices running within the system, including those only reachable internally"
   type = map(object({
@@ -39,22 +30,13 @@ variable "microservices" {
   }))
 }
 
-variable "public_monitors" {
-  description = "The monitors running within the system exposed to the load balancer"
+variable "public_services" {
+  description = "Hosts on the shared load balancer (public microservices, monitors, and managed-sync when not on the restrict allowlist)."
   type = map(object({
-    port       = number
-    public_url = string
+    port             = optional(number)
+    healthcheck_path = optional(string)
+    public_url       = string
   }))
-}
-
-variable "release_ingress" {
-  description = "The helm release for the ingress."
-  type        = any
-}
-
-variable "release_paragon_on_prem" {
-  description = "The helm release for the Paragon microservices."
-  type        = any
 }
 
 variable "worker_security_group_ids" {

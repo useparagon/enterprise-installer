@@ -96,7 +96,7 @@ variable "excluded_microservices" {
 }
 
 variable "private_services" {
-  description = "Services that should not be publicly exposed (filtered from public_microservices and public_monitors)."
+  description = "Services that get no Ingress. Removed from public_microservices and public_monitors on both internet-facing and internal load balancers. ingress_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict_public_exposure is true, allowlisted services can still be listed here."
   type        = list(string)
   default     = []
 }
@@ -304,8 +304,8 @@ variable "uptime_company" {
   default     = null
 }
 
-variable "health_checker_enabled" {
-  description = "Specifies that health checker is enabled."
+variable "restrict_public_exposure" {
+  description = "When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private_services to further restrict allowlisted endpoints."
   type        = bool
   default     = false
 }
@@ -420,12 +420,6 @@ variable "hoop_image_tag" {
   description = "Container image tag for the Hoop agent."
   type        = string
   default     = "1.2.1"
-}
-
-variable "hoop_grafana_connection" {
-  description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
-  type        = bool
-  default     = false
 }
 
 variable "hoop_k8s_connections" {
@@ -743,16 +737,34 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
+  restrict_public_exposure = var.restrict_public_exposure
+
+  restricted_public_microservice_allowlist = toset([
+    "api-triggerkit",
+    "connect",
+    "dashboard",
+    "health-checker",
+    "hermes",
+    "worker-proxy",
+    "zeus",
+  ])
+
   public_microservices = {
     for microservice, config in local.microservices :
     microservice => config
-    if lookup(config, "public_url", null) != null && !contains(var.private_services, microservice)
+    if lookup(config, "public_url", null) != null && lookup(config, "public_url", "") != "" && !contains(var.private_services, microservice) && (
+      !local.restrict_public_exposure || contains(local.restricted_public_microservice_allowlist, microservice)
+    )
   }
+
+  uptime_excluded_microservices = toset([
+    "cache-replay",
+  ])
 
   uptime_services = {
     for microservice, config in local.public_microservices :
     microservice => config
-    if var.ingress_scheme != "internal" && (microservice == "health-checker" || !var.health_checker_enabled)
+    if var.ingress_scheme != "internal" && !contains(local.uptime_excluded_microservices, microservice)
   }
 
   monitors = {
@@ -802,13 +814,24 @@ locals {
     }
   }
 
-  public_monitors = var.monitors_enabled ? {
+  # Internet-facing monitor Ingress (Grafana when it has a public_url). Restrict mode keeps monitors internal (Hoop).
+  public_monitors = var.monitors_enabled && !local.restrict_public_exposure ? {
     for monitor, config in local.monitors :
     monitor => config
-    if lookup(config, "public_url", null) != null && !contains(var.private_services, monitor)
+    if lookup(config, "public_url", null) != null && lookup(config, "public_url", "") != "" && !contains(var.private_services, monitor)
   } : {}
 
-  public_services = merge(local.public_microservices, local.public_monitors)
+  # Managed Sync uses sync.${domain} via its Helm ingress; keep DNS/AGC listeners when
+  # restrict_public_exposure omits api-sync from public_microservices (key api-sync → api-sync-secret).
+  managed_sync_public_dns = var.managed_sync_enabled && contains(keys(local.microservices), "api-sync") && !contains(keys(local.public_microservices), "api-sync") && !contains(var.private_services, "api-sync") ? {
+    "api-sync" = local.microservices["api-sync"]
+  } : {}
+
+  public_services = merge(
+    local.public_microservices,
+    local.public_monitors,
+    local.managed_sync_public_dns,
+  )
 
   helm_keys_to_remove = [
     "POSTGRES_HOST",

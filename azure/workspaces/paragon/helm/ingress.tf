@@ -12,11 +12,13 @@ locals {
   subchart_enabled = merge(
     { for name in keys(var.microservices) : name => { enabled = true } },
     try(nonsensitive(var.helm_values.subchart), {}),
+    var.restrict_public_exposure ? { health-checker = { enabled = true } } : {},
   )
 
   # Hostnames that need Certificate CRs when nginx Ingress is gone (AGC direct).
+  # public_services includes managed_sync_public_dns (sync host when restrict drops api-sync).
   agc_direct_certificate_hosts = {
-    for name, cfg in merge(var.public_microservices, var.public_monitors) :
+    for name, cfg in var.public_services :
     name => replace(replace(cfg.public_url, "https://", ""), "http://", "")
     if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true)
   }

@@ -75,7 +75,8 @@ resource "helm_release" "managed_sync" {
   verify           = false
   timeout          = 300
   force_update     = true
-  # The API server still validates writes; skip Helm's extra OpenAPI fetch over Connect Gateway.
+  # Parent chart renders ScaledObject; KEDA CRDs come from the subchart. OpenAPI
+  # validation runs before subchart CRDs exist (and manual CRD fixes break Helm ownership).
   disable_openapi_validation = true
 
   values = concat(
