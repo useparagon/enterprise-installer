@@ -638,6 +638,7 @@ locals {
   effective_platform_version = coalesce(
     var.platform_version,
     try(local.helm_vars.global.env.VERSION, null),
+    "",
   )
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "S3")
@@ -1156,9 +1157,10 @@ locals {
           MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
           }, {
           for key, value in local.helm_vars.global.env :
-          key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+          key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
-        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {},
+        { VERSION = local.effective_platform_version },
       )
     })
   })

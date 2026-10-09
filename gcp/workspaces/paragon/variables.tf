@@ -974,6 +974,7 @@ locals {
   effective_platform_version = coalesce(
     var.platform_version,
     try(local.helm_vars.global.env.VERSION, null),
+    "",
   )
 
   gcp_provider_credentials = jsonencode({
@@ -1502,9 +1503,10 @@ locals {
         local.postgres_max_storage_env,
         {
           for key, value in local.helm_vars.global.env :
-          key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+          key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
-        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {},
+        { VERSION = local.effective_platform_version },
       )
     })
   })
