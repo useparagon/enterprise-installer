@@ -505,6 +505,12 @@ variable "agent_os_vendor_config" {
   default     = {}
 }
 
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository."
+  type        = string
+  default     = "https://helm.useparagon.com"
+}
+
 variable "waf_enabled" {
   description = "Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf_managed_rule_groups, rate limits, or IP lists in tfvars."
   type        = bool

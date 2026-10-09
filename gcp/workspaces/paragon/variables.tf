@@ -157,6 +157,12 @@ variable "managed_sync_version" {
   default     = "0.0.131"
 }
 
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository."
+  type        = string
+  default     = "https://helm.useparagon.com"
+}
+
 variable "excluded_microservices" {
   description = "The microservices that should be excluded from the deployment."
   type        = list(string)

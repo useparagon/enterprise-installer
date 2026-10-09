@@ -511,6 +511,12 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository."
+  type        = string
+  default     = "https://helm.useparagon.com"
+}
+
 locals {
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
   hash                  = substr(sha256(var.azure_subscription_id), 0, 8)

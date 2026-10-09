@@ -74,6 +74,7 @@ module "helm" {
   agent_os_broker_secret_name   = var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_broker[0].name : null
   agent_os_admin_secret_name    = var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_admin[0].name : null
   agent_os_vendor_secret_name   = var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_vendor[0].name : null
+  paragon_helm_repository       = var.paragon_helm_repository
   microservices                 = local.microservices
   monitor_version               = local.monitor_version
   monitors                      = local.monitors
