@@ -1,7 +1,7 @@
 locals {
-  # Application defaults (models, AWS node placement, resources) come from
-  # the chart published after PR #113. Terraform supplies tenant endpoints,
-  # identity and feature switches; capacity stays on chart defaults.
+  # The Agent OS chart owns Enterprise application defaults, migration hooks,
+  # Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
+  # Terraform supplies only AWS identity, tenant integration and secret rollout.
   agent_os_aws_values = {
     global = {
       agentOs = {
@@ -19,14 +19,9 @@ locals {
           region = var.aws_region
         }
 
-        # BIFROST_URL is in-cluster Service DNS, same as PARAGON_ZEUS_URL.
-        # The chart injects it only when HOST_ENV=AWS_K8.
         env = {
-          HOST_ENV                              = try(var.helm_values.global.env["HOST_ENV"], "AWS_K8")
-          NODE_ENV                              = try(var.helm_values.global.env["NODE_ENV"], "production")
+          HOST_ENV                              = "AWS_K8"
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
-          LOG_LEVEL                             = try(var.helm_values.global.env["LOG_LEVEL"], "info")
-          BIFROST_URL                           = "http://agent-os-bifrost:8080"
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
           PARAGON_MANAGED_SYNC_URL              = "http://api-sync:${var.microservices["api-sync"].port}"
           PARAGON_MANAGED_SYNC_PROJECT_HOST     = "api-project"
@@ -38,29 +33,6 @@ locals {
       }
     }
 
-    # Match Managed Sync's Enterprise pattern: provision PostgreSQL roles and
-    # schemas before Helm waits for application Deployments to become healthy.
-    # Both hooks are supported by the currently published Agent OS chart.
-    migration = {
-      hookType = "pre-install,pre-upgrade"
-    }
-
-    # Helm dependency conditions cannot be derived from HOST_ENV templates.
-    tools-api = {
-      migration = {
-        hookType = "pre-install,pre-upgrade"
-      }
-      env = {
-        AGENT_OS_TOOL_SEARCH_ENABLED     = "true"
-        AGENT_OS_TOOL_EXECUTE_ENABLED    = "true"
-        AGENT_OS_EXEC_ALLOW_SIDE_EFFECTS = "true"
-      }
-    }
-
-    # Opt-in feature profile requires this explicit dependency switch.
-    bifrost = {
-      enabled = true
-    }
   }
 }
 
