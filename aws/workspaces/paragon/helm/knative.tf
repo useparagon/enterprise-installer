@@ -26,6 +26,12 @@ resource "kubernetes_namespace" "knative_serving" {
   metadata {
     name = "knative-serving"
   }
+
+  # Knative and Kourier annotate this namespace after installation. Do not
+  # remove their controller-owned labels on subsequent Terraform plans.
+  lifecycle {
+    ignore_changes = [metadata[0].labels]
+  }
 }
 
 locals {
