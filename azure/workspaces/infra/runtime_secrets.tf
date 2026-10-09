@@ -127,6 +127,7 @@ resource "azurerm_key_vault_secret" "runtime_agent_os" {
   value = jsonencode({
     app_config         = local.agent_os_app_config
     admin_config       = local.agent_os_admin_config
+    broker_config      = local.agent_os_capability_broker_config
     storage_account    = module.storage.blob.name
     storage_account_id = module.storage.blob.id
     container          = module.storage.blob.agent_os_container
@@ -182,8 +183,35 @@ resource "azurerm_key_vault_secret" "runtime_bastion" {
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
 
-# Agent OS app/admin secret payloads, composed from the postgres, redis-managed, storage and
-# kafka modules and stored in Key Vault. Service pods only ever receive the app payload.
+# Agent OS app/admin/broker secret payloads, composed from the postgres, redis-managed,
+# storage and kafka modules and stored in Key Vault. Service pods only ever receive the
+# app payload; capability-broker gets its own least-privilege payload below.
+#
+# NOTE: azurerm_key_vault_secret.runtime_agent_os below is NOT merged with the currently
+# stored value, so any infra apply overwrites whatever the paragon workspace previously
+# layered on top (LICENSE, ZEUS_ACCESS_TOKEN, etc. computed in paragon/runtime_secrets.tf).
+# Always re-apply the paragon workspace after an infra apply that touches Agent OS.
+
+resource "random_password" "agent_os_capability_broker_signing_key" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 64
+  special = false
+}
+
+resource "random_password" "agent_os_capability_broker_service_token" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 64
+  special = false
+}
+
+resource "random_password" "agent_os_extraction_api_key" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 64
+  special = false
+}
 
 locals {
   agent_os_db    = try(one(module.postgres).agent_os, null)
@@ -236,6 +264,9 @@ locals {
     AOS_S3_PARSED_PREFIX      = "parsed/"
     AOS_S3_INDEX_BUCKET       = module.storage.blob.agent_os_container
     AOS_S3_INDEX_AZ_ID        = ""
+
+    AGENT_OS_CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
+    EXTRACTION_API_KEY                       = random_password.agent_os_extraction_api_key[0].result
   } : null
 
   agent_os_admin_config = var.agent_os_enabled ? {
@@ -246,5 +277,24 @@ locals {
     ADMIN_POSTGRES_PASSWORD    = local.agent_os_db.admin_password
     ADMIN_POSTGRES_SSL_ENABLED = "true"
     ADMIN_POSTGRES_SSL_CA      = ""
+
+    # The migration Job grants this role in TOOLS_POSTGRES_DATABASE before capability-broker starts.
+    CAPABILITY_BROKER_POSTGRES_USERNAME = local.agent_os_db.capability_broker.user
+    CAPABILITY_BROKER_POSTGRES_PASSWORD = local.agent_os_db.capability_broker.password
+  } : null
+
+  # Unlike the app secret, only capability-broker receives its signing key and
+  # least-privilege PostgreSQL role (same pattern as AWS/GCP).
+  agent_os_capability_broker_config = var.agent_os_enabled ? {
+    TOOLS_POSTGRES_HOST        = local.agent_os_db.host
+    TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    TOOLS_POSTGRES_DATABASE    = local.agent_os_db.databases.tools.database
+    TOOLS_POSTGRES_USERNAME    = local.agent_os_db.capability_broker.user
+    TOOLS_POSTGRES_PASSWORD    = local.agent_os_db.capability_broker.password
+    TOOLS_POSTGRES_SSL_ENABLED = "true"
+
+    CAPABILITY_BROKER_SIGNING_KEY   = random_password.agent_os_capability_broker_signing_key[0].result
+    CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
+    CAPABILITY_BROKER_SIGNING_KID   = "capability-broker-v1"
   } : null
 }

@@ -140,6 +140,16 @@ resource "azurerm_key_vault_secret" "agent_os_admin" {
   ))
 }
 
+# Capability-broker is a passthrough of the infra-generated least-privilege payload
+# (signing key, service token, scoped Postgres role). No paragon-side overlay, same as GCP.
+resource "azurerm_key_vault_secret" "agent_os_broker" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name         = "agent-os-capability-broker"
+  key_vault_id = data.azurerm_key_vault.paragon.id
+  value        = jsonencode(local.agent_os_handoff.broker_config)
+}
+
 resource "azurerm_key_vault_secret" "agent_os_vendor" {
   count = var.agent_os_enabled ? 1 : 0
 
@@ -154,6 +164,14 @@ resource "azurerm_key_vault_secret" "agent_os_vendor" {
   # agentOs.secrets.vendor seed create; subsequent rotations stay out of band.
   lifecycle {
     ignore_changes = [value]
+
+    precondition {
+      condition = try(trimspace(coalesce(
+        try(local.agent_os_file_vendor_config.VOYAGE_API_KEY, null),
+        try(var.agent_os_vendor_config.VOYAGE_API_KEY, null),
+      )) != "", false)
+      error_message = "Agent OS requires VOYAGE_API_KEY. Set agentOs.secrets.vendor.VOYAGE_API_KEY in .secure/values.yaml before enabling agent_os_enabled."
+    }
   }
 }
 

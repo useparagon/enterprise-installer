@@ -14,6 +14,10 @@ output "agent_os" {
         password = random_password.agent_os_app_password[name].result
       }
     }
+    capability_broker = {
+      user     = random_string.agent_os_capability_broker_username[0].result
+      password = random_password.agent_os_capability_broker_password[0].result
+    }
   } : null
   sensitive = true
 }

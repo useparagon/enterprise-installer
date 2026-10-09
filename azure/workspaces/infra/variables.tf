@@ -543,9 +543,13 @@ variable "eventhub_namespace_sku" {
     error_message = "The sku_name must be `Basic`, `Standard`, or `Premium`."
   }
 
+  # Azure cannot migrate an existing Standard namespace to Premium in place; changing
+  # sku is ForceNew and destroys the namespace's data. Require the operator to set
+  # Premium explicitly (new deployment, or after a deliberate out-of-band migration)
+  # instead of letting Terraform switch it automatically when agent_os_enabled flips.
   validation {
-    condition     = !var.agent_os_enabled || contains(["Standard", "Premium"], var.eventhub_namespace_sku)
-    error_message = "Agent OS Kafka requires an Event Hubs Standard or Premium namespace."
+    condition     = !var.agent_os_enabled || var.eventhub_namespace_sku == "Premium"
+    error_message = "Agent OS requires eventhub_namespace_sku = \"Premium\". Set it explicitly before enabling agent_os_enabled; Azure cannot migrate an existing Standard namespace to Premium without recreating it and losing its data."
   }
 }
 

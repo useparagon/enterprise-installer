@@ -172,6 +172,29 @@ locals {
     }
   }) : null
 
+  agent_os_broker_external_secret_yaml = var.agent_os_enabled ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "agent-os-capability-broker"
+      namespace = kubernetes_namespace.paragon.id
+    }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef = {
+        name = "azure-key-vault"
+        kind = "SecretStore"
+      }
+      target = {
+        name           = "agent-os-capability-broker"
+        creationPolicy = "Owner"
+      }
+      dataFrom = [
+        { extract = { key = var.agent_os_secret_names.broker } },
+      ]
+    }
+  }) : null
+
   external_secret_paragon_yaml = yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ExternalSecret"
@@ -286,7 +309,8 @@ resource "kubectl_manifest" "secret_store" {
   depends_on = [helm_release.external_secrets]
 }
 
-# Agent OS has exactly two ESO-managed Kubernetes Secrets; app merges vendor then app.
+# Agent OS has three ESO-managed Kubernetes Secrets: app (merges vendor then app),
+# admin (migration Job) and capability-broker (least-privilege, same as AWS/GCP).
 resource "kubectl_manifest" "agent_os_app_external_secret" {
   count = var.agent_os_enabled ? 1 : 0
 
@@ -298,6 +322,13 @@ resource "kubectl_manifest" "agent_os_admin_external_secret" {
   count = var.agent_os_enabled ? 1 : 0
 
   yaml_body  = local.agent_os_admin_external_secret_yaml
+  depends_on = [kubectl_manifest.secret_store]
+}
+
+resource "kubectl_manifest" "agent_os_broker_external_secret" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  yaml_body  = local.agent_os_broker_external_secret_yaml
   depends_on = [kubectl_manifest.secret_store]
 }
 

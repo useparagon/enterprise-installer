@@ -19,12 +19,14 @@ locals {
           }
         }
 
+        # AZURE_K8 suppresses Kafka CreateAcls on Event Hubs. BIFROST_URL is
+        # in-cluster Service DNS; the chart injects it only for AWS_K8.
         env = {
-          # AZURE_K8 suppresses Kafka CreateAcls on Event Hubs.
           HOST_ENV                              = "AZURE_K8"
           NODE_ENV                              = try(var.helm_values.global.env["NODE_ENV"], "production")
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
           LOG_LEVEL                             = try(var.helm_values.global.env["LOG_LEVEL"], "info")
+          BIFROST_URL                           = "http://agent-os-bifrost:8080"
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
           PARAGON_MANAGED_SYNC_URL              = "http://api-sync:${var.microservices["api-sync"].port}"
           PARAGON_MANAGED_SYNC_PROJECT_HOST     = "api-project"
@@ -57,11 +59,41 @@ locals {
       enabled = true
     }
 
-    # AKS ESO produces agent-os-app/admin; unlike AWS, there is no dedicated
-    # agent-os-capability-broker Secret. Use the app Secret for this workload.
+    # The broker reads only its least-privilege role and signing credentials,
+    # same as AWS/GCP (AKS ESO produces a dedicated agent-os-capability-broker Secret).
     capability-broker = {
-      includeGlobalSecret = true
-      secretName          = ""
+      secretName          = "agent-os-capability-broker"
+      includeGlobalSecret = false
+    }
+
+    # AKS needs explicit scheduling for the tainted Agent OS pools provisioned
+    # in infra/cluster (aosindex / aosextract); the chart's default affinity targets AWS.
+    index-maintainer = {
+      nodeSelector = { "useparagon.com/workload" = "agent-os-index" }
+      tolerations = [{
+        key      = "useparagon.com/workload"
+        operator = "Equal"
+        value    = "agent-os-index"
+        effect   = "NoSchedule"
+      }]
+    }
+    index-reader = {
+      nodeSelector = { "useparagon.com/workload" = "agent-os-index" }
+      tolerations = [{
+        key      = "useparagon.com/workload"
+        operator = "Equal"
+        value    = "agent-os-index"
+        effect   = "NoSchedule"
+      }]
+    }
+    extraction-service = {
+      nodeSelector = { "useparagon.com/workload" = "agent-os-extract" }
+      tolerations = [{
+        key      = "useparagon.com/workload"
+        operator = "Equal"
+        value    = "agent-os-extract"
+        effect   = "NoSchedule"
+      }]
     }
   }
 }
@@ -96,6 +128,7 @@ resource "helm_release" "agent_os" {
     terraform_data.eso_secrets_gate,
     data.kubernetes_secret.agent_os_app,
     data.kubernetes_secret.agent_os_admin,
+    data.kubernetes_secret.agent_os_broker,
     data.kubernetes_secret.docker_cfg,
     kubernetes_service_account.agent_os,
   ]

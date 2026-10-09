@@ -129,3 +129,25 @@ resource "random_password" "agent_os_app_password" {
   numeric = true
   special = false
 }
+
+# Least-privilege role for the capability-broker workload. Kept separate from the
+# app role (above) so the broker never receives the app's full `tools` grants.
+resource "random_string" "agent_os_capability_broker_username" {
+  count = length(local.agent_os_databases) > 0 ? 1 : 0
+
+  length  = 16
+  lower   = true
+  upper   = true
+  numeric = false
+  special = false
+}
+
+resource "random_password" "agent_os_capability_broker_password" {
+  count = length(local.agent_os_databases) > 0 ? 1 : 0
+
+  length  = 32
+  lower   = true
+  upper   = true
+  numeric = true
+  special = false
+}

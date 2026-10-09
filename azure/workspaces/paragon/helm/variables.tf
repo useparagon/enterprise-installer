@@ -256,6 +256,7 @@ variable "agent_os_secret_names" {
   type = object({
     app    = string
     admin  = string
+    broker = string
     vendor = string
   })
   default = null

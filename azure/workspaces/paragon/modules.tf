@@ -24,6 +24,7 @@ module "helm" {
     openobserve     = azurerm_key_vault_secret.openobserve[0].version
     agent_os_app    = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_app[0].version : null
     agent_os_admin  = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_admin[0].version : null
+    agent_os_broker = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_broker[0].version : null
     agent_os_vendor = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_vendor[0].version : null
   }))
   ingress_scheme           = var.ingress_scheme
@@ -45,6 +46,7 @@ module "helm" {
   agent_os_secret_names = var.agent_os_enabled ? {
     app    = azurerm_key_vault_secret.agent_os_app[0].name
     admin  = azurerm_key_vault_secret.agent_os_admin[0].name
+    broker = azurerm_key_vault_secret.agent_os_broker[0].name
     vendor = azurerm_key_vault_secret.agent_os_vendor[0].name
   } : null
   agent_os_workload_identity_client_id = var.agent_os_enabled ? azurerm_user_assigned_identity.agent_os[0].client_id : null

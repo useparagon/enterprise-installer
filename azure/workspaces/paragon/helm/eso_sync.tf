@@ -6,6 +6,7 @@ locals {
     var.managed_sync_secret_name != null ? try(kubectl_manifest.external_secret_managed_sync[0].uid, null) : null,
     var.agent_os_enabled ? try(kubectl_manifest.agent_os_app_external_secret[0].uid, null) : null,
     var.agent_os_enabled ? try(kubectl_manifest.agent_os_admin_external_secret[0].uid, null) : null,
+    var.agent_os_enabled ? try(kubectl_manifest.agent_os_broker_external_secret[0].uid, null) : null,
   ]))
 }
 
@@ -17,6 +18,7 @@ resource "time_sleep" "wait_for_eso_core_secrets" {
     kubectl_manifest.external_secret_docker,
     kubectl_manifest.agent_os_app_external_secret,
     kubectl_manifest.agent_os_admin_external_secret,
+    kubectl_manifest.agent_os_broker_external_secret,
   ]
 
   triggers = {
@@ -100,7 +102,7 @@ data "kubernetes_secret" "managed_sync_secrets" {
   depends_on = [terraform_data.eso_secrets_gate]
 }
 
-# Verify ESO created the two Agent OS secrets before dependent workloads are added.
+# Verify ESO created all three Agent OS secrets before dependent workloads are added.
 data "kubernetes_secret" "agent_os_app" {
   count = var.agent_os_enabled ? 1 : 0
 
@@ -117,6 +119,17 @@ data "kubernetes_secret" "agent_os_admin" {
 
   metadata {
     name      = "agent-os-admin"
+    namespace = kubernetes_namespace.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret" "agent_os_broker" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  metadata {
+    name      = "agent-os-capability-broker"
     namespace = kubernetes_namespace.paragon.id
   }
 
