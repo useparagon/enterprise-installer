@@ -100,14 +100,15 @@ module "helm" {
 module "dns" {
   source = "./dns"
 
-  domain                  = var.domain
-  public_services         = local.public_services
-  route53_zone_id         = module.alb.route53_zone_id
-  workspace               = local.workspace
-  cluster_name            = local.cluster_name
-  release_ingress         = module.helm.release_ingress
-  release_paragon_logging = module.helm.release_paragon_logging
-  release_paragon_on_prem = module.helm.release_paragon_on_prem
+  domain                        = var.domain
+  public_services               = local.public_services
+  route53_zone_id               = module.alb.route53_zone_id
+  workspace                     = local.workspace
+  cluster_name                  = local.cluster_name
+  release_ingress               = module.helm.release_ingress
+  release_paragon_logging       = module.helm.release_paragon_logging
+  release_paragon_on_prem       = module.helm.release_paragon_on_prem
+  ingress_alb_dns_name_fallback = module.helm.alb_dns_name
 }
 
 module "managed_sync_config" {
