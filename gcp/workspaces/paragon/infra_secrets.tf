@@ -118,6 +118,7 @@ locals {
   # Final Agent OS application secrets follow the workspace naming convention.
   agent_os_app_secret_name    = var.agent_os_enabled ? "${local.workspace}-agent-os-app" : null
   agent_os_admin_secret_name  = var.agent_os_enabled ? "${local.workspace}-agent-os-admin" : null
+  agent_os_broker_secret_name = var.agent_os_enabled ? "${local.workspace}-agent-os-capability-broker" : null
   agent_os_vendor_secret_name = var.agent_os_enabled ? "${local.workspace}-agent-os-vendor" : null
   agent_os_service_account    = try(nonsensitive(local.agent_os_handoff.service_account), null)
 }

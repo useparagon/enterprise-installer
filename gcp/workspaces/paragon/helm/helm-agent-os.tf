@@ -19,7 +19,10 @@ locals {
 
         env = {
           HOST_ENV                              = "GCP_K8"
-          PLATFORM_ENV                          = "enterprise"
+          NODE_ENV                              = try(var.helm_values.global.env["NODE_ENV"], "production")
+          PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
+          LOG_LEVEL                             = try(var.helm_values.global.env["LOG_LEVEL"], "info")
+          BIFROST_URL                           = "http://agent-os-bifrost:8080"
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
           PARAGON_MANAGED_SYNC_URL              = "http://api-sync:${var.microservices["api-sync"].port}"
           PARAGON_MANAGED_SYNC_PROJECT_HOST     = "api-project"
@@ -39,13 +42,51 @@ locals {
       migration = {
         hookType = "pre-install,pre-upgrade"
       }
+      env = {
+        AGENT_OS_TOOL_SEARCH_ENABLED     = "true"
+        AGENT_OS_TOOL_EXECUTE_ENABLED    = "true"
+        AGENT_OS_EXEC_ALLOW_SIDE_EFFECTS = "true"
+      }
     }
 
-    # GCP ESO creates only agent-os-app and agent-os-admin. Share the app
-    # Secret with capability-broker instead of requiring an absent third one.
+    bifrost = {
+      enabled = true
+    }
+
     capability-broker = {
-      includeGlobalSecret = true
-      secretName          = ""
+      # The broker reads only the least-privilege role and signing credentials.
+      secretName          = "agent-os-capability-broker"
+      includeGlobalSecret = false
+    }
+
+    # Unlike the AWS-only chart defaults, GKE needs explicit scheduling for
+    # the tainted Agent OS pools provisioned in infra/cluster.
+    index-maintainer = {
+      nodeSelector = { "useparagon.com/workload" = "agent-os-index" }
+      tolerations = [{
+        key      = "useparagon.com/workload"
+        operator = "Equal"
+        value    = "agent-os-index"
+        effect   = "NoSchedule"
+      }]
+    }
+    index-reader = {
+      nodeSelector = { "useparagon.com/workload" = "agent-os-index" }
+      tolerations = [{
+        key      = "useparagon.com/workload"
+        operator = "Equal"
+        value    = "agent-os-index"
+        effect   = "NoSchedule"
+      }]
+    }
+    extraction-service = {
+      nodeSelector = { "useparagon.com/workload" = "agent-os-extract" }
+      tolerations = [{
+        key      = "useparagon.com/workload"
+        operator = "Equal"
+        value    = "agent-os-extract"
+        effect   = "NoSchedule"
+      }]
     }
   }
 }
@@ -81,6 +122,7 @@ resource "helm_release" "agent_os" {
     terraform_data.eso_secrets_gate,
     data.kubernetes_secret.agent_os_app,
     data.kubernetes_secret.agent_os_admin,
+    data.kubernetes_secret.agent_os_broker,
     data.kubernetes_secret.docker_cfg,
     kubernetes_service_account_v1.agent_os,
     google_service_account_iam_member.agent_os_workload_identity,

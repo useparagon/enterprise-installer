@@ -145,6 +145,41 @@ resource "google_secret_manager_secret_version" "runtime_cluster" {
   })
 }
 
+# Terraform generates only the bootstrap credentials. The migration Job
+# provisions the broker database role and limits its table privileges.
+resource "random_string" "agent_os_capability_broker_username" {
+  count   = var.agent_os_enabled ? 1 : 0
+  length  = 16
+  lower   = true
+  upper   = true
+  numeric = false
+  special = false
+}
+
+resource "random_password" "agent_os_capability_broker_password" {
+  count   = var.agent_os_enabled ? 1 : 0
+  length  = 32
+  special = false
+}
+
+resource "random_password" "agent_os_capability_broker_signing_key" {
+  count   = var.agent_os_enabled ? 1 : 0
+  length  = 64
+  special = false
+}
+
+resource "random_password" "agent_os_capability_broker_service_token" {
+  count   = var.agent_os_enabled ? 1 : 0
+  length  = 64
+  special = false
+}
+
+resource "random_password" "agent_os_extraction_api_key" {
+  count   = var.agent_os_enabled ? 1 : 0
+  length  = 64
+  special = false
+}
+
 resource "google_secret_manager_secret" "runtime_agent_os" {
   count     = var.agent_os_enabled ? 1 : 0
   secret_id = "${local.runtime_secret_prefix}-agent-os"
@@ -160,6 +195,7 @@ resource "google_secret_manager_secret_version" "runtime_agent_os" {
   secret_data = jsonencode({
     app_config      = local.agent_os_app_config
     admin_config    = local.agent_os_admin_config
+    broker_config   = local.agent_os_capability_broker_config
     bucket          = module.storage.storage.agent_os_bucket
     service_account = module.storage.storage.agent_os_service_account
   })
@@ -174,6 +210,9 @@ locals {
   agent_os_kafka = one(module.kafka)
 
   agent_os_app_config = var.agent_os_enabled ? {
+    AGENT_OS_CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
+    EXTRACTION_API_KEY                       = random_password.agent_os_extraction_api_key[0].result
+
     CONTEXT_POSTGRES_HOST        = local.agent_os_db.host
     CONTEXT_POSTGRES_PORT        = tostring(local.agent_os_db.port)
     CONTEXT_POSTGRES_DATABASE    = local.agent_os_db.databases.context.database
@@ -226,5 +265,38 @@ locals {
     ADMIN_POSTGRES_PASSWORD    = local.agent_os_db.admin_password
     ADMIN_POSTGRES_SSL_ENABLED = "true"
     ADMIN_POSTGRES_SSL_CA      = ""
+
+    CAPABILITY_BROKER_POSTGRES_USERNAME = random_string.agent_os_capability_broker_username[0].result
+    CAPABILITY_BROKER_POSTGRES_PASSWORD = random_password.agent_os_capability_broker_password[0].result
+
+    ADMIN_KAFKA_BROKER_URLS   = local.agent_os_kafka.cluster_bootstrap_brokers
+    ADMIN_KAFKA_SASL_USERNAME = local.agent_os_kafka.agent_os_acl_admin_username
+    # Google Managed Kafka SASL/PLAIN requires base64(JSON service-account key).
+    ADMIN_KAFKA_SASL_PASSWORD  = base64encode(local.agent_os_kafka.agent_os_acl_admin_password)
+    ADMIN_KAFKA_SASL_MECHANISM = local.agent_os_kafka.cluster_mechanism
+    ADMIN_KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.cluster_tls_enabled)
+
+    KAFKA_PRINCIPAL_ACL_ADMIN    = "User:${local.agent_os_kafka.agent_os_acl_admin_username}"
+    KAFKA_PRINCIPAL_AGENT_OS     = "User:${local.agent_os_kafka.agent_os_service_account_email}"
+    KAFKA_PRINCIPAL_MANAGED_SYNC = "User:${local.agent_os_kafka.cluster_service_account_email}"
+
+    KAFKA_TOPIC_PARTITIONS          = "3"
+    KAFKA_TOPIC_REPLICATION_FACTOR  = "3"
+    KAFKA_TOPIC_MIN_INSYNC_REPLICAS = "2"
+  } : null
+
+  # Unlike the app Secret, only capability-broker receives its signing key
+  # and least-privilege PostgreSQL role. The migration Job grants the role.
+  agent_os_capability_broker_config = var.agent_os_enabled ? {
+    TOOLS_POSTGRES_HOST        = local.agent_os_db.host
+    TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    TOOLS_POSTGRES_DATABASE    = local.agent_os_db.databases.tools.database
+    TOOLS_POSTGRES_USERNAME    = random_string.agent_os_capability_broker_username[0].result
+    TOOLS_POSTGRES_PASSWORD    = random_password.agent_os_capability_broker_password[0].result
+    TOOLS_POSTGRES_SSL_ENABLED = "true"
+
+    CAPABILITY_BROKER_SIGNING_KEY   = random_password.agent_os_capability_broker_signing_key[0].result
+    CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
+    CAPABILITY_BROKER_SIGNING_KID   = "capability-broker-v1"
   } : null
 }

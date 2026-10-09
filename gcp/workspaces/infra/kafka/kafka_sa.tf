@@ -44,3 +44,27 @@ resource "google_service_account_key" "kafka_client_agent_os" {
   service_account_id = google_service_account.kafka_client_agent_os[0].name
 }
 
+
+# Use a separate Kafka identity to bootstrap ACLs; neither Managed Sync nor
+# the Agent OS consumer should have ACL administration privileges.
+resource "google_service_account" "kafka_acl_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  project      = var.gcp_project_id
+  account_id   = "kafka-${substr(md5(var.workspace), 0, 8)}-acl"
+  display_name = "Kafka ACL admin for Agent OS (${var.workspace})"
+}
+
+resource "google_project_iam_member" "kafka_acl_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  project = var.gcp_project_id
+  role    = "roles/managedkafka.client"
+  member  = "serviceAccount:${google_service_account.kafka_acl_admin[0].email}"
+}
+
+resource "google_service_account_key" "kafka_acl_admin" {
+  count = var.agent_os_enabled && var.gmk_sasl_mechanism == "plain" ? 1 : 0
+
+  service_account_id = google_service_account.kafka_acl_admin[0].name
+}

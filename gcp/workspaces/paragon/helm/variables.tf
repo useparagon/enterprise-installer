@@ -74,6 +74,12 @@ variable "agent_os_admin_secret_name" {
   default     = null
 }
 
+variable "agent_os_broker_secret_name" {
+  description = "Secret Manager secret id for Agent OS capability-broker credentials. Null when Agent OS is disabled."
+  type        = string
+  default     = null
+}
+
 variable "agent_os_vendor_secret_name" {
   description = "Secret Manager secret id for operator-owned Agent OS vendor keys. Null when Agent OS is disabled."
   type        = string

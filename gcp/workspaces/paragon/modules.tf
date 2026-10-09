@@ -66,6 +66,7 @@ module "helm" {
     openobserve_gcs = local.openobserve_gcs_enabled ? google_secret_manager_secret_version.openobserve_gcs[0].name : null
     agent_os_app    = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_app[0].name : null
     agent_os_admin  = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_admin[0].name : null
+    agent_os_broker = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_broker[0].name : null
     agent_os_vendor = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_vendor[0].name : null
   }))
   ingress_scheme              = var.ingress_scheme
@@ -82,6 +83,7 @@ module "helm" {
   agent_os_file_values        = try(local.helm_vars.agentOs.values, {})
   agent_os_app_secret_name    = local.agent_os_app_secret_name
   agent_os_admin_secret_name  = local.agent_os_admin_secret_name
+  agent_os_broker_secret_name = local.agent_os_broker_secret_name
   agent_os_vendor_secret_name = local.agent_os_vendor_secret_name
   agent_os_service_account    = local.agent_os_service_account
   microservices               = local.microservices

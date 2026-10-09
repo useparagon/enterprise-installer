@@ -61,3 +61,14 @@ output "agent_os_cluster_password" {
 output "agent_os_service_account_email" {
   value = var.agent_os_enabled ? google_service_account.kafka_client_agent_os[0].email : null
 }
+
+output "agent_os_acl_admin_username" {
+  description = "Dedicated Kafka ACL bootstrap principal for Agent OS."
+  value       = var.agent_os_enabled ? google_service_account.kafka_acl_admin[0].email : null
+}
+
+output "agent_os_acl_admin_password" {
+  description = "Dedicated Kafka ACL bootstrap SASL/PLAIN key (decoded JSON)."
+  value       = var.agent_os_enabled && var.gmk_sasl_mechanism == "plain" ? base64decode(google_service_account_key.kafka_acl_admin[0].private_key) : null
+  sensitive   = true
+}

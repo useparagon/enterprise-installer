@@ -8,6 +8,7 @@ locals {
     var.managed_sync_secret_name != null ? try(kubectl_manifest.external_secret_managed_sync[0].uid, null) : null,
     var.agent_os_enabled && var.agent_os_app_secret_name != null && var.agent_os_vendor_secret_name != null ? try(kubectl_manifest.external_secret_agent_os_app[0].uid, null) : null,
     var.agent_os_enabled && var.agent_os_admin_secret_name != null ? try(kubectl_manifest.external_secret_agent_os_admin[0].uid, null) : null,
+    var.agent_os_enabled && var.agent_os_broker_secret_name != null ? try(kubectl_manifest.external_secret_agent_os_broker[0].uid, null) : null,
   ]))
 }
 
@@ -97,6 +98,17 @@ resource "time_sleep" "wait_for_eso_agent_os_admin" {
   }
 }
 
+resource "time_sleep" "wait_for_eso_agent_os_broker" {
+  count           = var.agent_os_enabled && var.agent_os_broker_secret_name != null ? 1 : 0
+  create_duration = "30s"
+
+  depends_on = [kubectl_manifest.external_secret_agent_os_broker[0]]
+
+  triggers = {
+    external_secret = try(kubectl_manifest.external_secret_agent_os_broker[0].uid, null)
+  }
+}
+
 resource "terraform_data" "eso_secrets_gate" {
   input = local.eso_sync_triggers
 
@@ -108,6 +120,7 @@ resource "terraform_data" "eso_secrets_gate" {
     time_sleep.wait_for_eso_managed_sync,
     time_sleep.wait_for_eso_agent_os_app,
     time_sleep.wait_for_eso_agent_os_admin,
+    time_sleep.wait_for_eso_agent_os_broker,
   ]
 }
 
@@ -191,6 +204,17 @@ data "kubernetes_secret" "agent_os_admin" {
 
   metadata {
     name      = "agent-os-admin"
+    namespace = kubernetes_namespace_v1.paragon.id
+  }
+
+  depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret" "agent_os_broker" {
+  count = var.agent_os_enabled && var.agent_os_broker_secret_name != null ? 1 : 0
+
+  metadata {
+    name      = "agent-os-capability-broker"
     namespace = kubernetes_namespace_v1.paragon.id
   }
 

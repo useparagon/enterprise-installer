@@ -1,4 +1,51 @@
 locals {
+  # Installer-owned secret payloads stay out of Helm values. Customer-supplied
+  # agentOs.secrets are merged into Secret Manager before ESO reads them.
+  agent_os_file_secrets = try(local.helm_vars.agentOs.secrets, {})
+  agent_os_file_app_config = {
+    for key, value in try(local.agent_os_file_secrets.app, {}) :
+    key => tostring(value) if value != null
+  }
+  agent_os_file_admin_config = {
+    for key, value in try(local.agent_os_file_secrets.admin, {}) :
+    key => tostring(value) if value != null
+  }
+  agent_os_file_vendor_config = {
+    for key, value in try(local.agent_os_file_secrets.vendor, {}) :
+    key => tostring(value) if value != null && trimspace(tostring(value)) != ""
+  }
+
+  agent_os_managed_sync_config = var.agent_os_enabled ? module.managed_sync_config[0].config : {}
+  agent_os_license = try(coalesce(
+    try(local.helm_secret_values.LICENSE, null),
+    try(local.agent_os_managed_sync_config.LICENSE, null),
+    try(local.helm_vars.global.env["LICENSE"], null),
+  ), null)
+  agent_os_managed_sync_token = try(coalesce(
+    try(local.agent_os_managed_sync_config.API_SYNC_ACCESS_TOKEN, null),
+    try(local.helm_secret_values.API_SYNC_ACCESS_TOKEN, null),
+    try(local.helm_vars.global.env["API_SYNC_ACCESS_TOKEN"], null),
+    local.agent_os_license,
+  ), null)
+  agent_os_zeus_token = try(coalesce(
+    try(local.helm_secret_values.ZEUS_ACCESS_TOKEN, null),
+    try(local.helm_vars.global.env["ZEUS_ACCESS_TOKEN"], null),
+    local.agent_os_license,
+  ), null)
+  agent_os_actionkit_token = try(coalesce(
+    try(local.helm_secret_values.WORKER_ACTIONKIT_ACCESS_TOKEN, null),
+    try(local.helm_vars.global.env["WORKER_ACTIONKIT_ACCESS_TOKEN"], null),
+    local.agent_os_license,
+  ), null)
+  agent_os_app_config_from_paragon = var.agent_os_enabled ? {
+    for key, value in {
+      MANAGED_SYNC_ACCESS_TOKEN     = local.agent_os_managed_sync_token
+      ZEUS_ACCESS_TOKEN             = local.agent_os_zeus_token
+      WORKER_ACTIONKIT_ACCESS_TOKEN = local.agent_os_actionkit_token
+      LICENSE                       = local.agent_os_license
+    } : key => tostring(value) if value != null && trimspace(tostring(value)) != ""
+  } : {}
+
   runtime_secret_names = {
     env             = "${local.workspace}-env"
     docker_cfg      = "${local.workspace}-docker-cfg"
@@ -98,7 +145,9 @@ resource "google_secret_manager_secret_version" "agent_os_app" {
   secret = google_secret_manager_secret.agent_os_app[0].id
   secret_data = jsonencode(merge(
     local.agent_os_handoff.app_config,
+    local.agent_os_app_config_from_paragon,
     var.agent_os_app_config,
+    local.agent_os_file_app_config,
   ))
 }
 
@@ -117,7 +166,23 @@ resource "google_secret_manager_secret_version" "agent_os_admin" {
   secret_data = jsonencode(merge(
     local.agent_os_handoff.admin_config,
     var.agent_os_admin_config,
+    local.agent_os_file_admin_config,
   ))
+}
+
+resource "google_secret_manager_secret" "agent_os_broker" {
+  count     = var.agent_os_enabled ? 1 : 0
+  secret_id = local.agent_os_broker_secret_name
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "agent_os_broker" {
+  count       = var.agent_os_enabled ? 1 : 0
+  secret      = google_secret_manager_secret.agent_os_broker[0].id
+  secret_data = jsonencode(local.agent_os_handoff.broker_config)
 }
 
 resource "google_secret_manager_secret" "agent_os_vendor" {
@@ -130,9 +195,12 @@ resource "google_secret_manager_secret" "agent_os_vendor" {
 }
 
 resource "google_secret_manager_secret_version" "agent_os_vendor" {
-  count       = var.agent_os_enabled ? 1 : 0
-  secret      = google_secret_manager_secret.agent_os_vendor[0].id
-  secret_data = jsonencode(var.agent_os_vendor_config)
+  count  = var.agent_os_enabled ? 1 : 0
+  secret = google_secret_manager_secret.agent_os_vendor[0].id
+  secret_data = jsonencode(merge(
+    var.agent_os_vendor_config,
+    local.agent_os_file_vendor_config,
+  ))
 
   # Operator-owned API keys. Tfvars only seed the first version; later applies
   # must not create a new empty version that ESO would sync as latest.

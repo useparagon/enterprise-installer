@@ -270,6 +270,27 @@ locals {
     }
   }) : null
 
+  external_secret_agent_os_broker_yaml = var.agent_os_enabled && var.agent_os_broker_secret_name != null ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = "agent-os-capability-broker"
+      namespace = kubernetes_namespace_v1.paragon.id
+    }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef = {
+        name = "gcp-secret-manager"
+        kind = "ClusterSecretStore"
+      }
+      target = {
+        name           = "agent-os-capability-broker"
+        creationPolicy = "Owner"
+      }
+      dataFrom = [{ extract = { key = var.agent_os_broker_secret_name } }]
+    }
+  }) : null
+
   external_secret_agent_os_admin_yaml = var.agent_os_enabled && var.agent_os_admin_secret_name != null ? yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ExternalSecret"
@@ -373,4 +394,10 @@ resource "kubectl_manifest" "external_secret_agent_os_admin" {
     kubernetes_namespace_v1.paragon,
     kubernetes_service_account_v1.agent_os,
   ]
+}
+
+resource "kubectl_manifest" "external_secret_agent_os_broker" {
+  count      = var.agent_os_enabled && var.agent_os_broker_secret_name != null ? 1 : 0
+  yaml_body  = local.external_secret_agent_os_broker_yaml
+  depends_on = [kubectl_manifest.secret_store, kubernetes_namespace_v1.paragon]
 }
