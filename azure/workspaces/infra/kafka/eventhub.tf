@@ -4,10 +4,11 @@ resource "azurerm_eventhub_namespace" "kafka" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
 
-  sku                      = var.eventhub_namespace_sku
+  # Enabling Agent OS replaces Standard with Premium, destroying the existing Kafka namespace, topics and events.
+  sku                      = var.agent_os_enabled ? "Premium" : var.eventhub_namespace_sku
   capacity                 = var.eventhub_capacity
-  auto_inflate_enabled     = var.eventhub_auto_inflate_enabled
-  maximum_throughput_units = var.eventhub_auto_inflate_enabled ? var.eventhub_maximum_throughput_units : null
+  auto_inflate_enabled     = var.agent_os_enabled ? false : var.eventhub_auto_inflate_enabled
+  maximum_throughput_units = !var.agent_os_enabled && var.eventhub_auto_inflate_enabled ? var.eventhub_maximum_throughput_units : null
 
   # Network configuration - start with private endpoint only
   # Note: Kafka protocol is automatically enabled for Standard and Premium SKUs
@@ -37,7 +38,7 @@ resource "azurerm_eventhub_namespace_authorization_rule" "kafka" {
 # Managed Sync owns the source streams consumed by Agent OS. Event Hubs does not
 # support Kafka AdminClient topic creation, so Terraform must provision these entities.
 resource "azurerm_eventhub" "managed_sync_agent_os_sources" {
-  for_each = var.managed_sync_enabled ? toset([
+  for_each = var.agent_os_enabled ? toset([
     "sync.content-record",
     "sync.content-permission",
     "sync.instance-status",
@@ -85,4 +86,31 @@ resource "azurerm_eventhub_authorization_rule" "agent_os_dlt_writer" {
   listen = false
   send   = true
   manage = false
+}
+
+# Event Hubs cannot create Kafka topics through Kafka AdminClient. Provision
+# the remaining Managed Sync v1.0.75 topics alongside the Context streams above.
+resource "azurerm_eventhub" "managed_sync_topics" {
+  for_each = var.agent_os_enabled ? toset([
+    "autoscaling",
+    "sync.instance",
+    "sync.instance.dlt",
+    "sync.instance-job",
+    "sync.instance-job.dlt",
+    "sync.instance-record-completed",
+    "sync.instance-record-completed.dlt",
+    "sync.instance-record-permission",
+    "sync.instance-record-permission.dlt",
+    "sync.instance-records-content.delete",
+    "sync.instance-records-content.delete.dlt",
+    "sync.instance.delete",
+    "sync.instance.delete.dlt",
+    "sync.notification",
+    "sync.notification.dlt",
+  ]) : toset([])
+
+  name              = each.value
+  namespace_id      = azurerm_eventhub_namespace.kafka.id
+  partition_count   = var.agent_os_eventhub_partition_count
+  message_retention = var.agent_os_eventhub_message_retention
 }

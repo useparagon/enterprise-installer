@@ -500,12 +500,6 @@ variable "agent_os_enabled" {
   }
 }
 
-variable "agent_os_version" {
-  description = "The version of the Agent OS helm chart to install (consumed by the paragon workspace in PARA-25775)."
-  type        = string
-  default     = "latest"
-}
-
 variable "agent_os_index_vm_size" {
   description = "VM size for the Agent OS index AKS node pool."
   type        = string
@@ -556,12 +550,16 @@ variable "eventhub_namespace_sku" {
 }
 
 variable "eventhub_capacity" {
-  description = "The capacity units for the Event Hubs namespace (1-20 for Standard, 1-8 for Premium)."
+  description = "Standard throughput units or Premium processing units (1 PU by default with Agent OS)."
   type        = number
   default     = 1
   validation {
     condition     = var.eventhub_capacity >= 1 && var.eventhub_capacity <= 20
     error_message = "The capacity must be between 1 and 20."
+  }
+  validation {
+    condition     = !var.agent_os_enabled || contains([1, 2, 4, 6, 8, 10, 12, 16], var.eventhub_capacity)
+    error_message = "Agent OS requires a supported Premium capacity (1, 2, 4, 6, 8, 10, 12 or 16 PUs)."
   }
 }
 

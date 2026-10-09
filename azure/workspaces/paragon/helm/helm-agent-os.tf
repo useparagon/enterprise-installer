@@ -33,6 +33,16 @@ locals {
       }
     }
 
+    # Provision application PostgreSQL roles before Helm waits for ready pods.
+    migration = {
+      hookType = "pre-install,pre-upgrade"
+    }
+    tools-api = {
+      migration = {
+        hookType = "pre-install,pre-upgrade"
+      }
+    }
+
     # AKS ESO produces agent-os-app/admin; unlike AWS, there is no dedicated
     # agent-os-capability-broker Secret. Use the app Secret for this workload.
     capability-broker = {
@@ -57,7 +67,7 @@ resource "helm_release" "agent_os" {
   verify           = false
   wait             = true
   wait_for_jobs    = true
-  timeout          = 1800
+  timeout          = 900
 
   # Chart defaults < cloud runtime integration < Terraform overrides
   # < agentOs.values from the customer values.yaml.
