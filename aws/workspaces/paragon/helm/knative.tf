@@ -135,7 +135,7 @@ resource "terraform_data" "knative_serving_ready" {
   provisioner "local-exec" {
     # Run a script bundled inside the AWS Helm module so isolated Terraform
     # workspaces do not depend on files at the repository root.
-    command = "sh ${abspath("${path.module}/wait-knative-serving.sh")}"
+    command = "sh ${path.module}/wait-knative-serving.sh"
     environment = merge(local.eks_exec_env, {
       KNATIVE_API_HOST     = data.aws_eks_cluster.cluster.endpoint
       KNATIVE_CA_PEM       = base64decode(data.aws_eks_cluster.cluster.certificate_authority[0].data)
