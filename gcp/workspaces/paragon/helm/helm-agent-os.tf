@@ -1,5 +1,6 @@
-# The upstream Agent OS chart owns application defaults and service
-# scheduling. Keep only GKE/tenant integration and independent overrides here.
+# The Agent OS chart owns Enterprise application defaults, migration hooks,
+# Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
+# Terraform supplies only GKE identity, tenant integration and secret rollout.
 locals {
   agent_os_gcp_values = {
     global = {
@@ -17,14 +18,9 @@ locals {
           }
         }
 
-        # BIFROST_URL is in-cluster Service DNS, same as PARAGON_ZEUS_URL.
-        # The chart injects it only when HOST_ENV=AWS_K8.
         env = {
           HOST_ENV                              = "GCP_K8"
-          NODE_ENV                              = try(var.helm_values.global.env["NODE_ENV"], "production")
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
-          LOG_LEVEL                             = try(var.helm_values.global.env["LOG_LEVEL"], "info")
-          BIFROST_URL                           = "http://agent-os-bifrost:8080"
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
           PARAGON_MANAGED_SYNC_URL              = "http://api-sync:${var.microservices["api-sync"].port}"
           PARAGON_MANAGED_SYNC_PROJECT_HOST     = "api-project"
@@ -36,60 +32,6 @@ locals {
       }
     }
 
-    # Provision application PostgreSQL roles before Helm waits for ready pods.
-    migration = {
-      hookType = "pre-install,pre-upgrade"
-    }
-    tools-api = {
-      migration = {
-        hookType = "pre-install,pre-upgrade"
-      }
-      env = {
-        AGENT_OS_TOOL_SEARCH_ENABLED     = "true"
-        AGENT_OS_TOOL_EXECUTE_ENABLED    = "true"
-        AGENT_OS_EXEC_ALLOW_SIDE_EFFECTS = "true"
-      }
-    }
-
-    bifrost = {
-      enabled = true
-    }
-
-    capability-broker = {
-      # The broker reads only the least-privilege role and signing credentials.
-      secretName          = "agent-os-capability-broker"
-      includeGlobalSecret = false
-    }
-
-    # Unlike the AWS-only chart defaults, GKE needs explicit scheduling for
-    # the tainted Agent OS pools provisioned in infra/cluster.
-    index-maintainer = {
-      nodeSelector = { "useparagon.com/workload" = "agent-os-index" }
-      tolerations = [{
-        key      = "useparagon.com/workload"
-        operator = "Equal"
-        value    = "agent-os-index"
-        effect   = "NoSchedule"
-      }]
-    }
-    index-reader = {
-      nodeSelector = { "useparagon.com/workload" = "agent-os-index" }
-      tolerations = [{
-        key      = "useparagon.com/workload"
-        operator = "Equal"
-        value    = "agent-os-index"
-        effect   = "NoSchedule"
-      }]
-    }
-    extraction-service = {
-      nodeSelector = { "useparagon.com/workload" = "agent-os-extract" }
-      tolerations = [{
-        key      = "useparagon.com/workload"
-        operator = "Equal"
-        value    = "agent-os-extract"
-        effect   = "NoSchedule"
-      }]
-    }
   }
 }
 
