@@ -203,6 +203,12 @@ resource "google_secret_manager_secret_version" "runtime_agent_os" {
 
 # Agent OS app/admin secret payloads, composed from the postgres, redis, storage and kafka
 # modules and stored in Secret Manager. Service pods only ever receive the app payload.
+#
+# NOTE: google_secret_manager_secret_version.runtime_agent_os below is NOT merged with the
+# currently stored value, so any infra apply overwrites whatever the paragon workspace
+# previously layered on top (LICENSE, ZEUS_ACCESS_TOKEN, etc. computed in
+# paragon/runtime_secrets.tf). Always re-apply the paragon workspace after an infra apply
+# that touches Agent OS.
 
 locals {
   agent_os_db    = module.postgres.agent_os

@@ -206,6 +206,14 @@ resource "google_secret_manager_secret_version" "agent_os_vendor" {
   # must not create a new empty version that ESO would sync as latest.
   lifecycle {
     ignore_changes = [secret_data]
+
+    precondition {
+      condition = try(trimspace(coalesce(
+        try(local.agent_os_file_vendor_config.VOYAGE_API_KEY, null),
+        try(var.agent_os_vendor_config.VOYAGE_API_KEY, null),
+      )) != "", false)
+      error_message = "Agent OS requires VOYAGE_API_KEY. Set agentOs.secrets.vendor.VOYAGE_API_KEY in .secure/values.yaml before enabling agent_os_enabled."
+    }
   }
 }
 

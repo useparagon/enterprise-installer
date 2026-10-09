@@ -63,6 +63,16 @@ resource "google_project_iam_member" "kafka_acl_admin" {
   member  = "serviceAccount:${google_service_account.kafka_acl_admin[0].email}"
 }
 
+# roles/managedkafka.client only grants data-plane connect permissions; ACL
+# create/update/delete requires the dedicated ACL editor role.
+resource "google_project_iam_member" "kafka_acl_admin_acl_editor" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  project = var.gcp_project_id
+  role    = "roles/managedkafka.aclEditor"
+  member  = "serviceAccount:${google_service_account.kafka_acl_admin[0].email}"
+}
+
 resource "google_service_account_key" "kafka_acl_admin" {
   count = var.agent_os_enabled && var.gmk_sasl_mechanism == "plain" ? 1 : 0
 

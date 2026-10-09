@@ -17,6 +17,8 @@ locals {
           }
         }
 
+        # BIFROST_URL is in-cluster Service DNS, same as PARAGON_ZEUS_URL.
+        # The chart injects it only when HOST_ENV=AWS_K8.
         env = {
           HOST_ENV                              = "GCP_K8"
           NODE_ENV                              = try(var.helm_values.global.env["NODE_ENV"], "production")
