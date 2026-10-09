@@ -8,8 +8,7 @@
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
-| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
-| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 2.0 |
+| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | >= 0.0.19 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
 
 ## Providers
@@ -120,6 +119,8 @@
 | <a name="input_monitor_version"></a> [monitor\_version](#input\_monitor\_version) | The version of the Paragon monitors to install. | `string` | `null` | no |
 | <a name="input_monitors_enabled"></a> [monitors\_enabled](#input\_monitors\_enabled) | Specifies that monitors are enabled. | `bool` | `false` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | The name of the organization that's deploying Paragon. | `string` | n/a | yes |
+| <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input\_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
+| <a name="input_platform_version"></a> [platform\_version](#input\_platform\_version) | Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML. | `string` | `null` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that get no Ingress. Removed from public\_microservices and public\_monitors on both internet-facing and internal load balancers. ingress\_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict\_public\_exposure is true, allowlisted services can still be listed here. | `list(string)` | `[]` | no |
 | <a name="input_restrict_public_exposure"></a> [restrict\_public\_exposure](#input\_restrict\_public\_exposure) | When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private\_services to further restrict allowlisted endpoints. Removing many Ingresses from the shared ALB group requires elasticloadbalancing:SetRulePriorities on the load balancer controller IAM principal (see infra eks-worker-policy); without it, deleted Ingress objects can remain Terminating while ALB rules stay active until the controller reconciles. | `bool` | `false` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
@@ -146,6 +147,7 @@
 | <a name="output_openobserve_password"></a> [openobserve\_password](#output\_openobserve\_password) | n/a |
 | <a name="output_pgadmin_admin_email"></a> [pgadmin\_admin\_email](#output\_pgadmin\_admin\_email) | PGAdmin admin login email. |
 | <a name="output_pgadmin_admin_password"></a> [pgadmin\_admin\_password](#output\_pgadmin\_admin\_password) | PGAdmin admin login password. |
+| <a name="output_tracking"></a> [tracking](#output\_tracking) | Non-sensitive deployment metadata for external environment tracking. |
 | <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime\_webhook) | Uptime webhook URL |
 | <a name="output_waf_logs_bucket"></a> [waf\_logs\_bucket](#output\_waf\_logs\_bucket) | S3 bucket name for WAF traffic logs when WAF is enabled, otherwise null. |
 | <a name="output_waf_web_acl_arn"></a> [waf\_web\_acl\_arn](#output\_waf\_web\_acl\_arn) | ARN of the regional WAFv2 Web ACL when WAF is enabled, otherwise null. |

@@ -141,6 +141,8 @@ Do not commit real credentials to git.
 | <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve\_email) | OpenObserve admin login email. | `string` | `null` | no |
 | <a name="input_openobserve_password"></a> [openobserve\_password](#input\_openobserve\_password) | OpenObserve admin login password. | `string` | `null` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
+| <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input\_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
+| <a name="input_platform_version"></a> [platform\_version](#input\_platform\_version) | Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML. | `string` | `null` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that get no Ingress. Removed from public\_microservices and public\_monitors on both internet-facing and internal load balancers. ingress\_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict\_public\_exposure is true, allowlisted services can still be listed here. | `list(string)` | `[]` | no |
 | <a name="input_restrict_public_exposure"></a> [restrict\_public\_exposure](#input\_restrict\_public\_exposure) | When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private\_services to further restrict allowlisted endpoints. | `bool` | `false` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
@@ -173,6 +175,7 @@ Do not commit real credentials to git.
 | <a name="output_nameservers"></a> [nameservers](#output\_nameservers) | Azure DNS nameservers to delegate at the registrar (null when dns\_provider is not azure\_dns). |
 | <a name="output_pgadmin_admin_email"></a> [pgadmin\_admin\_email](#output\_pgadmin\_admin\_email) | PGAdmin admin login email. |
 | <a name="output_pgadmin_admin_password"></a> [pgadmin\_admin\_password](#output\_pgadmin\_admin\_password) | PGAdmin admin login password. |
+| <a name="output_tracking"></a> [tracking](#output\_tracking) | Non-sensitive deployment metadata for external environment tracking. |
 | <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime\_webhook) | Uptime webhook URL |
 <!-- END_TF_DOCS -->
 

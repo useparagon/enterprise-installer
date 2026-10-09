@@ -13,16 +13,7 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-| Name | Version |
-| ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
-| <a name="requirement_google"></a> [google](#requirement\_google) | ~> 7.0 |
-| <a name="requirement_google-beta"></a> [google-beta](#requirement\_google-beta) | ~> 7.0 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
-| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
-| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 1.17.0 |
-| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
-| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
+No requirements.
 
 ## Providers
 
@@ -131,6 +122,8 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve\_email) | OpenObserve admin login email. | `string` | `null` | no |
 | <a name="input_openobserve_password"></a> [openobserve\_password](#input\_openobserve\_password) | OpenObserve admin login password. | `string` | `null` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
+| <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input\_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
+| <a name="input_platform_version"></a> [platform\_version](#input\_platform\_version) | Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML. | `string` | `null` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that get no Ingress. Removed from public\_microservices and public\_monitors on both external and internal load balancers. ingress\_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict\_public\_exposure is true, allowlisted services can still be listed here. | `list(string)` | `[]` | no |
 | <a name="input_region"></a> [region](#input\_region) | The region where to host Google Cloud Organization resources. | `string` | n/a | yes |
 | <a name="input_region_zone"></a> [region\_zone](#input\_region\_zone) | The zone in the region where to host Google Cloud Organization resources. | `string` | n/a | yes |
@@ -161,6 +154,7 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | <a name="output_load_balancer"></a> [load\_balancer](#output\_load\_balancer) | Location of the load balancer |
 | <a name="output_pgadmin_admin_email"></a> [pgadmin\_admin\_email](#output\_pgadmin\_admin\_email) | PGAdmin admin login email. |
 | <a name="output_pgadmin_admin_password"></a> [pgadmin\_admin\_password](#output\_pgadmin\_admin\_password) | PGAdmin admin login password. |
+| <a name="output_tracking"></a> [tracking](#output\_tracking) | Non-sensitive deployment metadata for external environment tracking. |
 | <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime\_webhook) | Uptime webhook URL |
 | <a name="output_waf_rule_count"></a> [waf\_rule\_count](#output\_waf\_rule\_count) | Number of rules in the Cloud Armor policy when WAF is enabled, otherwise null. The default quota is 200 rules per policy. |
 | <a name="output_waf_security_policy_name"></a> [waf\_security\_policy\_name](#output\_waf\_security\_policy\_name) | Name of the Cloud Armor security policy when WAF is enabled, otherwise null. |

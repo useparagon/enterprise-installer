@@ -26,6 +26,11 @@ variable "managed_sync_version" {
   default     = "0.0.131"
 }
 
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts."
+  type        = string
+}
+
 variable "region" {
   description = "The region where to host Google Cloud Organization resources."
   type        = string

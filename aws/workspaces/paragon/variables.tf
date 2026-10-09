@@ -448,6 +448,12 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository."
+  type        = string
+  default     = "https://helm.useparagon.com"
+}
+
 variable "platform_version" {
   description = "Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML."
   type        = string
