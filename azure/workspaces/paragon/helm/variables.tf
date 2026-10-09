@@ -231,8 +231,23 @@ variable "agent_os_enabled" {
 }
 
 variable "agent_os_version" {
-  description = "The version of the Agent OS helm chart to install."
+  description = "The published Agent OS chart version."
   type        = string
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL for Agent OS."
+  type        = string
+}
+
+variable "agent_os_helm_values" {
+  description = "Installer chart overrides."
+  type        = any
+}
+
+variable "agent_os_file_values" {
+  description = "Chart overrides from the agentOs.values section of the customer's values.yaml."
+  type        = any
 }
 
 # Agent OS cloud secret names and workload identity are supplied by the parent workspace.

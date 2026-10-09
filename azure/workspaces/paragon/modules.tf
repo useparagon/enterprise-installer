@@ -39,6 +39,9 @@ module "helm" {
   managed_sync_version     = var.managed_sync_version
   agent_os_enabled         = var.agent_os_enabled
   agent_os_version         = var.agent_os_version
+  agent_os_helm_repository = var.agent_os_helm_repository
+  agent_os_helm_values     = var.agent_os_helm_values
+  agent_os_file_values     = try(local.helm_vars.agentOs.values, {})
   agent_os_secret_names = var.agent_os_enabled ? {
     app    = azurerm_key_vault_secret.agent_os_app[0].name
     admin  = azurerm_key_vault_secret.agent_os_admin[0].name
