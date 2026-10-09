@@ -8,7 +8,7 @@ installer removes the `agentOs` wrapper before rendering the regular Paragon cha
 
 ```yaml
 agentOs:
-  version: "0.1.0"
+  version: "<published-chart-version-with-PR-113>"
   # repository: https://paragon-helm-production.s3.amazonaws.com
   values:
     global:
@@ -21,8 +21,13 @@ agentOs:
 ```
 
 The same chart-root structure can be supplied programmatically through
-`agent_os_helm_values`. Precedence is: AWS installer defaults, `agent_os_helm_values`, then
-`.secure/values.yaml` `agentOs.values`.
+`agent_os_helm_values`. Precedence is: **Agent OS chart defaults**, AWS
+tenant integrations/feature switches, `agent_os_helm_values`, then
+`.secure/values.yaml` `agentOs.values`. The chart automatically derives model
+defaults, the Bifrost URL and dedicated index/extraction node placement when
+`global.agentOs.env.HOST_ENV=AWS_K8`. Do not duplicate those application
+defaults in Terraform. Use a published chart **after** Agent OS PR #113
+merged; the older 0.2.0 stable release does not contain that change.
 
 Secrets must not be placed in `agentOs.values`, because Helm stores rendered release values.
 Use `.secure/values.yaml` `agentOs.secrets` instead; Terraform writes those values to Secrets
@@ -38,14 +43,7 @@ agentOs:
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-| Name | Version |
-| ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
-| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
-| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 2.0 |
-| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
+No requirements.
 
 ## Providers
 
@@ -116,7 +114,7 @@ agentOs:
 | <a name="input_agent_os_app_config"></a> [agent\_os\_app\_config](#input\_agent\_os\_app\_config) | Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload. | `map(string)` | `{}` | no |
 | <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. | `bool` | `false` | no |
 | <a name="input_agent_os_helm_repository"></a> [agent\_os\_helm\_repository](#input\_agent\_os\_helm\_repository) | Helm repository URL used to install Agent OS. | `string` | `"https://paragon-helm-production.s3.amazonaws.com"` | no |
-| <a name="input_agent_os_helm_values"></a> [agent\_os\_helm\_values](#input\_agent\_os\_helm\_values) | Additional Agent OS chart values supplied through Terraform. Applied after generated AWS defaults and before .secure/values.yaml agentOs.values. | `any` | `{}` | no |
+| <a name="input_agent_os_helm_values"></a> [agent\_os\_helm\_values](#input\_agent\_os\_helm\_values) | Additional Agent OS chart values supplied through Terraform. Applied after AWS-specific runtime integrations and before .secure/values.yaml agentOs.values; application defaults live in the upstream chart. | `any` | `{}` | no |
 | <a name="input_agent_os_vendor_config"></a> [agent\_os\_vendor\_config](#input\_agent\_os\_vendor\_config) | Optional Agent OS vendor keys merged onto the operator-owned secret. An empty map cannot wipe keys already in Secrets Manager. | `map(string)` | `{}` | no |
 | <a name="input_agent_os_version"></a> [agent\_os\_version](#input\_agent\_os\_version) | Version of the Agent OS Helm chart to install when Agent OS is enabled. | `string` | `"0.1.0"` | no |
 | <a name="input_aws_access_key_id"></a> [aws\_access\_key\_id](#input\_aws\_access\_key\_id) | AWS Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws\_assume\_role\_arn. | `string` | `null` | no |

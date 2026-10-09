@@ -484,7 +484,7 @@ variable "agent_os_helm_repository" {
 }
 
 variable "agent_os_helm_values" {
-  description = "Additional Agent OS chart values supplied through Terraform. Applied after generated AWS defaults and before .secure/values.yaml agentOs.values."
+  description = "Additional Agent OS chart values supplied through Terraform. Applied after AWS-specific runtime integrations and before .secure/values.yaml agentOs.values; application defaults live in the upstream chart."
   type        = any
   default     = {}
   sensitive   = true
