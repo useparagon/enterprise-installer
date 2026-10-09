@@ -550,16 +550,23 @@ variable "eventhub_namespace_sku" {
 }
 
 variable "eventhub_capacity" {
-  description = "Standard throughput units or Premium processing units (1 PU by default with Agent OS)."
+  description = "Standard Event Hubs throughput units (1-20); separate from Premium processing units."
   type        = number
   default     = 1
   validation {
     condition     = var.eventhub_capacity >= 1 && var.eventhub_capacity <= 20
     error_message = "The capacity must be between 1 and 20."
   }
+}
+
+variable "eventhub_premium_processing_units" {
+  description = "Premium Event Hubs processing units when Agent OS is enabled (100 event hubs per PU)."
+  type        = number
+  default     = 1
+
   validation {
-    condition     = !var.agent_os_enabled || contains([1, 2, 4, 6, 8, 10, 12, 16], var.eventhub_capacity)
-    error_message = "Agent OS requires a supported Premium capacity (1, 2, 4, 6, 8, 10, 12 or 16 PUs)."
+    condition     = contains([1, 2, 4, 6, 8, 10, 12, 16], var.eventhub_premium_processing_units)
+    error_message = "Premium processing units must be 1, 2, 4, 6, 8, 10, 12 or 16."
   }
 }
 

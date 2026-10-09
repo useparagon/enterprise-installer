@@ -140,6 +140,7 @@ module "kafka" {
   agent_os_eventhub_message_retention = var.agent_os_eventhub_message_retention
   eventhub_auto_inflate_enabled       = var.eventhub_auto_inflate_enabled
   eventhub_capacity                   = var.eventhub_capacity
+  eventhub_premium_processing_units   = var.eventhub_premium_processing_units
   eventhub_maximum_throughput_units   = var.eventhub_maximum_throughput_units
   eventhub_namespace_sku              = var.eventhub_namespace_sku
   private_subnet                      = module.network.private_subnet

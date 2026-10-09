@@ -4,11 +4,12 @@ resource "azurerm_eventhub_namespace" "kafka" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
 
-  # Enabling Agent OS replaces Standard with Premium, destroying the existing Kafka namespace, topics and events.
+  # Standard allows only 10 Event Hubs per namespace. Agent OS and Managed Sync
+  # need Premium; this SKU change REPLACES an existing Standard namespace and its data.
   sku                      = var.agent_os_enabled ? "Premium" : var.eventhub_namespace_sku
-  capacity                 = var.eventhub_capacity
-  auto_inflate_enabled     = var.agent_os_enabled ? false : var.eventhub_auto_inflate_enabled
-  maximum_throughput_units = !var.agent_os_enabled && var.eventhub_auto_inflate_enabled ? var.eventhub_maximum_throughput_units : null
+  capacity                 = var.agent_os_enabled ? var.eventhub_premium_processing_units : var.eventhub_capacity
+  auto_inflate_enabled     = !var.agent_os_enabled && var.eventhub_namespace_sku == "Standard" && var.eventhub_auto_inflate_enabled
+  maximum_throughput_units = !var.agent_os_enabled && var.eventhub_namespace_sku == "Standard" && var.eventhub_auto_inflate_enabled ? var.eventhub_maximum_throughput_units : null
 
   # Network configuration - start with private endpoint only
   # Note: Kafka protocol is automatically enabled for Standard and Premium SKUs

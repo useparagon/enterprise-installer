@@ -20,8 +20,11 @@ locals {
         }
 
         env = {
+          # AZURE_K8 suppresses Kafka CreateAcls on Event Hubs.
           HOST_ENV                              = "AZURE_K8"
-          PLATFORM_ENV                          = "enterprise"
+          NODE_ENV                              = try(var.helm_values.global.env["NODE_ENV"], "production")
+          PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
+          LOG_LEVEL                             = try(var.helm_values.global.env["LOG_LEVEL"], "info")
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
           PARAGON_MANAGED_SYNC_URL              = "http://api-sync:${var.microservices["api-sync"].port}"
           PARAGON_MANAGED_SYNC_PROJECT_HOST     = "api-project"
@@ -41,6 +44,17 @@ locals {
       migration = {
         hookType = "pre-install,pre-upgrade"
       }
+      env = {
+        AGENT_OS_TOOL_SEARCH_ENABLED     = "true"
+        AGENT_OS_TOOL_EXECUTE_ENABLED    = "true"
+        AGENT_OS_EXEC_ALLOW_SIDE_EFFECTS = "true"
+      }
+    }
+
+    # Same Enterprise feature profile as AWS. VOYAGE_API_KEY must be seeded in
+    # the operator-owned agent-os-vendor Key Vault secret before Helm installs.
+    bifrost = {
+      enabled = true
     }
 
     # AKS ESO produces agent-os-app/admin; unlike AWS, there is no dedicated
