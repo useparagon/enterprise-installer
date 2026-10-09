@@ -163,6 +163,12 @@ variable "paragon_helm_repository" {
   default     = "https://helm.useparagon.com"
 }
 
+variable "platform_version" {
+  description = "Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML."
+  type        = string
+  default     = null
+}
+
 variable "excluded_microservices" {
   description = "The microservices that should be excluded from the deployment."
   type        = list(string)
@@ -964,6 +970,13 @@ locals {
     )
   )
 
+  installer_chart_version = trimspace(file("${path.module}/../../../scripts/installer-chart-version.txt"))
+  effective_platform_version = coalesce(
+    var.platform_version,
+    try(local.helm_vars.global.env.VERSION, null),
+    "",
+  )
+
   gcp_provider_credentials = jsonencode({
     type                        = "service_account",
     auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs",
@@ -1283,6 +1296,7 @@ locals {
         ORGANIZATION           = var.organization
         PARAGON_DOMAIN         = var.domain
         PLATFORM_ENV           = "enterprise"
+        VERSION                = local.effective_platform_version
 
         # Service ports
         ACCOUNT_PORT            = try(local.microservices.account.port, null)
@@ -1489,9 +1503,10 @@ locals {
         local.postgres_max_storage_env,
         {
           for key, value in local.helm_vars.global.env :
-          key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+          key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
-        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {},
+        { VERSION = local.effective_platform_version },
       )
     })
   })

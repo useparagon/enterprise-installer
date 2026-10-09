@@ -517,6 +517,12 @@ variable "paragon_helm_repository" {
   default     = "https://helm.useparagon.com"
 }
 
+variable "platform_version" {
+  description = "Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML."
+  type        = string
+  default     = null
+}
+
 locals {
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
   hash                  = substr(sha256(var.azure_subscription_id), 0, 8)
@@ -575,6 +581,13 @@ locals {
     var.helm_yaml != null ? var.helm_yaml : (
       fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
     )
+  )
+
+  installer_chart_version = trimspace(file("${path.module}/../../../scripts/installer-chart-version.txt"))
+  effective_platform_version = coalesce(
+    var.platform_version,
+    try(local.helm_vars.global.env.VERSION, null),
+    "",
   )
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "AZURE")
@@ -915,6 +928,7 @@ locals {
         ORGANIZATION           = var.organization
         PARAGON_DOMAIN         = var.domain
         PLATFORM_ENV           = "enterprise"
+        VERSION                = local.effective_platform_version
 
         # Service ports
         ACCOUNT_PORT            = try(local.microservices.account.port, null)
@@ -1117,9 +1131,10 @@ locals {
         MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
         }, {
         for key, value in local.helm_vars.global.env :
-        key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+        key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
-        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {},
+        { VERSION = local.effective_platform_version },
       )
     })
   })

@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # version of charts, must be semver and doesn't have to match Paragon appVersion
-version="2026.10.07"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+version="$(tr -d '[:space:]' < "${SCRIPT_DIR}/scripts/installer-chart-version.txt")"
 
 # defaults
 provider="aws"

@@ -18,6 +18,11 @@ output "alb_arn" {
   value       = data.aws_lb.load_balancer.arn
 }
 
+output "alb_dns_name" {
+  description = "DNS name of the ingress ALB (for greenfield service CNAME targets when tagging API data is not yet visible)."
+  value       = data.aws_lb.load_balancer.dns_name
+}
+
 output "namespace_paragon" {
   value = kubernetes_namespace.paragon
 }

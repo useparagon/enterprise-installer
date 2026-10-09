@@ -50,6 +50,11 @@ resolve_chart_tag() {
     return 0
   fi
 
+  if [[ -n "${TF_VAR_platform_version:-}" ]]; then
+    printf '%s' "${TF_VAR_platform_version}"
+    return 0
+  fi
+
   local values_file=""
   if [[ -n "${TF_VAR_helm_yaml_path:-}" && -f "${TF_VAR_helm_yaml_path}" ]]; then
     values_file="${TF_VAR_helm_yaml_path}"
@@ -58,7 +63,7 @@ resolve_chart_tag() {
   fi
 
   if [[ -z "${values_file}" ]]; then
-    echo "ERROR: set PARAGON_CHART_TAG or mount paragon-values.yaml (TF_VAR_helm_yaml_path) with global.env.VERSION" >&2
+    echo "ERROR: set PARAGON_CHART_TAG, TF_VAR_platform_version, or a values file (TF_VAR_helm_yaml_path) with global.env.VERSION" >&2
     return 1
   fi
 
