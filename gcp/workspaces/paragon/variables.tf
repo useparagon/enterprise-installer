@@ -175,9 +175,21 @@ variable "agent_os_enabled" {
 }
 
 variable "agent_os_version" {
-  description = "The version of the Agent OS Helm chart to install."
+  description = "The published Agent OS Helm chart version (override when enabling a newer chart)."
   type        = string
-  default     = "latest"
+  default     = "0.2.0"
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL for the independent Agent OS release."
+  type        = string
+  default     = "https://paragon-helm-production.s3.amazonaws.com"
+}
+
+variable "agent_os_helm_values" {
+  description = "Optional Agent OS chart overrides layered after cloud integration and before agentOs.values from values.yaml."
+  type        = any
+  default     = {}
 }
 
 variable "agent_os_app_config" {
@@ -1559,7 +1571,12 @@ locals {
     key => tostring(value)
     if value != null && tostring(value) != "" && local.helm_is_secret_env_key[key]
   }
-  helm_values_public = merge(local.helm_values, {
+  # agentOs is installer-only metadata for a separate Helm release. It must
+  # not be forwarded to the existing Paragon/Managed Sync charts.
+  helm_values_public = merge({
+    for key, value in local.helm_values : key => value
+    if key != "agentOs"
+    }, {
     global = merge(local.helm_values.global, {
       env = {
         for key, value in local.helm_values.global.env :

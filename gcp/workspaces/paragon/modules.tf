@@ -77,6 +77,9 @@ module "helm" {
   paragon_helm_repository     = var.paragon_helm_repository
   agent_os_enabled            = var.agent_os_enabled
   agent_os_version            = var.agent_os_version
+  agent_os_helm_repository    = var.agent_os_helm_repository
+  agent_os_helm_values        = var.agent_os_helm_values
+  agent_os_file_values        = try(local.helm_vars.agentOs.values, {})
   agent_os_app_secret_name    = local.agent_os_app_secret_name
   agent_os_admin_secret_name  = local.agent_os_admin_secret_name
   agent_os_vendor_secret_name = local.agent_os_vendor_secret_name

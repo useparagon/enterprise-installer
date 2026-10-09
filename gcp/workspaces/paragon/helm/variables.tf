@@ -43,9 +43,23 @@ variable "agent_os_enabled" {
 }
 
 variable "agent_os_version" {
-  description = "The version of the Agent OS Helm chart to install."
+  description = "The published Agent OS Helm chart version."
   type        = string
-  default     = "latest"
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL for Agent OS."
+  type        = string
+}
+
+variable "agent_os_helm_values" {
+  description = "Installer chart overrides."
+  type        = any
+}
+
+variable "agent_os_file_values" {
+  description = "Chart overrides from agentOs.values in the customer's values.yaml."
+  type        = any
 }
 
 variable "agent_os_app_secret_name" {
