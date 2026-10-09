@@ -1,7 +1,7 @@
 locals {
-  # Application defaults (models, Bifrost URL, AWS node placement, resources)
-  # come from the chart published after PR #113. Terraform only supplies
-  # tenant endpoints, identity, feature switches and test-specific capacity.
+  # Application defaults (models, AWS node placement, resources) come from
+  # the chart published after PR #113. Terraform supplies tenant endpoints,
+  # identity and feature switches; capacity stays on chart defaults.
   agent_os_aws_values = {
     global = {
       agentOs = {
@@ -19,11 +19,14 @@ locals {
           region = var.aws_region
         }
 
+        # BIFROST_URL is in-cluster Service DNS, same as PARAGON_ZEUS_URL.
+        # The chart injects it only when HOST_ENV=AWS_K8.
         env = {
           HOST_ENV                              = try(var.helm_values.global.env["HOST_ENV"], "AWS_K8")
           NODE_ENV                              = try(var.helm_values.global.env["NODE_ENV"], "production")
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
           LOG_LEVEL                             = try(var.helm_values.global.env["LOG_LEVEL"], "info")
+          BIFROST_URL                           = "http://agent-os-bifrost:8080"
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
           PARAGON_MANAGED_SYNC_URL              = "http://api-sync:${var.microservices["api-sync"].port}"
           PARAGON_MANAGED_SYNC_PROJECT_HOST     = "api-project"
@@ -54,21 +57,6 @@ locals {
       }
     }
 
-    # Test-only capacity overrides. All other pod defaults live in the chart.
-    index-reader = {
-      replicaCount = 1
-      pdb = {
-        enabled = false
-      }
-    }
-
-    extraction-service = {
-      autoscaling = {
-        minReplicas = 1
-        maxReplicas = 12
-      }
-    }
-
     # Opt-in feature profile requires this explicit dependency switch.
     bifrost = {
       enabled = true
@@ -93,8 +81,8 @@ resource "helm_release" "agent_os" {
   wait_for_jobs    = true
   timeout          = 900 # 15 minutes, consistent with Paragon and Managed Sync
 
-  # Helm owns application defaults; tenant-specific AWS integration and
-  # test capacity are layered before these two override surfaces:
+  # Helm owns application defaults; tenant-specific AWS integration is
+  # layered before these two override surfaces:
   #   1. Terraform: agent_os_helm_values
   #   2. .secure/values.yaml: agentOs.values (highest precedence)
   values = [

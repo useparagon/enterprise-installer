@@ -133,6 +133,12 @@ resource "random_password" "agent_os_extraction_api_key" {
 # (operator-owned API keys). Infra creates the secret paths and seeds app/admin.
 # The paragon workspace overlays extra keys. Vendor is created empty here and
 # ignore_changes so later infra applies do not wipe operator or paragon writes.
+#
+# NOTE: app/admin below are NOT merged with the currently stored value, so any infra
+# apply overwrites whatever the paragon workspace previously layered on top (LICENSE,
+# ZEUS_ACCESS_TOKEN, etc. computed in paragon/runtime_secrets.tf). Always re-apply the
+# paragon workspace after an infra apply that touches Agent OS (same requirement the
+# "agent_os_karpenter_pools_from_infra" check documents for Karpenter).
 
 resource "aws_secretsmanager_secret" "agent_os_app" {
   count = var.agent_os_enabled ? 1 : 0
