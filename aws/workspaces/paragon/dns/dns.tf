@@ -56,19 +56,25 @@ locals {
   ingress_alb_dns_name_live = local.ingress_alb_dns_target_ready ? data.aws_lb.ingress_dns_target[0].dns_name : null
 
   # Prefer api-sync (managed sync host); otherwise first public service lexicographically.
-  route53_anchor_service = var.enabled && length(var.public_services) > 0 ? (
-    contains(keys(var.public_services), "api-sync") ? var.public_services["api-sync"] : var.public_services[sort(keys(var.public_services))[0]]
+  route53_anchor_service_name = var.enabled && length(var.public_services) > 0 ? (
+    contains(keys(var.public_services), "api-sync") ? "api-sync" : sort(keys(var.public_services))[0]
   ) : null
+  route53_anchor_service = local.route53_anchor_service_name != null ? var.public_services[local.route53_anchor_service_name] : null
 
-  route53_anchor_fqdn = local.route53_anchor_service != null ? "${trim(replace(
-    replace(
-      replace(local.route53_anchor_service.public_url, var.domain, ""),
-      "https://",
+  route53_anchor_origin_name = local.route53_anchor_service == null ? "" : (
+    var.path_based_routing_enabled && try(local.route53_anchor_service.path_prefix, "") != "" ?
+    local.route53_anchor_service_name :
+    trim(replace(
+      replace(
+        replace(local.route53_anchor_service.public_url, var.domain, ""),
+        "https://",
+        ""
+      ),
+      "http://",
       ""
-    ),
-    "http://",
-    ""
-  ), ".")}.${var.domain}." : ""
+    ), ".")
+  )
+  route53_anchor_fqdn = local.route53_anchor_service != null ? "${local.route53_anchor_origin_name}.${var.domain}." : ""
 }
 
 data "aws_route53_records" "cname_anchor" {
@@ -100,7 +106,9 @@ resource "aws_route53_record" "microservice" {
   for_each = local.manage_route53_cnames ? var.public_services : {}
 
   zone_id = var.route53_zone_id
-  name = replace(
+  # External proxy hostname belongs to the customer. Keep service-specific
+  # Paragon origin CNAME for TLS/SNI while ALB routes by path, not Host.
+  name = var.path_based_routing_enabled && try(each.value.path_prefix, "") != "" ? each.key : replace(
     replace(
       replace(each.value.public_url, var.domain, ""),
       "https://",

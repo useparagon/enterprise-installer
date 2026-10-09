@@ -1,5 +1,54 @@
 # Paragon AWS Deployment
 
+## Shared-host path routing
+
+**Direct cutover for AWS (PARA-25255).** Enable this option to route every
+publicly exposed Paragon microservice and HTTP worker through one reverse-proxy
+hostname and a service-specific prefix:
+
+```hcl
+path_based_routing_enabled = true
+path_routing_base_path     = "/paragon"
+path_routing_public_host   = "proxy-path-test.staging.pgn.so"
+```
+
+The host and base path are specified **once**. Terraform generates paths
+`/paragon/account`, `/paragon/api-triggerkit`, `/paragon/connect`,
+`/paragon/dashboard`, `/paragon/hermes`, `/paragon/passport`,
+`/paragon/zeus`, `/paragon/worker-proxy`, and every other exposed
+Paragon HTTP worker/service. It also sets their effective `*_PUBLIC_URL`
+values to `https://proxy-path-test.staging.pgn.so/paragon/<service>` in
+Helm and sets `HTTP_PATH_PREFIX=/paragon/<service>` individually.
+`worker-auditlogs` uses the environment key `WORKER_AUDIT_LOGS_PUBLIC_URL`.
+
+**No shadow Ingress:** the normal service Ingress becomes a hostless AWS ALB
+`Prefix` rule. The original host rules are replaced. ALB health checks and
+Kubernetes probes stay unprefixed on `/healthz`. The existing special
+unprefixed `/projects/*/sdk/*` forwarding rules are removed in path mode,
+and the Connect prefixed SDK trigger/proxy rules remain.
+
+The proxy hostname is **not** created in Paragon's Route53 module; configure
+the DNS record to point to the separate Nginx endpoint. Each Paragon origin
+`<service>.<domain>` CNAME remains pointed at the ALB for verified TLS/SNI
+when Nginx forwards the original HTTP URI. Enable `path_based_routing_enabled`
+only when application images include the `HTTP_PATH_PREFIX` middleware.
+
+The path setting applies to the monorepo microservices/workers exposed through
+the Paragon Helm chart, respecting the actual public/private/excluded services.
+Managed Sync (`api-sync`) has its own Helm ingress and application; the path
+handling for Managed Sync is a **separate application/chart dependency**.
+Grafana and other third-party monitoring UIs do not use the Nest middleware.
+Dashboard is Next.js and needs a matching frontend base path/asset-routing
+implementation for full browser functionality; an ALB route and Nest
+middleware alone cannot provide it.
+
+**Explicit URL mode:** when `path_routing_base_path` and
+`path_routing_public_host` are both empty, the previous implementation still
+supports path-bearing `*_PUBLIC_URL` values on selected services, as long
+as they all share an external hostname. Leaving
+`path_based_routing_enabled=false` preserves the existing host-based
+defaults in unrelated installations.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
