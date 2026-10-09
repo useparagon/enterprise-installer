@@ -66,8 +66,8 @@ module "helm" {
   managed_sync_secret_name      = local.runtime_managed_sync_secret_name
   managed_sync_version          = var.managed_sync_version
   agent_os_enabled              = var.agent_os_enabled
-  agent_os_version              = local.agent_os_chart_version
-  agent_os_helm_repository      = local.agent_os_chart_repository
+  agent_os_version              = var.agent_os_version
+  agent_os_helm_repository      = var.agent_os_helm_repository
   agent_os_helm_values          = var.agent_os_helm_values
   agent_os_file_values          = local.agent_os_file_values
   agent_os_app_secret_name      = var.agent_os_enabled ? data.aws_secretsmanager_secret.agent_os_app[0].name : null

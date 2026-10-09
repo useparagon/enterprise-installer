@@ -194,9 +194,11 @@ locals {
     ADMIN_KAFKA_SASL_MECHANISM = local.agent_os_kafka.acl_admin_kafka_credentials.mechanism
     ADMIN_KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.cluster_tls_enabled)
 
-    KAFKA_PRINCIPAL_ACL_ADMIN    = local.agent_os_kafka.acl_admin_kafka_credentials.username
-    KAFKA_PRINCIPAL_AGENT_OS     = local.agent_os_kafka.agent_os_kafka_credentials.username
-    KAFKA_PRINCIPAL_MANAGED_SYNC = local.agent_os_kafka.kafka_credentials.username
+    # Kafka ACLs require typed principals; SASL credentials keep raw usernames.
+    # Cloud infrastructure already uses this User:<username> convention.
+    KAFKA_PRINCIPAL_ACL_ADMIN    = "User:${local.agent_os_kafka.acl_admin_kafka_credentials.username}"
+    KAFKA_PRINCIPAL_AGENT_OS     = "User:${local.agent_os_kafka.agent_os_kafka_credentials.username}"
+    KAFKA_PRINCIPAL_MANAGED_SYNC = "User:${local.agent_os_kafka.kafka_credentials.username}"
 
     KAFKA_TOPIC_PARTITIONS          = "3"
     KAFKA_TOPIC_REPLICATION_FACTOR  = tostring(ceil(var.msk_kafka_num_broker_nodes / 2))

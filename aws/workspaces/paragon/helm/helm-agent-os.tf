@@ -1,47 +1,28 @@
 locals {
-  # Installer-owned AWS defaults. Keep environment-specific tuning out of this
-  # object: Terraform and .secure/values.yaml are layered after it so customers
-  # can override any chart value without editing the module.
+  # Application defaults (models, Bifrost URL, AWS node placement, resources)
+  # come from the chart published after PR #113. Terraform only supplies
+  # tenant endpoints, identity, feature switches and test-specific capacity.
   agent_os_aws_values = {
     global = {
       agentOs = {
-        image = {
-          registry   = "docker.io"
-          pullPolicy = "IfNotPresent"
-        }
+        cloud = "aws"
 
         imagePullSecrets = var.docker_cfg_secret_name != null ? [
           { name = var.docker_pull_secret_name }
         ] : []
 
-        secretName      = "agent-os-app"
-        adminSecretName = "agent-os-admin"
-        cloud           = "aws"
-
-        serviceAccount = {
-          name                         = "agent-os"
-          automountServiceAccountToken = true
-        }
-
         identity = {
           provider = "aws-pod-identity"
         }
 
-        # Bucket names and credentials are injected by the Agent OS application
-        # Secret. Values only describe the AWS SDK/object-store behavior.
         objectStore = {
-          endpoint  = ""
-          region    = var.aws_region
-          allowHttp = false
-          credentials = {
-            secretName = ""
-          }
+          region = var.aws_region
         }
 
         env = {
-          HOST_ENV                              = "AWS_K8"
-          NODE_ENV                              = "production"
-          PLATFORM_ENV                          = "enterprise"
+          HOST_ENV                              = try(var.helm_values.global.env["HOST_ENV"], "AWS_K8")
+          NODE_ENV                              = try(var.helm_values.global.env["NODE_ENV"], "production")
+          PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
           LOG_LEVEL                             = try(var.helm_values.global.env["LOG_LEVEL"], "info")
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
           PARAGON_MANAGED_SYNC_URL              = "http://api-sync:${var.microservices["api-sync"].port}"
@@ -49,63 +30,23 @@ locals {
           PARAGON_MANAGED_SYNC_PROJECT_TCP_PORT = tostring(try(var.helm_values.global.env["API_PROJECT_TCP_PORT"], 1805))
           PARAGON_ACTIONKIT_URL                 = "http://worker-actionkit:${var.microservices["worker-actionkit"].port}"
           CAPABILITY_BROKER_ACTIONKIT_URL       = "http://worker-actionkit:${var.microservices["worker-actionkit"].port}"
-          BIFROST_URL                           = "http://agent-os-bifrost:8080"
-
-          # The services consume Secrets through envFrom. Including the opaque
-          # revision in the pod template makes secret-only Terraform changes
-          # trigger a normal Helm rollout instead of waiting for a manual restart.
-          AGENT_OS_SECRET_REVISION = var.secrets_revision
+          AGENT_OS_SECRET_REVISION              = var.secrets_revision
         }
       }
     }
 
-    serviceAccount = {
-      # Terraform creates this ServiceAccount and EKS Pod Identity binds it.
-      create = false
-    }
-
-    secret = {
-      # External Secrets owns agent-os-app/admin/broker on enterprise clusters.
-      create = false
-    }
-
-    rbac = {
-      create = true
-    }
-
-    prometheusRbac = {
-      # Enterprise monitoring already owns its discovery permissions.
-      enabled = false
-    }
-
-    kafkaAcls = {
-      # AWS enterprise uses MSK SCRAM and the chart owns the ACL inventory.
-      enabled = true
-    }
-
-    ingress = {
-      # Agent OS is consumed from inside the Paragon cluster for now. This can
-      # be enabled/configured from Terraform or .secure/values.yaml later.
-      enabled = false
-    }
-
-    # The database roles are created by Helm hooks. They must run before the
-    # Deployments become healthy, otherwise first install deadlocks waiting on
-    # pods that cannot authenticate to Postgres yet.
+    # Match Managed Sync's Enterprise pattern: provision PostgreSQL roles and
+    # schemas before Helm waits for application Deployments to become healthy.
+    # Both hooks are supported by the currently published Agent OS chart.
     migration = {
-      enabled = true
+      hookType = "pre-install,pre-upgrade"
     }
 
-    context-api = {
-      enabled = true
-    }
-
-    context-ingest = {
-      enabled = true
-    }
-
+    # Helm dependency conditions cannot be derived from HOST_ENV templates.
     tools-api = {
-      enabled = true
+      migration = {
+        hookType = "pre-install,pre-upgrade"
+      }
       env = {
         AGENT_OS_TOOL_SEARCH_ENABLED     = "true"
         AGENT_OS_TOOL_EXECUTE_ENABLED    = "true"
@@ -113,66 +54,22 @@ locals {
       }
     }
 
-    tool-indexer = {
-      enabled = true
-    }
-
-    capability-broker = {
-      enabled             = true
-      secretName          = "agent-os-capability-broker"
-      includeGlobalSecret = false
-    }
-
-    index-maintainer = {
-      enabled = true
-      nodeSelector = {
-        "useparagon.com/workload" = "agent-os-index"
-      }
-      tolerations = [{
-        key      = "useparagon.com/workload"
-        operator = "Equal"
-        value    = "agent-os-index"
-        effect   = "NoSchedule"
-      }]
-    }
-
+    # Test-only capacity overrides. All other pod defaults live in the chart.
     index-reader = {
-      enabled = true
-      nodeSelector = {
-        "useparagon.com/workload" = "agent-os-index"
-      }
-      tolerations = [{
-        key      = "useparagon.com/workload"
-        operator = "Equal"
-        value    = "agent-os-index"
-        effect   = "NoSchedule"
-      }]
-    }
-
-    index-writer = {
-      enabled = true
-      env = {
-        # Bound glibc arenas so large Lance merge allocations return memory
-        # instead of ratcheting the writer toward its container limit.
-        MALLOC_ARENA_MAX = "4"
+      replicaCount = 1
+      pdb = {
+        enabled = false
       }
     }
 
     extraction-service = {
-      enabled = true
-      nodeSelector = {
-        "useparagon.com/workload" = "agent-os-extract"
+      autoscaling = {
+        minReplicas = 1
+        maxReplicas = 12
       }
-      tolerations = [{
-        key      = "useparagon.com/workload"
-        operator = "Equal"
-        value    = "agent-os-extract"
-        effect   = "NoSchedule"
-      }]
     }
 
-    # Bifrost is part of the Enterprise Agent OS release. VOYAGE_API_KEY remains
-    # secret material and comes from the operator-managed vendor secret.
+    # Opt-in feature profile requires this explicit dependency switch.
     bifrost = {
       enabled = true
     }
@@ -194,10 +91,10 @@ resource "helm_release" "agent_os" {
   verify           = false
   wait             = true
   wait_for_jobs    = true
-  timeout          = 1800
+  timeout          = 900 # 15 minutes, consistent with Paragon and Managed Sync
 
-  # Helm deep-merges these in order. This gives us sane AWS defaults while
-  # preserving two explicit override surfaces:
+  # Helm owns application defaults; tenant-specific AWS integration and
+  # test capacity are layered before these two override surfaces:
   #   1. Terraform: agent_os_helm_values
   #   2. .secure/values.yaml: agentOs.values (highest precedence)
   values = [

@@ -711,16 +711,10 @@ locals {
   agent_os_file_vendor_config = {
     for key, value in try(local.agent_os_file_secrets.vendor, {}) :
     key => tostring(value)
-    if value != null
+    # An empty placeholder in the optional values file must not overwrite
+    # a provisioned provider key with an empty string.
+    if value != null && trimspace(tostring(value)) != ""
   }
-  agent_os_chart_version = nonsensitive(coalesce(
-    try(local.agent_os_file_config.version, null),
-    var.agent_os_version,
-  ))
-  agent_os_chart_repository = nonsensitive(coalesce(
-    try(local.agent_os_file_config.repository, null),
-    var.agent_os_helm_repository,
-  ))
   paragon_helm_vars = {
     for key, value in local.helm_vars :
     key => value

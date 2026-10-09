@@ -34,7 +34,13 @@ locals {
     kubernetes_secret.docker_login[0].data,
     tomap({})
   )
-  knative_serving_pull_secret = var.create_docker_pull_secret && length(local.knative_image_pull_data) > 0
+  # Secret contents can be unknown at plan time when ESO is refreshing them.
+  # Resource instance counts stay known, so use those to decide whether to
+  # mirror the pull secret into the Knative Serving namespace.
+  knative_serving_pull_secret = var.create_docker_pull_secret && (
+    length(data.kubernetes_secret.docker_cfg) > 0 ||
+    length(kubernetes_secret.docker_login) > 0
+  )
 }
 
 # Same docker-cfg as paragon workloads. Knative's revision controller lives in

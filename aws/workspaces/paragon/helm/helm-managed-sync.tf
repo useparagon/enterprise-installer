@@ -4,6 +4,17 @@ locals {
   # Single values document for chart-specific overrides (keep one entry in helm_release.values
   # so plan/apply does not churn on yaml fragment ordering).
   managed_sync_chart_values = yamlencode({
+    # Managed Sync 1.0.75 skips context topics on Enterprise by default to
+    # accommodate the Azure Event Hubs Basic topic limit (PARA-27285).
+    # When Agent OS is enabled, let Managed Sync register its context topics
+    # and publish sync lifecycle events before Agent OS starts consuming them.
+    global = {
+      env = {
+        MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = var.agent_os_enabled ? "false" : "true"
+        MANAGED_SYNC_STATUS_EVENTS_ENABLED             = var.agent_os_enabled ? "true" : "false"
+      }
+    }
+
     # openfga-migrate is a post-install hook while the openfga ServiceAccount is normally
     # a regular resource. On first install, the cluster can create the Job before the SA is
     # visible, producing: serviceaccount "openfga" not found.
