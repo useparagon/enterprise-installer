@@ -19,11 +19,8 @@ module "postgres" {
   postgres_tier                  = var.postgres_tier
   region                         = var.region
   workspace                      = local.workspace
-  auditlogs_lock_enabled         = var.auditlogs_lock_enabled
-  auditlogs_retention_days       = var.auditlogs_retention_days
   agent_os_enabled               = var.agent_os_enabled
   agent_os_postgres              = var.agent_os_postgres
-  private_subnet                 = module.network.private_subnet
 }
 
 module "redis" {
@@ -48,18 +45,16 @@ module "kafka" {
   count  = var.managed_sync_enabled ? 1 : 0
   source = "./kafka"
 
-  gcp_project_id               = local.gcp_project_id
-  region                       = var.region
-  workspace                    = local.workspace
-  private_subnet_uri           = module.network.private_subnet.self_link
-  gmk_vcpu_count               = var.gmk_vcpu_count
-  gmk_memory_bytes             = var.gmk_memory_gib * 1024 * 1024 * 1024
-  gmk_disk_size_gib            = var.gmk_disk_size_gib
-  gmk_auto_rebalance           = var.gmk_auto_rebalance
-  gmk_sasl_mechanism           = var.gmk_sasl_mechanism
-  gmk_kafka_version            = var.gmk_kafka_version
-  gmk_sasl_plain_key_file_path = var.gmk_sasl_plain_key_file_path
-  agent_os_enabled             = var.agent_os_enabled
+  gcp_project_id     = local.gcp_project_id
+  region             = var.region
+  workspace          = local.workspace
+  private_subnet_uri = module.network.private_subnet.self_link
+  gmk_vcpu_count     = var.gmk_vcpu_count
+  gmk_memory_bytes   = var.gmk_memory_gib * 1024 * 1024 * 1024
+  gmk_disk_size_gib  = var.gmk_disk_size_gib
+  gmk_auto_rebalance = var.gmk_auto_rebalance
+  gmk_sasl_mechanism = var.gmk_sasl_mechanism
+  agent_os_enabled   = var.agent_os_enabled
 }
 
 module "storage" {

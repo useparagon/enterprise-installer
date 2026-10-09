@@ -215,12 +215,6 @@ variable "agent_os_enabled" {
   }
 }
 
-variable "agent_os_version" {
-  description = "The version of the Agent OS helm chart to install (consumed by the paragon workspace in PARA-25775)."
-  type        = string
-  default     = "latest"
-}
-
 variable "agent_os_postgres" {
   description = "Agent OS Cloud SQL instances keyed by instance name. Each entry can be sized and changed independently."
   type = map(object({
@@ -294,12 +288,6 @@ variable "agent_os_extract_max_count" {
   description = "Max extract nodes. Staging 3, production 8 (covers 30 pods at 4/node)."
   type        = number
   default     = 8
-}
-
-variable "gmk_kafka_version" {
-  description = "Kafka version for the Google Managed Kafka cluster (version offered by the service)."
-  type        = string
-  default     = "3.7.1"
 }
 
 variable "gmk_vcpu_count" {

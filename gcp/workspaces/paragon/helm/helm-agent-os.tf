@@ -31,6 +31,16 @@ locals {
       }
     }
 
+    # Provision application PostgreSQL roles before Helm waits for ready pods.
+    migration = {
+      hookType = "pre-install,pre-upgrade"
+    }
+    tools-api = {
+      migration = {
+        hookType = "pre-install,pre-upgrade"
+      }
+    }
+
     # GCP ESO creates only agent-os-app and agent-os-admin. Share the app
     # Secret with capability-broker instead of requiring an absent third one.
     capability-broker = {
@@ -55,7 +65,7 @@ resource "helm_release" "agent_os" {
   verify           = false
   wait             = true
   wait_for_jobs    = true
-  timeout          = 1800
+  timeout          = 900
 
   # Connect Gateway may reject Helm's extra OpenAPI discovery requests.
   disable_openapi_validation = true

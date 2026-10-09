@@ -172,6 +172,18 @@ variable "agent_os_enabled" {
     condition     = !var.agent_os_enabled || var.managed_sync_enabled
     error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
   }
+
+  validation {
+    condition = !var.agent_os_enabled || try(
+      tonumber(split(".", var.managed_sync_version)[0]) > 1 ||
+      (tonumber(split(".", var.managed_sync_version)[0]) == 1 && (
+        tonumber(split(".", var.managed_sync_version)[1]) > 0 ||
+        tonumber(split("-", split(".", var.managed_sync_version)[2])[0]) >= 75
+      )),
+      false
+    )
+    error_message = "Agent OS requires managed_sync_version >= 1.0.75; override the legacy GCP default."
+  }
 }
 
 variable "agent_os_version" {

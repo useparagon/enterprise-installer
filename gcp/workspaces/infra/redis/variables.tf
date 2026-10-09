@@ -13,6 +13,11 @@ variable "network" {
   type        = any
 }
 
+variable "private_subnet" {
+  description = "Private subnet for Agent OS Valkey PSC connections."
+  type        = any
+}
+
 variable "region" {
   description = "The region where to host Google Cloud Organization resources."
   type        = string
