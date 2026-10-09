@@ -1,7 +1,18 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName := include "health-checker.fullname" . -}}
 {{- $svcPort := .Values.service.port -}}
-{{- $hostless := .Values.ingress.hostless | default false -}}
+{{- /* Default ingress class must match the cloud provider. */ -}}
+{{- $ingressClass := .Values.ingress.className -}}
+{{- if not $ingressClass -}}
+{{- if eq .Values.global.env.HOST_ENV "AWS_K8" -}}
+{{- $ingressClass = "alb" -}}
+{{- else if eq .Values.global.env.HOST_ENV "GCP_K8" -}}
+{{- $ingressClass = ternary "gce-internal" "gce" (eq (default "" .Values.ingress.scheme) "internal") -}}
+{{- else -}}
+{{- $ingressClass = "nginx" -}}
+{{- end -}}
+{{- end -}}
+{{- $hostless := and (eq .Values.global.env.HOST_ENV "AWS_K8") (.Values.ingress.hostless | default false) -}}
 {{- $path := .Values.ingress.path | default "/" -}}
 
 apiVersion: networking.k8s.io/v1

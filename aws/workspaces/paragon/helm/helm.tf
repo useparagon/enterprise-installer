@@ -74,18 +74,24 @@ locals {
           {
             SERVICE = microservice_name
           },
-          var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
-            HTTP_PATH_PREFIX = var.public_microservices[microservice_name].path_prefix
-          } : {}
+          {
+            for key, value in {
+              HTTP_PATH_PREFIX = try(var.public_microservices[microservice_name].path_prefix, "")
+            } : key => value
+            if var.path_based_routing_enabled && value != ""
+          }
         )
       },
       # env.standard only emits keys listed in service-inputs envKeys or Values.envKeys.
-      var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
-        envKeys = distinct(concat(
-          try(nonsensitive(var.helm_values)[microservice_name].envKeys, []),
-          ["HTTP_PATH_PREFIX"]
-        ))
-      } : {}
+      {
+        for key, value in {
+          envKeys = distinct(concat(
+            try(nonsensitive(var.helm_values)[microservice_name].envKeys, []),
+            ["HTTP_PATH_PREFIX"]
+          ))
+        } : key => value
+        if var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != ""
+      }
     )
   })
 
@@ -100,22 +106,25 @@ locals {
           load_balancer_name = var.workspace
           logs_bucket        = var.logs_bucket
         },
-        var.path_based_routing_enabled && microservice_config.path_prefix != "" ? merge(
-          {
-            # Outrank legacy host-based rules if the external reverse proxy rewrites Host.
+        {
+          for key, value in {
+            # Hostless Prefix rule is the ONLY public Ingress for each routed service.
             group_order = -100
             hostless    = true
             path        = microservice_config.path_prefix
-          },
-          microservice_name == "connect" ? {
-            # Connect SDK traffic is served by Hermes/worker-proxy. Keep those
-            # prefixed routes on the Connect Ingress so they outrank its catch-all.
+          } : key => value
+          if var.path_based_routing_enabled && microservice_config.path_prefix != ""
+        },
+        {
+          for key, value in {
+            # Connect SDK requests still target the Hermes/worker-proxy services.
             connect_sdk_routes = {
               hermes_port       = try(var.microservices["hermes"].port, 1702)
               worker_proxy_port = try(var.microservices["worker-proxy"].port, 1715)
             }
-          } : {}
-        ) : {},
+          } : key => value
+          if var.path_based_routing_enabled && microservice_config.path_prefix != "" && microservice_name == "connect"
+        },
         var.waf_web_acl_arn != "" ? { wafv2_acl_arn = var.waf_web_acl_arn } : {}
       )
     }

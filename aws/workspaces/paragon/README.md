@@ -2,25 +2,52 @@
 
 ## Shared-host path routing
 
-Set `path_based_routing_enabled = true` to route public Paragon microservices through a shared external host with service-specific path prefixes. The path prefix is taken from each service's existing `*_PUBLIC_URL`; there is no separate path variable. Public monitor URLs and Managed Sync remain host-based in this flow.
+**Direct cutover for AWS (PARA-25255).** Enable this option to route every
+publicly exposed Paragon microservice and HTTP worker through one reverse-proxy
+hostname and a service-specific prefix:
 
-For example:
-
-```yaml
-global:
-  env:
-    HERMES_PUBLIC_URL: https://proxy.example.com/paragon/hermes
-    ZEUS_PUBLIC_URL: https://proxy.example.com/paragon/zeus
-    CONNECT_PUBLIC_URL: https://proxy.example.com/paragon/connect
-    PASSPORT_PUBLIC_URL: https://proxy.example.com/paragon/passport
-    WORKER_PROXY_PUBLIC_URL: https://proxy.example.com/paragon/worker-proxy
+```hcl
+path_based_routing_enabled = true
+path_routing_base_path     = "/paragon"
+path_routing_public_host   = "proxy-path-test.staging.pgn.so"
 ```
 
-All path-routed services must use the same public host and unique, non-root path prefixes without trailing slashes (max 126 characters; the AWS Load Balancer Controller also emits the `/*` form and ALB limits each path pattern to 128 characters). Ingress rules match the path without requiring the public `Host` header, so an upstream reverse proxy may rewrite `Host`. Host-based services and monitors cannot reuse that shared external hostname. Route53 keeps `<service>.<domain>` CNAMEs as TLS-valid origins the proxy can target.
+The host and base path are specified **once**. Terraform generates paths
+`/paragon/account`, `/paragon/api-triggerkit`, `/paragon/connect`,
+`/paragon/dashboard`, `/paragon/hermes`, `/paragon/passport`,
+`/paragon/zeus`, `/paragon/worker-proxy`, and every other exposed
+Paragon HTTP worker/service. It also sets their effective `*_PUBLIC_URL`
+values to `https://proxy-path-test.staging.pgn.so/paragon/<service>` in
+Helm and sets `HTTP_PATH_PREFIX=/paragon/<service>` individually.
+`worker-auditlogs` uses the environment key `WORKER_AUDIT_LOGS_PUBLIC_URL`.
 
-ALB target-group health checks and Kubernetes probes stay on `/healthz` without the public path prefix. Existing unprefixed Connect SDK ALB routes remain available, and when Connect itself is path-routed the prefixed SDK trigger/proxy paths are routed to Hermes/worker-proxy before the Connect catch-all. Application support is PARA-25254; Helm also injects `HTTP_PATH_PREFIX` via an `envKeys` override so the var reaches pods even before `service-inputs` lists it.
+**No shadow Ingress:** the normal service Ingress becomes a hostless AWS ALB
+`Prefix` rule. The original host rules are replaced. ALB health checks and
+Kubernetes probes stay unprefixed on `/healthz`. The existing special
+unprefixed `/projects/*/sdk/*` forwarding rules are removed in path mode,
+and the Connect prefixed SDK trigger/proxy rules remain.
 
-Uptime monitors use `public_url + healthcheck_path` (the external proxy URL). Pause or retarget them until the proxy and app middleware are live.
+The proxy hostname is **not** created in Paragon's Route53 module; configure
+the DNS record to point to the separate Nginx endpoint. Each Paragon origin
+`<service>.<domain>` CNAME remains pointed at the ALB for verified TLS/SNI
+when Nginx forwards the original HTTP URI. Enable `path_based_routing_enabled`
+only when application images include the `HTTP_PATH_PREFIX` middleware.
+
+The path setting applies to the monorepo microservices/workers exposed through
+the Paragon Helm chart, respecting the actual public/private/excluded services.
+Managed Sync (`api-sync`) has its own Helm ingress and application; the path
+handling for Managed Sync is a **separate application/chart dependency**.
+Grafana and other third-party monitoring UIs do not use the Nest middleware.
+Dashboard is Next.js and needs a matching frontend base path/asset-routing
+implementation for full browser functionality; an ALB route and Nest
+middleware alone cannot provide it.
+
+**Explicit URL mode:** when `path_routing_base_path` and
+`path_routing_public_host` are both empty, the previous implementation still
+supports path-bearing `*_PUBLIC_URL` values on selected services, as long
+as they all share an external hostname. Leaving
+`path_based_routing_enabled=false` preserves the existing host-based
+defaults in unrelated installations.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -143,8 +170,8 @@ Uptime monitors use `public_url + healthcheck_path` (the external proxy URL). Pa
 | <a name="input_monitor_version"></a> [monitor\_version](#input\_monitor\_version) | The version of the Paragon monitors to install. | `string` | `null` | no |
 | <a name="input_monitors_enabled"></a> [monitors\_enabled](#input\_monitors\_enabled) | Specifies that monitors are enabled. | `bool` | `false` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | The name of the organization that's deploying Paragon. | `string` | n/a | yes |
-| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Enable path-prefixed public routes for services whose *\_PUBLIC\_URL includes a non-root path. Services without a path keep the existing host-based routing. | `bool` | `false` | no |
-| <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that should not be publicly exposed (filtered from public\_microservices and public\_monitors). | `list(string)` | `[]` | no |
+| <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that get no Ingress. Removed from public\_microservices and public\_monitors on both internet-facing and internal load balancers. ingress\_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict\_public\_exposure is true, allowlisted services can still be listed here. | `list(string)` | `[]` | no |
+| <a name="input_restrict_public_exposure"></a> [restrict\_public\_exposure](#input\_restrict\_public\_exposure) | When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private\_services to further restrict allowlisted endpoints. Removing many Ingresses from the shared ALB group requires elasticloadbalancing:SetRulePriorities on the load balancer controller IAM principal (see infra eks-worker-policy); without it, deleted Ingress objects can remain Terminating while ALB rules stay active until the controller reconciles. | `bool` | `false` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
 | <a name="input_uptime_company"></a> [uptime\_company](#input\_uptime\_company) | Optional pretty company name to include in BetterStack Uptime monitors. | `string` | `null` | no |
 | <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf\_enabled) | Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf\_managed\_rule\_groups, rate limits, or IP lists in tfvars. | `bool` | `false` | no |

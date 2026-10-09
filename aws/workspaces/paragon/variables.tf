@@ -126,10 +126,48 @@ variable "ingress_scheme" {
   default     = "internet-facing"
 }
 
+variable "path_routing_base_path" {
+  description = "When path routing is enabled, prefix every exposed Paragon HTTP service with this base path (for example /paragon/account). Blank retains explicit *_PUBLIC_URL paths."
+  type        = string
+  default     = ""
+
+  validation {
+    condition = var.path_routing_base_path == "" || (
+      length(regexall("^/[a-z0-9-]+(/[a-z0-9-]+)*$", var.path_routing_base_path)) == 1 &&
+      length(var.path_routing_base_path) <= 90 &&
+      var.path_routing_base_path != "/projects" &&
+      !startswith(var.path_routing_base_path, "/projects/")
+    )
+    error_message = "path_routing_base_path must be a lowercase path like /paragon (no trailing slash, max 90 chars) and cannot use /projects."
+  }
+}
+
+variable "path_routing_public_host" {
+  description = "External reverse proxy DNS hostname (without scheme or path) for all Paragon services when path_routing_base_path is set. This hostname is managed by the proxy operator, not by the Paragon Route53 module."
+  type        = string
+  default     = ""
+
+  validation {
+    condition = var.path_routing_public_host == "" || (
+      length(var.path_routing_public_host) <= 253 &&
+      length(regexall("^[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)+$", var.path_routing_public_host)) == 1
+    )
+    error_message = "path_routing_public_host must be a DNS hostname without https:// or a path (e.g. proxy.staging.pgn.so)."
+  }
+}
+
 variable "path_based_routing_enabled" {
-  description = "Enable path-prefixed public routes for services whose *_PUBLIC_URL includes a non-root path. Services without a path keep the existing host-based routing."
+  description = "Route Paragon public HTTP services with hostless ALB Prefix rules. With path_routing_base_path and path_routing_public_host, generate /<base>/<service> routes for every exposed Paragon HTTP service."
   type        = bool
   default     = false
+
+  validation {
+    condition = (
+      (var.path_routing_base_path == "" && var.path_routing_public_host == "") ||
+      (var.path_based_routing_enabled && var.path_routing_base_path != "" && var.path_routing_public_host != "")
+    )
+    error_message = "Set path_based_routing_enabled=true and both path_routing_base_path and path_routing_public_host, or leave both empty."
+  }
 
   validation {
     condition = !var.path_based_routing_enabled || alltrue([
@@ -182,7 +220,7 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || length(distinct([
+    condition = !var.path_based_routing_enabled || var.path_routing_base_path != "" || length(local.path_routed_public_prefixes) == 0 || length(distinct([
       for service in keys(local.path_routed_public_prefixes) :
       lower(replace(
         local.public_microservices_base[service].public_url,
@@ -908,6 +946,18 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
+  restrict_public_exposure = var.restrict_public_exposure
+
+  restricted_public_microservice_allowlist = toset([
+    "api-triggerkit",
+    "connect",
+    "dashboard",
+    "health-checker",
+    "hermes",
+    "worker-proxy",
+    "zeus",
+  ])
+
   public_microservices_base = {
     for microservice, config in local.microservices :
     microservice => config
@@ -916,23 +966,33 @@ locals {
     )
   }
 
+  # Path mode cuts over every public Paragon HTTP microservice and HTTP
+  # worker, rather than a manually maintained allowlist of selected services.
+  # Managed Sync uses a different Helm chart and is managed independently.
   path_routed_public_prefixes = {
     for microservice, config in local.public_microservices_base :
-    microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
+    microservice => var.path_routing_base_path != "" ?
+    "${var.path_routing_base_path}/${microservice}" :
+    "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
     if(
-      trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != "" &&
-      !contains(keys(local.managed_sync_microservices), microservice)
+      !contains(keys(local.managed_sync_microservices), microservice) &&
+      (
+        var.path_routing_base_path != "" ||
+        trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+      )
     )
   }
 
-  path_routing_reserved_hosts = toset([
-    for service in keys(local.path_routed_public_prefixes) :
-    lower(replace(
-      local.public_microservices_base[service].public_url,
-      "/^https?:\\/\\/([^\\/?#]+).*$/",
-      "$1"
-    ))
-  ])
+  path_routing_reserved_hosts = (
+    var.path_routing_base_path != "" ? toset([lower(var.path_routing_public_host)]) : toset([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ])
+  )
 
   # Path-routed services keep <service>.<domain> as Terraform-managed ALB origins.
   # The external reverse-proxy hostname must remain distinct from every such origin.
@@ -944,14 +1004,29 @@ locals {
   public_microservices = {
     for microservice, config in local.public_microservices_base :
     microservice => merge(config, {
-      public_host = var.path_based_routing_enabled ? replace(
-        config.public_url,
-        "/^https?:\\/\\/([^\\/?#]+).*$/",
-        "$1"
-      ) : replace(replace(config.public_url, "https://", ""), "http://", "")
+      # One shared proxy host and one service path, even if the old values
+      # previously used individual hosts. The normal Ingress becomes hostless.
+      public_url = (
+        var.path_based_routing_enabled && var.path_routing_base_path != "" && contains(keys(local.path_routed_public_prefixes), microservice) ?
+        "https://${var.path_routing_public_host}${local.path_routed_public_prefixes[microservice]}" : config.public_url
+      )
+      public_host = (
+        var.path_based_routing_enabled && var.path_routing_base_path != "" && contains(keys(local.path_routed_public_prefixes), microservice) ?
+        var.path_routing_public_host : (
+          var.path_based_routing_enabled ? replace(
+            config.public_url,
+            "/^https?:\\/\\/([^\\/?#]+).*$/",
+            "$1"
+          ) : replace(replace(config.public_url, "https://", ""), "http://", "")
+        )
+      )
       path_prefix = lookup(local.path_routed_public_prefixes, microservice, "")
     })
   }
+
+  uptime_excluded_microservices = toset([
+    "cache-replay",
+  ])
 
   uptime_services = {
     for microservice, config in local.public_microservices :
@@ -1279,7 +1354,17 @@ locals {
           for key, value in local.helm_vars.global.env :
           key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
-        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {},
+        # A single proxy DNS/base path becomes the PUBLIC_URL contract for all
+        # exposed Paragon microservices and workers. Do this AFTER user values
+        # so the same URL reaches every application's env and generated Helm chart.
+        var.path_based_routing_enabled && var.path_routing_base_path != "" ? {
+          for service, config in local.public_microservices :
+          lookup({
+            "worker-auditlogs" = "WORKER_AUDIT_LOGS_PUBLIC_URL"
+          }, service, "${upper(replace(service, "-", "_"))}_PUBLIC_URL") => config.public_url
+          if contains(keys(local.monorepo_microservices), service)
+        } : {}
       )
     })
   })

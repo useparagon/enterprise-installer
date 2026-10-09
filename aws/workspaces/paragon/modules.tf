@@ -17,19 +17,15 @@ module "waf" {
 module "alb" {
   source = "./alb"
 
-  certificate                = var.certificate
-  cluster_name               = local.cluster_name
-  cloudflare_dns_api_token   = var.cloudflare_dns_api_token
-  cloudflare_zone_id         = var.cloudflare_zone_id
-  dns_provider               = var.dns_provider
-  domain                     = var.domain
-  path_based_routing_enabled = var.path_based_routing_enabled
-  microservices              = local.microservices
-  public_microservices       = local.public_microservices
-  public_monitors            = local.public_monitors
-  release_ingress            = module.helm.release_ingress
-  release_paragon_on_prem    = module.helm.release_paragon_on_prem
-  vpc_id                     = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
+  certificate              = var.certificate
+  cluster_name             = local.cluster_name
+  cloudflare_dns_api_token = var.cloudflare_dns_api_token
+  cloudflare_zone_id       = var.cloudflare_zone_id
+  dns_provider             = var.dns_provider
+  domain                   = var.domain
+  microservices            = local.microservices
+  public_services          = local.public_services
+  vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
   worker_security_group_ids = coalescelist(
     try(compact(local.infra_vars.worker_security_group_ids.value), []),
     try(compact(local.infra_vars.karpenter.value.security_group_ids), []),
@@ -106,14 +102,15 @@ module "helm" {
 module "dns" {
   source = "./dns"
 
-  domain                  = var.domain
-  public_services         = local.public_services
-  route53_zone_id         = module.alb.route53_zone_id
-  workspace               = local.workspace
-  cluster_name            = local.cluster_name
-  release_ingress         = module.helm.release_ingress
-  release_paragon_logging = module.helm.release_paragon_logging
-  release_paragon_on_prem = module.helm.release_paragon_on_prem
+  domain                     = var.domain
+  public_services            = local.public_services
+  path_based_routing_enabled = var.path_based_routing_enabled
+  route53_zone_id            = module.alb.route53_zone_id
+  workspace                  = local.workspace
+  cluster_name               = local.cluster_name
+  release_ingress            = module.helm.release_ingress
+  release_paragon_logging    = module.helm.release_paragon_logging
+  release_paragon_on_prem    = module.helm.release_paragon_on_prem
 }
 
 module "managed_sync_config" {
