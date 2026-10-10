@@ -4,10 +4,11 @@ output "agent_os" {
     port    = try(local.agent_os_valkey_endpoints["cache"].port, null)
     ssl     = true
     cluster = local.agent_os_valkey_instances["cache"].cluster_enabled
-    ca_certificate = join("\n", flatten([
+    # A blank CA is valid: Agent OS uses system trust roots when no custom CA is set.
+    ca_certificate = try(join("\n", flatten([
       for chain in google_memorystore_instance.agent_os["cache"].managed_server_ca[0].ca_certs :
       chain.certificates
-    ]))
+    ])), "")
   } : null
   sensitive = true
 
