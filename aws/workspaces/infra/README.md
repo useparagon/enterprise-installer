@@ -129,14 +129,13 @@ a legacy workload to the new map is **not** an automatic migration.
 | <a name="input_docker_password"></a> [docker\_password](#input\_docker\_password) | Docker password for application image pulls. | `string` | `null` | no |
 | <a name="input_docker_registry_server"></a> [docker\_registry\_server](#input\_docker\_registry\_server) | Docker registry server for application image pulls. | `string` | `null` | no |
 | <a name="input_docker_username"></a> [docker\_username](#input\_docker\_username) | Docker username for application image pulls. | `string` | `null` | no |
-| <a name="input_eks_admin_arns"></a> [eks\_admin\_arns](#input\_eks\_admin\_arns) | Array of ARNs for IAM users or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard. | `list(string)` | `[]` | no |
+| <a name="input_eks_admin_arns"></a> [eks\_admin\_arns](#input\_eks\_admin\_arns) | IAM user or role ARNs, including IAM Identity Center (SSO) role ARNs, granted EKS cluster-admin access. | `list(string)` | `[]` | no |
 | <a name="input_eks_max_node_count"></a> [eks\_max\_node\_count](#input\_eks\_max\_node\_count) | The maximum number of nodes to run in the Kubernetes cluster. | `number` | `50` | no |
 | <a name="input_eks_min_node_count"></a> [eks\_min\_node\_count](#input\_eks\_min\_node\_count) | The minimum number of nodes to run in the Kubernetes cluster. | `number` | `4` | no |
 | <a name="input_eks_ondemand_node_instance_type"></a> [eks\_ondemand\_node\_instance\_type](#input\_eks\_ondemand\_node\_instance\_type) | The compute instance type to use for Kubernetes nodes. | `string` | `"m6a.xlarge"` | no |
 | <a name="input_eks_spot_instance_percent"></a> [eks\_spot\_instance\_percent](#input\_eks\_spot\_instance\_percent) | The percentage of spot instances to use for Kubernetes nodes. | `number` | `75` | no |
 | <a name="input_eks_spot_node_instance_type"></a> [eks\_spot\_node\_instance\_type](#input\_eks\_spot\_node\_instance\_type) | The compute instance type to use for Kubernetes spot nodes. | `string` | `"t3a.xlarge,t3.xlarge,m5a.xlarge,m5.xlarge,m6a.xlarge,m6i.xlarge,m7a.xlarge,m7i.xlarge,r5a.xlarge,m4.xlarge"` | no |
 | <a name="input_eks_system_managed_node_group"></a> [eks\_system\_managed\_node\_group](#input\_eks\_system\_managed\_node\_group) | System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default). | <pre>object({<br/>    map_key         = optional(string, "node-default")<br/>    name            = optional(string)<br/>    use_name_prefix = optional(bool, false)<br/>    ec2_name_tag    = optional(string)<br/>    instance_types  = optional(list(string))<br/>    min_size        = optional(number, 2)<br/>    max_size        = optional(number, 3)<br/>    desired_size    = optional(number, 2)<br/>    labels          = optional(map(string), { "karpenter.sh/controller" = "true" })<br/>  })</pre> | `{}` | no |
-| <a name="input_eks_view_arns"></a> [eks\_view\_arns](#input\_eks\_view\_arns) | IAM role ARNs allowed to view EKS resources, pod logs and events without modifying workloads or reading Kubernetes Secrets. Use for QA/SSO roles; never add these to eks\_admin\_arns. | `list(string)` | `[]` | no |
 | <a name="input_elasticache_multi_az"></a> [elasticache\_multi\_az](#input\_elasticache\_multi\_az) | Whether or not to enable multi-AZ in each ElastiCache instance. | `bool` | `true` | no |
 | <a name="input_elasticache_multiple_instances"></a> [elasticache\_multiple\_instances](#input\_elasticache\_multiple\_instances) | Whether or not to create multiple ElastiCache instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_elasticache_node_type"></a> [elasticache\_node\_type](#input\_elasticache\_node\_type) | The ElastiCache node type used for Redis. | `string` | `"cache.r6g.large"` | no |
@@ -216,39 +215,6 @@ cdn_bucket_acl_reset = true
 ```
 
 After `BucketOwnerEnforced` is active, ACL updates are ignored via `lifecycle.ignore_changes` to avoid S3 API errors on subsequent applies.
-
-## QA / AWS SSO access to EKS
-
-The EKS module provisions access entries through `module.eks.access_entries`.
-Use `eks_view_arns` for QA and other SSO principals that need to inspect pod
-health, events and logs. The associated **AmazonEKSViewPolicy** grants
-read-only cluster visibility, including `pods/log`, but does **not**
-allow Kubernetes Secrets, `kubectl exec`, or modifications.
-
-For an Enterprise test account, resolve the exact IAM role ARNs using
-`aws iam list-roles` (filter `AWSReservedSSO_*`) and set them in the
-**infra workspace's** `vars.auto.tfvars`:
-
-```hcl
-eks_view_arns = [
-  "arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AWSReadOnlyAccess_ROLE_SUFFIX",
-  "arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AWSPowerUserAccess_ROLE_SUFFIX",
-]
-```
-
-This applies only to the current EKS cluster. For a Spacelift-managed
-workspace, configure the same `eks_view_arns` list on that infra stack or
-context (for example, via `TF_VAR_eks_view_arns` as a JSON array). A local
-`vars.auto.tfvars` is ignored by Git: if the next Spacelift apply omits the
-variable, Terraform will plan to **remove** these two access entries.
-The IAM Identity Center permission set must also be assigned to the
-relevant QA users in AWS. Users must select the same SSO role and region
-in their AWS CLI credentials.
-SSO role suffixes can change if assignments are recreated; refresh the ARNs
-rather than hardcoding them in shared Terraform.
-
-**Do not put QA roles in `eks_admin_arns`**. That input also grants
-Kubernetes cluster-admin and KMS administrator access.
 
 ## S3 bucket encryption (SSE-S3 vs SSE-KMS)
 

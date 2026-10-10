@@ -205,22 +205,9 @@ variable "eks_max_node_count" {
 }
 
 variable "eks_admin_arns" {
-  description = "Array of ARNs for IAM users or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard."
+  description = "IAM user or role ARNs, including IAM Identity Center (SSO) role ARNs, granted EKS cluster-admin access."
   type        = list(string)
   default     = []
-}
-
-variable "eks_view_arns" {
-  description = "IAM role ARNs allowed to view EKS resources, pod logs and events without modifying workloads or reading Kubernetes Secrets. Use for QA/SSO roles; never add these to eks_admin_arns."
-  type        = list(string)
-  default     = []
-
-  validation {
-    condition = alltrue([
-      for arn in var.eks_view_arns : can(regex("^arn:[^:]+:iam::[0-9]{12}:role/", arn))
-    ])
-    error_message = "eks_view_arns must contain IAM role ARNs (not STS assumed-role session ARNs)."
-  }
 }
 
 variable "create_autoscaling_linked_role" {

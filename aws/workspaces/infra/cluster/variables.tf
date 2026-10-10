@@ -19,12 +19,7 @@ variable "private_subnet_ids" {
 }
 
 variable "eks_admin_arns" {
-  description = "Array of ARNs for IAM users, groups or roles that should have admin access to cluster. Includes the Terraform caller."
-  type        = list(string)
-}
-
-variable "eks_view_arns" {
-  description = "IAM roles to associate with AmazonEKSViewPolicy, cluster-scoped for QA visibility into pods, events and logs (no Kubernetes Secrets)."
+  description = "IAM user or role ARNs, including IAM Identity Center (SSO) role ARNs, granted EKS cluster-admin access. Includes the Terraform caller."
   type        = list(string)
 }
 
