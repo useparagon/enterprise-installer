@@ -95,14 +95,16 @@ module "gke" {
         enable_gvnic         = false
         enable_private_nodes = true
         image_type           = "COS_CONTAINERD"
-        initial_node_count   = var.agent_os_index_min_count
-        local_ssd_count      = 0
-        machine_type         = var.agent_os_index_machine_type
-        total_max_count      = var.agent_os_index_max_count
-        total_min_count      = var.agent_os_index_min_count
-        node_locations       = "${var.region_zone},${var.region_zone_backup}"
-        preemptible          = false
-        spot                 = false
+        # Initial count is per zone; autoscaling limits below are regional totals.
+        initial_node_count = floor(var.agent_os_index_min_count / 2)
+        local_ssd_count    = 0
+        machine_type       = var.agent_os_index_machine_type
+        total_max_count    = var.agent_os_index_max_count
+        total_min_count    = var.agent_os_index_min_count
+        location_policy    = "BALANCED"
+        node_locations     = "${var.region_zone},${var.region_zone_backup}"
+        preemptible        = false
+        spot               = false
     }] : [],
 
     # Agent OS extraction workloads require dedicated on-demand, compute-optimized AMD capacity.
@@ -117,14 +119,16 @@ module "gke" {
         enable_gvnic         = false
         enable_private_nodes = true
         image_type           = "COS_CONTAINERD"
-        initial_node_count   = var.agent_os_extract_min_count
-        local_ssd_count      = 0
-        machine_type         = var.agent_os_extract_machine_type
-        total_max_count      = var.agent_os_extract_max_count
-        total_min_count      = var.agent_os_extract_min_count
-        node_locations       = "${var.region_zone},${var.region_zone_backup}"
-        preemptible          = false
-        spot                 = false
+        # Start at zero when the regional minimum is one; scale on pod demand.
+        initial_node_count = floor(var.agent_os_extract_min_count / 2)
+        local_ssd_count    = 0
+        machine_type       = var.agent_os_extract_machine_type
+        total_max_count    = var.agent_os_extract_max_count
+        total_min_count    = var.agent_os_extract_min_count
+        location_policy    = "BALANCED"
+        node_locations     = "${var.region_zone},${var.region_zone_backup}"
+        preemptible        = false
+        spot               = false
     }] : [],
   ])
 

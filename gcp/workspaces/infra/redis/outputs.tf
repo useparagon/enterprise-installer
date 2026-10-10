@@ -14,10 +14,12 @@ output "agent_os" {
   precondition {
     condition = (
       !var.agent_os_enabled ||
-      !contains(keys(local.agent_os_valkey_instances), "cache") ||
-      local.agent_os_valkey_endpoints["cache"] != null
+      (
+        try(local.agent_os_valkey_endpoints["cache"].ip_address, null) != null &&
+        try(local.agent_os_valkey_endpoints["cache"].port > 0, false)
+      )
     )
-    error_message = "Agent OS Valkey did not return the required primary/discovery PSC endpoint."
+    error_message = "Agent OS Valkey must expose a primary/discovery PSC IP address and port."
   }
 }
 

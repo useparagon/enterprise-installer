@@ -22,7 +22,7 @@ locals {
           HOST_ENV                              = "GCP_K8"
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
-          PARAGON_MANAGED_SYNC_URL              = "http://api-sync:${var.microservices["api-sync"].port}"
+          PARAGON_MANAGED_SYNC_URL              = "http://api-sync:${try(var.microservices["api-sync"].port, 1800)}"
           PARAGON_MANAGED_SYNC_PROJECT_HOST     = "api-project"
           PARAGON_MANAGED_SYNC_PROJECT_TCP_PORT = tostring(try(var.helm_values.global.env["API_PROJECT_TCP_PORT"], 1805))
           PARAGON_ACTIONKIT_URL                 = "http://worker-actionkit:${var.microservices["worker-actionkit"].port}"
