@@ -143,8 +143,8 @@ locals {
         creationPolicy = "Owner"
       }
       dataFrom = [
-        { extract = { key = var.agent_os_secret_names.vendor } },
-        { extract = { key = var.agent_os_secret_names.app } },
+        { extract = { key = "agent-os-vendor" } },
+        { extract = { key = "agent-os-app" } },
       ]
     }
   }) : null
@@ -167,7 +167,7 @@ locals {
         creationPolicy = "Owner"
       }
       dataFrom = [
-        { extract = { key = var.agent_os_secret_names.admin } },
+        { extract = { key = "agent-os-admin" } },
       ]
     }
   }) : null
@@ -190,7 +190,7 @@ locals {
         creationPolicy = "Owner"
       }
       dataFrom = [
-        { extract = { key = var.agent_os_secret_names.broker } },
+        { extract = { key = "agent-os-capability-broker" } },
       ]
     }
   }) : null

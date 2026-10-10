@@ -250,18 +250,7 @@ variable "agent_os_file_values" {
   type        = any
 }
 
-# Agent OS cloud secret names and workload identity are supplied by the parent workspace.
-variable "agent_os_secret_names" {
-  description = "Key Vault secret names used to assemble Agent OS Kubernetes secrets."
-  type = object({
-    app    = string
-    admin  = string
-    broker = string
-    vendor = string
-  })
-  default = null
-}
-
+# Agent OS workload identity is supplied by the parent workspace.
 variable "agent_os_workload_identity_client_id" {
   description = "Client ID of the Agent OS user-assigned workload identity."
   type        = string

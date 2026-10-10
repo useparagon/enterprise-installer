@@ -27,28 +27,22 @@ module "helm" {
     agent_os_broker = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_broker[0].version : null
     agent_os_vendor = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_vendor[0].version : null
   }))
-  ingress_scheme           = var.ingress_scheme
-  nginx_public             = local.nginx_public
-  agc_active               = local.agc_active
-  agc_direct               = local.agc_direct
-  agc_subnet_cidr          = try(local.infra_vars.network.value.agc_subnet_cidr, null)
-  key_vault_name           = data.azurerm_key_vault.paragon.name
-  k8s_version              = var.k8s_version
-  logs_bucket              = local.logs_bucket
-  managed_sync_enabled     = var.managed_sync_enabled
-  managed_sync_secret_name = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
-  managed_sync_version     = var.managed_sync_version
-  agent_os_enabled         = var.agent_os_enabled
-  agent_os_version         = var.agent_os_version
-  agent_os_helm_repository = var.agent_os_helm_repository
-  agent_os_helm_values     = var.agent_os_helm_values
-  agent_os_file_values     = try(local.helm_vars.agentOs.values, {})
-  agent_os_secret_names = var.agent_os_enabled ? {
-    app    = azurerm_key_vault_secret.agent_os_app[0].name
-    admin  = azurerm_key_vault_secret.agent_os_admin[0].name
-    broker = azurerm_key_vault_secret.agent_os_broker[0].name
-    vendor = azurerm_key_vault_secret.agent_os_vendor[0].name
-  } : null
+  ingress_scheme                       = var.ingress_scheme
+  nginx_public                         = local.nginx_public
+  agc_active                           = local.agc_active
+  agc_direct                           = local.agc_direct
+  agc_subnet_cidr                      = try(local.infra_vars.network.value.agc_subnet_cidr, null)
+  key_vault_name                       = data.azurerm_key_vault.paragon.name
+  k8s_version                          = var.k8s_version
+  logs_bucket                          = local.logs_bucket
+  managed_sync_enabled                 = var.managed_sync_enabled
+  managed_sync_secret_name             = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
+  managed_sync_version                 = var.managed_sync_version
+  agent_os_enabled                     = var.agent_os_enabled
+  agent_os_version                     = var.agent_os_version
+  agent_os_helm_repository             = var.agent_os_helm_repository
+  agent_os_helm_values                 = var.agent_os_helm_values
+  agent_os_file_values                 = try(local.helm_vars.agentOs.values, {})
   agent_os_workload_identity_client_id = var.agent_os_enabled ? azurerm_user_assigned_identity.agent_os[0].client_id : null
   agent_os_workload_identity_ready = var.agent_os_enabled ? sha256(join(":", [
     azurerm_federated_identity_credential.agent_os[0].id,
