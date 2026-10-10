@@ -171,13 +171,15 @@ resource "aws_msk_configuration" "kafka" {
 
   kafka_versions = [var.msk_kafka_version]
 
+  # Preserve the existing cluster-wide defaults. Agent OS topics specify their
+  # own replication and min ISR through the topic-creation Job.
   server_properties = <<-PROPERTIES
 auto.create.topics.enable = true
 delete.topic.enable = true
 log.retention.hours = 168
 num.partitions = 3
-default.replication.factor = ${min(3, var.msk_kafka_num_broker_nodes)}
-min.insync.replicas = ${max(1, min(3, var.msk_kafka_num_broker_nodes) - 1)}
+default.replication.factor = ${ceil(var.msk_kafka_num_broker_nodes / 2)}
+min.insync.replicas = ${ceil(var.msk_kafka_num_broker_nodes / 2)}
 PROPERTIES
 
   lifecycle {
