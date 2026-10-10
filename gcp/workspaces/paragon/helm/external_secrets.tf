@@ -238,7 +238,7 @@ locals {
   }) : null
 
   # Agent OS: vendor first then app so Terraform app keys win collisions; admin is separate.
-  external_secret_agent_os_app_yaml = var.agent_os_enabled && var.agent_os_app_secret_name != null && var.agent_os_vendor_secret_name != null ? yamlencode({
+  external_secret_agent_os_app_yaml = var.agent_os_enabled ? yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ExternalSecret"
     metadata = {
@@ -258,19 +258,19 @@ locals {
       dataFrom = [
         {
           extract = {
-            key = var.agent_os_vendor_secret_name
+            key = "${var.workspace}-agent-os-vendor"
           }
         },
         {
           extract = {
-            key = var.agent_os_app_secret_name
+            key = "${var.workspace}-agent-os-app"
           }
         },
       ]
     }
   }) : null
 
-  external_secret_agent_os_broker_yaml = var.agent_os_enabled && var.agent_os_broker_secret_name != null ? yamlencode({
+  external_secret_agent_os_broker_yaml = var.agent_os_enabled ? yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ExternalSecret"
     metadata = {
@@ -287,11 +287,11 @@ locals {
         name           = "agent-os-capability-broker"
         creationPolicy = "Owner"
       }
-      dataFrom = [{ extract = { key = var.agent_os_broker_secret_name } }]
+      dataFrom = [{ extract = { key = "${var.workspace}-agent-os-capability-broker" } }]
     }
   }) : null
 
-  external_secret_agent_os_admin_yaml = var.agent_os_enabled && var.agent_os_admin_secret_name != null ? yamlencode({
+  external_secret_agent_os_admin_yaml = var.agent_os_enabled ? yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ExternalSecret"
     metadata = {
@@ -310,7 +310,7 @@ locals {
       }
       dataFrom = [{
         extract = {
-          key = var.agent_os_admin_secret_name
+          key = "${var.workspace}-agent-os-admin"
         }
       }]
     }
@@ -375,7 +375,7 @@ resource "kubernetes_service_account_v1" "agent_os" {
 }
 
 resource "kubectl_manifest" "external_secret_agent_os_app" {
-  count = var.agent_os_enabled && var.agent_os_app_secret_name != null && var.agent_os_vendor_secret_name != null ? 1 : 0
+  count = var.agent_os_enabled ? 1 : 0
 
   yaml_body = local.external_secret_agent_os_app_yaml
   depends_on = [
@@ -386,7 +386,7 @@ resource "kubectl_manifest" "external_secret_agent_os_app" {
 }
 
 resource "kubectl_manifest" "external_secret_agent_os_admin" {
-  count = var.agent_os_enabled && var.agent_os_admin_secret_name != null ? 1 : 0
+  count = var.agent_os_enabled ? 1 : 0
 
   yaml_body = local.external_secret_agent_os_admin_yaml
   depends_on = [
@@ -397,7 +397,7 @@ resource "kubectl_manifest" "external_secret_agent_os_admin" {
 }
 
 resource "kubectl_manifest" "external_secret_agent_os_broker" {
-  count      = var.agent_os_enabled && var.agent_os_broker_secret_name != null ? 1 : 0
+  count      = var.agent_os_enabled ? 1 : 0
   yaml_body  = local.external_secret_agent_os_broker_yaml
   depends_on = [kubectl_manifest.secret_store, kubernetes_namespace_v1.paragon]
 }

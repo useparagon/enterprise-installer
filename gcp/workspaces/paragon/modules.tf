@@ -81,10 +81,6 @@ module "helm" {
   agent_os_helm_repository    = var.agent_os_helm_repository
   agent_os_helm_values        = var.agent_os_helm_values
   agent_os_file_values        = try(local.helm_vars.agentOs.values, {})
-  agent_os_app_secret_name    = local.agent_os_app_secret_name
-  agent_os_admin_secret_name  = local.agent_os_admin_secret_name
-  agent_os_broker_secret_name = local.agent_os_broker_secret_name
-  agent_os_vendor_secret_name = local.agent_os_vendor_secret_name
   agent_os_service_account    = local.agent_os_service_account
   microservices               = local.microservices
   monitor_version             = local.monitor_version
