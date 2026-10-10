@@ -529,9 +529,14 @@ variable "agent_os_enabled" {
 }
 
 variable "agent_os_version" {
-  description = "The published Agent OS Helm chart version (override to the release containing chart-owned defaults when enabling)."
+  description = "Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS."
   type        = string
-  default     = "0.2.0"
+  default     = null
+
+  validation {
+    condition     = !var.agent_os_enabled || try(length(trimspace(var.agent_os_version)) > 0, false)
+    error_message = "Set agent_os_version to a published chart containing Enterprise defaults when enabling Agent OS."
+  }
 }
 
 variable "agent_os_helm_repository" {
