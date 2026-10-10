@@ -461,13 +461,13 @@ variable "agent_os_enabled" {
 
 
 variable "agent_os_version" {
-  description = "Version of the Agent OS Helm chart to install when Agent OS is enabled."
+  description = "Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS."
   type        = string
-  default     = "0.1.0"
+  default     = null
 
   validation {
-    condition     = length(trimspace(var.agent_os_version)) > 0
-    error_message = "agent_os_version must not be empty."
+    condition     = !var.agent_os_enabled || try(length(trimspace(var.agent_os_version)) > 0, false)
+    error_message = "Set agent_os_version to a published chart containing Enterprise defaults when enabling Agent OS."
   }
 }
 

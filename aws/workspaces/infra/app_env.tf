@@ -147,7 +147,8 @@ locals {
       ? "rediss://:${urlencode(local.agent_os_cache.password)}@${local.agent_os_cache.host}:${local.agent_os_cache.port}"
       : "redis://${local.agent_os_cache.host}:${local.agent_os_cache.port}"
     )
-    AOS_REDIS_PASSWORD        = coalesce(local.agent_os_cache.password, "")
+    # Valkey without TLS has no AUTH token; coalesce(null, "") is invalid in Terraform.
+    AOS_REDIS_PASSWORD        = local.agent_os_cache.password != null ? local.agent_os_cache.password : ""
     AOS_REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
     AOS_REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
 
@@ -201,7 +202,7 @@ locals {
     KAFKA_PRINCIPAL_MANAGED_SYNC = "User:${local.agent_os_kafka.kafka_credentials.username}"
 
     KAFKA_TOPIC_PARTITIONS          = "3"
-    KAFKA_TOPIC_REPLICATION_FACTOR  = tostring(ceil(var.msk_kafka_num_broker_nodes / 2))
-    KAFKA_TOPIC_MIN_INSYNC_REPLICAS = tostring(ceil(var.msk_kafka_num_broker_nodes / 2))
+    KAFKA_TOPIC_REPLICATION_FACTOR  = tostring(min(3, var.msk_kafka_num_broker_nodes))
+    KAFKA_TOPIC_MIN_INSYNC_REPLICAS = tostring(max(1, min(3, var.msk_kafka_num_broker_nodes) - 1))
   } : null
 }

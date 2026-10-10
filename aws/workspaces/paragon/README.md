@@ -15,7 +15,7 @@ by `agentOs` keys in values.yaml. Example `vars.auto.tfvars`:
 ```hcl
 managed_sync_enabled = true
 agent_os_enabled     = false # Switch to true after infra and Managed Sync are ready
-agent_os_version     = "0.2.0"
+agent_os_version     = "0.3.0-beta.3" # Use the compatible published chart for this environment
 ```
 
 The infra workspace requires both `managed_sync_enabled = true` and
@@ -159,7 +159,7 @@ do not yet have the corresponding Agent OS Helm/secret integration.
 | <a name="input_agent_os_helm_repository"></a> [agent\_os\_helm\_repository](#input\_agent\_os\_helm\_repository) | Helm repository URL used to install Agent OS. | `string` | `"https://paragon-helm-production.s3.amazonaws.com"` | no |
 | <a name="input_agent_os_helm_values"></a> [agent\_os\_helm\_values](#input\_agent\_os\_helm\_values) | Additional Agent OS chart values supplied through Terraform. Applied after generated AWS defaults and before .secure/values.yaml agentOs.values. | `any` | `{}` | no |
 | <a name="input_agent_os_vendor_config"></a> [agent\_os\_vendor\_config](#input\_agent\_os\_vendor\_config) | Optional Agent OS vendor keys merged onto the operator-owned secret. An empty map cannot wipe keys already in Secrets Manager. | `map(string)` | `{}` | no |
-| <a name="input_agent_os_version"></a> [agent\_os\_version](#input\_agent\_os\_version) | Version of the Agent OS Helm chart to install when Agent OS is enabled. | `string` | `"0.1.0"` | no |
+| <a name="input_agent_os_version"></a> [agent\_os\_version](#input\_agent\_os\_version) | Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS. | `string` | `null` | no |
 | <a name="input_aws_access_key_id"></a> [aws\_access\_key\_id](#input\_aws\_access\_key\_id) | AWS Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws\_assume\_role\_arn. | `string` | `null` | no |
 | <a name="input_aws_assume_role_arn"></a> [aws\_assume\_role\_arn](#input\_aws\_assume\_role\_arn) | Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift). | `string` | `null` | no |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | The AWS region resources are created in. | `string` | n/a | yes |
