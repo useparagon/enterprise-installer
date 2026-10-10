@@ -213,12 +213,12 @@ locals {
       dataFrom = [
         {
           extract = {
-            key = var.agent_os_vendor_secret_name
+            key = "paragon/${var.workspace}/agent-os/vendor"
           }
         },
         {
           extract = {
-            key = var.agent_os_app_secret_name
+            key = "paragon/${var.workspace}/agent-os/app"
           }
         },
       ]
@@ -244,7 +244,7 @@ locals {
       }
       dataFrom = [{
         extract = {
-          key = var.agent_os_broker_secret_name
+          key = "paragon/${var.workspace}/agent-os/capability-broker"
         }
       }]
     }
@@ -269,7 +269,7 @@ locals {
       }
       dataFrom = [{
         extract = {
-          key = var.agent_os_admin_secret_name
+          key = "paragon/${var.workspace}/agent-os/admin"
         }
       }]
     }
