@@ -205,7 +205,7 @@ variable "eks_max_node_count" {
 }
 
 variable "eks_admin_arns" {
-  description = "Array of ARNs for IAM users or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard."
+  description = "IAM user or role ARNs, including IAM Identity Center (SSO) role ARNs, granted EKS cluster-admin access."
   type        = list(string)
   default     = []
 }
@@ -454,6 +454,223 @@ variable "managed_sync_enabled" {
   default     = false
 }
 
+variable "valkey_enabled" {
+  description = "Whether to enable creation of Valkey instances from valkey_instances. Independent from legacy Redis so both can run in parallel during migrations."
+  type        = bool
+  default     = false
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled and valkey_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+
+  validation {
+    condition     = !var.agent_os_enabled || var.valkey_enabled
+    error_message = "Agent OS requires Valkey. Set valkey_enabled = true when agent_os_enabled is true."
+  }
+}
+
+
+# Per-instance PostgreSQL catalog. Defaults live here in the root workspace;
+# the child postgres module receives a fully resolved map without defaults.
+# The agent_os entry is created only when agent_os_enabled=true. Other entries
+# can be introduced independently (without activating Agent OS).
+variable "rds_postgres" {
+  description = "Independent PostgreSQL RDS instances keyed by workload (agent_os, airflow, etc.). Legacy Paragon/Managed Sync databases remain managed by rds_multiple_instances until explicitly migrated."
+  type = map(object({
+    enabled                             = optional(bool, true)
+    identifier                          = optional(string)
+    database_name                       = optional(string, "postgres")
+    port                                = optional(number, 5432)
+    instance_class                      = optional(string, "db.t4g.medium")
+    allocated_storage                   = optional(number, 100)
+    max_allocated_storage               = optional(number, 1000)
+    engine_version                      = optional(string, "16")
+    multi_az                            = optional(bool, true)
+    availability_zone                   = optional(string)
+    read_replica                        = optional(bool, false)
+    replica_instance_class              = optional(string, "db.t4g.small")
+    storage_type                        = optional(string, "gp3")
+    iops                                = optional(number)
+    storage_throughput                  = optional(number)
+    backup_retention_days               = optional(number, 7)
+    backup_window                       = optional(string, "06:00-07:00")
+    maintenance_window                  = optional(string, "Tue:04:00-Tue:05:00")
+    log_statement                       = optional(string, "ddl")
+    log_min_duration_statement          = optional(number, 1000)
+    enabled_cloudwatch_logs_exports     = optional(list(string), ["postgresql", "upgrade"])
+    monitoring_interval                 = optional(number, 15)
+    performance_insights_enabled        = optional(bool, true)
+    performance_insights_retention_days = optional(number, 31)
+    ca_cert_identifier                  = optional(string, "rds-ca-rsa2048-g1")
+    auto_minor_version_upgrade          = optional(bool, true)
+    allow_major_version_upgrade         = optional(bool, false)
+    apply_immediately                   = optional(bool, true)
+    deletion_protection                 = optional(bool)
+    kms_key_arn                         = optional(string)
+    ingress_cidr_blocks                 = optional(list(string))
+    tags                                = optional(map(string), {})
+  }))
+  default = {
+    agent_os = {}
+  }
+
+  validation {
+    condition = alltrue([
+      for key, cfg in var.rds_postgres :
+      can(regex("^[a-z][a-z0-9_]*$", key)) &&
+      (cfg.identifier == null || can(regex("^[a-z][a-z0-9-]*[a-z0-9]$", cfg.identifier))) &&
+      cfg.port >= 1 && cfg.port <= 65535
+    ])
+    error_message = "rds_postgres map keys must use lowercase letters/numbers/underscores, and custom identifiers must be valid RDS identifiers. Port must be between 1 and 65535."
+  }
+
+  validation {
+    condition     = !var.agent_os_enabled || try(var.rds_postgres["agent_os"].enabled, false)
+    error_message = "When agent_os_enabled=true, rds_postgres must contain an enabled agent_os entry."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.rds_postgres :
+      cfg.allocated_storage >= 20 &&
+      cfg.max_allocated_storage >= 100 &&
+      cfg.max_allocated_storage >= ceil(cfg.allocated_storage * 1.1)
+    ])
+    error_message = "rds_postgres allocated_storage must be at least 20 GiB; max_allocated_storage must be at least 100 GiB and 10% greater than allocated_storage."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.rds_postgres :
+      contains(["gp2", "gp3"], cfg.storage_type) &&
+      (cfg.iops == null) == (cfg.storage_throughput == null)
+    ])
+    error_message = "rds_postgres storage_type must be gp2 or gp3; iops and storage_throughput must be set together."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.rds_postgres :
+      (cfg.iops == null || cfg.storage_throughput == null) ? true : (
+        cfg.storage_type == "gp3" &&
+        cfg.allocated_storage >= 400 &&
+        cfg.iops >= 12000 &&
+        cfg.storage_throughput >= 500
+      )
+    ])
+    error_message = "Custom rds_postgres gp3 performance requires >=400 GiB, >=12000 IOPS and >=500 MiB/s throughput."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.rds_postgres :
+      cfg.backup_retention_days >= 0 && cfg.backup_retention_days <= 35 &&
+      (!cfg.multi_az || cfg.availability_zone == null)
+    ])
+    error_message = "rds_postgres backup_retention_days must be 0-35 and availability_zone may only be set when multi_az=false."
+  }
+}
+
+variable "valkey_instances" {
+  description = <<-EOT
+    Per-instance overrides for the shared Valkey catalog. Only agent_os is supported today.
+    Future Redis migrations can add cache, queue, system, and managed_sync to the catalog without changing the Valkey implementation.
+    Creation requires valkey_enabled plus the product feature flag; today agent_os is created only when both valkey_enabled and agent_os_enabled are true.
+  EOT
+  type = map(object({
+    node_type               = optional(string)
+    multi_az                = optional(bool)
+    cluster_enabled         = optional(bool)
+    engine_version          = optional(string)
+    tls_enabled             = optional(bool)
+    snapshot_retention_days = optional(number)
+    log_retention_days      = optional(number)
+  }))
+  default = {}
+
+  validation {
+    condition     = length(setsubtract(toset(keys(var.valkey_instances)), toset(["agent_os"]))) == 0
+    error_message = "valkey_instances currently supports only the agent_os key. cache, queue, system, and managed_sync will be added with the Redis-to-Valkey migration."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.valkey_instances :
+      cfg.snapshot_retention_days == null || (
+        cfg.snapshot_retention_days >= 0 && cfg.snapshot_retention_days <= 35
+      )
+    ])
+    error_message = "Valkey snapshot_retention_days must be between 0 and 35 when set."
+  }
+}
+
+variable "agent_os_index_instance_types" {
+  description = "Instance types for the Agent OS index managed node group / Karpenter NodePool."
+  type        = list(string)
+  default     = ["r6a.2xlarge", "r6i.2xlarge", "r5a.2xlarge"]
+}
+
+variable "agent_os_index_min_count" {
+  description = "Minimum nodes in the Agent OS index managed node group."
+  type        = number
+  default     = 2
+}
+
+variable "agent_os_index_max_count" {
+  description = "Maximum nodes in the Agent OS index managed node group / Karpenter nodes limit."
+  type        = number
+  default     = 4
+}
+
+variable "agent_os_index_cpu_limit" {
+  description = "Karpenter cpu limit for the Agent OS index NodePool (explicit, same pattern as karpenter_node_pools)."
+  type        = string
+  default     = "32"
+}
+
+variable "agent_os_index_memory_limit" {
+  description = "Karpenter memory limit for the Agent OS index NodePool (explicit, same pattern as karpenter_node_pools)."
+  type        = string
+  default     = "256Gi"
+}
+
+variable "agent_os_extract_instance_types" {
+  description = "Extract node instance types. Default c6a.4xlarge; bump max_count and Karpenter limits together if changed."
+  type        = list(string)
+  default     = ["c6a.4xlarge"]
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction managed node group."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Max extract nodes / Karpenter nodes limit. Staging 3, production 8 (covers 30 pods at 4/node)."
+  type        = number
+  default     = 8
+}
+
+variable "agent_os_extract_cpu_limit" {
+  description = "Karpenter cpu limit for extract NodePool. Default 8× c6a.4xlarge (16 vCPU)."
+  type        = string
+  default     = "128"
+}
+
+variable "agent_os_extract_memory_limit" {
+  description = "Karpenter memory limit for extract NodePool. Default 8× c6a.4xlarge (32 GiB)."
+  type        = string
+  default     = "256Gi"
+}
+
 variable "msk_kafka_version" {
   description = "The Kafka version for the MSK cluster."
   type        = string
@@ -588,4 +805,44 @@ locals {
     var.eks_admin_arns,
     [local.caller_arn]
   )))
+
+  # Shared Valkey catalog. Only Agent OS is enabled today. Future Redis migrations
+  # add cache/queue/system/managed_sync entries here and keep the same module/resources.
+  valkey_instance_defaults = {
+    node_type               = "cache.t4g.medium"
+    multi_az                = true
+    cluster_enabled         = false
+    engine_version          = "7.2"
+    tls_enabled             = false
+    snapshot_retention_days = 7
+    log_retention_days      = 30
+  }
+
+  valkey_instance_overrides = {
+    for name, override in var.valkey_instances :
+    name => { for key, value in override : key => value if value != null }
+  }
+
+  valkey_catalog = {
+    agent_os = merge(
+      local.valkey_instance_defaults,
+      {
+        # Agent OS already consumes an authenticated rediss:// connection.
+        tls_enabled = true
+      },
+      lookup(local.valkey_instance_overrides, "agent_os", {}),
+    )
+  }
+
+  valkey_instance_enabled = {
+    agent_os = var.agent_os_enabled
+  }
+
+  valkey_instances = {
+    for name, config in local.valkey_catalog :
+    name => config
+    if var.valkey_enabled && local.valkey_instance_enabled[name]
+  }
+
+  valkey_enabled = var.valkey_enabled && length(local.valkey_instances) > 0
 }

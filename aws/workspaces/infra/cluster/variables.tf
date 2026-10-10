@@ -19,7 +19,7 @@ variable "private_subnet_ids" {
 }
 
 variable "eks_admin_arns" {
-  description = "Array of ARNs for IAM users, groups or roles that should have admin access to cluster. Includes the Terraform caller."
+  description = "IAM user or role ARNs, including IAM Identity Center (SSO) role ARNs, granted EKS cluster-admin access. Includes the Terraform caller."
   type        = list(string)
 }
 
@@ -145,6 +145,69 @@ variable "use_latest_ami_release_version" {
   description = "When true, resolve the latest AMI release version per node group ami_type for the cluster Kubernetes version at plan/apply."
   type        = bool
   default     = false
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS managed node groups."
+  type        = bool
+}
+
+variable "agent_os_index_instance_types" {
+  description = "Instance types for the Agent OS index managed node group / Karpenter NodePool."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.agent_os_index_instance_types) > 0
+    error_message = "At least one Agent OS index instance type is required."
+  }
+}
+
+variable "agent_os_index_min_count" {
+  type = number
+}
+
+variable "agent_os_index_max_count" {
+  type = number
+}
+
+variable "agent_os_index_cpu_limit" {
+  description = "Karpenter cpu limit for the Agent OS index NodePool."
+  type        = string
+}
+
+variable "agent_os_index_memory_limit" {
+  description = "Karpenter memory limit for the Agent OS index NodePool."
+  type        = string
+}
+
+variable "agent_os_extract_instance_types" {
+  description = "Compute-optimized AMD instance types for the Agent OS extraction managed node group / Karpenter NodePool."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.agent_os_extract_instance_types) > 0
+    error_message = "At least one Agent OS extraction instance type is required."
+  }
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction managed node group."
+  type        = number
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction managed node group."
+  type        = number
+}
+
+variable "agent_os_extract_cpu_limit" {
+  description = "Karpenter cpu limit for the Agent OS extract NodePool."
+  type        = string
+}
+
+variable "agent_os_extract_memory_limit" {
+  description = "Karpenter memory limit for the Agent OS extract NodePool."
+  type        = string
 }
 
 variable "egress_ready" {

@@ -1,5 +1,80 @@
 # Paragon AWS Deployment
 
+## Agent OS configuration
+
+Agent OS is deployed as a separate Helm release when `agent_os_enabled = true`.
+The installer derives standard chart values from Terraform and the existing
+Paragon/Managed Sync configuration. Its `agentOs` section stays commented
+out in `.secure/values.yaml` until activation, when only the external Voyage
+API key needs to be provided. The installer never forwards the `agentOs`
+metadata wrapper to the regular Paragon chart.
+
+**Chart version and deployment enablement are controlled only by Terraform inputs**, never
+by `agentOs` keys in values.yaml. Example `vars.auto.tfvars`:
+
+```hcl
+managed_sync_enabled = true
+agent_os_enabled     = false # Switch to true after infra and Managed Sync are ready
+agent_os_version     = "0.3.0-beta.3" # Use the compatible published chart for this environment
+```
+
+The infra workspace requires both `managed_sync_enabled = true` and
+`valkey_enabled = true` before `agent_os_enabled` can be true. In the paragon
+workspace, Managed Sync must also be enabled before Agent OS.
+
+On AWS Enterprise, enabling Agent OS also configures Managed Sync to create its
+context Kafka topics and publish sync lifecycle events. Specifically,
+`helm/helm-managed-sync.tf` sets `MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION=false`
+and `MANAGED_SYNC_STATUS_EVENTS_ENABLED=true` when `agent_os_enabled = true`.
+Managed Sync version 1.0.75 or later is required for the context-topic flag
+(PARA-27285). The Managed Sync Helm release runs before Agent OS; without Agent OS,
+the on-prem defaults continue to skip these topics and status events.
+
+Agent OS settings (cloud identity, service URLs/ports, model selection, node
+selectors, tolerations, replicas, Bifrost enablement) are supplied by Terraform
+in `helm/helm-agent-os.tf` and/or the Agent OS chart. The only field normally
+needed in `.secure/values.yaml` is the external Voyage API key, kept commented
+out until Agent OS is enabled:
+
+```yaml
+# agentOs:
+#   secrets:
+#     vendor:
+#       VOYAGE_API_KEY: ""
+```
+
+The separate `agent_os_helm_values` Terraform variable remains available
+for optional chart-root overrides. If present, `agentOs.values` in the
+shared YAML is still supported at highest precedence, but no overrides are
+necessary for the standard Enterprise deployment.
+
+Secrets must not be placed in `agentOs.values` or `global.env`: Helm stores
+release values. Instead, uncomment `agentOs.secrets.vendor` in `.secure/values.yaml`
+and supply the actual key before enabling Agent OS:
+
+```yaml
+agentOs:
+  secrets:
+    vendor:
+      VOYAGE_API_KEY: "<your Voyage AI key>"
+```
+
+Terraform merges this field into the AWS Secrets Manager secret
+`paragon/<workspace>/agent-os/vendor`, and External Secrets merges it into
+the Kubernetes `agent-os-app` Secret used by Bifrost. The installer rejects
+Agent OS activation without a nonempty Voyage API key. A blank placeholder is
+ignored, not written as the API key.
+
+For Enterprise, the Paragon and Managed Sync monorepos use `LICENSE` as the
+default service-plane token. Agent OS takes `MANAGED_SYNC_ACCESS_TOKEN`,
+`ZEUS_ACCESS_TOKEN`, and `WORKER_ACTIONKIT_ACCESS_TOKEN` from the effective
+Paragon/Managed Sync configuration, with a fallback to `LICENSE`. Any explicit
+tokens remain authoritative. The service-plane tokens and vendor keys are stored
+in Secrets Manager, never embedded into the Agent OS Helm release.
+
+This implementation currently targets AWS; Azure and GCP enterprise installers
+do not yet have the corresponding Agent OS Helm/secret integration.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -39,20 +114,33 @@
 | ---- | ---- |
 | [aws_iam_role.eso](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.eso_secrets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_secretsmanager_secret_version.agent_os_admin_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.agent_os_app_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.agent_os_vendor_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.docker_cfg_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.env_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.managed_sync_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [terraform_data.agent_os_karpenter_pools](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [terraform_data.runtime_secrets_populated](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_eks_cluster.cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/eks_cluster) | data source |
 | [aws_iam_policy_document.eso_assume](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.eso_secrets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_secretsmanager_secret.agent_os_admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret.agent_os_app](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret.agent_os_broker](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret.agent_os_vendor](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
 | [aws_secretsmanager_secret.docker_cfg](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
 | [aws_secretsmanager_secret.env](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
 | [aws_secretsmanager_secret.managed_sync](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
 | [aws_secretsmanager_secret.openobserve](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret_version.agent_os_admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.agent_os_app](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.agent_os_broker](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.agent_os_vendor](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.docker_cfg](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.env](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.infra_agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
@@ -65,6 +153,13 @@
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agent_os_admin_config"></a> [agent\_os\_admin\_config](#input\_agent\_os\_admin\_config) | Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-owned base payload. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_app_config"></a> [agent\_os\_app\_config](#input\_agent\_os\_app\_config) | Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. | `bool` | `false` | no |
+| <a name="input_agent_os_helm_repository"></a> [agent\_os\_helm\_repository](#input\_agent\_os\_helm\_repository) | Helm repository URL used to install Agent OS. | `string` | `"https://paragon-helm-production.s3.amazonaws.com"` | no |
+| <a name="input_agent_os_helm_values"></a> [agent\_os\_helm\_values](#input\_agent\_os\_helm\_values) | Additional Agent OS chart values supplied through Terraform. Applied after generated AWS defaults and before .secure/values.yaml agentOs.values. | `any` | `{}` | no |
+| <a name="input_agent_os_vendor_config"></a> [agent\_os\_vendor\_config](#input\_agent\_os\_vendor\_config) | Optional Agent OS vendor keys merged onto the operator-owned secret. An empty map cannot wipe keys already in Secrets Manager. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_version"></a> [agent\_os\_version](#input\_agent\_os\_version) | Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS. | `string` | `null` | no |
 | <a name="input_aws_access_key_id"></a> [aws\_access\_key\_id](#input\_aws\_access\_key\_id) | AWS Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws\_assume\_role\_arn. | `string` | `null` | no |
 | <a name="input_aws_assume_role_arn"></a> [aws\_assume\_role\_arn](#input\_aws\_assume\_role\_arn) | Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift). | `string` | `null` | no |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | The AWS region resources are created in. | `string` | n/a | yes |

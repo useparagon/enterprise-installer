@@ -9,6 +9,12 @@ output "postgres" {
   sensitive   = true
 }
 
+output "rds_postgres" {
+  description = "Independently configured PostgreSQL RDS connections (agent_os and future workloads). Does not change the legacy postgres output."
+  value       = module.postgres.rds_postgres
+  sensitive   = true
+}
+
 output "monitoring" {
   description = "Non-sensitive monitoring settings (includes pg_config.max_storage_bytes for Grafana storage alerts)."
   value = {

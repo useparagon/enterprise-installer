@@ -12,8 +12,12 @@ module "acm_request_certificate" {
 
 # this has been required at times for certificate validation to succeed for alternate name
 resource "aws_route53_record" "caa" {
-  name    = var.domain
-  records = ["0 issue \"amazon.com\""]
+  name = var.domain
+  # ACM and Certbot (Let's Encrypt, including DNS-01 wildcard validation).
+  records = [
+    "0 issue \"amazon.com\"",
+    "0 issue \"letsencrypt.org\"",
+  ]
   ttl     = 300
   type    = "CAA"
   zone_id = aws_route53_zone.paragon.zone_id

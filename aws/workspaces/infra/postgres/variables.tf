@@ -92,6 +92,49 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS Postgres instances."
+  type        = bool
+}
+
+# Fully resolved inputs from the root workspace; no defaults in child modules.
+variable "rds_postgres" {
+  description = "Independent PostgreSQL RDS instances, keyed by workload."
+  type = map(object({
+    identifier                          = string
+    database_name                       = string
+    port                                = number
+    instance_class                      = string
+    allocated_storage                   = number
+    max_allocated_storage               = number
+    engine_version                      = string
+    multi_az                            = bool
+    availability_zone                   = string
+    read_replica                        = bool
+    replica_instance_class              = string
+    storage_type                        = string
+    iops                                = number
+    storage_throughput                  = number
+    backup_retention_days               = number
+    backup_window                       = string
+    maintenance_window                  = string
+    log_statement                       = string
+    log_min_duration_statement          = number
+    enabled_cloudwatch_logs_exports     = list(string)
+    monitoring_interval                 = number
+    performance_insights_enabled        = bool
+    performance_insights_retention_days = number
+    ca_cert_identifier                  = string
+    auto_minor_version_upgrade          = bool
+    allow_major_version_upgrade         = bool
+    apply_immediately                   = bool
+    deletion_protection                 = bool
+    kms_key_arn                         = string
+    ingress_cidr_blocks                 = list(string)
+    tags                                = map(string)
+  }))
+}
+
 variable "migrated_passwords" {
   description = "Override credentials to preserve complexity conventions when migrating from legacy workspaces"
   type        = map(string)

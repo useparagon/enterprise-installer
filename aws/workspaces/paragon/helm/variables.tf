@@ -202,6 +202,39 @@ variable "managed_sync_version" {
   type        = string
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled."
+  type        = bool
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+
+variable "agent_os_version" {
+  description = "Version of the Agent OS Helm chart to install."
+  type        = string
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL used to install Agent OS."
+  type        = string
+}
+
+variable "agent_os_helm_values" {
+  description = "Additional Agent OS chart values supplied through Terraform."
+  type        = any
+  sensitive   = true
+}
+
+variable "agent_os_file_values" {
+  description = "Agent OS chart-root overrides loaded from .secure/values.yaml agentOs.values."
+  type        = any
+  sensitive   = true
+}
+
 variable "paragon_helm_repository" {
   description = "Helm repository URL used to install Paragon-managed charts."
   type        = string

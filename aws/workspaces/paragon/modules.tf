@@ -65,6 +65,11 @@ module "helm" {
   managed_sync_enabled          = var.managed_sync_enabled
   managed_sync_secret_name      = local.runtime_managed_sync_secret_name
   managed_sync_version          = var.managed_sync_version
+  agent_os_enabled              = var.agent_os_enabled
+  agent_os_version              = var.agent_os_version
+  agent_os_helm_repository      = var.agent_os_helm_repository
+  agent_os_helm_values          = var.agent_os_helm_values
+  agent_os_file_values          = local.agent_os_file_values
   paragon_helm_repository       = var.paragon_helm_repository
   microservices                 = local.microservices
   monitor_version               = local.monitor_version
@@ -89,7 +94,7 @@ module "helm" {
   } : null
   karpenter_node_os_volume_size_gib = var.karpenter_node_os_volume_size_gib
   karpenter_node_volume_size_gib    = var.karpenter_node_volume_size_gib
-  karpenter_node_pools              = var.karpenter_node_pools
+  karpenter_node_pools              = local.karpenter_node_pools
   karpenter_defaults                = var.karpenter_defaults
   workspace                         = local.workspace
 
@@ -130,9 +135,12 @@ module "pod_identity" {
   source = "./pod-identity"
   count  = try(local.storage_output.role_arn, null) != null ? 1 : 0
 
-  cluster_name = local.cluster_name
-  namespace    = module.helm.namespace_paragon.id
-  s3_role_arn  = local.storage_output.role_arn
+  cluster_name             = local.cluster_name
+  namespace                = module.helm.namespace_paragon.id
+  s3_role_arn              = local.storage_output.role_arn
+  agent_os_enabled         = var.agent_os_enabled
+  agent_os_service_account = "agent-os"
+  agent_os_role_arn        = var.agent_os_enabled ? local.agent_os_handoff.pod_identity_role_arn : null
   service_accounts = setunion(
     toset(keys(local.monorepo_microservices)),
     toset(["ocs-code-runner"]),

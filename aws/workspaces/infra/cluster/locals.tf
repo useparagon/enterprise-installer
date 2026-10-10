@@ -147,10 +147,102 @@ locals {
     taints          = [local.karpenter_controller_taint]
   }
 
+  # Agent OS index workloads require dedicated on-demand, memory-optimized capacity.
+  agent_os_index_node_group = {
+    min_count      = var.agent_os_index_min_count
+    max_count      = var.agent_os_index_max_count
+    instance_types = var.agent_os_index_instance_types
+    capacity       = "ON_DEMAND"
+    ami_type       = local.legacy_node_ami_type
+    labels = {
+      "useparagon.com/workload"     = "agent-os-index"
+      "useparagon.com/capacityType" = "ondemand"
+    }
+    taints = [
+      {
+        key    = "useparagon.com/workload"
+        value  = "agent-os-index"
+        effect = "NO_SCHEDULE"
+      }
+    ]
+  }
+
+  # Agent OS extraction workloads require dedicated on-demand, compute-optimized capacity.
+  agent_os_extract_node_group = {
+    min_count      = var.agent_os_extract_min_count
+    max_count      = var.agent_os_extract_max_count
+    instance_types = var.agent_os_extract_instance_types
+    capacity       = "ON_DEMAND"
+    ami_type       = local.legacy_node_ami_type
+    labels = {
+      "useparagon.com/workload"     = "agent-os-extract"
+      "useparagon.com/capacityType" = "ondemand"
+    }
+    taints = [
+      {
+        key    = "useparagon.com/workload"
+        value  = "agent-os-extract"
+        effect = "NO_SCHEDULE"
+      }
+    ]
+  }
+
+  # Agent OS Karpenter capacity is defined in infra so both compute modes use
+  # the same instance types and limits. Limits are explicit (same pattern as
+  # karpenter_node_pools defaults) — bump cpu/memory vars when changing types.
+  agent_os_karpenter_node_pools = var.agent_os_enabled ? {
+    "agent-os-index" = {
+      capacity_types = ["on-demand"]
+      instance_types = var.agent_os_index_instance_types
+      cpu_limit      = var.agent_os_index_cpu_limit
+      memory_limit   = var.agent_os_index_memory_limit
+      nodes_limit    = var.agent_os_index_max_count
+      weight         = 10
+      labels = {
+        "useparagon.com/workload"     = "agent-os-index"
+        "useparagon.com/capacityType" = "ondemand"
+      }
+      taints = [
+        {
+          key    = "useparagon.com/workload"
+          value  = "agent-os-index"
+          effect = "NoSchedule"
+        }
+      ]
+    }
+    "agent-os-extract" = {
+      capacity_types = ["on-demand"]
+      instance_types = var.agent_os_extract_instance_types
+      cpu_limit      = var.agent_os_extract_cpu_limit
+      memory_limit   = var.agent_os_extract_memory_limit
+      nodes_limit    = var.agent_os_extract_max_count
+      weight         = 10
+      labels = {
+        "useparagon.com/workload"     = "agent-os-extract"
+        "useparagon.com/capacityType" = "ondemand"
+      }
+      taints = [
+        {
+          key    = "useparagon.com/workload"
+          value  = "agent-os-extract"
+          effect = "NoSchedule"
+        }
+      ]
+    }
+  } : {}
+
+  # Do not duplicate Agent OS capacity during Karpenter migration coexistence.
+  # Karpenter owns these pools whenever it is enabled; MNGs are the fallback.
+  agent_os_mng_enabled = var.agent_os_enabled && !var.enable_karpenter
+
   # Karpenter on → dedicated system MNG. Legacy pools are independent (migration coexistence).
   managed_node_groups = merge(
     var.enable_karpenter ? { system = local.system_node_group } : {},
     var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
+    local.agent_os_mng_enabled ? {
+      "agent-os-index"   = local.agent_os_index_node_group
+      "agent-os-extract" = local.agent_os_extract_node_group
+    } : {},
   )
 
   # Release-version pins are AMI-family-specific (Bottlerocket vs AL2023).
@@ -158,7 +250,13 @@ locals {
     for _, v in local.managed_node_groups : coalesce(try(v.ami_type, null), local.legacy_node_ami_type)
   ])
 
-  cluster_autoscaler_node_groups = var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {}
+  cluster_autoscaler_node_groups = merge(
+    var.enable_legacy_mng_pools || !var.enable_karpenter ? local.legacy_node_groups : {},
+    local.agent_os_mng_enabled ? {
+      "agent-os-index"   = local.agent_os_index_node_group
+      "agent-os-extract" = local.agent_os_extract_node_group
+    } : {},
+  )
 
   cluster_autoscaler_enabled = length(local.cluster_autoscaler_node_groups) > 0
 

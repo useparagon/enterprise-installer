@@ -123,6 +123,102 @@ resource "aws_secretsmanager_secret_version" "managed_sync_paragon_overlay" {
   ))
 }
 
+# Agent OS reuses the effective Enterprise service-plane credentials.
+# In the Paragon and Managed Sync monorepos, these tokens fall back to LICENSE
+# when not explicitly provided. Reuse the deployed infra env secret if LICENSE
+# is provisioned there rather than repeated in .secure/values.yaml.
+locals {
+  agent_os_paragon_env_secret  = var.agent_os_enabled ? jsondecode(data.aws_secretsmanager_secret_version.env.secret_string) : {}
+  agent_os_managed_sync_config = var.agent_os_enabled ? module.managed_sync_config[0].config : {}
+
+  agent_os_license = try(coalesce(
+    try(local.agent_os_paragon_env_secret.LICENSE, null),
+    try(local.agent_os_managed_sync_config.LICENSE, null),
+    try(local.helm_vars.global.env["LICENSE"], null),
+  ), null)
+
+  # Managed Sync's API_SYNC_ACCESS_TOKEN defaults to LICENSE on Enterprise.
+  agent_os_managed_sync_token = try(coalesce(
+    try(local.agent_os_managed_sync_config.API_SYNC_ACCESS_TOKEN, null),
+    try(local.agent_os_paragon_env_secret.API_SYNC_ACCESS_TOKEN, null),
+    try(local.helm_vars.global.env["API_SYNC_ACCESS_TOKEN"], null),
+    local.agent_os_license,
+  ), null)
+
+  # Zeus and worker-actionkit independently accept explicit tokens and otherwise
+  # use LICENSE in the Paragon monorepo. Never copy the monorepo's static dev fallback.
+  agent_os_zeus_token = try(coalesce(
+    try(local.agent_os_paragon_env_secret.ZEUS_ACCESS_TOKEN, null),
+    try(local.helm_vars.global.env["ZEUS_ACCESS_TOKEN"], null),
+    local.agent_os_license,
+  ), null)
+
+  agent_os_actionkit_token = try(coalesce(
+    try(local.agent_os_paragon_env_secret.WORKER_ACTIONKIT_ACCESS_TOKEN, null),
+    try(local.helm_vars.global.env["WORKER_ACTIONKIT_ACCESS_TOKEN"], null),
+    local.agent_os_license,
+  ), null)
+
+  agent_os_app_config_from_paragon = var.agent_os_enabled ? {
+    for key, value in {
+      MANAGED_SYNC_ACCESS_TOKEN     = local.agent_os_managed_sync_token
+      ZEUS_ACCESS_TOKEN             = local.agent_os_zeus_token
+      WORKER_ACTIONKIT_ACCESS_TOKEN = local.agent_os_actionkit_token
+      LICENSE                       = local.agent_os_license
+    } : key => tostring(value)
+    if value != null && trimspace(tostring(value)) != ""
+  } : {}
+}
+
+# Match the Managed Sync flow: infra owns/initially populates these secrets,
+# while the paragon workspace overlays app-level values that infra cannot know.
+resource "aws_secretsmanager_secret_version" "agent_os_app_paragon_overlay" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = data.aws_secretsmanager_secret.agent_os_app[0].id
+  secret_string = jsonencode(merge(
+    jsondecode(data.aws_secretsmanager_secret_version.agent_os_app[0].secret_string),
+    local.agent_os_app_config_from_paragon,
+    var.agent_os_app_config,
+    local.agent_os_file_app_config,
+  ))
+}
+
+resource "aws_secretsmanager_secret_version" "agent_os_admin_paragon_overlay" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = data.aws_secretsmanager_secret.agent_os_admin[0].id
+  secret_string = jsonencode(merge(
+    jsondecode(data.aws_secretsmanager_secret_version.agent_os_admin[0].secret_string),
+    var.agent_os_admin_config,
+    local.agent_os_file_admin_config,
+  ))
+}
+
+resource "aws_secretsmanager_secret_version" "agent_os_vendor_paragon_overlay" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  secret_id = data.aws_secretsmanager_secret.agent_os_vendor[0].id
+  # Merge so an empty tfvars map cannot wipe keys already in Secrets Manager.
+  # Operator-provided API keys come from .secure/values.yaml agentOs.secrets.vendor.
+  secret_string = jsonencode(merge(
+    jsondecode(data.aws_secretsmanager_secret_version.agent_os_vendor[0].secret_string),
+    var.agent_os_vendor_config,
+    local.agent_os_file_vendor_config,
+  ))
+
+  lifecycle {
+    precondition {
+      condition = try(trimspace(coalesce(
+        try(local.agent_os_file_vendor_config.VOYAGE_API_KEY, null),
+        try(var.agent_os_vendor_config.VOYAGE_API_KEY, null),
+        try(jsondecode(data.aws_secretsmanager_secret_version.agent_os_vendor[0].secret_string).VOYAGE_API_KEY, null),
+      )) != "", false)
+      error_message = "Agent OS requires VOYAGE_API_KEY. Set agentOs.secrets.vendor.VOYAGE_API_KEY in .secure/values.yaml before enabling agent_os_enabled."
+    }
+  }
+}
+
 data "aws_secretsmanager_secret" "openobserve" {
   name = local.runtime_secret_names.openobserve
 }
@@ -144,9 +240,13 @@ locals {
 # Gate Helm/ESO until Secrets Manager values exist (not just secret metadata).
 resource "terraform_data" "runtime_secrets_populated" {
   input = {
-    env         = aws_secretsmanager_secret_version.env_paragon_overlay.version_id
-    docker_cfg  = local.runtime_docker_cfg_sync_enabled ? local.runtime_docker_cfg_version_id : null
-    openobserve = data.aws_secretsmanager_secret_version.openobserve.version_id
+    env             = aws_secretsmanager_secret_version.env_paragon_overlay.version_id
+    docker_cfg      = local.runtime_docker_cfg_sync_enabled ? local.runtime_docker_cfg_version_id : null
+    openobserve     = data.aws_secretsmanager_secret_version.openobserve.version_id
+    agent_os_app    = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_app_paragon_overlay[0].version_id : null
+    agent_os_broker = var.agent_os_enabled ? data.aws_secretsmanager_secret_version.agent_os_broker[0].version_id : null
+    agent_os_admin  = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_admin_paragon_overlay[0].version_id : null
+    agent_os_vendor = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_vendor_paragon_overlay[0].version_id : null
     managed_sync = var.managed_sync_enabled ? (
       aws_secretsmanager_secret_version.managed_sync_paragon_overlay[0].version_id
     ) : null

@@ -2,15 +2,42 @@
 
 See [setup-policy.json](../../setup-policy.json) for permissions that are required to execute this. Note that `<AWS_ACCOUNT_ID>` must be replaced to match target account.
 
+## PostgreSQL RDS instance catalog
+
+The root workspace's `rds_postgres` map defines independent RDS PostgreSQL
+instances. Defaults and the Agent OS enablement condition live in the root,
+not in the `postgres` child module. Each map entry can override its
+instance class, database name, Multi-AZ, storage type/size, performance,
+replicas, encryption, monitoring, access CIDRs, backups and maintenance.
+
+```hcl
+rds_postgres = {
+  agent_os = {
+    multi_az = false # Temporary single-AZ test override
+  }
+  # Future standalone workload, opt-in:
+  airflow = {
+    enabled        = false
+    database_name  = "airflow"
+    instance_class = "db.t4g.small"
+    multi_az       = true
+  }
+}
+```
+
+The `agent_os` entry is gated by `agent_os_enabled` and retains the
+existing Agent OS secret handoff and logical `context`/`tools` databases.
+The legacy Paragon/Managed Sync RDS resources continue unchanged; adding
+a legacy workload to the new map is **not** an automatic migration.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
 | Name | Version |
 | ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
-| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 
 ## Providers
 
@@ -36,12 +63,18 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 
 | Name | Type |
 | ---- | ---- |
+| [aws_kms_alias.agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_alias) | resource |
+| [aws_kms_alias.valkey](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_alias) | resource |
+| [aws_kms_key.agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_key) | resource |
+| [aws_kms_key.valkey](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/kms_key) | resource |
+| [aws_secretsmanager_secret.runtime_agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret_version.runtime_agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
@@ -49,11 +82,25 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | [aws_secretsmanager_secret_version.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
+| [aws_iam_policy_document.agent_os_kms](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_iam_policy_document.valkey_kms](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_partition.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/partition) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled and valkey\_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive. | `bool` | `false` | no |
+| <a name="input_agent_os_extract_cpu_limit"></a> [agent\_os\_extract\_cpu\_limit](#input\_agent\_os\_extract\_cpu\_limit) | Karpenter cpu limit for extract NodePool. Default 8× c6a.4xlarge (16 vCPU). | `string` | `"128"` | no |
+| <a name="input_agent_os_extract_instance_types"></a> [agent\_os\_extract\_instance\_types](#input\_agent\_os\_extract\_instance\_types) | Extract node instance types. Default c6a.4xlarge; bump max\_count and Karpenter limits together if changed. | `list(string)` | <pre>[<br/>  "c6a.4xlarge"<br/>]</pre> | no |
+| <a name="input_agent_os_extract_max_count"></a> [agent\_os\_extract\_max\_count](#input\_agent\_os\_extract\_max\_count) | Max extract nodes / Karpenter nodes limit. Staging 3, production 8 (covers 30 pods at 4/node). | `number` | `8` | no |
+| <a name="input_agent_os_extract_memory_limit"></a> [agent\_os\_extract\_memory\_limit](#input\_agent\_os\_extract\_memory\_limit) | Karpenter memory limit for extract NodePool. Default 8× c6a.4xlarge (32 GiB). | `string` | `"256Gi"` | no |
+| <a name="input_agent_os_extract_min_count"></a> [agent\_os\_extract\_min\_count](#input\_agent\_os\_extract\_min\_count) | Minimum nodes in the Agent OS extraction managed node group. | `number` | `1` | no |
+| <a name="input_agent_os_index_cpu_limit"></a> [agent\_os\_index\_cpu\_limit](#input\_agent\_os\_index\_cpu\_limit) | Karpenter cpu limit for the Agent OS index NodePool (explicit, same pattern as karpenter\_node\_pools). | `string` | `"32"` | no |
+| <a name="input_agent_os_index_instance_types"></a> [agent\_os\_index\_instance\_types](#input\_agent\_os\_index\_instance\_types) | Instance types for the Agent OS index managed node group / Karpenter NodePool. | `list(string)` | <pre>[<br/>  "r6a.2xlarge",<br/>  "r6i.2xlarge",<br/>  "r5a.2xlarge"<br/>]</pre> | no |
+| <a name="input_agent_os_index_max_count"></a> [agent\_os\_index\_max\_count](#input\_agent\_os\_index\_max\_count) | Maximum nodes in the Agent OS index managed node group / Karpenter nodes limit. | `number` | `4` | no |
+| <a name="input_agent_os_index_memory_limit"></a> [agent\_os\_index\_memory\_limit](#input\_agent\_os\_index\_memory\_limit) | Karpenter memory limit for the Agent OS index NodePool (explicit, same pattern as karpenter\_node\_pools). | `string` | `"256Gi"` | no |
+| <a name="input_agent_os_index_min_count"></a> [agent\_os\_index\_min\_count](#input\_agent\_os\_index\_min\_count) | Minimum nodes in the Agent OS index managed node group. | `number` | `2` | no |
 | <a name="input_ami_release_version"></a> [ami\_release\_version](#input\_ami\_release\_version) | Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2023 legacy coexistence, use ami\_release\_versions instead. | `string` | `null` | no |
 | <a name="input_ami_release_versions"></a> [ami\_release\_versions](#input\_ami\_release\_versions) | Optional map of managed node group key (system, ondemand, spot) to AMI release version pin. When non-empty, overrides ami\_release\_version and pins only the listed groups. | `map(string)` | `{}` | no |
 | <a name="input_app_bucket_expiration"></a> [app\_bucket\_expiration](#input\_app\_bucket\_expiration) | The number of days to retain S3 app data before deleting | `number` | `90` | no |
@@ -82,7 +129,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_docker_password"></a> [docker\_password](#input\_docker\_password) | Docker password for application image pulls. | `string` | `null` | no |
 | <a name="input_docker_registry_server"></a> [docker\_registry\_server](#input\_docker\_registry\_server) | Docker registry server for application image pulls. | `string` | `null` | no |
 | <a name="input_docker_username"></a> [docker\_username](#input\_docker\_username) | Docker username for application image pulls. | `string` | `null` | no |
-| <a name="input_eks_admin_arns"></a> [eks\_admin\_arns](#input\_eks\_admin\_arns) | Array of ARNs for IAM users or roles that should have admin access to cluster. Used for viewing cluster resources in AWS dashboard. | `list(string)` | `[]` | no |
+| <a name="input_eks_admin_arns"></a> [eks\_admin\_arns](#input\_eks\_admin\_arns) | IAM user or role ARNs, including IAM Identity Center (SSO) role ARNs, granted EKS cluster-admin access. | `list(string)` | `[]` | no |
 | <a name="input_eks_max_node_count"></a> [eks\_max\_node\_count](#input\_eks\_max\_node\_count) | The maximum number of nodes to run in the Kubernetes cluster. | `number` | `50` | no |
 | <a name="input_eks_min_node_count"></a> [eks\_min\_node\_count](#input\_eks\_min\_node\_count) | The minimum number of nodes to run in the Kubernetes cluster. | `number` | `4` | no |
 | <a name="input_eks_ondemand_node_instance_type"></a> [eks\_ondemand\_node\_instance\_type](#input\_eks\_ondemand\_node\_instance\_type) | The compute instance type to use for Kubernetes nodes. | `string` | `"m6a.xlarge"` | no |
@@ -120,6 +167,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_rds_max_allocated_storage"></a> [rds\_max\_allocated\_storage](#input\_rds\_max\_allocated\_storage) | Maximum storage (GiB) for autoscaling on each Postgres RDS instance. | `number` | `1000` | no |
 | <a name="input_rds_multi_az"></a> [rds\_multi\_az](#input\_rds\_multi\_az) | Whether or not to enable multi-AZ in each RDS instance. | `bool` | `true` | no |
 | <a name="input_rds_multiple_instances"></a> [rds\_multiple\_instances](#input\_rds\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
+| <a name="input_rds_postgres"></a> [rds\_postgres](#input\_rds\_postgres) | Independent PostgreSQL RDS instances keyed by workload (agent\_os, airflow, etc.). Legacy Paragon/Managed Sync databases remain managed by rds\_multiple\_instances until explicitly migrated. | <pre>map(object({<br/>    enabled                             = optional(bool, true)<br/>    identifier                          = optional(string)<br/>    database_name                       = optional(string, "postgres")<br/>    port                                = optional(number, 5432)<br/>    instance_class                      = optional(string, "db.t4g.medium")<br/>    allocated_storage                   = optional(number, 100)<br/>    max_allocated_storage               = optional(number, 1000)<br/>    engine_version                      = optional(string, "16")<br/>    multi_az                            = optional(bool, true)<br/>    availability_zone                   = optional(string)<br/>    read_replica                        = optional(bool, false)<br/>    replica_instance_class              = optional(string, "db.t4g.small")<br/>    storage_type                        = optional(string, "gp3")<br/>    iops                                = optional(number)<br/>    storage_throughput                  = optional(number)<br/>    backup_retention_days               = optional(number, 7)<br/>    backup_window                       = optional(string, "06:00-07:00")<br/>    maintenance_window                  = optional(string, "Tue:04:00-Tue:05:00")<br/>    log_statement                       = optional(string, "ddl")<br/>    log_min_duration_statement          = optional(number, 1000)<br/>    enabled_cloudwatch_logs_exports     = optional(list(string), ["postgresql", "upgrade"])<br/>    monitoring_interval                 = optional(number, 15)<br/>    performance_insights_enabled        = optional(bool, true)<br/>    performance_insights_retention_days = optional(number, 31)<br/>    ca_cert_identifier                  = optional(string, "rds-ca-rsa2048-g1")<br/>    auto_minor_version_upgrade          = optional(bool, true)<br/>    allow_major_version_upgrade         = optional(bool, false)<br/>    apply_immediately                   = optional(bool, true)<br/>    deletion_protection                 = optional(bool)<br/>    kms_key_arn                         = optional(string)<br/>    ingress_cidr_blocks                 = optional(list(string))<br/>    tags                                = optional(map(string), {})<br/>  }))</pre> | <pre>{<br/>  "agent_os": {}<br/>}</pre> | no |
 | <a name="input_rds_postgres_version"></a> [rds\_postgres\_version](#input\_rds\_postgres\_version) | Postgres version for the database. | `string` | `"14"` | no |
 | <a name="input_rds_restore_from_snapshot"></a> [rds\_restore\_from\_snapshot](#input\_rds\_restore\_from\_snapshot) | Specifies that RDS instances should be restored from a snapshot. | `bool` | `false` | no |
 | <a name="input_s3_kms_encryption_enabled"></a> [s3\_kms\_encryption\_enabled](#input\_s3\_kms\_encryption\_enabled) | Encrypt the app, CDN, audit logs, and managed sync S3 buckets with AWS KMS (SSE-KMS) instead of S3-managed keys (SSE-S3). Existing deployments default to SSE-S3; enable for new installs or to migrate existing buckets to KMS. The logs bucket always uses SSE-S3 because ALB and S3 server access logs do not support SSE-KMS. | `bool` | `false` | no |
@@ -127,6 +175,8 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="input_secrets_recovery_window_in_days"></a> [secrets\_recovery\_window\_in\_days](#input\_secrets\_recovery\_window\_in\_days) | Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve) and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection. | `number` | `0` | no |
 | <a name="input_ssh_whitelist"></a> [ssh\_whitelist](#input\_ssh\_whitelist) | An optional list of IP addresses to whitelist ssh access. | `string` | `""` | no |
 | <a name="input_use_latest_ami_release_version"></a> [use\_latest\_ami\_release\_version](#input\_use\_latest\_ami\_release\_version) | When true, resolve the latest AMI release version per node group ami\_type for the cluster Kubernetes version at plan/apply. | `bool` | `false` | no |
+| <a name="input_valkey_enabled"></a> [valkey\_enabled](#input\_valkey\_enabled) | Whether to enable creation of Valkey instances from valkey\_instances. Independent from legacy Redis so both can run in parallel during migrations. | `bool` | `false` | no |
+| <a name="input_valkey_instances"></a> [valkey\_instances](#input\_valkey\_instances) | Per-instance overrides for the shared Valkey catalog. Only agent\_os is supported today.<br/>Future Redis migrations can add cache, queue, system, and managed\_sync to the catalog without changing the Valkey implementation.<br/>Creation requires valkey\_enabled plus the product feature flag; today agent\_os is created only when both valkey\_enabled and agent\_os\_enabled are true. | <pre>map(object({<br/>    node_type               = optional(string)<br/>    multi_az                = optional(bool)<br/>    cluster_enabled         = optional(bool)<br/>    engine_version          = optional(string)<br/>    tls_enabled             = optional(bool)<br/>    snapshot_retention_days = optional(number)<br/>    log_retention_days      = optional(number)<br/>  }))</pre> | `{}` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR for the VPC. | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_vpc_cidr_newbits"></a> [vpc\_cidr\_newbits](#input\_vpc\_cidr\_newbits) | Newbits used for calculating subnets. | `number` | `3` | no |
 
@@ -145,6 +195,7 @@ See [setup-policy.json](../../setup-policy.json) for permissions that are requir
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | The bucket used to store system logs. |
 | <a name="output_monitoring"></a> [monitoring](#output\_monitoring) | Non-sensitive monitoring settings (includes pg\_config.max\_storage\_bytes for Grafana storage alerts). |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
+| <a name="output_rds_postgres"></a> [rds\_postgres](#output\_rds\_postgres) | Independently configured PostgreSQL RDS connections (agent\_os and future workloads). Does not change the legacy postgres output. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
 | <a name="output_secrets_manager_env_secret"></a> [secrets\_manager\_env\_secret](#output\_secrets\_manager\_env\_secret) | Name of the Secrets Manager secret containing Paragon env config. |
 | <a name="output_secrets_manager_secret_arns"></a> [secrets\_manager\_secret\_arns](#output\_secrets\_manager\_secret\_arns) | ARNs of application Secrets Manager secrets. |

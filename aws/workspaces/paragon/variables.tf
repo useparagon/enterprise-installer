@@ -448,6 +448,63 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+
+variable "agent_os_version" {
+  description = "Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = !var.agent_os_enabled || try(length(trimspace(var.agent_os_version)) > 0, false)
+    error_message = "Set agent_os_version to a published chart containing Enterprise defaults when enabling Agent OS."
+  }
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL used to install Agent OS."
+  type        = string
+  default     = "https://paragon-helm-production.s3.amazonaws.com"
+}
+
+variable "agent_os_helm_values" {
+  description = "Additional Agent OS chart values supplied through Terraform. Applied after generated AWS defaults and before .secure/values.yaml agentOs.values."
+  type        = any
+  default     = {}
+  sensitive   = true
+}
+
+variable "agent_os_app_config" {
+  description = "Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_admin_config" {
+  description = "Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_vendor_config" {
+  description = "Optional Agent OS vendor keys merged onto the operator-owned secret. An empty map cannot wipe keys already in Secrets Manager."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
 variable "paragon_helm_repository" {
   description = "Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository."
   type        = string
@@ -614,6 +671,13 @@ locals {
 
   waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
 
+  # Agent OS capacity is owned by infra. This workspace only renders the
+  # Karpenter NodePools from the cluster handoff.
+  karpenter_node_pools = merge(
+    var.karpenter_node_pools,
+    var.agent_os_enabled ? try(local.infra_vars.karpenter.value.agent_os_node_pools, {}) : {},
+  )
+
   # use default where standard value can be determined
   cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
   cluster_k8s_version = try(local.infra_vars.k8s_version.value, var.k8s_version)
@@ -627,6 +691,35 @@ locals {
       fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
     )
   )
+
+  # Agent OS shares .secure/values.yaml with Paragon but owns an isolated chart.
+  # agentOs is installer metadata/overrides and must never be forwarded to the
+  # Paragon chart itself. The chart-root override lives at agentOs.values.
+  agent_os_file_config  = try(local.helm_vars.agentOs, {})
+  agent_os_file_values  = try(local.agent_os_file_config.values, {})
+  agent_os_file_secrets = try(local.agent_os_file_config.secrets, {})
+  agent_os_file_app_config = {
+    for key, value in try(local.agent_os_file_secrets.app, {}) :
+    key => tostring(value)
+    if value != null
+  }
+  agent_os_file_admin_config = {
+    for key, value in try(local.agent_os_file_secrets.admin, {}) :
+    key => tostring(value)
+    if value != null
+  }
+  agent_os_file_vendor_config = {
+    for key, value in try(local.agent_os_file_secrets.vendor, {}) :
+    key => tostring(value)
+    # An empty placeholder in the optional values file must not overwrite
+    # a provisioned provider key with an empty string.
+    if value != null && trimspace(tostring(value)) != ""
+  }
+  paragon_helm_vars = {
+    for key, value in local.helm_vars :
+    key => value
+    if key != "agentOs"
+  }
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "S3")
 
@@ -928,7 +1021,7 @@ locals {
 
   pg_config = try(local.infra_vars.monitoring.value.pg_config, {})
 
-  helm_values = merge(local.helm_vars, {
+  helm_values = merge(local.paragon_helm_vars, {
     global = merge(local.helm_vars.global, {
       env = merge(
         {

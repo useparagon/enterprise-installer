@@ -38,6 +38,24 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
+variable "valkey_kms_key_arn" {
+  description = "KMS key ARN shared by all Valkey instances for at-rest encryption and CloudWatch logs."
+  type        = string
+}
+
+variable "valkey_instances" {
+  description = "Resolved shared Valkey instances keyed by logical service name."
+  type = map(object({
+    node_type               = string
+    multi_az                = bool
+    cluster_enabled         = bool
+    engine_version          = string
+    tls_enabled             = bool
+    snapshot_retention_days = number
+    log_retention_days      = number
+  }))
+}
+
 locals {
   redis_instances = var.elasticache_multiple_instances ? merge({
     cache = {
