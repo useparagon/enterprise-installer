@@ -92,8 +92,12 @@ resource "azurerm_key_vault_secret" "runtime_redis_managed" {
 
   name         = "redis-managed"
   key_vault_id = azurerm_key_vault.paragon.id
-  # Always present so paragon KV handoff can resolve redis_managed (null when AMR disabled).
-  value = jsonencode(var.redis_managed_enabled ? module.redis_managed[0].redis : null)
+  # Agent OS credentials have a dedicated app secret and must not leak into the
+  # shared platform/Managed Sync handoff consumed by Helm and Hoop.
+  value = jsonencode(var.redis_managed_enabled ? {
+    for name, config in module.redis_managed[0].redis :
+    name => config if name != "agent_os"
+  } : null)
 
   depends_on = [azurerm_key_vault_access_policy.terraform]
 }
@@ -110,6 +114,24 @@ resource "azurerm_key_vault_secret" "runtime_storage" {
     auditlogs_container         = module.storage.blob.auditlogs_container
     root_user                   = module.storage.blob.name
     root_password               = module.storage.blob.access_key
+  })
+
+  depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
+resource "azurerm_key_vault_secret" "runtime_agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name         = "agent-os"
+  key_vault_id = azurerm_key_vault.paragon.id
+  value = jsonencode({
+    app_config         = local.agent_os_app_config
+    admin_config       = local.agent_os_admin_config
+    broker_config      = local.agent_os_capability_broker_config
+    storage_account    = module.storage.blob.name
+    storage_account_id = module.storage.blob.id
+    container          = module.storage.blob.agent_os_container
+    container_id       = module.storage.blob.agent_os_container_id
   })
 
   depends_on = [azurerm_key_vault_access_policy.terraform]
@@ -159,4 +181,120 @@ resource "azurerm_key_vault_secret" "runtime_bastion" {
   })
 
   depends_on = [azurerm_key_vault_access_policy.terraform]
+}
+
+# Agent OS app/admin/broker secret payloads, composed from the postgres, redis-managed,
+# storage and kafka modules and stored in Key Vault. Service pods only ever receive the
+# app payload; capability-broker gets its own least-privilege payload below.
+#
+# NOTE: azurerm_key_vault_secret.runtime_agent_os below is NOT merged with the currently
+# stored value, so any infra apply overwrites whatever the paragon workspace previously
+# layered on top (LICENSE, ZEUS_ACCESS_TOKEN, etc. computed in paragon/runtime_secrets.tf).
+# Always re-apply the paragon workspace after an infra apply that touches Agent OS.
+
+resource "random_password" "agent_os_capability_broker_signing_key" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 64
+  special = false
+}
+
+resource "random_password" "agent_os_capability_broker_service_token" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 64
+  special = false
+}
+
+resource "random_password" "agent_os_extraction_api_key" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  length  = 64
+  special = false
+}
+
+locals {
+  agent_os_db    = try(one(module.postgres).agent_os, null)
+  agent_os_cache = try(one(module.redis_managed).redis["agent_os"], null)
+  agent_os_kafka = one(module.kafka)
+
+  agent_os_cache_scheme = try(local.agent_os_cache.ssl, false) ? "rediss" : "redis"
+
+  agent_os_app_config = var.agent_os_enabled ? {
+    CONTEXT_POSTGRES_HOST        = local.agent_os_db.host
+    CONTEXT_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    CONTEXT_POSTGRES_DATABASE    = local.agent_os_db.databases.context.database
+    CONTEXT_POSTGRES_USERNAME    = local.agent_os_db.databases.context.user
+    CONTEXT_POSTGRES_PASSWORD    = local.agent_os_db.databases.context.password
+    CONTEXT_POSTGRES_SSL_ENABLED = "true"
+    CONTEXT_POSTGRES_SSL_CA      = ""
+
+    TOOLS_POSTGRES_HOST        = local.agent_os_db.host
+    TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    TOOLS_POSTGRES_DATABASE    = local.agent_os_db.databases.tools.database
+    TOOLS_POSTGRES_USERNAME    = local.agent_os_db.databases.tools.user
+    TOOLS_POSTGRES_PASSWORD    = local.agent_os_db.databases.tools.password
+    TOOLS_POSTGRES_SSL_ENABLED = "true"
+    TOOLS_POSTGRES_SSL_CA      = ""
+
+    AOS_REDIS_HOST            = local.agent_os_cache.host
+    AOS_REDIS_PORT            = tostring(local.agent_os_cache.port)
+    AOS_REDIS_URL             = "${local.agent_os_cache_scheme}://:${urlencode(local.agent_os_cache.password)}@${local.agent_os_cache.host}:${local.agent_os_cache.port}"
+    AOS_REDIS_PASSWORD        = local.agent_os_cache.password
+    AOS_REDIS_TLS_ENABLED     = tostring(local.agent_os_cache.ssl)
+    AOS_REDIS_CLUSTER_ENABLED = tostring(local.agent_os_cache.cluster)
+
+    AOS_KAFKA_BROKER_URLS    = local.agent_os_kafka.bootstrap_servers
+    AOS_KAFKA_SASL_USERNAME  = local.agent_os_kafka.agent_os_kafka_credentials.username
+    AOS_KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_kafka_credentials.password
+    AOS_KAFKA_SASL_MECHANISM = local.agent_os_kafka.agent_os_kafka_credentials.mechanism
+    AOS_KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.tls_enabled)
+
+    # Event Hubs SAS rules cannot express read-on-source + write-on-DLT with one key.
+    # Keep runtime consumption read-only and publish the DLT writer separately for the
+    # application path that emits dead letters.
+    AOS_KAFKA_DLT_SASL_USERNAME  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.username
+    AOS_KAFKA_DLT_SASL_PASSWORD  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.password
+    AOS_KAFKA_DLT_SASL_MECHANISM = local.agent_os_kafka.agent_os_dlt_kafka_credentials.mechanism
+
+    # Blob container, addressed through the AOS_S3_* keys the Agent OS config slices expect.
+    AOS_AZURE_STORAGE_ACCOUNT = module.storage.blob.name
+    AOS_S3_BUCKET             = module.storage.blob.agent_os_container
+    AOS_S3_PARSED_BUCKET      = module.storage.blob.agent_os_container
+    AOS_S3_PARSED_PREFIX      = "parsed/"
+    AOS_S3_INDEX_BUCKET       = module.storage.blob.agent_os_container
+    AOS_S3_INDEX_AZ_ID        = ""
+
+    AGENT_OS_CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
+    EXTRACTION_API_KEY                       = random_password.agent_os_extraction_api_key[0].result
+  } : null
+
+  agent_os_admin_config = var.agent_os_enabled ? {
+    ADMIN_POSTGRES_HOST        = local.agent_os_db.host
+    ADMIN_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    ADMIN_POSTGRES_DATABASE    = local.agent_os_db.admin_database
+    ADMIN_POSTGRES_USERNAME    = local.agent_os_db.admin_user
+    ADMIN_POSTGRES_PASSWORD    = local.agent_os_db.admin_password
+    ADMIN_POSTGRES_SSL_ENABLED = "true"
+    ADMIN_POSTGRES_SSL_CA      = ""
+
+    # The migration Job grants this role in TOOLS_POSTGRES_DATABASE before capability-broker starts.
+    CAPABILITY_BROKER_POSTGRES_USERNAME = local.agent_os_db.capability_broker.user
+    CAPABILITY_BROKER_POSTGRES_PASSWORD = local.agent_os_db.capability_broker.password
+  } : null
+
+  # Unlike the app secret, only capability-broker receives its signing key and
+  # least-privilege PostgreSQL role (same pattern as AWS/GCP).
+  agent_os_capability_broker_config = var.agent_os_enabled ? {
+    TOOLS_POSTGRES_HOST        = local.agent_os_db.host
+    TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
+    TOOLS_POSTGRES_DATABASE    = local.agent_os_db.databases.tools.database
+    TOOLS_POSTGRES_USERNAME    = local.agent_os_db.capability_broker.user
+    TOOLS_POSTGRES_PASSWORD    = local.agent_os_db.capability_broker.password
+    TOOLS_POSTGRES_SSL_ENABLED = "true"
+
+    CAPABILITY_BROKER_SIGNING_KEY   = random_password.agent_os_capability_broker_signing_key[0].result
+    CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
+    CAPABILITY_BROKER_SIGNING_KID   = "capability-broker-v1"
+  } : null
 }

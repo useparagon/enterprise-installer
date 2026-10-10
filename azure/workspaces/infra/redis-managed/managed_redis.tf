@@ -1,7 +1,7 @@
 resource "azurerm_managed_redis" "redis" {
   for_each = local.redis_instances
 
-  name                = "${var.workspace}-${each.key}"
+  name                = "${var.workspace}-${replace(each.key, "_", "-")}"
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
   sku_name            = each.value.sku
@@ -9,7 +9,7 @@ resource "azurerm_managed_redis" "redis" {
   high_availability_enabled = each.value.high_availability_enabled
   public_network_access     = var.public_network_access
 
-  tags = merge(var.tags, { Name = "${var.workspace}-${each.key}" })
+  tags = merge(var.tags, { Name = "${var.workspace}-${replace(each.key, "_", "-")}" })
 
   dynamic "identity" {
     for_each = var.export_storage_enabled ? [1] : []

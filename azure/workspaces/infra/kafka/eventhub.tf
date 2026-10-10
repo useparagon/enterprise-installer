@@ -4,10 +4,16 @@ resource "azurerm_eventhub_namespace" "kafka" {
   location            = var.resource_group.location
   resource_group_name = var.resource_group.name
 
+  # Azure does not support migrating a Standard namespace to Premium in place
+  # (https://learn.microsoft.com/azure/event-hubs/event-hubs-faq): the sku
+  # attribute is ForceNew and replaces the namespace, destroying its data.
+  # Never auto-switch sku based on agent_os_enabled. The variable validation
+  # below requires the operator to have already deployed (or deliberately
+  # recreated) a Premium namespace before enabling Agent OS.
   sku                      = var.eventhub_namespace_sku
-  capacity                 = var.eventhub_capacity
-  auto_inflate_enabled     = var.eventhub_auto_inflate_enabled
-  maximum_throughput_units = var.eventhub_auto_inflate_enabled ? var.eventhub_maximum_throughput_units : null
+  capacity                 = var.eventhub_namespace_sku == "Premium" ? var.eventhub_premium_processing_units : var.eventhub_capacity
+  auto_inflate_enabled     = var.eventhub_namespace_sku == "Standard" && var.eventhub_auto_inflate_enabled
+  maximum_throughput_units = var.eventhub_namespace_sku == "Standard" && var.eventhub_auto_inflate_enabled ? var.eventhub_maximum_throughput_units : null
 
   # Network configuration - start with private endpoint only
   # Note: Kafka protocol is automatically enabled for Standard and Premium SKUs
@@ -32,4 +38,93 @@ resource "azurerm_eventhub_namespace_authorization_rule" "kafka" {
   listen = true
   send   = true
   manage = true
+}
+
+# Managed Sync owns the source streams consumed by Agent OS. Event Hubs does not
+# support Kafka AdminClient topic creation, so Terraform must provision these entities.
+resource "azurerm_eventhub" "managed_sync_agent_os_sources" {
+  for_each = var.agent_os_enabled ? toset([
+    "sync.content-record",
+    "sync.content-permission",
+    "sync.instance-status",
+  ]) : toset([])
+
+  name              = each.value
+  namespace_id      = azurerm_eventhub_namespace.kafka.id
+  partition_count   = var.agent_os_eventhub_partition_count
+  message_retention = var.agent_os_eventhub_message_retention
+}
+
+# Agent OS owns only the DLT for the Managed Sync status stream.
+resource "azurerm_eventhub" "agent_os_dlt" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name              = "sync.instance-status.dlt"
+  namespace_id      = azurerm_eventhub_namespace.kafka.id
+  partition_count   = var.agent_os_eventhub_partition_count
+  message_retention = var.agent_os_eventhub_message_retention
+}
+
+# Context Ingest uses one Kafka consumer for all three Managed Sync source topics, so the
+# runtime reader credential must be namespace-scoped. Keep it read-only; DLT writes use a
+# separate entity-scoped credential below.
+#
+# NOTE: namespace-scoped means a leaked key also reads Managed Sync's own traffic in this
+# namespace (Event Hubs SAS rules cannot be scoped to a subset of entities). Rotate this
+# key independently of the Managed Sync key (azurerm_eventhub_namespace_authorization_rule.kafka)
+# if it is ever suspected to have leaked.
+resource "azurerm_eventhub_namespace_authorization_rule" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  # Max authorization rule name length is 50 (Microsoft.EventHub namespaces/eventhubs/
+  # authorizationRules). 30 + 1 + 8 + 1 + len("aos-read") = 48, fits.
+  name                = "${substr(var.workspace, 0, 30)}-${substr(md5(var.workspace), 0, 8)}-aos-read"
+  namespace_name      = azurerm_eventhub_namespace.kafka.name
+  resource_group_name = var.resource_group.name
+
+  listen = true
+  send   = false
+  manage = false
+}
+
+resource "azurerm_eventhub_authorization_rule" "agent_os_dlt_writer" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  # Max authorization rule name length is 50. "aos-dlt-write" is longer than "aos-read",
+  # so the workspace prefix must be shorter here: 25 + 1 + 8 + 1 + len("aos-dlt-write") = 48.
+  name                = "${substr(var.workspace, 0, 25)}-${substr(md5(var.workspace), 0, 8)}-aos-dlt-write"
+  namespace_name      = azurerm_eventhub_namespace.kafka.name
+  eventhub_name       = azurerm_eventhub.agent_os_dlt[0].name
+  resource_group_name = var.resource_group.name
+
+  listen = false
+  send   = true
+  manage = false
+}
+
+# Event Hubs cannot create Kafka topics through Kafka AdminClient. Provision
+# the remaining Managed Sync v1.0.75 topics alongside the Context streams above.
+resource "azurerm_eventhub" "managed_sync_topics" {
+  for_each = var.agent_os_enabled ? toset([
+    "autoscaling",
+    "sync.instance",
+    "sync.instance.dlt",
+    "sync.instance-job",
+    "sync.instance-job.dlt",
+    "sync.instance-record-completed",
+    "sync.instance-record-completed.dlt",
+    "sync.instance-record-permission",
+    "sync.instance-record-permission.dlt",
+    "sync.instance-records-content.delete",
+    "sync.instance-records-content.delete.dlt",
+    "sync.instance.delete",
+    "sync.instance.delete.dlt",
+    "sync.notification",
+    "sync.notification.dlt",
+  ]) : toset([])
+
+  name              = each.value
+  namespace_id      = azurerm_eventhub_namespace.kafka.id
+  partition_count   = var.agent_os_eventhub_partition_count
+  message_retention = var.agent_os_eventhub_message_retention
 }

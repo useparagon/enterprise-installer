@@ -18,6 +18,26 @@ variable "workspace" {
   type        = string
 }
 
+variable "managed_sync_enabled" {
+  description = "Whether Managed Sync owns the sync.instance-status Event Hub."
+  type        = bool
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create Agent OS Event Hubs resources and scoped authorization rules."
+  type        = bool
+}
+
+variable "agent_os_eventhub_partition_count" {
+  description = "Partition count for the Managed Sync instance-status Event Hubs that Agent OS also uses. Partitions cannot be decreased after creation."
+  type        = number
+}
+
+variable "agent_os_eventhub_message_retention" {
+  description = "Retention in days for the Managed Sync instance-status Event Hubs that Agent OS also uses."
+  type        = number
+}
+
 variable "tags" {
   description = "Default tags to apply to resources"
   type        = map(string)
@@ -34,12 +54,23 @@ variable "eventhub_namespace_sku" {
 }
 
 variable "eventhub_capacity" {
-  description = "The capacity units for the Event Hubs namespace (1-20 for Standard, 1-8 for Premium)."
+  description = "Standard Event Hubs throughput units (1-20). Premium uses eventhub_premium_processing_units."
   type        = number
   default     = 1
   validation {
     condition     = var.eventhub_capacity >= 1 && var.eventhub_capacity <= 20
     error_message = "The capacity must be between 1 and 20."
+  }
+}
+
+variable "eventhub_premium_processing_units" {
+  description = "Premium Event Hubs processing units used when Agent OS is enabled."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = contains([1, 2, 4, 6, 8, 10, 12, 16], var.eventhub_premium_processing_units)
+    error_message = "Premium processing units must be 1, 2, 4, 6, 8, 10, 12 or 16."
   }
 }
 

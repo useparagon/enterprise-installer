@@ -49,6 +49,16 @@ resource "azurerm_storage_container" "managed_sync" {
   storage_account_id    = azurerm_storage_account.blob.id
 }
 
+# Agent OS stores parsed documents and index data in this dedicated container.
+# Access is added through workload identity in PARA-25776; no account key is stored.
+resource "azurerm_storage_container" "agent_os" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  name                  = "${var.workspace}-agent-os"
+  container_access_type = "private"
+  storage_account_id    = azurerm_storage_account.blob.id
+}
+
 resource "azurerm_storage_container" "auditlogs" {
   name                  = "${var.workspace}-auditlogs"
   container_access_type = "private"
