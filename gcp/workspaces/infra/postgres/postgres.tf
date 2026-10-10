@@ -214,3 +214,153 @@ resource "google_sql_user" "sync_instance" {
   project  = var.gcp_project_id
 }
 
+
+# Agent OS Cloud SQL instances are driven by the workspace-level map so each physical
+# instance can be sized and changed independently from Paragon/Managed Sync.
+locals {
+  agent_os_postgres_instances = var.agent_os_enabled ? var.agent_os_postgres : {}
+
+  agent_os_postgres_names = {
+    for key, _ in local.agent_os_postgres_instances :
+    key => key == "agent_os" ? "${var.workspace}-agent-os" : "${var.workspace}-agent-os-${replace(key, "_", "-")}"
+  }
+
+  # `context` and `tools` are logical Agent OS databases on the primary `agent_os`
+  # physical instance. Additional map entries are independent Cloud SQL servers.
+  agent_os_databases = var.agent_os_enabled && contains(keys(local.agent_os_postgres_instances), "agent_os") ? toset(["context", "tools"]) : toset([])
+}
+
+resource "google_sql_database_instance" "agent_os" {
+  for_each = local.agent_os_postgres_instances
+
+  name                = local.agent_os_postgres_names[each.key]
+  project             = var.gcp_project_id
+  region              = var.region
+  database_version    = each.value.engine_version
+  deletion_protection = !var.disable_deletion_protection
+
+  settings {
+    tier                  = each.value.instance_class
+    availability_type     = each.value.multi_az ? "REGIONAL" : "ZONAL"
+    disk_size             = each.value.allocated_storage
+    disk_autoresize       = true
+    disk_autoresize_limit = each.value.max_allocated_storage
+    disk_type             = each.value.storage_type
+
+    backup_configuration {
+      enabled    = true
+      start_time = "06:00"
+    }
+
+    ip_configuration {
+      ipv4_enabled    = false
+      private_network = var.network.id
+      ssl_mode        = "ENCRYPTED_ONLY"
+    }
+
+    insights_config {
+      query_insights_enabled = true
+    }
+  }
+
+  timeouts {
+    create = "30m"
+    update = "30m"
+    delete = "30m"
+  }
+
+  depends_on = [google_service_networking_connection.private_vpc_connection]
+}
+
+resource "google_sql_database_instance" "agent_os_replica" {
+  for_each = {
+    for key, cfg in local.agent_os_postgres_instances : key => cfg
+    if cfg.read_replica
+  }
+
+  name                 = "${local.agent_os_postgres_names[each.key]}-replica"
+  project              = var.gcp_project_id
+  region               = var.region
+  database_version     = each.value.engine_version
+  master_instance_name = google_sql_database_instance.agent_os[each.key].name
+  deletion_protection  = !var.disable_deletion_protection
+
+  settings {
+    tier      = each.value.replica_instance_class
+    disk_type = each.value.storage_type
+
+    ip_configuration {
+      ipv4_enabled    = false
+      private_network = var.network.id
+      ssl_mode        = "ENCRYPTED_ONLY"
+    }
+  }
+}
+
+resource "random_string" "agent_os_root_username" {
+  for_each = local.agent_os_postgres_instances
+
+  length  = 16
+  lower   = true
+  upper   = true
+  numeric = false
+  special = false
+}
+
+resource "random_password" "agent_os_root_password" {
+  for_each = local.agent_os_postgres_instances
+
+  length  = 32
+  lower   = true
+  upper   = true
+  numeric = true
+  special = false
+}
+
+resource "google_sql_user" "agent_os_root" {
+  for_each = local.agent_os_postgres_instances
+
+  name     = random_string.agent_os_root_username[each.key].result
+  password = random_password.agent_os_root_password[each.key].result
+  instance = google_sql_database_instance.agent_os[each.key].name
+  project  = var.gcp_project_id
+}
+
+resource "random_string" "agent_os_app_username" {
+  for_each = local.agent_os_databases
+
+  length  = 16
+  lower   = true
+  upper   = true
+  numeric = false
+  special = false
+}
+
+resource "random_password" "agent_os_app_password" {
+  for_each = local.agent_os_databases
+
+  length  = 32
+  lower   = true
+  upper   = true
+  numeric = true
+  special = false
+}
+
+resource "google_sql_user" "agent_os_app" {
+  for_each = local.agent_os_databases
+
+  name     = random_string.agent_os_app_username[each.key].result
+  password = random_password.agent_os_app_password[each.key].result
+  instance = google_sql_database_instance.agent_os["agent_os"].name
+  project  = var.gcp_project_id
+}
+
+# Destroy order: drop the databases before the users that own objects in them.
+resource "google_sql_database" "agent_os" {
+  for_each = local.agent_os_databases
+
+  name       = each.value
+  project    = var.gcp_project_id
+  instance   = google_sql_database_instance.agent_os["agent_os"].name
+  depends_on = [google_sql_user.agent_os_app]
+}

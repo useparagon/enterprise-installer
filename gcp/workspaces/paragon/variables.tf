@@ -163,6 +163,73 @@ variable "paragon_helm_repository" {
   default     = "https://helm.useparagon.com"
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+
+  validation {
+    condition = !var.agent_os_enabled || try(
+      tonumber(split(".", var.managed_sync_version)[0]) > 1 ||
+      (tonumber(split(".", var.managed_sync_version)[0]) == 1 && (
+        tonumber(split(".", var.managed_sync_version)[1]) > 0 ||
+        tonumber(split("-", split(".", var.managed_sync_version)[2])[0]) >= 75
+      )),
+      false
+    )
+    error_message = "Agent OS requires managed_sync_version >= 1.0.75; override the legacy GCP default."
+  }
+}
+
+variable "agent_os_version" {
+  description = "Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = !var.agent_os_enabled || try(length(trimspace(var.agent_os_version)) > 0, false)
+    error_message = "Set agent_os_version to a published chart containing Enterprise defaults when enabling Agent OS."
+  }
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL for the independent Agent OS release."
+  type        = string
+  default     = "https://paragon-helm-production.s3.amazonaws.com"
+}
+
+variable "agent_os_helm_values" {
+  description = "Optional Agent OS chart overrides layered after cloud integration and before agentOs.values from values.yaml."
+  type        = any
+  default     = {}
+}
+
+variable "agent_os_app_config" {
+  description = "Additional Agent OS app secret values populated by the paragon workspace on top of the infra-derived base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_admin_config" {
+  description = "Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-derived base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_vendor_config" {
+  description = "Optional first-apply seed for the operator-owned Agent OS vendor secret. After create, Terraform ignores changes so console or out-of-band keys are preserved."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
 variable "excluded_microservices" {
   description = "The microservices that should be excluded from the deployment."
   type        = list(string)
@@ -1521,7 +1588,12 @@ locals {
     key => tostring(value)
     if value != null && tostring(value) != "" && local.helm_is_secret_env_key[key]
   }
-  helm_values_public = merge(local.helm_values, {
+  # agentOs is installer-only metadata for a separate Helm release. It must
+  # not be forwarded to the existing Paragon/Managed Sync charts.
+  helm_values_public = merge({
+    for key, value in local.helm_values : key => value
+    if key != "agentOs"
+    }, {
     global = merge(local.helm_values.global, {
       env = {
         for key, value in local.helm_values.global.env :

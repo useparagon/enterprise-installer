@@ -17,3 +17,14 @@ resource "google_service_account_iam_member" "managed_sync_workload_identity" {
   role               = "roles/iam.workloadIdentityUser"
   member             = "serviceAccount:${data.google_container_cluster.cluster.project}.svc.id.goog[${kubernetes_namespace_v1.paragon.id}/managed-sync-service-account]"
 }
+
+# Agent OS pods in the Paragon namespace use the dedicated agent-os KSA/GSA identity.
+resource "google_service_account_iam_member" "agent_os_workload_identity" {
+  count = var.agent_os_enabled && var.agent_os_service_account != null ? 1 : 0
+
+  service_account_id = "projects/${data.google_container_cluster.cluster.project}/serviceAccounts/${var.agent_os_service_account}"
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${data.google_container_cluster.cluster.project}.svc.id.goog[${kubernetes_namespace_v1.paragon.id}/agent-os]"
+
+  depends_on = [kubernetes_service_account_v1.agent_os]
+}

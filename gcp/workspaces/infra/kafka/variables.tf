@@ -52,3 +52,8 @@ variable "gmk_sasl_mechanism" {
   }
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create a dedicated Agent OS Kafka client service account."
+  type        = bool
+}
+

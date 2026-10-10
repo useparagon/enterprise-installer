@@ -10,6 +10,13 @@ There are several ways to provide GCP credentials. Here are how they are evaluat
 
 NOTE: The credentials above may refer to a Workload Identity Pool account instead of a service account. This would require additional configuration in Terraform Cloud as detailed [here](https://developer.hashicorp.com/terraform/cloud-docs/dynamic-provider-credentials/gcp-configuration).
 
+## Agent OS
+
+When enabling Agent OS, explicitly set `managed_sync_version = "1.0.75"` or a
+newer version (the legacy GCP default is too old). Managed Sync creates Context
+topics and publishes status events; the Agent OS Helm migrations run before
+application readiness checks.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -48,11 +55,17 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | Name | Type |
 | ---- | ---- |
 | [google_project_iam_member.eso_secret_accessor](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
+| [google_secret_manager_secret.agent_os_admin](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.agent_os_app](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.agent_os_vendor](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.docker_cfg](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.env](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.managed_sync](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.openobserve](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.openobserve_gcs](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret_version.agent_os_admin](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.agent_os_app](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.agent_os_vendor](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.docker_cfg](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.env](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.managed_sync](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
@@ -64,6 +77,7 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | [random_string.openobserve_email](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [google_client_config.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/client_config) | data source |
 | [google_project.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/project) | data source |
+| [google_secret_manager_secret_version.infra_agent_os](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
 | [google_secret_manager_secret_version.infra_cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
 | [google_secret_manager_secret_version.infra_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
 | [google_secret_manager_secret_version.infra_monitoring](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
@@ -76,6 +90,13 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agent_os_admin_config"></a> [agent\_os\_admin\_config](#input\_agent\_os\_admin\_config) | Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-derived base payload. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_app_config"></a> [agent\_os\_app\_config](#input\_agent\_os\_app\_config) | Additional Agent OS app secret values populated by the paragon workspace on top of the infra-derived base payload. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. | `bool` | `false` | no |
+| <a name="input_agent_os_helm_repository"></a> [agent\_os\_helm\_repository](#input\_agent\_os\_helm\_repository) | Helm repository URL for the independent Agent OS release. | `string` | `"https://paragon-helm-production.s3.amazonaws.com"` | no |
+| <a name="input_agent_os_helm_values"></a> [agent\_os\_helm\_values](#input\_agent\_os\_helm\_values) | Optional Agent OS chart overrides layered after cloud integration and before agentOs.values from values.yaml. | `any` | `{}` | no |
+| <a name="input_agent_os_vendor_config"></a> [agent\_os\_vendor\_config](#input\_agent\_os\_vendor\_config) | Optional first-apply seed for the operator-owned Agent OS vendor secret. After create, Terraform ignores changes so console or out-of-band keys are preserved. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_version"></a> [agent\_os\_version](#input\_agent\_os\_version) | Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS. | `string` | `null` | no |
 | <a name="input_cloudflare_api_token"></a> [cloudflare\_api\_token](#input\_cloudflare\_api\_token) | Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Zone `DNS` | `string` | `null` | no |
 | <a name="input_cloudflare_zone_id"></a> [cloudflare\_zone\_id](#input\_cloudflare\_zone\_id) | Cloudflare zone id to set CNAMEs. | `string` | `null` | no |
 | <a name="input_cluster_name_override"></a> [cluster\_name\_override](#input\_cluster\_name\_override) | Optional override for the GKE cluster name when it does not follow the default ${workspace}-cluster naming. | `string` | `null` | no |
@@ -125,13 +146,13 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 | <a name="input_ingress_scheme"></a> [ingress\_scheme](#input\_ingress\_scheme) | Whether the load balancer is 'external' (public) or 'internal' (private) | `string` | `"external"` | no |
 | <a name="input_k8s_version"></a> [k8s\_version](#input\_k8s\_version) | The version of Kubernetes to run in the cluster. | `string` | `"1.31"` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync (deploy managed-sync Helm chart and config). | `bool` | `false` | no |
-| <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
 | <a name="input_managed_sync_version"></a> [managed\_sync\_version](#input\_managed\_sync\_version) | The version of the Managed Sync Helm chart to install. | `string` | `"0.0.131"` | no |
 | <a name="input_monitor_version"></a> [monitor\_version](#input\_monitor\_version) | The version of the Paragon monitors to install. | `string` | `null` | no |
 | <a name="input_monitors_enabled"></a> [monitors\_enabled](#input\_monitors\_enabled) | Specifies that monitors are enabled. | `bool` | `false` | no |
 | <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve\_email) | OpenObserve admin login email. | `string` | `null` | no |
 | <a name="input_openobserve_password"></a> [openobserve\_password](#input\_openobserve\_password) | OpenObserve admin login password. | `string` | `null` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
+| <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input\_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that get no Ingress. Removed from public\_microservices and public\_monitors on both external and internal load balancers. ingress\_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict\_public\_exposure is true, allowlisted services can still be listed here. | `list(string)` | `[]` | no |
 | <a name="input_region"></a> [region](#input\_region) | The region where to host Google Cloud Organization resources. | `string` | n/a | yes |
 | <a name="input_region_zone"></a> [region\_zone](#input\_region\_zone) | The zone in the region where to host Google Cloud Organization resources. | `string` | n/a | yes |

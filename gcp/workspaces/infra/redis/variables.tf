@@ -13,6 +13,11 @@ variable "network" {
   type        = any
 }
 
+variable "private_subnet" {
+  description = "Private subnet for Agent OS Valkey PSC connections."
+  type        = any
+}
+
 variable "region" {
   description = "The region where to host Google Cloud Organization resources."
   type        = string
@@ -42,6 +47,26 @@ variable "managed_sync_enabled" {
   description = "Whether to create a dedicated Redis instance for Managed Sync."
   type        = bool
   default     = false
+}
+
+variable "disable_deletion_protection" {
+  description = "Whether to disable deletion protection on the Agent OS Valkey instance."
+  type        = bool
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create the dedicated Agent OS Valkey cache."
+  type        = bool
+}
+
+variable "agent_os_valkey" {
+  description = "Resolved Agent OS Memorystore for Valkey instances keyed by cache name. Defaults are owned by the workspace root."
+  type = map(object({
+    node_type       = string
+    multi_az        = bool
+    cluster_enabled = bool
+    engine_version  = string
+  }))
 }
 
 locals {

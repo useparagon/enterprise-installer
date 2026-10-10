@@ -204,6 +204,92 @@ variable "managed_sync_enabled" {
   default     = false
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_postgres" {
+  description = "Agent OS Cloud SQL instances keyed by instance name. Each entry can be sized and changed independently."
+  type = map(object({
+    instance_class         = optional(string, "db-custom-2-4096")
+    allocated_storage      = optional(number, 100)
+    max_allocated_storage  = optional(number, 1000)
+    engine_version         = optional(string, "POSTGRES_16")
+    multi_az               = optional(bool, true)
+    read_replica           = optional(bool, false)
+    replica_instance_class = optional(string, "db-custom-1-3840")
+    storage_type           = optional(string, "PD_SSD")
+  }))
+  default = {
+    agent_os = {}
+  }
+
+  validation {
+    condition = alltrue([
+      for _, cfg in var.agent_os_postgres :
+      cfg.max_allocated_storage >= 100 && cfg.max_allocated_storage >= cfg.allocated_storage
+    ])
+    error_message = "Agent OS Cloud SQL max_allocated_storage must be at least 100 GiB and >= allocated_storage."
+  }
+}
+
+variable "agent_os_valkey" {
+  description = <<-EOT
+    Overrides for Agent OS Memorystore for Valkey instances. Each key is a logical cache name (cache).
+    Merged per key with agent_os_valkey_default (node_type, multi_az, cluster_enabled, engine_version).
+    Null uses defaults only.
+  EOT
+  type = map(object({
+    node_type       = optional(string)
+    multi_az        = optional(bool)
+    cluster_enabled = optional(bool)
+    engine_version  = optional(string)
+  }))
+  default  = null
+  nullable = true
+}
+
+variable "agent_os_index_machine_type" {
+  description = "GKE machine type for the Agent OS index node pool."
+  type        = string
+  default     = "n2-highmem-8"
+}
+
+variable "agent_os_index_min_count" {
+  type    = number
+  default = 2
+}
+
+variable "agent_os_index_max_count" {
+  type    = number
+  default = 4
+}
+
+variable "agent_os_extract_machine_type" {
+  description = "Extract GKE machine type. Default c2d-standard-16 (16 vCPU; 4 pods/node)."
+  type        = string
+  default     = "c2d-standard-16"
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction GKE node pool."
+  type        = number
+  default     = 1
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Max extract nodes. Staging 3, production 8 (covers 30 pods at 4/node)."
+  type        = number
+  default     = 8
+}
+
 variable "gmk_vcpu_count" {
   description = "Number of vCPUs for the GMK cluster (minimum 3 in GCP)."
   type        = number
@@ -236,6 +322,11 @@ variable "gmk_sasl_mechanism" {
   validation {
     condition     = contains(["oauthbearer", "plain"], var.gmk_sasl_mechanism)
     error_message = "gmk_sasl_mechanism must be \"oauthbearer\" or \"plain\"."
+  }
+
+  validation {
+    condition     = !var.agent_os_enabled || var.gmk_sasl_mechanism == "plain"
+    error_message = "Agent OS currently requires gmk_sasl_mechanism = \"plain\"; its workload identity is assigned to the storage/Valkey service account, not the Kafka client service account."
   }
 }
 
@@ -339,4 +430,34 @@ locals {
 
   // get distinct values from comma-separated list, filter empty values and trim them
   ssh_whitelist = distinct([for value in split(",", var.ssh_whitelist) : "${trimspace(value)}${replace(value, "/", "") != value ? "" : "/32"}" if trimspace(value) != ""])
+
+  # Agent OS Valkey: catalog defaults + optional per-key overrides (same pattern as Azure redis_managed_instances).
+  agent_os_valkey_instance_defaults = {
+    node_type       = "STANDARD_SMALL"
+    multi_az        = true
+    cluster_enabled = false
+    engine_version  = "VALKEY_7_2"
+  }
+
+  agent_os_valkey_default = {
+    cache = {
+      node_type       = "STANDARD_SMALL"
+      multi_az        = true
+      cluster_enabled = false
+      engine_version  = "VALKEY_7_2"
+    }
+  }
+
+  agent_os_valkey_overrides = var.agent_os_valkey != null ? var.agent_os_valkey : {}
+
+  agent_os_valkey = merge(
+    local.agent_os_valkey_default,
+    {
+      for name, override in local.agent_os_valkey_overrides : name => merge(
+        lookup(local.agent_os_valkey_default, name, local.agent_os_valkey_instance_defaults),
+        # Partial tfvars objects set omitted optional attributes to null; drop them so defaults survive merge.
+        { for key, value in override : key => value if value != null },
+      )
+    },
+  )
 }

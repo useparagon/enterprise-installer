@@ -48,6 +48,16 @@ locals {
     }
   }
 
+  # Managed Sync owns Context topic creation in Google Managed Kafka.
+  managed_sync_agent_os_values = var.agent_os_enabled ? {
+    global = {
+      env = {
+        MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = "false"
+        MANAGED_SYNC_STATUS_EVENTS_ENABLED             = "true"
+      }
+    }
+  } : {}
+
   # Chart pods all use this KSA. Per-service serviceAccount values are ignored.
   managed_sync_workload_identity_values = var.storage_service_account != null ? {
     serviceAccount = {
@@ -73,7 +83,7 @@ resource "helm_release" "managed_sync" {
   cleanup_on_fail  = true
   atomic           = true
   verify           = false
-  timeout          = 300
+  timeout          = var.agent_os_enabled ? 900 : 300
   force_update     = true
   # Parent chart renders ScaledObject; KEDA CRDs come from the subchart. OpenAPI
   # validation runs before subchart CRDs exist (and manual CRD fixes break Helm ownership).
@@ -85,6 +95,7 @@ resource "helm_release" "managed_sync" {
     local.managed_sync_workload_identity_values != {} ? [yamlencode(local.managed_sync_workload_identity_values)] : [],
     [yamlencode(local.managed_sync_ingress_service_values)],
     [yamlencode(local.managed_sync_jobs_env_from)],
+    local.managed_sync_agent_os_values != {} ? [yamlencode(local.managed_sync_agent_os_values)] : [],
     [local.secret_hash]
   )
 
