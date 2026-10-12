@@ -18,11 +18,6 @@ variable "workspace" {
   type        = string
 }
 
-variable "managed_sync_enabled" {
-  description = "Whether Managed Sync owns the sync.instance-status Event Hub."
-  type        = bool
-}
-
 variable "agent_os_enabled" {
   description = "Whether to create Agent OS Event Hubs resources and scoped authorization rules."
   type        = bool
