@@ -22,8 +22,9 @@ resource "random_password" "msk_password" {
 }
 
 resource "aws_secretsmanager_secret" "msk_credentials" {
-  name       = "AmazonMSK_${var.workspace}-credentials"
-  kms_key_id = aws_kms_key.kafka.key_id
+  name                    = "AmazonMSK_${var.workspace}-credentials"
+  kms_key_id              = aws_kms_key.kafka.key_id
+  recovery_window_in_days = var.secrets_recovery_window_in_days
 }
 
 resource "aws_secretsmanager_secret_version" "msk_credentials" {
