@@ -515,11 +515,13 @@ variable "agent_os_index_vm_size" {
 }
 
 variable "agent_os_index_min_count" {
+  description = "Minimum number of nodes in the Agent OS index AKS node pool."
   type    = number
   default = 2
 }
 
 variable "agent_os_index_max_count" {
+  description = "Maximum number of nodes in the Agent OS index AKS node pool."
   type    = number
   default = 4
 }
