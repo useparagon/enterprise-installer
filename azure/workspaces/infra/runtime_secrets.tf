@@ -247,7 +247,7 @@ locals {
     AOS_KAFKA_BROKER_URLS    = local.agent_os_kafka.bootstrap_servers
     AOS_KAFKA_SASL_USERNAME  = local.agent_os_kafka.agent_os_kafka_credentials.username
     AOS_KAFKA_SASL_PASSWORD  = local.agent_os_kafka.agent_os_kafka_credentials.password
-    AOS_KAFKA_SASL_MECHANISM = local.agent_os_kafka.agent_os_kafka_credentials.mechanism
+    AOS_KAFKA_SASL_MECHANISM = lower(local.agent_os_kafka.agent_os_kafka_credentials.mechanism)
     AOS_KAFKA_SSL_ENABLED    = tostring(local.agent_os_kafka.tls_enabled)
 
     # Event Hubs SAS rules cannot express read-on-source + write-on-DLT with one key.
@@ -255,7 +255,7 @@ locals {
     # application path that emits dead letters.
     AOS_KAFKA_DLT_SASL_USERNAME  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.username
     AOS_KAFKA_DLT_SASL_PASSWORD  = local.agent_os_kafka.agent_os_dlt_kafka_credentials.password
-    AOS_KAFKA_DLT_SASL_MECHANISM = local.agent_os_kafka.agent_os_dlt_kafka_credentials.mechanism
+    AOS_KAFKA_DLT_SASL_MECHANISM = lower(local.agent_os_kafka.agent_os_dlt_kafka_credentials.mechanism)
 
     # Blob container, addressed through the AOS_S3_* keys the Agent OS config slices expect.
     AOS_AZURE_STORAGE_ACCOUNT = module.storage.blob.name
