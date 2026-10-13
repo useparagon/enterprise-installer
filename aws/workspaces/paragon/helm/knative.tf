@@ -34,7 +34,7 @@ locals {
     kubernetes_secret.docker_login[0].data,
     tomap({})
   )
-  knative_serving_pull_secret = var.create_docker_pull_secret && length(local.knative_image_pull_data) > 0
+  knative_serving_pull_secret = var.create_docker_pull_secret && local.docker_pull_credentials_available
 }
 
 # Same docker-cfg as paragon workloads. Knative's revision controller lives in
