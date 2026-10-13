@@ -525,9 +525,9 @@ variable "agent_os_index_max_count" {
 }
 
 variable "agent_os_extract_vm_size" {
-  description = "Extract AKS VM size. Default Standard_F16as_v6 (16 vCPU, ~4 pods/node)."
+  description = "Extract AKS VM size. Default Standard_F32as_v6 for production; staging can override to Standard_F16as_v6."
   type        = string
-  default     = "Standard_F16as_v6"
+  default     = "Standard_F32as_v6"
 }
 
 variable "agent_os_extract_min_count" {

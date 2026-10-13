@@ -43,7 +43,7 @@ resource "azurerm_eventhub_namespace_authorization_rule" "kafka" {
 # Managed Sync owns the source streams consumed by Agent OS. Event Hubs does not
 # support Kafka AdminClient topic creation, so Terraform must provision these entities.
 resource "azurerm_eventhub" "managed_sync_agent_os_sources" {
-  for_each = var.agent_os_enabled ? toset([
+  for_each = var.managed_sync_enabled ? toset([
     "sync.content-record",
     "sync.content-permission",
     "sync.instance-status",
@@ -105,7 +105,7 @@ resource "azurerm_eventhub_authorization_rule" "agent_os_dlt_writer" {
 # Event Hubs cannot create Kafka topics through Kafka AdminClient. Provision
 # the remaining Managed Sync v1.0.75 topics alongside the Context streams above.
 resource "azurerm_eventhub" "managed_sync_topics" {
-  for_each = var.agent_os_enabled ? toset([
+  for_each = var.managed_sync_enabled ? toset([
     "autoscaling",
     "sync.instance",
     "sync.instance.dlt",

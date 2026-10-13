@@ -30,10 +30,12 @@ locals {
     # Azure Event Hubs topics are pre-provisioned by Terraform; Kafka AdminClient
     # cannot create them. Enable event publishing, not topic creation.
     global = {
-      env = var.agent_os_enabled ? {
-        MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = "true"
-        MANAGED_SYNC_STATUS_EVENTS_ENABLED             = "true"
-      } : {}
+      env = merge(
+        # Event Hubs does not support Kafka AdminClient topic creation, regardless
+        # of whether Agent OS is enabled.
+        { MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = "true" },
+        var.agent_os_enabled ? { MANAGED_SYNC_STATUS_EVENTS_ENABLED = "true" } : {},
+      )
     }
     ingress = {
       class     = "nginx"

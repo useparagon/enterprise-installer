@@ -69,7 +69,7 @@ resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
 
   name      = "azure.extensions"
   server_id = azurerm_postgresql_flexible_server.postgres[each.key].id
-  value     = "dblink,pg_cron,uuid-ossp"
+  value     = each.key == "agent_os" ? "dblink,pg_cron,uuid-ossp,vector" : "dblink,pg_cron,uuid-ossp"
 }
 
 resource "azurerm_postgresql_flexible_server_database" "paragon" {
