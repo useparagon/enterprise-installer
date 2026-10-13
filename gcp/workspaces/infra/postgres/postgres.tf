@@ -240,6 +240,8 @@ resource "google_sql_database_instance" "agent_os" {
   deletion_protection = !var.disable_deletion_protection
 
   settings {
+    # Custom db-custom machine tiers require Cloud SQL Enterprise edition.
+    edition               = "ENTERPRISE"
     tier                  = each.value.instance_class
     availability_type     = each.value.multi_az ? "REGIONAL" : "ZONAL"
     disk_size             = each.value.allocated_storage
