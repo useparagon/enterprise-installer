@@ -642,9 +642,9 @@ variable "agent_os_index_memory_limit" {
 }
 
 variable "agent_os_extract_instance_types" {
-  description = "Extract node instance types. Default c6a.4xlarge; bump max_count and Karpenter limits together if changed."
+  description = "Extract node instance types. Default c6a.8xlarge for production; staging can override to c6a.4xlarge."
   type        = list(string)
-  default     = ["c6a.4xlarge"]
+  default     = ["c6a.8xlarge"]
 }
 
 variable "agent_os_extract_min_count" {
@@ -660,15 +660,15 @@ variable "agent_os_extract_max_count" {
 }
 
 variable "agent_os_extract_cpu_limit" {
-  description = "Karpenter cpu limit for extract NodePool. Default 8× c6a.4xlarge (16 vCPU)."
+  description = "Karpenter cpu limit for extract NodePool. Default 8× c6a.8xlarge (32 vCPU)."
   type        = string
-  default     = "128"
+  default     = "256"
 }
 
 variable "agent_os_extract_memory_limit" {
-  description = "Karpenter memory limit for extract NodePool. Default 8× c6a.4xlarge (32 GiB)."
+  description = "Karpenter memory limit for extract NodePool. Default 8× c6a.8xlarge (64 GiB)."
   type        = string
-  default     = "256Gi"
+  default     = "512Gi"
 }
 
 variable "msk_kafka_version" {
