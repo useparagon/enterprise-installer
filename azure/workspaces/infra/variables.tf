@@ -29,6 +29,14 @@ variable "azure_tenant_id" {
   nullable    = true
 }
 
+# Resource group created outside Terraform by the bootstrap, if any.
+# New installations should leave this disabled and let Terraform create it.
+variable "import_existing_resource_group" {
+  description = "Import an already-created bootstrap resource group. Keep false for greenfield and when the group is already in Terraform state."
+  type        = bool
+  default     = false
+}
+
 # account
 variable "location" {
   description = "Azure geographic region to deploy resources in."

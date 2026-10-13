@@ -71,6 +71,8 @@ resource "azurerm_public_ip" "ingress" {
 }
 
 resource "helm_release" "ingress" {
+  count = var.agc_direct ? 0 : 1
+
   name       = "ingress-nginx"
   namespace  = kubernetes_namespace.paragon.id
   repository = "https://kubernetes.github.io/ingress-nginx"

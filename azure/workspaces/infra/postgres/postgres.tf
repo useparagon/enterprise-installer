@@ -73,7 +73,9 @@ resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
 }
 
 resource "azurerm_postgresql_flexible_server_database" "paragon" {
-  for_each = local.postgres_instances
+  # PostgreSQL Flexible Server provisions the default postgres database itself.
+  # Agent OS uses that database plus its own context and tools databases.
+  for_each = { for name, cfg in local.postgres_instances : name => cfg if name != "agent_os" }
 
   name      = each.value.db
   server_id = azurerm_postgresql_flexible_server.postgres[each.key].id

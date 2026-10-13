@@ -1,5 +1,14 @@
 # Paragon Azure Infrastructure
 
+## Resource group ownership (greenfield vs bootstrap)
+
+Greenfield installations leave `import_existing_resource_group = false` (the default),
+so Terraform creates `module.network.azurerm_resource_group.main` normally.
+If a least-privilege bootstrap created the resource group before Terraform,
+set `import_existing_resource_group = true` in the infra workspace variables to
+import the existing group instead. For an existing installation already recorded
+in Terraform state, leave the flag at its default.
+
 ## Azure credentials
 
 `azure_subscription_id` remains required for stable resource naming. Prefer
