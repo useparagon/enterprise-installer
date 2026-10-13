@@ -42,9 +42,11 @@ resource "helm_release" "cert_manager" {
 
   force_update     = false
   create_namespace = false
+  timeout          = 900
+  wait             = true
 
   set {
-    name  = "installCRDs"
+    name  = "crds.enabled"
     value = true
   }
 
