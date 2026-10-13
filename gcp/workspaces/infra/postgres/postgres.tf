@@ -250,8 +250,9 @@ resource "google_sql_database_instance" "agent_os" {
     disk_type             = each.value.storage_type
 
     backup_configuration {
-      enabled    = true
-      start_time = "06:00"
+      enabled                        = true
+      point_in_time_recovery_enabled = true
+      start_time                     = "06:00"
     }
 
     ip_configuration {
@@ -288,6 +289,7 @@ resource "google_sql_database_instance" "agent_os_replica" {
   deletion_protection  = !var.disable_deletion_protection
 
   settings {
+    edition   = "ENTERPRISE"
     tier      = each.value.replica_instance_class
     disk_type = each.value.storage_type
 
