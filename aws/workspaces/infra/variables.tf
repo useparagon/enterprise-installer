@@ -630,13 +630,13 @@ variable "agent_os_index_max_count" {
 }
 
 variable "agent_os_index_cpu_limit" {
-  description = "Karpenter cpu limit for the Agent OS index NodePool (explicit, same pattern as karpenter_node_pools)."
+  description = "Maximum aggregate vCPU capacity for the Agent OS index Karpenter NodePool."
   type        = string
   default     = "32"
 }
 
 variable "agent_os_index_memory_limit" {
-  description = "Karpenter memory limit for the Agent OS index NodePool (explicit, same pattern as karpenter_node_pools)."
+  description = "Maximum aggregate memory for the Agent OS index Karpenter NodePool."
   type        = string
   default     = "256Gi"
 }
@@ -660,13 +660,13 @@ variable "agent_os_extract_max_count" {
 }
 
 variable "agent_os_extract_cpu_limit" {
-  description = "Karpenter cpu limit for extract NodePool. Default 8× c6a.8xlarge (32 vCPU)."
+  description = "Maximum aggregate vCPU capacity for the Agent OS extraction Karpenter NodePool."
   type        = string
   default     = "256"
 }
 
 variable "agent_os_extract_memory_limit" {
-  description = "Karpenter memory limit for extract NodePool. Default 8× c6a.8xlarge (64 GiB)."
+  description = "Maximum aggregate memory for the Agent OS extraction Karpenter NodePool."
   type        = string
   default     = "512Gi"
 }

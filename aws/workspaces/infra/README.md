@@ -35,9 +35,10 @@ a legacy workload to the new map is **not** an automatic migration.
 
 | Name | Version |
 | ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.7.0 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 
 ## Providers
 
@@ -91,15 +92,15 @@ a legacy workload to the new map is **not** an automatic migration.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled and valkey\_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive. | `bool` | `false` | no |
-| <a name="input_agent_os_extract_cpu_limit"></a> [agent\_os\_extract\_cpu\_limit](#input\_agent\_os\_extract\_cpu\_limit) | Karpenter cpu limit for extract NodePool. Default 8× c6a.8xlarge (32 vCPU). | `string` | `"256"` | no |
+| <a name="input_agent_os_extract_cpu_limit"></a> [agent\_os\_extract\_cpu\_limit](#input\_agent\_os\_extract\_cpu\_limit) | Maximum aggregate vCPU capacity for the Agent OS extraction Karpenter NodePool. | `string` | `"256"` | no |
 | <a name="input_agent_os_extract_instance_types"></a> [agent\_os\_extract\_instance\_types](#input\_agent\_os\_extract\_instance\_types) | Extract node instance types. Default c6a.8xlarge for production; staging can override to c6a.4xlarge. | `list(string)` | <pre>[<br/>  "c6a.8xlarge"<br/>]</pre> | no |
 | <a name="input_agent_os_extract_max_count"></a> [agent\_os\_extract\_max\_count](#input\_agent\_os\_extract\_max\_count) | Max extract nodes / Karpenter nodes limit. Staging 3, production 8 (covers 30 pods at 4/node). | `number` | `8` | no |
-| <a name="input_agent_os_extract_memory_limit"></a> [agent\_os\_extract\_memory\_limit](#input\_agent\_os\_extract\_memory\_limit) | Karpenter memory limit for extract NodePool. Default 8× c6a.8xlarge (64 GiB). | `string` | `"512Gi"` | no |
+| <a name="input_agent_os_extract_memory_limit"></a> [agent\_os\_extract\_memory\_limit](#input\_agent\_os\_extract\_memory\_limit) | Maximum aggregate memory for the Agent OS extraction Karpenter NodePool. | `string` | `"512Gi"` | no |
 | <a name="input_agent_os_extract_min_count"></a> [agent\_os\_extract\_min\_count](#input\_agent\_os\_extract\_min\_count) | Minimum nodes in the Agent OS extraction managed node group. | `number` | `1` | no |
-| <a name="input_agent_os_index_cpu_limit"></a> [agent\_os\_index\_cpu\_limit](#input\_agent\_os\_index\_cpu\_limit) | Karpenter cpu limit for the Agent OS index NodePool (explicit, same pattern as karpenter\_node\_pools). | `string` | `"32"` | no |
+| <a name="input_agent_os_index_cpu_limit"></a> [agent\_os\_index\_cpu\_limit](#input\_agent\_os\_index\_cpu\_limit) | Maximum aggregate vCPU capacity for the Agent OS index Karpenter NodePool. | `string` | `"32"` | no |
 | <a name="input_agent_os_index_instance_types"></a> [agent\_os\_index\_instance\_types](#input\_agent\_os\_index\_instance\_types) | Instance types for the Agent OS index managed node group / Karpenter NodePool. | `list(string)` | <pre>[<br/>  "r6a.2xlarge",<br/>  "r6i.2xlarge",<br/>  "r5a.2xlarge"<br/>]</pre> | no |
 | <a name="input_agent_os_index_max_count"></a> [agent\_os\_index\_max\_count](#input\_agent\_os\_index\_max\_count) | Maximum nodes in the Agent OS index managed node group / Karpenter nodes limit. | `number` | `4` | no |
-| <a name="input_agent_os_index_memory_limit"></a> [agent\_os\_index\_memory\_limit](#input\_agent\_os\_index\_memory\_limit) | Karpenter memory limit for the Agent OS index NodePool (explicit, same pattern as karpenter\_node\_pools). | `string` | `"256Gi"` | no |
+| <a name="input_agent_os_index_memory_limit"></a> [agent\_os\_index\_memory\_limit](#input\_agent\_os\_index\_memory\_limit) | Maximum aggregate memory for the Agent OS index Karpenter NodePool. | `string` | `"256Gi"` | no |
 | <a name="input_agent_os_index_min_count"></a> [agent\_os\_index\_min\_count](#input\_agent\_os\_index\_min\_count) | Minimum nodes in the Agent OS index managed node group. | `number` | `2` | no |
 | <a name="input_ami_release_version"></a> [ami\_release\_version](#input\_ami\_release\_version) | Optional AMI release version pin applied to every managed node group. Only safe when all groups share one AMI family; for Bottlerocket system + AL2023 legacy coexistence, use ami\_release\_versions instead. | `string` | `null` | no |
 | <a name="input_ami_release_versions"></a> [ami\_release\_versions](#input\_ami\_release\_versions) | Optional map of managed node group key (system, ondemand, spot) to AMI release version pin. When non-empty, overrides ami\_release\_version and pins only the listed groups. | `map(string)` | `{}` | no |
