@@ -3,7 +3,7 @@ output "agent_os" {
   value = contains(keys(local.postgres_instances), "agent_os") ? {
     host           = azurerm_postgresql_flexible_server.postgres["agent_os"].fqdn
     port           = var.postgres_port
-    admin_database = azurerm_postgresql_flexible_server_database.paragon["agent_os"].name
+    admin_database = local.postgres_db_names["agent_os"]
     admin_user     = random_string.postgres_root_username["agent_os"].result
     admin_password = random_password.postgres_root_password["agent_os"].result
     databases = {
