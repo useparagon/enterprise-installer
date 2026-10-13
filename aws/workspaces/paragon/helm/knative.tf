@@ -40,9 +40,7 @@ locals {
     kubernetes_secret.docker_login[0].data,
     tomap({})
   )
-  # Secret contents can be unknown at plan time when ESO is refreshing them.
-  # Resource instance counts stay known, so use those to decide whether to
-  # mirror the pull secret into the Knative Serving namespace.
+  # Use resource counts: Secret data may be unknown during the first plan.
   knative_serving_pull_secret = var.create_docker_pull_secret && (
     length(data.kubernetes_secret.docker_cfg) > 0 ||
     length(kubernetes_secret.docker_login) > 0

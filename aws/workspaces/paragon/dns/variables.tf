@@ -53,3 +53,9 @@ variable "release_paragon_on_prem" {
   description = "On-prem Helm release; record depends_on only for greenfield ALB creation order."
   type        = any
 }
+
+variable "ingress_alb_dns_name_fallback" {
+  description = "Ingress ALB DNS name from module.helm (depends_on Helm releases). Used on greenfield apply when tagging-api discovery is still empty; ignored when local discovery succeeds (PARA-26180 chart bumps)."
+  type        = string
+  default     = null
+}
