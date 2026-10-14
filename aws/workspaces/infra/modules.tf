@@ -112,12 +112,13 @@ module "kafka" {
   source = "./kafka"
   count  = var.managed_sync_enabled ? 1 : 0
 
-  workspace                  = local.workspace
-  msk_autoscaling_enabled    = var.msk_autoscaling_enabled
-  msk_kafka_version          = var.msk_kafka_version
-  msk_instance_type          = var.msk_instance_type
-  msk_kafka_num_broker_nodes = var.msk_kafka_num_broker_nodes
-  agent_os_enabled           = var.agent_os_enabled
+  workspace                       = local.workspace
+  msk_autoscaling_enabled         = var.msk_autoscaling_enabled
+  msk_kafka_version               = var.msk_kafka_version
+  msk_instance_type               = var.msk_instance_type
+  msk_kafka_num_broker_nodes      = var.msk_kafka_num_broker_nodes
+  agent_os_enabled                = var.agent_os_enabled
+  secrets_recovery_window_in_days = var.secrets_recovery_window_in_days
 
   private_subnet = module.network.private_subnet
   vpc_id         = module.network.vpc.id
