@@ -215,7 +215,10 @@ locals {
   agent_os_cache = module.redis.agent_os
   agent_os_kafka = one(module.kafka)
 
-  agent_os_app_config = var.agent_os_enabled ? merge({
+  # Match the existing GCP Paragon/Managed Sync behavior: Cloud SQL requires TLS
+  # (ENCRYPTED_ONLY), but private-IP connections do not use DNS SAN verification.
+  # Do not supply *_POSTGRES_SSL_CA until certificate identity can be verified.
+  agent_os_app_config = var.agent_os_enabled ? {
     AGENT_OS_CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
     EXTRACTION_API_KEY                       = random_password.agent_os_extraction_api_key[0].result
 
@@ -225,7 +228,6 @@ locals {
     CONTEXT_POSTGRES_USERNAME    = local.agent_os_db.databases.context.user
     CONTEXT_POSTGRES_PASSWORD    = local.agent_os_db.databases.context.password
     CONTEXT_POSTGRES_SSL_ENABLED = "true"
-    CONTEXT_POSTGRES_SSL_CA      = local.agent_os_db.server_ca_cert
 
     TOOLS_POSTGRES_HOST        = local.agent_os_db.host
     TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
@@ -233,7 +235,6 @@ locals {
     TOOLS_POSTGRES_USERNAME    = local.agent_os_db.databases.tools.user
     TOOLS_POSTGRES_PASSWORD    = local.agent_os_db.databases.tools.password
     TOOLS_POSTGRES_SSL_ENABLED = "true"
-    TOOLS_POSTGRES_SSL_CA      = local.agent_os_db.server_ca_cert
 
     AOS_REDIS_HOST = local.agent_os_cache.host
     AOS_REDIS_PORT = tostring(local.agent_os_cache.port)
@@ -261,19 +262,15 @@ locals {
     AOS_S3_PARSED_PREFIX = "parsed/"
     AOS_S3_INDEX_BUCKET  = module.storage.storage.agent_os_bucket
     AOS_S3_INDEX_AZ_ID   = ""
-    }, var.agent_os_postgres_tls_servername == null ? {} : {
-    CONTEXT_POSTGRES_TLS_SERVERNAME = var.agent_os_postgres_tls_servername
-    TOOLS_POSTGRES_TLS_SERVERNAME   = var.agent_os_postgres_tls_servername
-  }) : null
+  } : null
 
-  agent_os_admin_config = var.agent_os_enabled ? merge({
+  agent_os_admin_config = var.agent_os_enabled ? {
     ADMIN_POSTGRES_HOST        = local.agent_os_db.host
     ADMIN_POSTGRES_PORT        = tostring(local.agent_os_db.port)
     ADMIN_POSTGRES_DATABASE    = local.agent_os_db.admin_database
     ADMIN_POSTGRES_USERNAME    = local.agent_os_db.admin_user
     ADMIN_POSTGRES_PASSWORD    = local.agent_os_db.admin_password
     ADMIN_POSTGRES_SSL_ENABLED = "true"
-    ADMIN_POSTGRES_SSL_CA      = local.agent_os_db.server_ca_cert
 
     CAPABILITY_BROKER_POSTGRES_USERNAME = random_string.agent_os_capability_broker_username[0].result
     CAPABILITY_BROKER_POSTGRES_PASSWORD = random_password.agent_os_capability_broker_password[0].result
@@ -292,25 +289,20 @@ locals {
     KAFKA_TOPIC_PARTITIONS          = "3"
     KAFKA_TOPIC_REPLICATION_FACTOR  = "3"
     KAFKA_TOPIC_MIN_INSYNC_REPLICAS = "2"
-    }, var.agent_os_postgres_tls_servername == null ? {} : {
-    ADMIN_POSTGRES_TLS_SERVERNAME = var.agent_os_postgres_tls_servername
-  }) : null
+  } : null
 
   # Unlike the app Secret, only capability-broker receives its signing key
   # and least-privilege PostgreSQL role. The migration Job grants the role.
-  agent_os_capability_broker_config = var.agent_os_enabled ? merge({
+  agent_os_capability_broker_config = var.agent_os_enabled ? {
     TOOLS_POSTGRES_HOST        = local.agent_os_db.host
     TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
     TOOLS_POSTGRES_DATABASE    = local.agent_os_db.databases.tools.database
     TOOLS_POSTGRES_USERNAME    = random_string.agent_os_capability_broker_username[0].result
     TOOLS_POSTGRES_PASSWORD    = random_password.agent_os_capability_broker_password[0].result
     TOOLS_POSTGRES_SSL_ENABLED = "true"
-    TOOLS_POSTGRES_SSL_CA      = local.agent_os_db.server_ca_cert
 
     CAPABILITY_BROKER_SIGNING_KEY   = random_password.agent_os_capability_broker_signing_key[0].result
     CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
     CAPABILITY_BROKER_SIGNING_KID   = "capability-broker-v1"
-    }, var.agent_os_postgres_tls_servername == null ? {} : {
-    TOOLS_POSTGRES_TLS_SERVERNAME = var.agent_os_postgres_tls_servername
-  }) : null
+  } : null
 }
