@@ -215,9 +215,6 @@ locals {
   agent_os_cache = module.redis.agent_os
   agent_os_kafka = one(module.kafka)
 
-  # Match the existing GCP Paragon/Managed Sync behavior: Cloud SQL requires TLS
-  # (ENCRYPTED_ONLY), but private-IP connections do not use DNS SAN verification.
-  # Do not supply *_POSTGRES_SSL_CA until certificate identity can be verified.
   agent_os_app_config = var.agent_os_enabled ? {
     AGENT_OS_CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
     EXTRACTION_API_KEY                       = random_password.agent_os_extraction_api_key[0].result
