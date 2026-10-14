@@ -40,6 +40,7 @@ resource "azurerm_eventhub_namespace_authorization_rule" "kafka" {
   manage = true
 }
 
+# Managed Sync requires Premium (18 entities exceed Standard quota of 10).
 # Managed Sync owns the source streams consumed by Agent OS. Event Hubs does not
 # support Kafka AdminClient topic creation, so Terraform must provision these entities.
 resource "azurerm_eventhub" "managed_sync_agent_os_sources" {

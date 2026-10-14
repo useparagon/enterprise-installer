@@ -516,14 +516,14 @@ variable "agent_os_index_vm_size" {
 
 variable "agent_os_index_min_count" {
   description = "Minimum number of nodes in the Agent OS index AKS node pool."
-  type    = number
-  default = 2
+  type        = number
+  default     = 2
 }
 
 variable "agent_os_index_max_count" {
   description = "Maximum number of nodes in the Agent OS index AKS node pool."
-  type    = number
-  default = 4
+  type        = number
+  default     = 4
 }
 
 variable "agent_os_extract_vm_size" {
@@ -558,8 +558,8 @@ variable "eventhub_namespace_sku" {
   # Premium explicitly (new deployment, or after a deliberate out-of-band migration)
   # instead of letting Terraform switch it automatically when agent_os_enabled flips.
   validation {
-    condition     = !var.agent_os_enabled || var.eventhub_namespace_sku == "Premium"
-    error_message = "Agent OS requires eventhub_namespace_sku = \"Premium\". Set it explicitly before enabling agent_os_enabled; Azure cannot migrate an existing Standard namespace to Premium without recreating it and losing its data."
+    condition     = !var.managed_sync_enabled || var.eventhub_namespace_sku == "Premium"
+    error_message = "Managed Sync requires eventhub_namespace_sku = \"Premium\" because its 18 Event Hubs exceed the Standard limit of 10. Existing Standard namespaces cannot be upgraded in place: plan a data-preserving migration before switching SKU."
   }
 }
 
