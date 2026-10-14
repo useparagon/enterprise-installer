@@ -469,3 +469,14 @@ variable "gmk_bootstrap_address" {
   type        = string
   default     = null
 }
+
+variable "agent_os_postgres_tls_servername" {
+  description = "Optional Cloud SQL certificate DNS SAN for Agent OS PostgreSQL connections over private IP. Must match the certificate; never infer from the IP."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.agent_os_postgres_tls_servername == null || can(regex("^[a-zA-Z0-9.-]+$", var.agent_os_postgres_tls_servername))
+    error_message = "agent_os_postgres_tls_servername must be a DNS hostname."
+  }
+}

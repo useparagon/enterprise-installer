@@ -215,7 +215,7 @@ locals {
   agent_os_cache = module.redis.agent_os
   agent_os_kafka = one(module.kafka)
 
-  agent_os_app_config = var.agent_os_enabled ? {
+  agent_os_app_config = var.agent_os_enabled ? merge({
     AGENT_OS_CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
     EXTRACTION_API_KEY                       = random_password.agent_os_extraction_api_key[0].result
 
@@ -261,9 +261,12 @@ locals {
     AOS_S3_PARSED_PREFIX = "parsed/"
     AOS_S3_INDEX_BUCKET  = module.storage.storage.agent_os_bucket
     AOS_S3_INDEX_AZ_ID   = ""
-  } : null
+    }, var.agent_os_postgres_tls_servername == null ? {} : {
+    CONTEXT_POSTGRES_TLS_SERVERNAME = var.agent_os_postgres_tls_servername
+    TOOLS_POSTGRES_TLS_SERVERNAME   = var.agent_os_postgres_tls_servername
+  }) : null
 
-  agent_os_admin_config = var.agent_os_enabled ? {
+  agent_os_admin_config = var.agent_os_enabled ? merge({
     ADMIN_POSTGRES_HOST        = local.agent_os_db.host
     ADMIN_POSTGRES_PORT        = tostring(local.agent_os_db.port)
     ADMIN_POSTGRES_DATABASE    = local.agent_os_db.admin_database
@@ -289,11 +292,13 @@ locals {
     KAFKA_TOPIC_PARTITIONS          = "3"
     KAFKA_TOPIC_REPLICATION_FACTOR  = "3"
     KAFKA_TOPIC_MIN_INSYNC_REPLICAS = "2"
-  } : null
+    }, var.agent_os_postgres_tls_servername == null ? {} : {
+    ADMIN_POSTGRES_TLS_SERVERNAME = var.agent_os_postgres_tls_servername
+  }) : null
 
   # Unlike the app Secret, only capability-broker receives its signing key
   # and least-privilege PostgreSQL role. The migration Job grants the role.
-  agent_os_capability_broker_config = var.agent_os_enabled ? {
+  agent_os_capability_broker_config = var.agent_os_enabled ? merge({
     TOOLS_POSTGRES_HOST        = local.agent_os_db.host
     TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
     TOOLS_POSTGRES_DATABASE    = local.agent_os_db.databases.tools.database
@@ -305,5 +310,7 @@ locals {
     CAPABILITY_BROKER_SIGNING_KEY   = random_password.agent_os_capability_broker_signing_key[0].result
     CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result
     CAPABILITY_BROKER_SIGNING_KID   = "capability-broker-v1"
-  } : null
+    }, var.agent_os_postgres_tls_servername == null ? {} : {
+    TOOLS_POSTGRES_TLS_SERVERNAME = var.agent_os_postgres_tls_servername
+  }) : null
 }
