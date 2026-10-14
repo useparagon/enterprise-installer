@@ -558,8 +558,8 @@ variable "eventhub_namespace_sku" {
   # Premium explicitly (new deployment, or after a deliberate out-of-band migration)
   # instead of letting Terraform switch it automatically when agent_os_enabled flips.
   validation {
-    condition     = !var.managed_sync_enabled || var.eventhub_namespace_sku == "Premium"
-    error_message = "Managed Sync requires eventhub_namespace_sku = \"Premium\" because its 18 Event Hubs exceed the Standard limit of 10. Existing Standard namespaces cannot be upgraded in place: plan a data-preserving migration before switching SKU."
+    condition     = !var.agent_os_enabled || var.eventhub_namespace_sku == "Premium"
+    error_message = "Agent OS requires eventhub_namespace_sku = \"Premium\" because the Managed Sync and Agent OS topic set exceeds the Standard Event Hubs limit of 10. Migrating an existing namespace from Standard to Premium requires a planned replacement."
   }
 }
 
