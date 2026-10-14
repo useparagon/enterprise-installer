@@ -264,14 +264,14 @@ variable "agent_os_index_machine_type" {
 
 variable "agent_os_index_min_count" {
   description = "Minimum number of nodes in the Agent OS index GKE node pool."
-  type    = number
-  default = 2
+  type        = number
+  default     = 2
 }
 
 variable "agent_os_index_max_count" {
   description = "Maximum number of nodes in the Agent OS index GKE node pool."
-  type    = number
-  default = 4
+  type        = number
+  default     = 4
 }
 
 variable "agent_os_extract_machine_type" {

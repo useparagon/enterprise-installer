@@ -225,7 +225,7 @@ locals {
     CONTEXT_POSTGRES_USERNAME    = local.agent_os_db.databases.context.user
     CONTEXT_POSTGRES_PASSWORD    = local.agent_os_db.databases.context.password
     CONTEXT_POSTGRES_SSL_ENABLED = "true"
-    CONTEXT_POSTGRES_SSL_CA      = ""
+    CONTEXT_POSTGRES_SSL_CA      = local.agent_os_db.server_ca_cert
 
     TOOLS_POSTGRES_HOST        = local.agent_os_db.host
     TOOLS_POSTGRES_PORT        = tostring(local.agent_os_db.port)
@@ -233,7 +233,7 @@ locals {
     TOOLS_POSTGRES_USERNAME    = local.agent_os_db.databases.tools.user
     TOOLS_POSTGRES_PASSWORD    = local.agent_os_db.databases.tools.password
     TOOLS_POSTGRES_SSL_ENABLED = "true"
-    TOOLS_POSTGRES_SSL_CA      = ""
+    TOOLS_POSTGRES_SSL_CA      = local.agent_os_db.server_ca_cert
 
     AOS_REDIS_HOST = local.agent_os_cache.host
     AOS_REDIS_PORT = tostring(local.agent_os_cache.port)
@@ -270,7 +270,7 @@ locals {
     ADMIN_POSTGRES_USERNAME    = local.agent_os_db.admin_user
     ADMIN_POSTGRES_PASSWORD    = local.agent_os_db.admin_password
     ADMIN_POSTGRES_SSL_ENABLED = "true"
-    ADMIN_POSTGRES_SSL_CA      = ""
+    ADMIN_POSTGRES_SSL_CA      = local.agent_os_db.server_ca_cert
 
     CAPABILITY_BROKER_POSTGRES_USERNAME = random_string.agent_os_capability_broker_username[0].result
     CAPABILITY_BROKER_POSTGRES_PASSWORD = random_password.agent_os_capability_broker_password[0].result
@@ -300,6 +300,7 @@ locals {
     TOOLS_POSTGRES_USERNAME    = random_string.agent_os_capability_broker_username[0].result
     TOOLS_POSTGRES_PASSWORD    = random_password.agent_os_capability_broker_password[0].result
     TOOLS_POSTGRES_SSL_ENABLED = "true"
+    TOOLS_POSTGRES_SSL_CA      = local.agent_os_db.server_ca_cert
 
     CAPABILITY_BROKER_SIGNING_KEY   = random_password.agent_os_capability_broker_signing_key[0].result
     CAPABILITY_BROKER_SERVICE_TOKEN = random_password.agent_os_capability_broker_service_token[0].result

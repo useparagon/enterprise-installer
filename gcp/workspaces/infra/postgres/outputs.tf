@@ -1,6 +1,7 @@
 # Agent OS: admin credentials for the migration Job plus one app user per logical database.
 output "agent_os" {
   value = var.agent_os_enabled && contains(keys(local.agent_os_postgres_instances), "agent_os") ? {
+    server_ca_cert = google_sql_database_instance.agent_os["agent_os"].server_ca_cert[0].cert
     host           = google_sql_database_instance.agent_os["agent_os"].private_ip_address
     port           = "5432"
     admin_database = "postgres"
