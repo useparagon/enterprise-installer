@@ -11,11 +11,14 @@ output "cluster_name" {
   value       = google_managed_kafka_cluster.kafka.name
 }
 
-# Bootstrap: hostname from GMK API (gcloud managed-kafka clusters describe --format=value(bootstrapAddress)).
-# Format: bootstrap.<cluster_id>.<region>.managedkafka.<project_id>.cloud.goog:9092 (not <id>-bootstrap.<region>.managedkafka.goog).
+# Some GMK clusters expose a legacy bootstrapAddress that does not resolve in
+# their VPC. Allow an explicit, validated private bootstrap DNS address instead.
 output "cluster_bootstrap_brokers" {
-  description = "Bootstrap broker address for Kafka clients (host:port). Required for KafkaJS."
-  value       = "bootstrap.${google_managed_kafka_cluster.kafka.cluster_id}.${google_managed_kafka_cluster.kafka.location}.managedkafka.${var.gcp_project_id}.cloud.goog:9092"
+  description = "Bootstrap broker address for Kafka clients (host:port)."
+  value = coalesce(
+    var.gmk_bootstrap_address,
+    "bootstrap.${google_managed_kafka_cluster.kafka.cluster_id}.${google_managed_kafka_cluster.kafka.location}.managedkafka.${var.gcp_project_id}.cloud.goog:9092",
+  )
 }
 
 output "cluster_service_account_email" {

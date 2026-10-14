@@ -463,3 +463,9 @@ locals {
     },
   )
 }
+
+variable "gmk_bootstrap_address" {
+  description = "Optional per-cluster Managed Kafka bootstrap address override for private DNS (host:port)."
+  type        = string
+  default     = null
+}
