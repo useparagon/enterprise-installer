@@ -8,7 +8,7 @@ output "tracking" {
     installer_version    = local.installer_chart_version
     k8s_version          = local.cluster_k8s_version
     managed_sync_enabled = var.managed_sync_enabled
-    managed_sync_version = var.managed_sync_version
+    managed_sync_version = var.managed_sync_enabled ? var.managed_sync_version : null
     domain               = var.domain
     dashboard_url        = try(local.microservices.dashboard.public_url, "https://dashboard.${var.domain}")
     grafana_url          = try(local.monitors["grafana"].public_url, "https://grafana.${var.domain}")
