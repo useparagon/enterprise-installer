@@ -3,7 +3,7 @@ locals {
 
   # Single values document for chart-specific overrides (keep one entry in helm_release.values
   # so plan/apply does not churn on yaml fragment ordering).
-  managed_sync_chart_values = yamlencode({
+  managed_sync_chart_values = yamlencode(merge({
     # openfga-migrate is a post-install hook while the openfga ServiceAccount is normally
     # a regular resource. On first install, the cluster can create the Job before the SA is
     # visible, producing: serviceaccount "openfga" not found.
@@ -50,7 +50,15 @@ locals {
         } : {}
       )
     }
-  })
+    }, var.agent_os_enabled ? {
+    # Leave existing Managed Sync values untouched until Agent OS is enabled.
+    global = {
+      env = {
+        MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = "false"
+        MANAGED_SYNC_STATUS_EVENTS_ENABLED             = "true"
+      }
+    }
+  } : {}))
 }
 
 resource "helm_release" "managed_sync" {

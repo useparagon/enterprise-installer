@@ -4,6 +4,9 @@ locals {
     var.docker_cfg_secret_name != null ? try(kubectl_manifest.external_secret_docker[0].uid, null) : null,
     var.openobserve_secret_name != null ? try(kubectl_manifest.external_secret_openobserve[0].uid, null) : null,
     var.managed_sync_secret_name != null ? try(kubectl_manifest.external_secret_managed_sync[0].uid, null) : null,
+    var.agent_os_enabled ? try(kubectl_manifest.external_secret_agent_os_app[0].uid, null) : null,
+    var.agent_os_enabled ? try(kubectl_manifest.external_secret_agent_os_broker[0].uid, null) : null,
+    var.agent_os_enabled ? try(kubectl_manifest.external_secret_agent_os_admin[0].uid, null) : null,
   ])) : var.runtime_secrets_ready
 }
 
@@ -46,6 +49,27 @@ resource "time_sleep" "wait_for_eso_managed_sync" {
   }
 }
 
+resource "time_sleep" "wait_for_eso_agent_os" {
+  count = var.install_external_secrets && var.agent_os_enabled ? 1 : 0
+
+  create_duration = "90s"
+
+  depends_on = [
+    kubectl_manifest.external_secret_agent_os_app[0],
+    kubectl_manifest.external_secret_agent_os_broker[0],
+    kubectl_manifest.external_secret_agent_os_admin[0],
+  ]
+
+  triggers = {
+    external_secrets = join(",", [
+      try(kubectl_manifest.external_secret_agent_os_app[0].uid, null),
+      try(kubectl_manifest.external_secret_agent_os_broker[0].uid, null),
+      try(kubectl_manifest.external_secret_agent_os_admin[0].uid, null),
+    ])
+    runtime_secrets_ready = var.runtime_secrets_ready
+  }
+}
+
 resource "time_sleep" "wait_for_gitops_secrets" {
   count = var.install_external_secrets ? 0 : 1
 
@@ -57,13 +81,19 @@ resource "time_sleep" "wait_for_gitops_secrets" {
 }
 
 resource "terraform_data" "eso_secrets_gate" {
-  input = local.eso_sync_triggers
+  input = join(",", compact([
+    local.eso_sync_triggers,
+    var.agent_os_enabled ? try(data.kubernetes_secret.agent_os_app[0].metadata[0].uid, null) : null,
+    var.agent_os_enabled ? try(data.kubernetes_secret.agent_os_broker[0].metadata[0].uid, null) : null,
+    var.agent_os_enabled ? try(data.kubernetes_secret.agent_os_admin[0].metadata[0].uid, null) : null,
+  ]))
 
   depends_on = [
     time_sleep.wait_for_eso_core_secrets,
     time_sleep.wait_for_gitops_secrets,
     time_sleep.wait_for_eso_openobserve,
     time_sleep.wait_for_eso_managed_sync,
+    time_sleep.wait_for_eso_agent_os,
   ]
 }
 
@@ -107,4 +137,37 @@ data "kubernetes_secret" "managed_sync_secrets" {
   }
 
   depends_on = [terraform_data.eso_secrets_gate]
+}
+
+data "kubernetes_secret" "agent_os_app" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  metadata {
+    name      = "agent-os-app"
+    namespace = local.paragon_namespace
+  }
+
+  depends_on = [time_sleep.wait_for_eso_agent_os]
+}
+
+data "kubernetes_secret" "agent_os_broker" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  metadata {
+    name      = "agent-os-capability-broker"
+    namespace = local.paragon_namespace
+  }
+
+  depends_on = [time_sleep.wait_for_eso_agent_os]
+}
+
+data "kubernetes_secret" "agent_os_admin" {
+  count = var.agent_os_enabled ? 1 : 0
+
+  metadata {
+    name      = "agent-os-admin"
+    namespace = local.paragon_namespace
+  }
+
+  depends_on = [time_sleep.wait_for_eso_agent_os]
 }
