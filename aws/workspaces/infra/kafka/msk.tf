@@ -55,8 +55,9 @@ resource "random_password" "msk_password_agent_os" {
 resource "aws_secretsmanager_secret" "msk_credentials_agent_os" {
   count = var.agent_os_enabled ? 1 : 0
 
-  name       = "AmazonMSK_${var.workspace}-agent-os-credentials"
-  kms_key_id = aws_kms_key.kafka.key_id
+  name                    = "AmazonMSK_${var.workspace}-agent-os-credentials"
+  kms_key_id              = aws_kms_key.kafka.key_id
+  recovery_window_in_days = var.secrets_recovery_window_in_days
 }
 
 resource "aws_secretsmanager_secret_version" "msk_credentials_agent_os" {
@@ -88,8 +89,9 @@ resource "random_password" "msk_password_acl_admin" {
 resource "aws_secretsmanager_secret" "msk_credentials_acl_admin" {
   count = var.agent_os_enabled ? 1 : 0
 
-  name       = "AmazonMSK_${var.workspace}-acl-admin-credentials"
-  kms_key_id = aws_kms_key.kafka.key_id
+  name                    = "AmazonMSK_${var.workspace}-acl-admin-credentials"
+  kms_key_id              = aws_kms_key.kafka.key_id
+  recovery_window_in_days = var.secrets_recovery_window_in_days
 }
 
 resource "aws_secretsmanager_secret_version" "msk_credentials_acl_admin" {

@@ -109,12 +109,12 @@ variable "rds_postgres" {
     max_allocated_storage               = number
     engine_version                      = string
     multi_az                            = bool
-    availability_zone                   = string
+    availability_zone                   = optional(string)
     read_replica                        = bool
     replica_instance_class              = string
     storage_type                        = string
-    iops                                = number
-    storage_throughput                  = number
+    iops                                = optional(number)
+    storage_throughput                  = optional(number)
     backup_retention_days               = number
     backup_window                       = string
     maintenance_window                  = string
