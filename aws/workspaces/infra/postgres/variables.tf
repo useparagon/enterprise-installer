@@ -129,7 +129,7 @@ variable "rds_postgres" {
     allow_major_version_upgrade         = bool
     apply_immediately                   = bool
     deletion_protection                 = bool
-    kms_key_arn                         = string
+    kms_key_arn                         = optional(string)
     ingress_cidr_blocks                 = list(string)
     tags                                = map(string)
   }))
