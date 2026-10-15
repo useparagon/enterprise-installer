@@ -10,6 +10,13 @@ There are several ways to provide GCP credentials. Here are how they are evaluat
 
 NOTE: The credentials above may refer to a Workload Identity Pool account instead of a service account. This would require additional configuration in Terraform Cloud as detailed [here](https://developer.hashicorp.com/terraform/cloud-docs/dynamic-provider-credentials/gcp-configuration).
 
+## Agent OS
+
+When enabling Agent OS, explicitly set `managed_sync_version = "1.0.75"` or a
+newer version (the legacy GCP default is too old). Managed Sync creates Context
+topics and publishes status events; the Agent OS Helm migrations run before
+application readiness checks.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -39,11 +46,17 @@ No requirements.
 | Name | Type |
 | ---- | ---- |
 | [google_project_iam_member.eso_secret_accessor](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
+| [google_secret_manager_secret.agent_os_admin](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.agent_os_app](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret.agent_os_vendor](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.docker_cfg](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.env](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.managed_sync](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.openobserve](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.openobserve_gcs](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret_version.agent_os_admin](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.agent_os_app](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [google_secret_manager_secret_version.agent_os_vendor](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.docker_cfg](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.env](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.managed_sync](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
@@ -55,6 +68,7 @@ No requirements.
 | [random_string.openobserve_email](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [google_client_config.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/client_config) | data source |
 | [google_project.paragon](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/project) | data source |
+| [google_secret_manager_secret_version.infra_agent_os](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
 | [google_secret_manager_secret_version.infra_cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
 | [google_secret_manager_secret_version.infra_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
 | [google_secret_manager_secret_version.infra_monitoring](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/secret_manager_secret_version) | data source |
@@ -67,6 +81,13 @@ No requirements.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agent_os_admin_config"></a> [agent\_os\_admin\_config](#input\_agent\_os\_admin\_config) | Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-derived base payload. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_app_config"></a> [agent\_os\_app\_config](#input\_agent\_os\_app\_config) | Additional Agent OS app secret values populated by the paragon workspace on top of the infra-derived base payload. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. | `bool` | `false` | no |
+| <a name="input_agent_os_helm_repository"></a> [agent\_os\_helm\_repository](#input\_agent\_os\_helm\_repository) | Helm repository URL for the independent Agent OS release. | `string` | `"https://paragon-helm-production.s3.amazonaws.com"` | no |
+| <a name="input_agent_os_helm_values"></a> [agent\_os\_helm\_values](#input\_agent\_os\_helm\_values) | Optional Agent OS chart overrides layered after cloud integration and before agentOs.values from values.yaml. | `any` | `{}` | no |
+| <a name="input_agent_os_vendor_config"></a> [agent\_os\_vendor\_config](#input\_agent\_os\_vendor\_config) | Optional first-apply seed for the operator-owned Agent OS vendor secret. After create, Terraform ignores changes so console or out-of-band keys are preserved. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_version"></a> [agent\_os\_version](#input\_agent\_os\_version) | Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS. | `string` | `null` | no |
 | <a name="input_cloudflare_api_token"></a> [cloudflare\_api\_token](#input\_cloudflare\_api\_token) | Cloudflare API token created at https://dash.cloudflare.com/profile/api-tokens. Requires Edit permissions on Zone `DNS` | `string` | `null` | no |
 | <a name="input_cloudflare_zone_id"></a> [cloudflare\_zone\_id](#input\_cloudflare\_zone\_id) | Cloudflare zone id to set CNAMEs. | `string` | `null` | no |
 | <a name="input_cluster_name_override"></a> [cluster\_name\_override](#input\_cluster\_name\_override) | Optional override for the GKE cluster name when it does not follow the default ${workspace}-cluster naming. | `string` | `null` | no |
