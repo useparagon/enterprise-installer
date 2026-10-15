@@ -21,12 +21,11 @@ resource "azurerm_user_assigned_identity" "alb" {
 resource "azurerm_federated_identity_credential" "alb" {
   count = var.enabled ? 1 : 0
 
-  name                = "${var.workspace}-alb"
-  resource_group_name = var.resource_group_name
-  parent_id           = azurerm_user_assigned_identity.alb[0].id
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = data.azurerm_kubernetes_cluster.cluster.oidc_issuer_url
-  subject             = "system:serviceaccount:${local.alb_controller_ns}:${local.alb_controller_sa}"
+  name      = "${var.workspace}-alb"
+  parent_id = azurerm_user_assigned_identity.alb[0].id
+  audience  = ["api://AzureADTokenExchange"]
+  issuer    = data.azurerm_kubernetes_cluster.cluster.oidc_issuer_url
+  subject   = "system:serviceaccount:${local.alb_controller_ns}:${local.alb_controller_sa}"
 }
 
 # Reader so the controller can discover the ALB and subnet.
