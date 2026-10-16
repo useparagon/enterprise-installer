@@ -479,7 +479,7 @@ variable "agent_os_version" {
 variable "agent_os_helm_repository" {
   description = "Helm repository URL used to install Agent OS."
   type        = string
-  default     = "https://paragon-helm-production.s3.amazonaws.com"
+  default     = "https://helm.useparagon.com"
 }
 
 variable "agent_os_helm_values" {
