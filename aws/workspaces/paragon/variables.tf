@@ -354,7 +354,7 @@ variable "hoop_image_repository" {
 variable "hoop_image_tag" {
   description = "Container image tag for the Hoop agent."
   type        = string
-  default     = "1.2.1"
+  default     = "1.2.2"
 }
 
 variable "hoop_k8s_connections" {
