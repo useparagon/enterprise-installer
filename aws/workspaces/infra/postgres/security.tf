@@ -62,3 +62,36 @@ resource "aws_security_group" "postgres" {
     Name = "${var.workspace}-postgres-security-group"
   }
 }
+
+# One private security group per catalog instance. The root selects allowed
+# CIDRs (private subnets by default); no application-specific policy here.
+resource "aws_security_group" "rds_postgres" {
+  for_each = var.rds_postgres
+
+  # Keep the existing Agent OS SG properties stable for state migration.
+  name_prefix = each.key == "agent_os" ? "${var.workspace}-agent-os-postgres" : "${each.value.identifier}-postgres"
+  description = each.key == "agent_os" ? "Security access rules for Agent OS Postgres." : "Security access rules for ${each.key} Postgres."
+  vpc_id      = var.vpc.id
+
+  ingress {
+    description = each.key == "agent_os" ? "Allow Agent OS workloads on port 5432." : "Allow workload traffic to Postgres."
+    from_port   = each.value.port
+    to_port     = each.value.port
+    protocol    = "tcp"
+    cidr_blocks = each.value.ingress_cidr_blocks
+  }
+
+  egress {
+    description = "Allow all outbound traffic."
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = merge({ Name = each.key == "agent_os" ? "${var.workspace}-agent-os-postgres" : "${each.value.identifier}-postgres" }, each.value.tags)
+}

@@ -9,6 +9,7 @@ output "tracking" {
     k8s_version          = try(local.infra_vars.k8s_version.value, var.k8s_version)
     managed_sync_enabled = var.managed_sync_enabled
     managed_sync_version = var.managed_sync_enabled ? var.managed_sync_version : null
+    agent_os_version     = var.agent_os_enabled ? var.agent_os_version : null
     domain               = var.domain
     dashboard_url        = try(local.microservices.dashboard.public_url, "https://dashboard.${var.domain}")
     grafana_url          = try(local.monitors["grafana"].public_url, "https://grafana.${var.domain}")

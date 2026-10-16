@@ -52,3 +52,19 @@ variable "gmk_sasl_mechanism" {
   }
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create a dedicated Agent OS Kafka client service account."
+  type        = bool
+}
+
+
+variable "gmk_bootstrap_address" {
+  description = "Optional override for the private Managed Kafka bootstrap DNS name (host:port), when the API's legacy bootstrap address does not resolve."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.gmk_bootstrap_address == null || can(regex("^[a-zA-Z0-9.-]+:[0-9]+$", var.gmk_bootstrap_address))
+    error_message = "gmk_bootstrap_address must be a DNS hostname and port, for example bootstrap-xyz.example:9092."
+  }
+}

@@ -11,11 +11,14 @@ output "cluster_name" {
   value       = google_managed_kafka_cluster.kafka.name
 }
 
-# Bootstrap: hostname from GMK API (gcloud managed-kafka clusters describe --format=value(bootstrapAddress)).
-# Format: bootstrap.<cluster_id>.<region>.managedkafka.<project_id>.cloud.goog:9092 (not <id>-bootstrap.<region>.managedkafka.goog).
+# Some GMK clusters expose a legacy bootstrapAddress that does not resolve in
+# their VPC. Allow an explicit, validated private bootstrap DNS address instead.
 output "cluster_bootstrap_brokers" {
-  description = "Bootstrap broker address for Kafka clients (host:port). Required for KafkaJS."
-  value       = "bootstrap.${google_managed_kafka_cluster.kafka.cluster_id}.${google_managed_kafka_cluster.kafka.location}.managedkafka.${var.gcp_project_id}.cloud.goog:9092"
+  description = "Bootstrap broker address for Kafka clients (host:port)."
+  value = coalesce(
+    var.gmk_bootstrap_address,
+    "bootstrap.${google_managed_kafka_cluster.kafka.cluster_id}.${google_managed_kafka_cluster.kafka.location}.managedkafka.${var.gcp_project_id}.cloud.goog:9092",
+  )
 }
 
 output "cluster_service_account_email" {
@@ -47,4 +50,28 @@ output "cluster_mechanism" {
 output "cluster_tls_enabled" {
   description = "TLS is always enabled for the Managed Kafka data plane."
   value       = true
+}
+
+output "agent_os_cluster_username" {
+  value = var.agent_os_enabled ? (var.gmk_sasl_mechanism == "plain" ? google_service_account.kafka_client_agent_os[0].email : null) : null
+}
+
+output "agent_os_cluster_password" {
+  value     = var.agent_os_enabled && var.gmk_sasl_mechanism == "plain" ? base64decode(google_service_account_key.kafka_client_agent_os[0].private_key) : null
+  sensitive = true
+}
+
+output "agent_os_service_account_email" {
+  value = var.agent_os_enabled ? google_service_account.kafka_client_agent_os[0].email : null
+}
+
+output "agent_os_acl_admin_username" {
+  description = "Dedicated Kafka ACL bootstrap principal for Agent OS."
+  value       = var.agent_os_enabled ? google_service_account.kafka_acl_admin[0].email : null
+}
+
+output "agent_os_acl_admin_password" {
+  description = "Dedicated Kafka ACL bootstrap SASL/PLAIN key (decoded JSON)."
+  value       = var.agent_os_enabled && var.gmk_sasl_mechanism == "plain" ? base64decode(google_service_account_key.kafka_acl_admin[0].private_key) : null
+  sensitive   = true
 }

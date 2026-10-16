@@ -33,6 +33,34 @@ variable "managed_sync_config" {
   default     = null
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS secrets."
+  type        = bool
+}
+
+variable "agent_os_kms_key_arn" {
+  description = "KMS key ARN used to encrypt the Agent OS secrets."
+  type        = string
+}
+
+variable "agent_os_app_config" {
+  description = "Agent OS app secret payload (datastores, broker, buckets). Null when Agent OS is disabled."
+  type        = map(string)
+  sensitive   = true
+}
+
+variable "agent_os_capability_broker_config" {
+  description = "Agent OS capability broker secret payload excluding generated signing/service tokens. Null when Agent OS is disabled."
+  type        = map(string)
+  sensitive   = true
+}
+
+variable "agent_os_admin_config" {
+  description = "Agent OS admin secret payload for the migration Job. Null when Agent OS is disabled."
+  type        = map(string)
+  sensitive   = true
+}
+
 variable "create_openobserve" {
   description = "When true, create the OpenObserve admin credentials secret."
   type        = bool
