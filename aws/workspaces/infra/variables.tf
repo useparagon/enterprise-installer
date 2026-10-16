@@ -35,6 +35,11 @@ variable "aws_assume_role_arn" {
 variable "organization" {
   description = "Name of organization to include in resource names."
   type        = string
+
+  validation {
+    condition     = length(var.organization) <= 16
+    error_message = "organization must be at most 16 characters so paragon-{organization}-{hash} can fit the 28-character workspace limit."
+  }
 }
 
 # network
@@ -749,7 +754,7 @@ variable "openobserve_email" {
 variable "secrets_recovery_window_in_days" {
   description = "Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve), MSK SCRAM credentials (AmazonMSK_*), and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection."
   type        = number
-  default     = 0
+  default     = 30
 
   validation {
     condition     = var.secrets_recovery_window_in_days == 0 || (var.secrets_recovery_window_in_days >= 7 && var.secrets_recovery_window_in_days <= 30)
@@ -761,7 +766,13 @@ locals {
   # hash of account ID to help ensure uniqueness of resources like S3 bucket names
   hash        = substr(sha256(data.aws_caller_identity.current.account_id), 0, 8)
   environment = "enterprise"
-  workspace   = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
+
+  # Tightest common AWS id suffix: ElastiCache replication_group "${workspace}-redis-cache" (max 40).
+  workspace_max_length = 28
+  workspace = coalesce(
+    var.migrated_workspace,
+    substr("paragon-${var.organization}-${local.hash}", 0, local.workspace_max_length)
+  )
 
   # NOTE hash and workspace can't be included in tags since it creates a circular reference
   default_tags = merge(

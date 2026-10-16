@@ -33,6 +33,11 @@ variable "aws_assume_role_arn" {
 variable "organization" {
   description = "The name of the organization that's deploying Paragon."
   type        = string
+
+  validation {
+    condition     = length(var.organization) <= 16
+    error_message = "organization must be at most 16 characters so paragon-{organization}-{hash} can fit the 28-character workspace limit."
+  }
 }
 
 variable "domain" {
@@ -672,8 +677,13 @@ locals {
   # output; null-safe when neither is present.
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
-  default_workspace = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
-  workspace         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace
+  # Must match aws/workspaces/infra: ElastiCache replication_group "${workspace}-redis-cache" (max 40).
+  workspace_max_length = 28
+  default_workspace = coalesce(
+    var.migrated_workspace,
+    substr("paragon-${var.organization}-${local.hash}", 0, local.workspace_max_length)
+  )
+  workspace = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace
 
   waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
 

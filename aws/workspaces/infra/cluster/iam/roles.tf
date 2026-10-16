@@ -25,7 +25,7 @@ resource "aws_iam_role" "controller" {
 resource "aws_iam_policy" "controller_ec2" {
   count = var.create ? 1 : 0
 
-  name_prefix = "KarpenterCtrlEC2-${var.cluster_name}-"
+  name_prefix = "KarpEC2-${var.cluster_name}-"
   description = "Karpenter controller EC2 policy for cluster ${var.cluster_name}"
   policy      = data.aws_iam_policy_document.karpenter_controller_ec2[0].json
   tags        = var.tags
@@ -34,7 +34,7 @@ resource "aws_iam_policy" "controller_ec2" {
 resource "aws_iam_policy" "controller_services" {
   count = var.create ? 1 : 0
 
-  name_prefix = "KarpenterCtrlSvc-${var.cluster_name}-"
+  name_prefix = "KarpSvc-${var.cluster_name}-"
   description = "Karpenter controller SSM/SQS/IAM/EKS/KMS policy for cluster ${var.cluster_name}"
   policy      = data.aws_iam_policy_document.karpenter_controller_services[0].json
   tags        = var.tags
