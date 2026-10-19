@@ -4,7 +4,6 @@
 global:
   caCerts:
     enabled: false
-    bundlePath: /etc/ssl/custom-ca/ca-bundle.pem
     sources: []
   redisCaCert:
     enabled: false

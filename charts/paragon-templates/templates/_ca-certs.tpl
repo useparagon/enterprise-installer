@@ -1,6 +1,7 @@
 {{/*
-Build resolved custom CA source list (YAML): enabled, bundlePath, sources[].
+Build resolved custom CA source list (YAML): enabled, sources[].
 Includes global.caCerts.sources when caCerts.enabled, plus global.redisCaCert when enabled (deduped).
+Bundle is always written to /etc/ssl/custom-ca/ca-bundle.pem on the shared emptyDir mount.
 Input: (dict "root" $)
 */}}
 {{- define "caCerts.configYaml" -}}
@@ -31,9 +32,7 @@ Input: (dict "root" $)
 {{- $sources = append $sources (dict "type" "secret" "name" $rn "key" "server-ca.pem") -}}
 {{- end -}}
 {{- end -}}
-{{- $bundlePath := $caCerts.bundlePath | default "/etc/ssl/custom-ca/ca-bundle.pem" -}}
 enabled: {{ gt (len $sources) 0 }}
-bundlePath: {{ $bundlePath | quote }}
 sources:
 {{- range $i, $src := $sources }}
   - index: {{ $i }}
@@ -54,9 +53,9 @@ Input: (dict "root" $)
 {{- $ca := include "caCerts.configYaml" (dict "root" $root) | fromYaml -}}
 {{- if $ca.enabled -}}
 - name: NODE_EXTRA_CA_CERTS
-  value: {{ $ca.bundlePath | quote }}
+  value: "/etc/ssl/custom-ca/ca-bundle.pem"
 - name: PGSSLROOTCERT
-  value: {{ $ca.bundlePath | quote }}
+  value: "/etc/ssl/custom-ca/ca-bundle.pem"
 {{- end -}}
 {{- end -}}
 
@@ -75,7 +74,8 @@ Input: (dict "root" $)
 {{- end -}}
 
 {{/*
-Init container concatenates mounted PEMs into bundlePath on emptyDir.
+Init container concatenates mounted PEMs into ca-bundle.pem on emptyDir.
+Uses kubectlImage (same as restart cron) so private registries mirror a known utility image.
 Input: (dict "root" $)
 */}}
 {{- define "caCerts.initContainers" -}}
@@ -83,11 +83,18 @@ Input: (dict "root" $)
 {{- $ca := include "caCerts.configYaml" (dict "root" $root) | fromYaml -}}
 {{- if $ca.enabled -}}
 - name: custom-ca-bundle
-  image: {{ include "paragon.testImage" (dict "root" $root) | quote }}
+  image: {{ include "paragon.kubectlImage" (dict "root" $root) | quote }}
   imagePullPolicy: {{ include "paragon.imagePullPolicy" (dict "root" $root) }}
   command: ["/bin/sh", "-c"]
   args:
-    - mkdir -p /etc/ssl/custom-ca/sources && cat /etc/ssl/custom-ca/sources/* > {{ $ca.bundlePath }}
+    - |
+      mkdir -p /etc/ssl/custom-ca/sources
+      : > /etc/ssl/custom-ca/ca-bundle.pem
+      for f in /etc/ssl/custom-ca/sources/*; do
+        [ -f "$f" ] || continue
+        cat "$f"
+        echo
+      done >> /etc/ssl/custom-ca/ca-bundle.pem
   volumeMounts:
     - name: custom-ca-bundle
       mountPath: /etc/ssl/custom-ca
