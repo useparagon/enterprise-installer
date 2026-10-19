@@ -1,4 +1,7 @@
 {{- if eq .Values.kind "DaemonSet" }}
+{{- $podAnnotations := .Values.podAnnotations | default dict -}}
+{{- $reloaderAnnotationsYaml := include "paragon.annotations.reloaderOnlyYaml" $podAnnotations -}}
+{{- $podTemplateAnnotationsYaml := include "paragon.annotations.podTemplateOnlyYaml" $podAnnotations -}}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -9,9 +12,14 @@ metadata:
     {{- with .Values.labels }}
       {{- toYaml . | nindent 4 }}
     {{- end }}
-  {{- with .Values.annotations }}
+  {{- if or .Values.annotations $reloaderAnnotationsYaml }}
   annotations:
+    {{- with .Values.annotations }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if $reloaderAnnotationsYaml }}
+    {{- $reloaderAnnotationsYaml | nindent 4 }}
+    {{- end }}
   {{- end }}
 spec:
   selector:
@@ -31,7 +39,7 @@ spec:
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-    {{- if or (not .Values.hotReload.enabled) .Values.podAnnotations }}
+    {{- if or (not .Values.hotReload.enabled) $podTemplateAnnotationsYaml }}
       annotations:
       {{- if not .Values.hotReload.enabled }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
@@ -39,8 +47,8 @@ spec:
         checksum/luascripts: {{ include (print $.Template.BasePath "/configmap-luascripts.yaml") . | sha256sum }}
       {{- end }}
       {{- end }}
-      {{- with .Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+      {{- if $podTemplateAnnotationsYaml }}
+        {{- $podTemplateAnnotationsYaml | nindent 8 }}
       {{- end }}
     {{- end }}
     spec:
