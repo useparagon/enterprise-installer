@@ -13,8 +13,6 @@ locals {
 
   slack_enabled = (
     var.hoop_enabled &&
-    try(var.hoop_slack_bot_token, null) != null && var.hoop_slack_bot_token != "" &&
-    try(var.hoop_slack_app_token, null) != null && var.hoop_slack_app_token != "" &&
     length(var.hoop_slack_channel_ids) > 0
   )
 
