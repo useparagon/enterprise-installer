@@ -270,20 +270,6 @@ variable "hoop_api_key" {
   default     = null
 }
 
-variable "hoop_slack_bot_token" {
-  description = "Slack bot token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "hoop_slack_app_token" {
-  description = "Slack app token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
 variable "hoop_slack_channel_ids" {
   description = "Slack channel IDs to notify for connections that require reviews."
   type        = list(string)
