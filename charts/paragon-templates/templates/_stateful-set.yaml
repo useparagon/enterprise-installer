@@ -9,6 +9,7 @@ Call with: include "statefulset.standard" (dict "root" $ "volumeName" "grafana" 
 {{- $storageSize := .storageSize | default "5Gi" -}}
 {{- $name := $root.Chart.Name -}}
 {{- $command := .command | default "" -}}
+{{- $ca := include "caCerts.configYaml" (dict "root" $root) | fromYaml -}}
 {{- $podAnnotations := dict -}}
 {{- if and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "podAnnotations") (kindIs "map" $root.Values.global.podAnnotations) -}}
 {{- $podAnnotations = merge $podAnnotations $root.Values.global.podAnnotations -}}
@@ -49,6 +50,10 @@ spec:
       serviceAccountName: {{ include (printf "%s.serviceAccountName" $name) $root }}
       securityContext:
         {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      {{- if $ca.enabled }}
+      initContainers:
+        {{- include "caCerts.initContainers" (dict "root" $root) | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ $name }}
           securityContext:
@@ -81,9 +86,11 @@ spec:
             {{- toYaml $root.Values.resources | nindent 12 }}
           env:
             {{- include "env.standard" $root | nindent 12 }}
+            {{- include "caCerts.containerEnv" (dict "root" $root) | nindent 12 }}
           volumeMounts:
             - name: {{ $volumeName }}
               mountPath: {{ $mountPath }}
+            {{- include "caCerts.containerVolumeMounts" (dict "root" $root) | nindent 12 }}
       {{- $tsEnabled := true -}}
       {{- if $root.Values.topologySpread -}}
       {{- if hasKey $root.Values.topologySpread "enabled" -}}
@@ -110,6 +117,10 @@ spec:
       {{- with $root.Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $ca.enabled }}
+      volumes:
+        {{- include "caCerts.volumes" (dict "root" $root) | nindent 8 }}
       {{- end }}
   volumeClaimTemplates:
     - metadata:

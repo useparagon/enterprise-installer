@@ -75,6 +75,23 @@ in Secrets Manager, never embedded into the Agent OS Helm release.
 This implementation currently targets AWS; Azure and GCP enterprise installers
 do not yet have the corresponding Agent OS Helm/secret integration.
 
+## Custom CA certificates (Redis / Postgres)
+
+On-prem and BYO databases that require custom CAs (for example Redis with TLS or
+RDS with enforced SSL) use `global.caCerts` in `.secure/values.yaml`. The chart
+mounts each listed Secret or ConfigMap PEM, concatenates them into one bundle, and
+sets `NODE_EXTRA_CA_CERTS` and `PGSSLROOTCERT` on Paragon Deployments, StatefulSets,
+and database migration Jobs.
+
+`global.redisCaCert` remains supported (GCP Memorystore may set it via Terraform).
+Prefer listing Postgres CAs under `global.caCerts.sources`; use a single `caCerts`
+block when both Redis and Postgres need trust anchors.
+
+Optional opt-in verification: `POSTGRES_SSL_REJECT_UNAUTHORIZED` in `global.env`
+(for platform) and `MANAGED_SYNC_POSTGRES_SSL_REJECT_UNAUTHORIZED` when Managed Sync
+is enabled. These stay off by default until the corresponding application release
+supports verify-full. See commented examples in `charts/values.placeholder.yaml`.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
