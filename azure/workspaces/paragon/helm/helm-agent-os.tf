@@ -1,8 +1,9 @@
-# The Agent OS chart owns Enterprise application defaults, migration hooks,
-# Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
-# Terraform supplies only AKS identity, customer endpoints and secret rollout.
-# HOST_ENV=AZURE_K8 tells the chart to omit Kafka ACLs for Event Hubs.
 locals {
+  agent_os_host = format("agentos.%s", var.domain)
+
+  # The Agent OS chart owns Enterprise application defaults, migration hooks,
+  # Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
+  # Terraform supplies only AKS identity, customer endpoints and secret rollout.
   agent_os_azure_values = {
     global = {
       agentOs = {
@@ -54,16 +55,12 @@ resource "helm_release" "agent_os" {
   wait_for_jobs    = true
   timeout          = 900
 
-  # Chart defaults < cloud runtime integration < Terraform overrides
-  # < agentOs.values from the customer values.yaml.
   values = [
     yamlencode(local.agent_os_azure_values),
     yamlencode(var.agent_os_helm_values),
     yamlencode(var.agent_os_file_values),
   ]
 
-  # Set the chart ingress explicitly from Terraform. When AGC uses direct
-  # Gateway API routes, only the shared Gateway owns the public endpoints.
   set {
     name  = "ingress.enabled"
     value = tostring(!var.agc_direct)
@@ -71,9 +68,10 @@ resource "helm_release" "agent_os" {
 
   set {
     name  = "ingress.host"
-    value = format("agentos.%s", var.domain)
+    value = local.agent_os_host
   }
 
+  # Chart reads ingress.class for the nginx annotation. It does not render ingressClassName.
   set {
     name  = "ingress.class"
     value = "nginx"

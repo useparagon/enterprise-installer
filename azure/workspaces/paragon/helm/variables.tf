@@ -221,7 +221,7 @@ variable "paragon_helm_repository" {
 }
 
 variable "domain" {
-  description = "Enterprise deployment domain used for the Agent OS API hostname."
+  description = "Enterprise deployment domain (agentos.<domain> public hostname)."
   type        = string
 }
 

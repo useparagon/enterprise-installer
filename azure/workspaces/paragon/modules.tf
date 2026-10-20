@@ -59,7 +59,7 @@ module "helm" {
   openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
-  public_services          = merge(local.public_services, local.agent_os_dns_services)
+  public_services          = local.public_services
   restrict_public_exposure = local.restrict_public_exposure
   resource_group           = local.infra_vars.resource_group.value
   workspace                = local.workspace
@@ -166,7 +166,7 @@ module "dns" {
   cloudflare_api_token = var.cloudflare_api_token
   cloudflare_zone_id   = var.cloudflare_zone_id
   ingress_loadbalancer = local.dns_ingress_target
-  public_services      = var.ingress_scheme == "internal" ? {} : merge(local.public_services, local.agent_os_dns_services)
+  public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
   ttl                  = local.dns_record_ttl
 }
 
@@ -190,7 +190,7 @@ module "dns_records" {
   resource_group_name  = module.dns_zone.resource_group_name
   domain               = var.domain
   ingress_loadbalancer = local.dns_ingress_target
-  public_services      = var.ingress_scheme == "internal" ? {} : merge(local.public_services, local.agent_os_dns_services)
+  public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
   record_ttl           = local.dns_record_ttl
 }
 
@@ -251,16 +251,8 @@ module "agc" {
 locals {
   agent_os_host = format("agentos.%s", var.domain)
 
-  # DNS and certificate only; the APIs are distinct Services under one hostname.
-  agent_os_dns_services = var.agent_os_enabled ? {
-    agentos = {
-      port       = 3000
-      public_url = format("https://%s", local.agent_os_host)
-    }
-  } : {}
-
-  # AGC direct routing: one HTTPS listener, two path-specific backends.
-  agent_os_agc_routes = var.agent_os_enabled ? {
+  # AGC direct routing: one HTTPS listener, path-specific backends (nginx Ingress is off).
+  agent_os_agc_routes = var.agent_os_enabled && local.agc_direct ? {
     agentos = {
       host = local.agent_os_host
       port = 3000

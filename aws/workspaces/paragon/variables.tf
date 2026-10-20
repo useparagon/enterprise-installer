@@ -1001,10 +1001,20 @@ locals {
     "api-sync" = local.microservices["api-sync"]
   } : {}
 
+  # Agent OS publishes agentos.<domain> via its Helm ingress (same shared front door as Managed Sync).
+  agent_os_public_dns = var.agent_os_enabled ? {
+    agentos = {
+      healthcheck_path = "/readyz"
+      port             = 3000
+      public_url       = format("https://agentos.%s", var.domain)
+    }
+  } : {}
+
   public_services = merge(
     local.public_microservices,
     local.public_monitors,
     local.managed_sync_public_dns,
+    local.agent_os_public_dns,
   )
 
   helm_keys_to_remove = [

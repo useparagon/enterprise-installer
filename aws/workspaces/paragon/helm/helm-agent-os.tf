@@ -1,4 +1,6 @@
 locals {
+  agent_os_host = format("agentos.%s", var.domain)
+
   # The Agent OS chart owns Enterprise application defaults, migration hooks,
   # Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
   # Terraform supplies only AWS identity, tenant integration and secret rollout.
@@ -34,6 +36,23 @@ locals {
     }
 
   }
+
+  # Same shared ALB group as Managed Sync (workspace), but keep a distinct
+  # Ingress object name — managed-sync already owns metadata.name = workspace.
+  agent_os_aws_ingress_values = yamlencode({
+    ingress = {
+      annotations = merge(
+        {
+          "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "false"
+          "alb.ingress.kubernetes.io/group.name"                          = var.workspace
+          "alb.ingress.kubernetes.io/load-balancer-name"                  = var.workspace
+        },
+        var.waf_web_acl_arn != "" ? {
+          "alb.ingress.kubernetes.io/wafv2-acl-arn" = var.waf_web_acl_arn
+        } : {}
+      )
+    }
+  })
 }
 
 resource "helm_release" "agent_os" {
@@ -53,18 +72,13 @@ resource "helm_release" "agent_os" {
   wait_for_jobs    = true
   timeout          = 900 # 15 minutes, consistent with Paragon and Managed Sync
 
-  # Helm owns application defaults; tenant-specific AWS integration is
-  # layered before these two override surfaces:
-  #   1. Terraform: agent_os_helm_values
-  #   2. .secure/values.yaml: agentOs.values (highest precedence)
   values = [
     yamlencode(local.agent_os_aws_values),
+    local.agent_os_aws_ingress_values,
     yamlencode(var.agent_os_helm_values),
     yamlencode(var.agent_os_file_values),
   ]
 
-  # Explicit Helm overrides: keep chart ingress disabled by default and enable
-  # it only for Enterprise, sharing Paragon's existing ALB with Managed Sync.
   set {
     name  = "ingress.enabled"
     value = "true"
@@ -72,7 +86,7 @@ resource "helm_release" "agent_os" {
 
   set {
     name  = "ingress.host"
-    value = format("agentos.%s", var.domain)
+    value = local.agent_os_host
   }
 
   set {
@@ -80,9 +94,10 @@ resource "helm_release" "agent_os" {
     value = var.certificate
   }
 
+  # Chart metadata.name; ALB group is workspace via ingress.annotations above.
   set {
     name  = "ingress.loadBalancerName"
-    value = var.workspace
+    value = "agent-os"
   }
 
   set {
@@ -91,18 +106,13 @@ resource "helm_release" "agent_os" {
   }
 
   set {
-    name  = "ingress.annotations.alb\\.ingress\\.kubernetes\\.io/manage-backend-security-group-rules"
-    value = "false"
-    type  = "string"
+    name  = "ingress.listenPorts[0].HTTP"
+    value = "80"
   }
 
-  dynamic "set" {
-    for_each = var.waf_web_acl_arn != "" ? [var.waf_web_acl_arn] : []
-    content {
-      name  = "ingress.annotations.alb\\.ingress\\.kubernetes\\.io/wafv2-acl-arn"
-      value = set.value
-      type  = "string"
-    }
+  set {
+    name  = "ingress.listenPorts[1].HTTPS"
+    value = "443"
   }
 
   depends_on = [
