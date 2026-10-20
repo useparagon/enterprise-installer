@@ -38,6 +38,16 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
+variable "redis_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "legacy_redis_migration_enabled" {
+  type    = bool
+  default = false
+}
+
 variable "valkey_kms_key_arn" {
   description = "KMS key ARN shared by all Valkey instances for at-rest encryption and CloudWatch logs."
   type        = string
@@ -53,6 +63,10 @@ variable "valkey_instances" {
     tls_enabled             = bool
     snapshot_retention_days = number
     log_retention_days      = number
+    num_node_groups         = number
+    replicas_per_node_group = number
+    kms_key_arn             = string
+    snapshot_name           = string
   }))
 }
 
@@ -89,7 +103,7 @@ locals {
   cache_autoscaling_supports_size = contains(["large", "xlarge", "2xlarge"], element(split(".", lower(var.elasticache_node_type)), 2))
   cache_autoscaling_enabled       = var.elasticache_multiple_instances && local.cache_autoscaling_supports_family && local.cache_autoscaling_supports_size
 
-  cache_autoscaling_targets = local.cache_autoscaling_enabled ? merge({
+  cache_autoscaling_targets = var.redis_enabled && local.cache_autoscaling_enabled ? merge({
     cache = {
       resource_id = "replication-group/${aws_elasticache_replication_group.redis[0].replication_group_id}"
     }

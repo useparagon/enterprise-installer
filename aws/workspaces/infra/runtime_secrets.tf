@@ -36,7 +36,7 @@ resource "aws_secretsmanager_secret" "runtime_redis" {
 
 resource "aws_secretsmanager_secret_version" "runtime_redis" {
   secret_id     = aws_secretsmanager_secret.runtime_redis.id
-  secret_string = jsonencode(module.redis.elasticache)
+  secret_string = jsonencode(local.redis_connections)
 }
 
 resource "aws_secretsmanager_secret" "runtime_storage" {

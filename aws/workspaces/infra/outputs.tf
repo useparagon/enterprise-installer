@@ -24,7 +24,7 @@ output "monitoring" {
 
 output "redis" {
   description = "Connection information for Redis."
-  value       = module.redis.elasticache
+  value       = local.redis_connections
   sensitive   = true
 }
 
@@ -113,4 +113,27 @@ output "secrets_manager_env_secret" {
 output "secrets_manager_secret_arns" {
   description = "ARNs of application Secrets Manager secrets."
   value       = module.secrets.secret_arns
+}
+
+output "valkey" {
+  description = "Physical Valkey connections by instance name; sensitive when AUTH is configured."
+  value       = module.redis.valkey
+  sensitive   = true
+}
+
+output "valkey_roles" {
+  description = "Logical roles mapped to Valkey connections including shared cache/queue/system."
+  value = {
+    for role, instance in local.valkey_role_instances :
+    role => module.redis.valkey[instance]
+    if contains(keys(module.redis.valkey), instance)
+  }
+  sensitive = true
+}
+
+
+output "legacy_redis" {
+  description = "Original Redis 6 connections for migration runner and rollback while redis_enabled=true."
+  value       = module.redis.elasticache
+  sensitive   = true
 }
