@@ -32,11 +32,6 @@ locals {
       }
     }
 
-    # External routing and TLS are owned by the existing GKE shared-ingress.
-    ingress = {
-      enabled = false
-    }
-
     # GCE Ingress uses NodePorts and the same Cloud Armor BackendConfig as Managed Sync.
     # Its /readyz health check is inferred from the chart's readiness probe.
     "context-api" = {
@@ -79,6 +74,13 @@ resource "helm_release" "agent_os" {
     yamlencode(var.agent_os_helm_values),
     yamlencode(var.agent_os_file_values),
   ]
+
+  # GCP routes through the Terraform-owned shared-ingress, just like Managed
+  # Sync; never create another GCE load balancer from the Agent OS chart.
+  set {
+    name  = "ingress.enabled"
+    value = "false"
+  }
 
   depends_on = [
     helm_release.managed_sync,

@@ -34,14 +34,6 @@ locals {
       }
     }
 
-    # nginx shares the existing Azure load balancer. In AGC direct mode,
-    # AGC HTTPRoutes own the external paths and this ingress stays disabled.
-    ingress = {
-      enabled   = !var.agc_direct
-      host      = format("agentos.%s", var.domain)
-      class     = "nginx"
-      tlsSecret = "agentos-secret"
-    }
   }
 }
 
@@ -69,6 +61,28 @@ resource "helm_release" "agent_os" {
     yamlencode(var.agent_os_helm_values),
     yamlencode(var.agent_os_file_values),
   ]
+
+  # Set the chart ingress explicitly from Terraform. When AGC uses direct
+  # Gateway API routes, only the shared Gateway owns the public endpoints.
+  set {
+    name  = "ingress.enabled"
+    value = tostring(!var.agc_direct)
+  }
+
+  set {
+    name  = "ingress.host"
+    value = format("agentos.%s", var.domain)
+  }
+
+  set {
+    name  = "ingress.class"
+    value = "nginx"
+  }
+
+  set {
+    name  = "ingress.tlsSecret"
+    value = "agentos-secret"
+  }
 
   depends_on = [
     helm_release.managed_sync,

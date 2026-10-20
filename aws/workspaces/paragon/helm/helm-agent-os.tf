@@ -33,22 +33,6 @@ locals {
       }
     }
 
-    # Share the existing Paragon ALB and wildcard ACM certificate with Managed Sync.
-    ingress = {
-      enabled          = true
-      host             = format("agentos.%s", var.domain)
-      certificate      = var.certificate
-      loadBalancerName = var.workspace
-      scheme           = var.ingress_scheme
-      annotations = merge(
-        {
-          "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "false"
-        },
-        var.waf_web_acl_arn != "" ? {
-          "alb.ingress.kubernetes.io/wafv2-acl-arn" = var.waf_web_acl_arn
-        } : {}
-      )
-    }
   }
 }
 
@@ -78,6 +62,48 @@ resource "helm_release" "agent_os" {
     yamlencode(var.agent_os_helm_values),
     yamlencode(var.agent_os_file_values),
   ]
+
+  # Explicit Helm overrides: keep chart ingress disabled by default and enable
+  # it only for Enterprise, sharing Paragon's existing ALB with Managed Sync.
+  set {
+    name  = "ingress.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "ingress.host"
+    value = format("agentos.%s", var.domain)
+  }
+
+  set {
+    name  = "ingress.certificate"
+    value = var.certificate
+  }
+
+  set {
+    name  = "ingress.loadBalancerName"
+    value = var.workspace
+  }
+
+  set {
+    name  = "ingress.scheme"
+    value = var.ingress_scheme
+  }
+
+  set {
+    name  = "ingress.annotations.alb\\.ingress\\.kubernetes\\.io/manage-backend-security-group-rules"
+    value = "false"
+    type  = "string"
+  }
+
+  dynamic "set" {
+    for_each = var.waf_web_acl_arn != "" ? [var.waf_web_acl_arn] : []
+    content {
+      name  = "ingress.annotations.alb\\.ingress\\.kubernetes\\.io/wafv2-acl-arn"
+      value = set.value
+      type  = "string"
+    }
+  }
 
   depends_on = [
     helm_release.managed_sync,
