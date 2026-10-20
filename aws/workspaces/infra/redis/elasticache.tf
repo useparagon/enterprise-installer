@@ -35,7 +35,7 @@ resource "aws_elasticache_parameter_group" "redis" {
   }
 
   dynamic "parameter" {
-    for_each = var.legacy_redis_migration_enabled ? [1] : []
+    for_each = contains(var.redis_kea_parameter_groups, each.key) ? [1] : []
     content {
       name  = "notify-keyspace-events"
       value = "KEA"

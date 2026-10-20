@@ -593,21 +593,22 @@ variable "redis_enabled" {
       var.valkey_enabled &&
       alltrue([
         for role in concat(["cache", "queue", "system", "workflow"], var.managed_sync_enabled ? ["managed_sync"] : []) :
-        lookup(var.redis_role_backend, role, "redis") == "valkey"
+        lookup(var.redis_role_backend, role, role == "workflow" ? lookup(var.redis_role_backend, "cache", "redis") : "redis") == "valkey"
       ])
     )
-    error_message = "Before disabling Redis, select Valkey for all application roles and Managed Sync (when enabled)."
+    error_message = "Before disabling Redis, select Valkey for all application roles and Managed Sync (when enabled). An omitted workflow entry follows cache."
   }
 }
 
 variable "valkey_instances" {
   description = <<-EOT
     Per-physical-instance overrides for cache, queue, system, managed_sync and agent_os.
-    Cache, queue and system are opt-in. Managed Sync also requires managed_sync_enabled;
-    Agent OS is automatically created when agent_os_enabled && managed_sync_enabled
-    && valkey_enabled, preserving the existing Agent OS-only deployment.
-    TLS defaults to false for new application/Managed Sync instances.
-    Existing Agent OS retains its current TLS default for compatibility.
+    Cache, queue, system and managed_sync are opt-in: a missing entry is not created.
+    Managed Sync also requires managed_sync_enabled.
+    Agent OS is created only when agent_os_enabled && managed_sync_enabled && valkey_enabled.
+    TLS is supported only on agent_os. The other instances stay TLS-off because the
+    *_REDIS_* secret contract has no AUTH token.
+    snapshot_name applies only at creation. Setting or changing it later replaces the replication group.
   EOT
   type = map(object({
     enabled                 = optional(bool, true)
@@ -639,10 +640,18 @@ variable "valkey_instances" {
       (cfg.log_retention_days == null || cfg.log_retention_days >= 1) &&
       (cfg.num_node_groups == null || (cfg.num_node_groups >= 1 && cfg.num_node_groups <= 500)) &&
       (cfg.replicas_per_node_group == null || (cfg.replicas_per_node_group >= 0 && cfg.replicas_per_node_group <= 5)) &&
-      (cfg.kms_key_arn == null || startswith(cfg.kms_key_arn, "arn:")) &&
+      (cfg.kms_key_arn == null || can(regex("^arn:aws[a-zA-Z-]*:kms:[a-z0-9-]+:[0-9]{12}:(key|alias)/.+$", cfg.kms_key_arn))) &&
       (cfg.snapshot_name == null || trimspace(cfg.snapshot_name) != "")
     ])
     error_message = "Invalid Valkey instance settings (node type, engine, backups, topology, CMK ARN or snapshot)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, cfg in var.valkey_instances :
+      name == "agent_os" || cfg.tls_enabled != true
+    ])
+    error_message = "TLS is supported only on agent_os. cache, queue, system and managed_sync stay TLS-off until the Redis secret contract carries AUTH."
   }
 
   validation {
@@ -682,7 +691,7 @@ variable "valkey_shared" {
 }
 
 variable "redis_role_backend" {
-  description = "Per-role declarative cutover: redis (default) or valkey. Terraform owns the Secrets Manager/ESO endpoint handoff."
+  description = "Per-role declarative cutover: redis (default) or valkey. Terraform owns the Secrets Manager/ESO endpoint handoff. An omitted workflow entry follows cache."
   type        = map(string)
   default     = {}
 
@@ -951,12 +960,40 @@ locals {
   }
 
   valkey_instance_enabled = {
-    cache        = try(var.valkey_instances["cache"].enabled, false)
-    queue        = !var.valkey_shared && try(var.valkey_instances["queue"].enabled, false)
-    system       = !var.valkey_shared && try(var.valkey_instances["system"].enabled, false)
-    managed_sync = var.managed_sync_enabled && try(var.valkey_instances["managed_sync"].enabled, true)
+    cache  = try(var.valkey_instances["cache"].enabled, false)
+    queue  = !var.valkey_shared && try(var.valkey_instances["queue"].enabled, false)
+    system = !var.valkey_shared && try(var.valkey_instances["system"].enabled, false)
+    # Opt-in, same as cache/queue/system. A missing key must not create a cluster
+    # on existing Agent OS installs, which already set managed_sync_enabled and valkey_enabled.
+    managed_sync = var.managed_sync_enabled && try(var.valkey_instances["managed_sync"].enabled, false)
     agent_os     = var.agent_os_enabled && var.managed_sync_enabled
   }
+
+  # Redis roles whose data will be copied to Valkey. Shared mode copies queue and
+  # system into the cache Valkey, so those Redis instances are sources too.
+  redis_migration_source = {
+    cache        = local.valkey_instance_enabled.cache
+    queue        = local.valkey_instance_enabled.queue || (var.valkey_shared && local.valkey_instance_enabled.cache)
+    system       = local.valkey_instance_enabled.system || (var.valkey_shared && local.valkey_instance_enabled.cache)
+    managed_sync = local.valkey_instance_enabled.managed_sync
+  }
+
+  redis_kea_on_cluster = var.redis_enabled && var.elasticache_multiple_instances && (
+    local.redis_migration_source.cache || local.redis_migration_source.managed_sync
+  )
+  redis_kea_on_standalone = var.redis_enabled && (
+    (
+      !var.elasticache_multiple_instances && (
+        local.redis_migration_source.cache || local.redis_migration_source.queue || local.redis_migration_source.system || local.redis_migration_source.managed_sync
+      )
+      ) || (
+      var.elasticache_multiple_instances && (local.redis_migration_source.queue || local.redis_migration_source.system)
+    )
+  )
+  redis_kea_parameter_groups = toset(compact([
+    local.redis_kea_on_cluster ? "cluster" : "",
+    local.redis_kea_on_standalone ? "standalone" : "",
+  ]))
 
   valkey_instances = {
     for name, config in local.valkey_catalog :
@@ -977,18 +1014,21 @@ locals {
     if contains(keys(module.redis.valkey), instance)
   }
 
+  # workflow shares the cache dataset. It follows cache unless the map sets it explicitly.
+  effective_redis_role_backend = merge(
+    var.redis_role_backend,
+    contains(keys(var.redis_role_backend), "workflow") ? {} : {
+      workflow = lookup(var.redis_role_backend, "cache", "redis")
+    }
+  )
+
   # Keep the legacy output shape unchanged until an explicit per-role switch.
   # Managed Sync consumes the selected "managed_sync" endpoint from runtime_redis.
   redis_connections = merge(module.redis.elasticache, var.redis_enabled ? { workflow = module.redis.elasticache.cache } : {}, {
-    for role, backend in var.redis_role_backend :
+    for role, backend in local.effective_redis_role_backend :
     role => local.valkey_role_connections[role]
     if backend == "valkey" && contains(keys(local.valkey_role_connections), role)
   })
-
-  legacy_redis_migration_enabled = var.redis_enabled && var.valkey_enabled && length([
-    for role in ["cache", "queue", "system", "managed_sync"] : role
-    if contains(keys(local.valkey_role_connections), role)
-  ]) > 0
 
   valkey_enabled = var.valkey_enabled && length(local.valkey_instances) > 0
 }

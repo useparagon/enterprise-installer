@@ -43,9 +43,10 @@ variable "redis_enabled" {
   default = true
 }
 
-variable "legacy_redis_migration_enabled" {
-  type    = bool
-  default = false
+variable "redis_kea_parameter_groups" {
+  description = "Redis parameter group families (cluster, standalone) that enable notify-keyspace-events=KEA. Only families whose Redis instances are migration sources."
+  type        = set(string)
+  default     = []
 }
 
 variable "valkey_kms_key_arn" {

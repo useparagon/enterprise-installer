@@ -101,7 +101,7 @@ module "redis" {
   elasticache_multiple_instances = var.elasticache_multiple_instances
   managed_sync_enabled           = var.managed_sync_enabled
   redis_enabled                  = var.redis_enabled
-  legacy_redis_migration_enabled = local.legacy_redis_migration_enabled
+  redis_kea_parameter_groups     = local.redis_kea_parameter_groups
   valkey_instances               = local.valkey_instances
   valkey_kms_key_arn             = try(aws_kms_key.valkey[0].arn, null)
 
