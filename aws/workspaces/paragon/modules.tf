@@ -38,6 +38,7 @@ module "helm" {
   source = "./helm"
 
   certificate                   = module.alb.certificate
+  domain                        = var.domain
   alb_backend_security_group_id = module.alb.backend_security_group_id
   aws_region                    = var.aws_region
   aws_access_key_id             = var.aws_access_key_id
@@ -108,6 +109,7 @@ module "dns" {
 
   domain                        = var.domain
   public_services               = local.public_services
+  agent_os_enabled              = var.agent_os_enabled
   route53_zone_id               = module.alb.route53_zone_id
   workspace                     = local.workspace
   cluster_name                  = local.cluster_name

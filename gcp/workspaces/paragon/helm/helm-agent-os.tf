@@ -32,6 +32,25 @@ locals {
       }
     }
 
+    # External routing and TLS are owned by the existing GKE shared-ingress.
+    ingress = {
+      enabled = false
+    }
+
+    # GCE Ingress uses NodePorts and the same Cloud Armor BackendConfig as Managed Sync.
+    # Its /readyz health check is inferred from the chart's readiness probe.
+    "context-api" = {
+      service = merge(
+        { type = "NodePort" },
+        local.waf_service_annotations
+      )
+    }
+    "tools-api" = {
+      service = merge(
+        { type = "NodePort" },
+        local.waf_service_annotations
+      )
+    }
   }
 }
 
@@ -63,6 +82,7 @@ resource "helm_release" "agent_os" {
 
   depends_on = [
     helm_release.managed_sync,
+    kubectl_manifest.waf_backendconfig,
     terraform_data.eso_secrets_gate,
     data.kubernetes_secret.agent_os_app,
     data.kubernetes_secret.agent_os_admin,

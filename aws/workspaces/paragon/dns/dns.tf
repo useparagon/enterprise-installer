@@ -124,3 +124,21 @@ resource "aws_route53_record" "microservice" {
     var.release_paragon_on_prem,
   ]
 }
+
+# Agent OS exposes two backends under one hostname, so it is not a single
+# Paragon microservice entry. Reuse the shared ALB DNS target.
+resource "aws_route53_record" "agent_os" {
+  count = var.enabled && var.agent_os_enabled ? 1 : 0
+
+  zone_id = var.route53_zone_id
+  name    = "agentos"
+  type    = "CNAME"
+  ttl     = var.record_ttl
+  records = [local.microservice_cname_target]
+
+  depends_on = [
+    var.release_ingress,
+    var.release_paragon_logging,
+    var.release_paragon_on_prem,
+  ]
+}

@@ -39,6 +39,7 @@ module "helm" {
   managed_sync_secret_name             = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
   managed_sync_version                 = var.managed_sync_version
   agent_os_enabled                     = var.agent_os_enabled
+  domain                               = var.domain
   agent_os_version                     = var.agent_os_version
   agent_os_helm_repository             = var.agent_os_helm_repository
   agent_os_helm_values                 = var.agent_os_helm_values
@@ -58,7 +59,7 @@ module "helm" {
   openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
-  public_services          = local.public_services
+  public_services          = merge(local.public_services, local.agent_os_dns_services)
   restrict_public_exposure = local.restrict_public_exposure
   resource_group           = local.infra_vars.resource_group.value
   workspace                = local.workspace
@@ -165,7 +166,7 @@ module "dns" {
   cloudflare_api_token = var.cloudflare_api_token
   cloudflare_zone_id   = var.cloudflare_zone_id
   ingress_loadbalancer = local.dns_ingress_target
-  public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
+  public_services      = var.ingress_scheme == "internal" ? {} : merge(local.public_services, local.agent_os_dns_services)
   ttl                  = local.dns_record_ttl
 }
 
@@ -189,7 +190,7 @@ module "dns_records" {
   resource_group_name  = module.dns_zone.resource_group_name
   domain               = var.domain
   ingress_loadbalancer = local.dns_ingress_target
-  public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
+  public_services      = var.ingress_scheme == "internal" ? {} : merge(local.public_services, local.agent_os_dns_services)
   record_ttl           = local.dns_record_ttl
 }
 
@@ -240,9 +241,33 @@ module "agc" {
   cluster_name           = local.cluster_name
   subnet_id              = try(local.infra_vars.network.value.agc_subnet_id, null)
   namespace              = module.helm.namespace_paragon.metadata[0].name
-  public_services        = local.agc_public_routes
+  public_services        = merge(local.agc_public_routes, local.agent_os_agc_routes)
   waf_enabled            = local.waf_active
   waf_policy_id          = local.waf_active ? module.waf[0].policy_id : null
   alb_controller_version = var.agc_alb_controller_version
   tags                   = local.default_tags
+}
+
+locals {
+  agent_os_host = format("agentos.%s", var.domain)
+
+  # DNS and certificate only; the APIs are distinct Services under one hostname.
+  agent_os_dns_services = var.agent_os_enabled ? {
+    agentos = {
+      port       = 3000
+      public_url = format("https://%s", local.agent_os_host)
+    }
+  } : {}
+
+  # AGC direct routing: one HTTPS listener, two path-specific backends.
+  agent_os_agc_routes = var.agent_os_enabled ? {
+    agentos = {
+      host = local.agent_os_host
+      port = 3000
+      routes = [
+        { path = "/api/context", service = "context-api", port = 3000 },
+        { path = "/api/tools", service = "tools-api", port = 3002 },
+      ]
+    }
+  } : {}
 }

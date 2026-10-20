@@ -34,6 +34,14 @@ locals {
       }
     }
 
+    # nginx shares the existing Azure load balancer. In AGC direct mode,
+    # AGC HTTPRoutes own the external paths and this ingress stays disabled.
+    ingress = {
+      enabled   = !var.agc_direct
+      host      = format("agentos.%s", var.domain)
+      class     = "nginx"
+      tlsSecret = "agentos-secret"
+    }
   }
 }
 

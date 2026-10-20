@@ -117,6 +117,11 @@ variable "flipt_options" {
   sensitive   = true
 }
 
+variable "domain" {
+  description = "Enterprise deployment domain used for the Agent OS API hostname."
+  type        = string
+}
+
 variable "certificate" {
   description = "The ARN of domain certificate."
   type        = string

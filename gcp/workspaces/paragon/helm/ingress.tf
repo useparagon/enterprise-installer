@@ -1,5 +1,10 @@
 locals {
   managed_sync_host = "sync.${var.domain}"
+  agent_os_host     = "agentos.${var.domain}"
+  agent_os_routes = [
+    { path = "/api/context", service = "context-api", port = 3000 },
+    { path = "/api/tools", service = "tools-api", port = 3002 },
+  ]
   managed_sync_routes = [
     { path = "/api/sync-projects", service = "api-project", port = 1804 },
     { path = "/api/catalog", service = "api-project", port = 1804 },
@@ -16,7 +21,8 @@ locals {
       for service in values(var.public_services) :
       replace(replace(service.public_url, "https://", ""), "http://", "")
     ],
-    var.managed_sync_enabled ? [local.managed_sync_host] : []
+    var.managed_sync_enabled ? [local.managed_sync_host] : [],
+    var.agent_os_enabled ? [local.agent_os_host] : []
   ))
 
   # Create a hash of domains to version the certificate name
@@ -136,6 +142,25 @@ resource "kubectl_manifest" "ingress" {
               }
             ]
           }
+        }] : [],
+        var.agent_os_enabled ? [{
+          host = local.agent_os_host
+          http = {
+            paths = [
+              for route in local.agent_os_routes : {
+                path     = route.path
+                pathType = "Prefix"
+                backend = {
+                  service = {
+                    name = route.service
+                    port = {
+                      number = route.port
+                    }
+                  }
+                }
+              }
+            ]
+          }
         }] : []
       )
     }
@@ -146,6 +171,7 @@ resource "kubectl_manifest" "ingress" {
     helm_release.paragon_monitoring,
     helm_release.paragon_logging,
     helm_release.managed_sync,
+    helm_release.agent_os,
   ]
 }
 

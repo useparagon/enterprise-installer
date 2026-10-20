@@ -220,6 +220,11 @@ variable "paragon_helm_repository" {
   type        = string
 }
 
+variable "domain" {
+  description = "Enterprise deployment domain used for the Agent OS API hostname."
+  type        = string
+}
+
 variable "agent_os_enabled" {
   description = "Whether to enable Agent OS. Requires managed_sync_enabled."
   type        = bool

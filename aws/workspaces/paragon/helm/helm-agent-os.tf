@@ -33,6 +33,22 @@ locals {
       }
     }
 
+    # Share the existing Paragon ALB and wildcard ACM certificate with Managed Sync.
+    ingress = {
+      enabled          = true
+      host             = format("agentos.%s", var.domain)
+      certificate      = var.certificate
+      loadBalancerName = var.workspace
+      scheme           = var.ingress_scheme
+      annotations = merge(
+        {
+          "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "false"
+        },
+        var.waf_web_acl_arn != "" ? {
+          "alb.ingress.kubernetes.io/wafv2-acl-arn" = var.waf_web_acl_arn
+        } : {}
+      )
+    }
   }
 }
 

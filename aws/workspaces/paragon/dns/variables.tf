@@ -33,6 +33,12 @@ variable "public_services" {
   }))
 }
 
+variable "agent_os_enabled" {
+  description = "Publish agentos.<domain> on the existing shared ALB when Agent OS is enabled."
+  type        = bool
+  default     = false
+}
+
 variable "record_ttl" {
   description = "TTL for service CNAME records."
   type        = number
