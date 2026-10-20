@@ -14,8 +14,9 @@ data "aws_iam_policy_document" "grafana_assume" {
 }
 
 resource "aws_iam_role" "grafana" {
+  # Default IAM path (/) so the role ARN matches customer install policies scoped to
+  # arn:aws:iam::*:role/paragon-*
   name               = "${var.workspace}-iam-grafana"
-  path               = "/env/"
   assume_role_policy = data.aws_iam_policy_document.grafana_assume.json
 
   tags = {
