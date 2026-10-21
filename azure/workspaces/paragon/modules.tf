@@ -39,6 +39,7 @@ module "helm" {
   managed_sync_secret_name             = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
   managed_sync_version                 = var.managed_sync_version
   agent_os_enabled                     = var.agent_os_enabled
+  domain                               = var.domain
   agent_os_version                     = var.agent_os_version
   agent_os_helm_repository             = var.agent_os_helm_repository
   agent_os_helm_values                 = var.agent_os_helm_values
@@ -237,9 +238,23 @@ module "agc" {
   cluster_name           = local.cluster_name
   subnet_id              = try(local.infra_vars.network.value.agc_subnet_id, null)
   namespace              = module.helm.namespace_paragon.metadata[0].name
-  public_services        = local.agc_public_routes
+  public_services        = merge(local.agc_public_routes, local.agent_os_agc_routes)
   waf_enabled            = local.waf_active
   waf_policy_id          = local.waf_active ? module.waf[0].policy_id : null
   alb_controller_version = var.agc_alb_controller_version
   tags                   = local.default_tags
+}
+
+locals {
+  # AGC direct routing: one HTTPS listener, path-specific backends (nginx Ingress is off).
+  agent_os_agc_routes = var.agent_os_enabled && local.agc_direct ? {
+    agentos = {
+      host = local.agent_os_host
+      port = local.agent_os_port
+      routes = [
+        { path = "/api/context", service = "context-api", port = local.agent_os_port },
+        { path = "/api/tools", service = "tools-api", port = 3002 },
+      ]
+    }
+  } : {}
 }

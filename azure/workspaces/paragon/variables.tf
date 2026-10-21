@@ -885,10 +885,23 @@ locals {
     "api-sync" = local.microservices["api-sync"]
   } : {}
 
+  agent_os_public_url = try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
+  agent_os_port       = try(tonumber(local.helm_vars.global.env["AGENT_OS_PORT"]), 3000)
+  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+
+  agent_os_public_dns = var.agent_os_enabled ? {
+    agentos = {
+      healthcheck_path = "/readyz"
+      port             = local.agent_os_port
+      public_url       = local.agent_os_public_url
+    }
+  } : {}
+
   public_services = merge(
     local.public_microservices,
     local.public_monitors,
     local.managed_sync_public_dns,
+    local.agent_os_public_dns,
   )
 
   helm_keys_to_remove = [

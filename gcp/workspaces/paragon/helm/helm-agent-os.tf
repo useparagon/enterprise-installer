@@ -18,6 +18,10 @@ locals {
           }
         }
 
+        services = {
+          context-api = local.agent_os_port
+        }
+
         env = {
           HOST_ENV                              = "GCP_K8"
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
@@ -32,6 +36,20 @@ locals {
       }
     }
 
+    # GCE Ingress uses NodePorts and the same Cloud Armor BackendConfig as Managed Sync.
+    # Its /readyz health check is inferred from the chart's readiness probe.
+    "context-api" = {
+      service = merge(
+        { type = "NodePort" },
+        local.waf_service_annotations
+      )
+    }
+    "tools-api" = {
+      service = merge(
+        { type = "NodePort" },
+        local.waf_service_annotations
+      )
+    }
   }
 }
 
@@ -61,8 +79,16 @@ resource "helm_release" "agent_os" {
     yamlencode(var.agent_os_file_values),
   ]
 
+  # GCP routes through the Terraform-owned shared-ingress, just like Managed
+  # Sync; never create another GCE load balancer from the Agent OS chart.
+  set {
+    name  = "ingress.enabled"
+    value = "false"
+  }
+
   depends_on = [
     helm_release.managed_sync,
+    kubectl_manifest.waf_backendconfig,
     terraform_data.eso_secrets_gate,
     data.kubernetes_secret.agent_os_app,
     data.kubernetes_secret.agent_os_admin,

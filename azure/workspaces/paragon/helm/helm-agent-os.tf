@@ -1,8 +1,11 @@
-# The Agent OS chart owns Enterprise application defaults, migration hooks,
-# Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
-# Terraform supplies only AKS identity, customer endpoints and secret rollout.
-# HOST_ENV=AZURE_K8 tells the chart to omit Kafka ACLs for Event Hubs.
 locals {
+  agent_os_public_url = try(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
+  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+  agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
+
+  # The Agent OS chart owns Enterprise application defaults, migration hooks,
+  # Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
+  # Terraform supplies only AKS identity, customer endpoints and secret rollout.
   agent_os_azure_values = {
     global = {
       agentOs = {
@@ -18,6 +21,10 @@ locals {
             clientId = var.agent_os_workload_identity_client_id
             tenantId = var.external_secrets_tenant_id
           }
+        }
+
+        services = {
+          context-api = local.agent_os_port
         }
 
         env = {
@@ -54,13 +61,32 @@ resource "helm_release" "agent_os" {
   wait_for_jobs    = true
   timeout          = 900
 
-  # Chart defaults < cloud runtime integration < Terraform overrides
-  # < agentOs.values from the customer values.yaml.
   values = [
     yamlencode(local.agent_os_azure_values),
     yamlencode(var.agent_os_helm_values),
     yamlencode(var.agent_os_file_values),
   ]
+
+  set {
+    name  = "ingress.enabled"
+    value = tostring(!var.agc_direct)
+  }
+
+  set {
+    name  = "ingress.host"
+    value = local.agent_os_host
+  }
+
+  # Chart reads ingress.class for the nginx annotation. It does not render ingressClassName.
+  set {
+    name  = "ingress.class"
+    value = "nginx"
+  }
+
+  set {
+    name  = "ingress.tlsSecret"
+    value = "agentos-secret"
+  }
 
   depends_on = [
     helm_release.managed_sync,
