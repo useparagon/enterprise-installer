@@ -38,6 +38,7 @@ module "helm" {
   source = "./helm"
 
   certificate                   = module.alb.certificate
+  domain                        = var.domain
   alb_backend_security_group_id = module.alb.backend_security_group_id
   aws_region                    = var.aws_region
   aws_access_key_id             = var.aws_access_key_id

@@ -59,6 +59,11 @@ variable "public_services" {
   type = map(object({
     host = string
     port = number
+    routes = optional(list(object({
+      path    = string
+      service = string
+      port    = number
+    })), [])
   }))
   default = {}
 }
