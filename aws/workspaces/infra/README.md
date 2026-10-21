@@ -123,7 +123,7 @@ a legacy workload to the new map is **not** an automatic migration.
 | <a name="input_cloudflare_tunnel_enabled"></a> [cloudflare\_tunnel\_enabled](#input\_cloudflare\_tunnel\_enabled) | Flag whether to enable Cloudflare Zero Trust tunnel for bastion | `bool` | `false` | no |
 | <a name="input_cloudflare_tunnel_subdomain"></a> [cloudflare\_tunnel\_subdomain](#input\_cloudflare\_tunnel\_subdomain) | Subdomain under the Cloudflare Zone to create the tunnel | `string` | `""` | no |
 | <a name="input_cloudflare_tunnel_zone_id"></a> [cloudflare\_tunnel\_zone\_id](#input\_cloudflare\_tunnel\_zone\_id) | Zone ID for Cloudflare domain | `string` | `""` | no |
-| <a name="input_create_autoscaling_linked_role"></a> [create\_autoscaling\_linked\_role](#input\_create\_autoscaling\_linked\_role) | Whether or not to create an IAM role for autoscaling. | `bool` | `true` | no |
+| <a name="input_create_autoscaling_linked_role"></a> [create\_autoscaling\_linked\_role](#input\_create\_autoscaling\_linked\_role) | Create the account autoscaling IAM service-linked role. When disabling after it was created, run `tofu state rm 'module.cluster.aws_iam_service_linked_role.autoscaling[0]'` before apply so the role is left in AWS. | `bool` | `true` | no |
 | <a name="input_disable_cloudtrail"></a> [disable\_cloudtrail](#input\_disable\_cloudtrail) | Used to specify that Cloudtrail is disabled. | `bool` | `true` | no |
 | <a name="input_disable_deletion_protection"></a> [disable\_deletion\_protection](#input\_disable\_deletion\_protection) | Used to disable deletion protection on RDS and S3 resources. | `bool` | `false` | no |
 | <a name="input_docker_email"></a> [docker\_email](#input\_docker\_email) | Docker email for application image pulls. | `string` | `null` | no |

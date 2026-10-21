@@ -216,7 +216,7 @@ variable "eks_admin_arns" {
 }
 
 variable "create_autoscaling_linked_role" {
-  description = "Whether or not to create an IAM role for autoscaling."
+  description = "Create the account autoscaling IAM service-linked role. When disabling after it was created, run `tofu state rm 'module.cluster.aws_iam_service_linked_role.autoscaling[0]'` before apply so the role is left in AWS."
   type        = bool
   default     = true
 }

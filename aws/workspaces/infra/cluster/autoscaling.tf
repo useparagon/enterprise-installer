@@ -1,16 +1,12 @@
 resource "aws_iam_service_linked_role" "autoscaling" {
   count            = var.create_autoscaling_linked_role ? 1 : 0
   aws_service_name = "autoscaling.amazonaws.com"
-}
 
-# When create_autoscaling_linked_role flips to false, drop Terraform tracking without
-# calling iam:DeleteServiceLinkedRole (scoped customer policies often omit aws-service-role/*).
-# This also prevents the role from being deleted when other deployments rely on it.
-removed {
-  from = aws_iam_service_linked_role.autoscaling
-
+  # Account-wide SLR; do not delete via Terraform when other stacks or ASGs still use it.
+  # To set create_autoscaling_linked_role = false, state-rm this instance first so apply
+  # does not call iam:DeleteServiceLinkedRole (customer policies often omit aws-service-role/*).
   lifecycle {
-    destroy = false
+    prevent_destroy = true
   }
 }
 
