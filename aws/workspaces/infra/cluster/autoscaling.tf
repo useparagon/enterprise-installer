@@ -7,7 +7,7 @@ resource "aws_iam_service_linked_role" "autoscaling" {
 # calling iam:DeleteServiceLinkedRole (scoped customer policies often omit aws-service-role/*).
 # This also prevents the role from being deleted when other deployments rely on it.
 removed {
-  from = aws_iam_service_linked_role.autoscaling[0]
+  from = aws_iam_service_linked_role.autoscaling
 
   lifecycle {
     destroy = false
