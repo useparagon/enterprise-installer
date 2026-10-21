@@ -677,7 +677,7 @@ locals {
     "health-checker" = {
       "healthcheck_path" = "/healthz"
       "port"             = try(local.helm_vars.global.env["HEALTH_CHECKER_PORT"], 1733)
-      "public_url"       = try(local.helm_vars.global.env["HEALTH_CHECKER_PUBLIC_URL"], "https://health-checker.${var.domain}")
+      "public_url"       = var.restrict_public_exposure ? try(local.helm_vars.global.env["HEALTH_CHECKER_PUBLIC_URL"], "https://health-checker.${var.domain}") : null
     }
     "hermes" = {
       "healthcheck_path" = "/healthz"
