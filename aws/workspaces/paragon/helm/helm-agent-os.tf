@@ -1,5 +1,7 @@
 locals {
-  agent_os_host = format("agentos.%s", var.domain)
+  agent_os_public_url = try(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
+  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+  agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
 
   # The Agent OS chart owns Enterprise application defaults, migration hooks,
   # Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
@@ -19,6 +21,10 @@ locals {
 
         objectStore = {
           region = var.aws_region
+        }
+
+        services = {
+          context-api = local.agent_os_port
         }
 
         env = {

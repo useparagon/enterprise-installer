@@ -249,15 +249,13 @@ module "agc" {
 }
 
 locals {
-  agent_os_host = format("agentos.%s", var.domain)
-
   # AGC direct routing: one HTTPS listener, path-specific backends (nginx Ingress is off).
   agent_os_agc_routes = var.agent_os_enabled && local.agc_direct ? {
     agentos = {
       host = local.agent_os_host
-      port = 3000
+      port = local.agent_os_port
       routes = [
-        { path = "/api/context", service = "context-api", port = 3000 },
+        { path = "/api/context", service = "context-api", port = local.agent_os_port },
         { path = "/api/tools", service = "tools-api", port = 3002 },
       ]
     }

@@ -18,6 +18,10 @@ locals {
           }
         }
 
+        services = {
+          context-api = local.agent_os_port
+        }
+
         env = {
           HOST_ENV                              = "GCP_K8"
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")

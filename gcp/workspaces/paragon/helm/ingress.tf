@@ -1,8 +1,10 @@
 locals {
-  managed_sync_host = "sync.${var.domain}"
-  agent_os_host     = "agentos.${var.domain}"
+  managed_sync_host   = "sync.${var.domain}"
+  agent_os_public_url = try(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"], "https://agentos.${var.domain}")
+  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+  agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
   agent_os_routes = [
-    { path = "/api/context", service = "context-api", port = 3000 },
+    { path = "/api/context", service = "context-api", port = local.agent_os_port },
     { path = "/api/tools", service = "tools-api", port = 3002 },
   ]
   managed_sync_routes = [
