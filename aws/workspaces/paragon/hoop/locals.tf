@@ -14,7 +14,7 @@ locals {
 
   slack_enabled = (
     var.hoop_enabled &&
-    length(var.hoop_slack_channel_ids) > 0
+    length(local.review_required_connections) > 0
   )
 
   postgres_connections = try(var.infra_vars.postgres.value, null) != null ? {

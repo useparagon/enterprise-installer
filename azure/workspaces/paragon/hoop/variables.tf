@@ -91,11 +91,6 @@ variable "reviewers_access_groups" {
   default     = ["dev-team-managers"]
 }
 
-variable "hoop_slack_channel_ids" {
-  description = "Slack channel IDs to notify for connections that require reviews."
-  type        = list(string)
-  default     = []
-}
 
 variable "infra_vars" {
   description = "Infrastructure variables from infra-output.json."

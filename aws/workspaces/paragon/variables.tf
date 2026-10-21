@@ -270,11 +270,6 @@ variable "hoop_api_key" {
   default     = null
 }
 
-variable "hoop_slack_channel_ids" {
-  description = "Slack channel IDs to notify for connections that require reviews."
-  type        = list(string)
-  default     = []
-}
 
 variable "hoop_all_access_groups" {
   description = "Additional access-control groups allowed when customer_facing is false."
