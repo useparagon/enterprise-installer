@@ -17,6 +17,8 @@ Call with: include "statefulset.standard" (dict "root" $ "volumeName" "grafana" 
 {{- if $root.Values.podAnnotations -}}
 {{- $podAnnotations = merge $podAnnotations $root.Values.podAnnotations -}}
 {{- end -}}
+{{- $reloaderAnnotationsYaml := include "paragon.annotations.reloaderOnlyYaml" $podAnnotations -}}
+{{- $podTemplateAnnotationsYaml := include "paragon.annotations.podTemplateOnlyYaml" $podAnnotations -}}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -24,6 +26,10 @@ metadata:
   name: {{ include (printf "%s.fullname" $name) $root }}
   labels:
     {{- include (printf "%s.labels" $name) $root | nindent 4 }}
+  {{- if $reloaderAnnotationsYaml }}
+  annotations:
+    {{- $reloaderAnnotationsYaml | nindent 4 }}
+  {{- end }}
 spec:
   {{- if not $root.Values.autoscaling.enabled }}
   replicas: {{ $root.Values.replicaCount }}
@@ -34,9 +40,9 @@ spec:
   serviceName: {{ include (printf "%s.fullname" $name) $root }}
   template:
     metadata:
-      {{- if $podAnnotations }}
+      {{- if $podTemplateAnnotationsYaml }}
       annotations:
-        {{- toYaml $podAnnotations | nindent 8 }}
+        {{- $podTemplateAnnotationsYaml | nindent 8 }}
       {{- end }}
       labels:
         {{- include (printf "%s.selectorLabels" $name) $root | nindent 8 }}

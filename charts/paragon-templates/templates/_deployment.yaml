@@ -22,6 +22,8 @@ Parameters:
 {{- if $root.Values.podAnnotations -}}
 {{- $podAnnotations = merge $podAnnotations $root.Values.podAnnotations -}}
 {{- end -}}
+{{- $reloaderAnnotationsYaml := include "paragon.annotations.reloaderOnlyYaml" $podAnnotations -}}
+{{- $podTemplateAnnotationsYaml := include "paragon.annotations.podTemplateOnlyYaml" $podAnnotations -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -32,6 +34,10 @@ metadata:
   {{- end }}
   labels:
     {{- include (printf "%s.labels" $name) $root | nindent 4 }}
+  {{- if $reloaderAnnotationsYaml }}
+  annotations:
+    {{- $reloaderAnnotationsYaml | nindent 4 }}
+  {{- end }}
 spec:
   {{- if not (and $root.Values.autoscaling $root.Values.autoscaling.enabled) }}
   replicas: {{ $root.Values.replicaCount | default 1 }}
@@ -41,9 +47,9 @@ spec:
       {{- include (printf "%s.selectorLabels" $name) $root | nindent 6 }}
   template:
     metadata:
-      {{- if $podAnnotations }}
+      {{- if $podTemplateAnnotationsYaml }}
       annotations:
-        {{- toYaml $podAnnotations | nindent 8 }}
+        {{- $podTemplateAnnotationsYaml | nindent 8 }}
       {{- end }}
       labels:
         {{- include (printf "%s.selectorLabels" $name) $root | nindent 8 }}

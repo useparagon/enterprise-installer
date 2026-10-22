@@ -1,11 +1,24 @@
----
 # create statefulset
+{{- $podAnnotations := dict -}}
+{{- if and .Values.global (kindIs "map" .Values.global) (hasKey .Values.global "podAnnotations") (kindIs "map" .Values.global.podAnnotations) -}}
+{{- $podAnnotations = merge $podAnnotations .Values.global.podAnnotations -}}
+{{- end -}}
+{{- if .Values.podAnnotations -}}
+{{- $podAnnotations = merge $podAnnotations .Values.podAnnotations -}}
+{{- end -}}
+{{- $reloaderAnnotationsYaml := include "paragon.annotations.reloaderOnlyYaml" $podAnnotations -}}
+{{- $podTemplateAnnotationsYaml := include "paragon.annotations.podTemplateOnlyYaml" $podAnnotations -}}
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ include "openobserve.fullname" . }}
   labels:
     {{- include "openobserve.labels" . | nindent 4 }}
+  {{- if $reloaderAnnotationsYaml }}
+  annotations:
+    {{- $reloaderAnnotationsYaml | nindent 4 }}
+  {{- end }}
 spec:
   serviceName: {{ include "openobserve.fullname" . }}
   replicas: {{ .Values.replicaCount | default 1 }}
@@ -14,9 +27,9 @@ spec:
       {{- include "openobserve.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- if .Values.podAnnotations }}
+      {{- if $podTemplateAnnotationsYaml }}
       annotations:
-        {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- $podTemplateAnnotationsYaml | nindent 8 }}
       {{- end }}
       labels:
         {{- include "openobserve.selectorLabels" . | nindent 8 }}
