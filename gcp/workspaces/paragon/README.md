@@ -17,6 +17,13 @@ newer version (the legacy GCP default is too old). Managed Sync creates Context
 topics and publishes status events; the Agent OS Helm migrations run before
 application readiness checks.
 
+## Custom CA certificates (Redis / Postgres)
+
+On GCP, Terraform may enable `global.redisCaCert` when Memorystore exports a CA.
+For external Postgres or dual Redis+Postgres trust, add sources under
+`global.caCerts` in `.secure/values.yaml`. See `charts/values.placeholder.yaml`
+for examples and optional verify-full env flags.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
