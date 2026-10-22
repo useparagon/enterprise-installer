@@ -26,6 +26,14 @@ Event Hubs and its Kafka topics. Managed Sync publishes status events but skips
 Kafka AdminClient topic creation (unsupported by Event Hubs). The Agent OS Helm
 release runs PostgreSQL migrations before waiting for application readiness.
 
+## Custom CA certificates (Redis / Postgres)
+
+Configure `global.caCerts` and optional verify flags in `.secure/values.yaml`.
+The Paragon chart builds a combined PEM bundle for Redis and/or Postgres custom
+CAs and applies it to workloads and migration Jobs (`NODE_EXTRA_CA_CERTS`,
+`PGSSLROOTCERT`). Examples and env flags are documented in
+`charts/values.placeholder.yaml`.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
