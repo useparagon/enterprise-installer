@@ -37,11 +37,12 @@ data "aws_secretsmanager_secret_version" "env" {
 
 resource "aws_secretsmanager_secret_version" "env_paragon_overlay" {
   secret_id = data.aws_secretsmanager_secret.env.id
-  # Infra owns the base secret and wins on conflicts; this workspace only overlays
-  # chart-specific keys that infra does not compute.
+  # Start from the current env secret (infra base + prior overlays), then apply
+  # helm-mounted customer secrets last so LICENSE and other chart secretKeys from
+  # paragon-values.yaml can replace stale values (e.g. prepare.sh placeholder).
   secret_string = jsonencode(merge(
-    local.helm_secret_values,
-    jsondecode(data.aws_secretsmanager_secret_version.env.secret_string)
+    jsondecode(data.aws_secretsmanager_secret_version.env.secret_string),
+    local.helm_secret_values
   ))
 
   lifecycle {

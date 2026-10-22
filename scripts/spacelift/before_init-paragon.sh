@@ -137,6 +137,15 @@ fi
 echo "Running prepare.sh -p ${CLOUD} -t ${CHART_TAG}"
 ./prepare.sh -p "${CLOUD}" -t "${CHART_TAG}"
 
+# prepare.sh seeds .secure/values.yaml from placeholder when missing; on Spacelift
+# the real file is the context mount at TF_VAR_helm_yaml_path — sync it so local
+# paths and stale placeholder LICENSE cannot win over the mount.
+if [[ -n "${TF_VAR_helm_yaml_path:-}" && -f "${TF_VAR_helm_yaml_path}" ]]; then
+  mkdir -p "${WS}/.secure"
+  cp "${TF_VAR_helm_yaml_path}" "${WS}/.secure/values.yaml"
+  echo "Synced ${TF_VAR_helm_yaml_path} → ${WS}/.secure/values.yaml"
+fi
+
 rm -f "${WS}/vars.auto.tfvars"
 rm -f "${REPO_ROOT}/${CLOUD}/workspaces/infra/vars.auto.tfvars"
 
