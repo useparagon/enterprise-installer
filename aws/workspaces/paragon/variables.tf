@@ -1,3 +1,20 @@
+variable "valkey_enabled" {
+  description = "Enable the two permanent physical Redis/Valkey migration Secrets in ESO. Set true after enabling Valkey in infra, independently of valkey_migration."
+  type        = bool
+  default     = false
+}
+
+variable "valkey_migration" {
+  description = "Application cutover only: false uses Redis, true uses Valkey. Both physical connection secrets remain unchanged."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.valkey_migration || var.valkey_enabled
+    error_message = "Enable parallel Valkey secrets (valkey_enabled=true) before setting valkey_migration=true."
+  }
+}
+
 variable "aws_region" {
   description = "The AWS region resources are created in."
   type        = string
@@ -422,6 +439,12 @@ variable "helm_yaml" {
   sensitive   = true
 }
 
+variable "redis_enabled" {
+  description = "Mirrors infra's redis_enabled. False means Redis 6 has been permanently decommissioned: the application always uses Valkey regardless of valkey_migration, and the Redis-side migration plumbing (physical secret sync, ESO grant) stops being created."
+  type        = bool
+  default     = true
+}
+
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync."
   type        = bool
@@ -676,8 +699,9 @@ locals {
   )
 
   # use default where standard value can be determined
-  cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
-  cluster_k8s_version = try(local.infra_vars.k8s_version.value, var.k8s_version)
+  cluster_name = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
+  # Kubernetes version is public cluster metadata, not a credential.
+  cluster_k8s_version = nonsensitive(try(local.infra_vars.k8s_version.value, var.k8s_version))
   logs_bucket         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
   auditlogs_bucket    = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
@@ -1018,21 +1042,36 @@ locals {
     "CLOUD_STORAGE_MICROSERVICE_PASS",
   ]
 
+  # Existing Redis and Managed Sync Helm consumers use the selected physical
+  # backend. Ignore only pinned Redis endpoints during a Valkey cutover; all
+  # other customer Helm overrides continue working unchanged.
+  valkey_cutover = var.valkey_enabled && (var.valkey_migration || !var.redis_enabled)
+  selected_helm_vars = local.valkey_cutover ? merge(local.helm_vars, {
+    global = merge(local.helm_vars.global, {
+      env = {
+        for key, value in local.helm_vars.global.env :
+        key => value
+        if !contains(["REDIS_HOST", "REDIS_PORT", "REDIS_URL", "REDIS_CLUSTER", "REDIS_SSL"], key) &&
+        !can(regex("^(CACHE|QUEUE|SYSTEM|WORKFLOW|MANAGED_SYNC)_REDIS_(URL|TLS_ENABLED|CLUSTER_ENABLED)$", key))
+      }
+    })
+  }) : local.helm_vars
+
   default_redis_cluster = try(
-    local.helm_vars.global.env["REDIS_CLUSTER"],
+    local.selected_helm_vars.global.env["REDIS_CLUSTER"],
     local.infra_vars.redis.value.cache.cluster,
     "false"
   )
 
   default_redis_ssl = try(
-    local.helm_vars.global.env["REDIS_SSL"],
+    local.selected_helm_vars.global.env["REDIS_SSL"],
     local.infra_vars.redis.value.cache.ssl,
     "false"
   )
 
   default_redis_url = try(
-    local.helm_vars.global.env["REDIS_URL"],
-    "${local.helm_vars.global.env["REDIS_HOST"]}:${local.helm_vars.global.env["REDIS_PORT"]}",
+    local.selected_helm_vars.global.env["REDIS_URL"],
+    "${local.selected_helm_vars.global.env["REDIS_HOST"]}:${local.selected_helm_vars.global.env["REDIS_PORT"]}",
     "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
   )
 
@@ -1196,9 +1235,9 @@ locals {
           SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
           SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
           SYSTEM_REDIS_URL               = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
-          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
-          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
-          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
+          WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
+          WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
+          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}", "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
 
           # Cloud Storage configurations (S3 auth via EKS Pod Identity; no static access keys)
           CLOUD_STORAGE_PUBLIC_BUCKET = try(local.storage_output.public_bucket, "${local.workspace}-cdn")
@@ -1253,7 +1292,7 @@ locals {
           MONITOR_REDIS_INSIGHT_HOST               = "http://redis-insight"
           MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
           }, {
-          for key, value in local.helm_vars.global.env :
+          for key, value in local.selected_helm_vars.global.env :
           key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
         var.managed_sync_enabled ? module.managed_sync_config[0].config : {},

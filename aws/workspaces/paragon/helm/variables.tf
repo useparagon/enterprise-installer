@@ -1,3 +1,15 @@
+variable "valkey_enabled" {
+  description = "Synchronize independent physical Redis and Valkey endpoint Secrets to Kubernetes."
+  type        = bool
+  default     = false
+}
+
+variable "redis_enabled" {
+  description = "Mirrors infra's redis_enabled. False stops syncing the physical Redis Secret: Redis has been permanently decommissioned."
+  type        = bool
+  default     = true
+}
+
 variable "aws_region" {
   description = "The AWS region resources are created in."
   type        = string

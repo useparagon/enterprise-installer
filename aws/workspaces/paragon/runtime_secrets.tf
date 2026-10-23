@@ -41,11 +41,38 @@ resource "aws_secretsmanager_secret_version" "env_paragon_overlay" {
   # helm-mounted customer secrets last so LICENSE and other chart secretKeys from
   # paragon-values.yaml can replace stale values (e.g. prepare.sh placeholder).
   secret_string = jsonencode(merge(
+    # Keep the original Redis delivery contract for both backends. Terraform
+    # selects the physical endpoint before building helm_secret_values; the
+    # existing paragon-secrets consumer receives the selected values.
     jsondecode(data.aws_secretsmanager_secret_version.env.secret_string),
     local.helm_secret_values
   ))
 
   lifecycle {
+    precondition {
+      condition = !var.valkey_migration || alltrue([
+        for role in local.active_redis_required_roles :
+        try(local.active_redis_connections[role].host != "" && local.active_redis_connections[role].port > 0, false)
+      ])
+      error_message = "Valkey cutover requires a valid physical Valkey endpoint for every active role, including shared Managed Sync."
+    }
+
+    precondition {
+      # Migration pairs are physical instances, not logical application roles.
+      # Workflow aliases Cache and Agent OS has its own independent Valkey.
+      condition = !var.valkey_migration || !var.redis_enabled || (
+        length(setsubtract(
+          toset([for role in keys(local.physical_redis_connections) : role if contains(["cache", "queue", "system", "managed_sync"], role)]),
+          toset(keys(local.physical_valkey_connections))
+        )) == 0 &&
+        length(setsubtract(
+          toset(keys(local.physical_valkey_connections)),
+          toset([for role in keys(local.physical_redis_connections) : role if contains(["cache", "queue", "system", "managed_sync"], role)])
+        )) == 0
+      )
+      error_message = "Physical Redis and Valkey migration pairs must match one-to-one before cutover."
+    }
+
     precondition {
       condition     = length(local.chart_service_inputs) > 0
       error_message = "No charts/**/files/service-inputs.json under ${path.root}/charts. Run ./prepare.sh -p aws before apply so secretKeys/envKeys can be classified."

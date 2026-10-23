@@ -17,7 +17,7 @@ output "valkey" {
 }
 
 output "elasticache" {
-  value = var.elasticache_multiple_instances ? {
+  value = !var.redis_enabled ? {} : var.elasticache_multiple_instances ? {
     for key, value in local.redis_instances :
     key => value.cluster == true ? {
       host    = aws_elasticache_replication_group.redis[key == "cache" ? 0 : 1].configuration_endpoint_address

@@ -6,7 +6,7 @@
 
 locals {
   argocd_postgres = module.postgres.rds
-  argocd_redis    = module.redis.elasticache
+  argocd_redis    = local.redis_connections
   argocd_storage  = module.storage.s3
 
   argocd_cloud_storage_type = "S3"
@@ -26,7 +26,7 @@ locals {
 
   argocd_redis_endpoint = {
     for role, source in local.argocd_redis_role_source :
-    role => try(local.argocd_redis[source], local.argocd_redis_cache, null)
+    role => try(local.argocd_redis[role], local.argocd_redis[source], local.argocd_redis_cache, null)
   }
 
   argocd_redis_cluster_enabled = {

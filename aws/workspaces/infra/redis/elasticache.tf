@@ -17,12 +17,13 @@ locals {
 }
 
 resource "aws_elasticache_subnet_group" "main" {
+  count      = var.redis_enabled ? 1 : 0
   name       = "${var.workspace}-elasticache-subnet"
   subnet_ids = local.cache_subnet_ids
 }
 
 resource "aws_elasticache_parameter_group" "redis" {
-  for_each = toset(["cluster", "standalone"])
+  for_each = var.redis_enabled ? toset(["cluster", "standalone"]) : toset([])
 
   name   = "${var.workspace}-redis-${each.key}${substr(local.redis_version, 0, 1)}"
   family = "redis${local.redis_version}"
@@ -31,6 +32,14 @@ resource "aws_elasticache_parameter_group" "redis" {
   parameter {
     name  = "maxmemory-policy"
     value = "allkeys-lru"
+  }
+
+  dynamic "parameter" {
+    for_each = contains(var.redis_kea_parameter_groups, each.key) ? [1] : []
+    content {
+      name  = "notify-keyspace-events"
+      value = "KEA"
+    }
   }
 
   # how often, in seconds, clients are pinged to ensure they're still connected
@@ -61,7 +70,7 @@ resource "aws_elasticache_parameter_group" "redis" {
 }
 
 resource "aws_elasticache_replication_group" "redis" {
-  count = var.elasticache_multiple_instances ? (var.managed_sync_enabled ? 2 : 1) : 0
+  count = var.redis_enabled && var.elasticache_multiple_instances ? (var.managed_sync_enabled ? 2 : 1) : 0
 
   replication_group_id = "${var.workspace}-redis-${count.index == 0 ? "cache" : "sync"}"
   description          = "Redis cluster for caching & workflows."
@@ -75,7 +84,7 @@ resource "aws_elasticache_replication_group" "redis" {
   snapshot_window          = "12:00-13:00"
   maintenance_window       = "tue:16:00-tue:17:00"
 
-  subnet_group_name          = aws_elasticache_subnet_group.main.name
+  subnet_group_name          = aws_elasticache_subnet_group.main[0].name
   security_group_ids         = [aws_security_group.elasticache.id]
   multi_az_enabled           = var.elasticache_multi_az
   automatic_failover_enabled = true
@@ -88,14 +97,14 @@ resource "aws_elasticache_replication_group" "redis" {
   }
 
   log_delivery_configuration {
-    destination      = aws_cloudwatch_log_group.redis.name
+    destination      = aws_cloudwatch_log_group.redis[0].name
     destination_type = "cloudwatch-logs"
     log_format       = "json"
     log_type         = "slow-log"
   }
 
   log_delivery_configuration {
-    destination      = aws_cloudwatch_log_group.redis.name
+    destination      = aws_cloudwatch_log_group.redis[0].name
     destination_type = "cloudwatch-logs"
     log_format       = "json"
     log_type         = "engine-log"
@@ -108,7 +117,7 @@ resource "aws_elasticache_replication_group" "redis" {
 }
 
 resource "aws_elasticache_cluster" "redis" {
-  for_each = local.redis_instances_standalone
+  for_each = var.redis_enabled ? local.redis_instances_standalone : {}
 
   cluster_id           = var.elasticache_multiple_instances ? "${var.workspace}-redis-${each.key}" : "${var.workspace}-redis"
   engine               = "redis"
@@ -122,18 +131,18 @@ resource "aws_elasticache_cluster" "redis" {
   snapshot_retention_limit = 5
   snapshot_window          = "12:00-13:00"
   maintenance_window       = "tue:16:00-tue:17:00"
-  subnet_group_name        = aws_elasticache_subnet_group.main.name
+  subnet_group_name        = aws_elasticache_subnet_group.main[0].name
   security_group_ids       = [aws_security_group.elasticache.id]
 
   log_delivery_configuration {
-    destination      = aws_cloudwatch_log_group.redis.name
+    destination      = aws_cloudwatch_log_group.redis[0].name
     destination_type = "cloudwatch-logs"
     log_format       = "json"
     log_type         = "slow-log"
   }
 
   log_delivery_configuration {
-    destination      = aws_cloudwatch_log_group.redis.name
+    destination      = aws_cloudwatch_log_group.redis[0].name
     destination_type = "cloudwatch-logs"
     log_format       = "json"
     log_type         = "engine-log"
@@ -146,12 +155,13 @@ resource "aws_elasticache_cluster" "redis" {
 }
 
 resource "aws_cloudwatch_log_group" "redis" {
+  count             = var.redis_enabled ? 1 : 0
   name_prefix       = "${var.workspace}-redis"
   retention_in_days = 365
 }
 
 resource "aws_appautoscaling_target" "cache" {
-  for_each = local.cache_autoscaling_targets
+  for_each = var.redis_enabled ? local.cache_autoscaling_targets : {}
 
   resource_id        = each.value.resource_id
   service_namespace  = "elasticache"
@@ -161,7 +171,7 @@ resource "aws_appautoscaling_target" "cache" {
 }
 
 resource "aws_appautoscaling_policy" "cache_memory" {
-  for_each = local.cache_autoscaling_targets
+  for_each = var.redis_enabled ? local.cache_autoscaling_targets : {}
 
   resource_id        = aws_appautoscaling_target.cache[each.key].resource_id
   service_namespace  = aws_appautoscaling_target.cache[each.key].service_namespace
@@ -182,7 +192,7 @@ resource "aws_appautoscaling_policy" "cache_memory" {
 }
 
 resource "aws_appautoscaling_policy" "cache_cpu" {
-  for_each = local.cache_autoscaling_targets
+  for_each = var.redis_enabled ? local.cache_autoscaling_targets : {}
 
   resource_id        = aws_appautoscaling_target.cache[each.key].resource_id
   service_namespace  = aws_appautoscaling_target.cache[each.key].service_namespace
@@ -315,6 +325,7 @@ resource "aws_elasticache_replication_group" "valkey" {
   port                 = 6379
   parameter_group_name = aws_elasticache_parameter_group.valkey[each.key].name
 
+  snapshot_name            = each.value.snapshot_name
   snapshot_retention_limit = each.value.snapshot_retention_days
   snapshot_window          = "12:00-13:00"
   maintenance_window       = "tue:16:00-tue:17:00"
@@ -324,13 +335,13 @@ resource "aws_elasticache_replication_group" "valkey" {
   multi_az_enabled           = each.value.multi_az
   automatic_failover_enabled = each.value.multi_az
 
-  num_node_groups         = each.value.cluster_enabled ? 1 : null
-  replicas_per_node_group = each.value.cluster_enabled ? (each.value.multi_az ? 1 : 0) : null
+  num_node_groups         = each.value.cluster_enabled ? coalesce(each.value.num_node_groups, 1) : null
+  replicas_per_node_group = each.value.cluster_enabled ? coalesce(each.value.replicas_per_node_group, each.value.multi_az ? 1 : 0) : null
   num_cache_clusters      = each.value.cluster_enabled ? null : (each.value.multi_az ? 2 : 1)
 
   transit_encryption_enabled = each.value.tls_enabled
   at_rest_encryption_enabled = true
-  kms_key_id                 = var.valkey_kms_key_arn
+  kms_key_id                 = coalesce(each.value.kms_key_arn, var.valkey_kms_key_arn)
   auth_token                 = each.value.tls_enabled ? random_password.valkey_auth[each.key].result : null
 
   log_delivery_configuration {
@@ -359,5 +370,16 @@ resource "aws_cloudwatch_log_group" "valkey" {
 
   name              = "/aws/elasticache/${local.valkey_names[each.key]}-valkey"
   retention_in_days = each.value.log_retention_days
-  kms_key_id        = var.valkey_kms_key_arn
+  kms_key_id        = coalesce(each.value.kms_key_arn, var.valkey_kms_key_arn)
+}
+
+# Preserve addresses for existing single-instance Redis resources.
+moved {
+  from = aws_elasticache_subnet_group.main
+  to   = aws_elasticache_subnet_group.main[0]
+}
+
+moved {
+  from = aws_cloudwatch_log_group.redis
+  to   = aws_cloudwatch_log_group.redis[0]
 }
