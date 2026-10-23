@@ -8,6 +8,12 @@ variable "cluster_host" {
   type        = string
 }
 
+variable "restrict_public_exposure" {
+  description = "When true, force-enables the health-checker subchart even if customer values disable it."
+  type        = bool
+  default     = false
+}
+
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync (deploy managed-sync Helm chart)."
   type        = bool
@@ -20,6 +26,48 @@ variable "managed_sync_version" {
   default     = "0.0.131"
 }
 
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts."
+  type        = string
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "The published Agent OS Helm chart version."
+  type        = string
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL for Agent OS."
+  type        = string
+}
+
+variable "agent_os_helm_values" {
+  description = "Installer chart overrides."
+  type        = any
+}
+
+variable "agent_os_file_values" {
+  description = "Chart overrides from agentOs.values in the customer's values.yaml."
+  type        = any
+}
+
+variable "agent_os_service_account" {
+  description = "GCP service account email for Agent OS Workload Identity. Null when Agent OS is disabled."
+  type        = string
+  default     = null
+}
+
 variable "region" {
   description = "The region where to host Google Cloud Organization resources."
   type        = string
@@ -27,11 +75,6 @@ variable "region" {
 
 variable "cluster_name" {
   description = "The name of the EKS cluster."
-  type        = string
-}
-
-variable "docker_registry_server" {
-  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
 }
 
@@ -51,25 +94,6 @@ variable "create_docker_pull_secret" {
   description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
   type        = bool
   default     = true
-}
-
-variable "docker_username" {
-  description = "Docker username to pull images."
-  type        = string
-  default     = null
-}
-
-variable "docker_password" {
-  description = "Docker password to pull images."
-  type        = string
-  default     = null
-  sensitive   = true
-}
-
-variable "docker_email" {
-  description = "Docker email to pull images."
-  type        = string
-  default     = null
 }
 
 variable "domain" {
@@ -95,12 +119,6 @@ variable "eso_iam_ready" {
 variable "gcp_project_id" {
   description = "GCP project ID for Secret Manager (ClusterSecretStore provider.gcpsm.projectID)."
   type        = string
-}
-
-variable "gcp_creds" {
-  description = "GCP credentials for logging bucket access. Null when OpenObserve uses Workload Identity instead of HMAC-style GCS credentials."
-  type        = string
-  default     = null
 }
 
 variable "openobserve_email" {
@@ -234,13 +252,6 @@ variable "redis_ca_cert_secret_name" {
   description = "Secret Manager secret name for the Redis CA certificate bundle."
   type        = string
   default     = null
-}
-
-variable "infra_vars" {
-  description = "Infrastructure output variables (from infra workspace)."
-  type        = any
-  default     = {}
-  sensitive   = true
 }
 
 variable "waf_security_policy_name" {

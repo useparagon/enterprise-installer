@@ -1,5 +1,6 @@
 variable "resource_group" {
   description = "The resource group to associate resources."
+  type        = any
 }
 
 variable "virtual_network_subnet_ids" {
@@ -19,6 +20,11 @@ variable "tags" {
 
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync."
+  type        = bool
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS blob container."
   type        = bool
 }
 

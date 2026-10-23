@@ -17,7 +17,12 @@ locals {
           }
         }
       ),
-      try(nonsensitive(var.helm_values.subchart), {})
+      try(nonsensitive(var.helm_values.subchart), {}),
+      var.restrict_public_exposure ? {
+        health-checker = {
+          enabled = true
+        }
+      } : {}
     )
   })
 
@@ -33,13 +38,8 @@ locals {
           } : {}
         )
       },
-      # env.standard only emits keys listed in service-inputs envKeys or Values.envKeys.
-      var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
-        envKeys = distinct(concat(
-          try(nonsensitive(var.helm_values)[microservice_name].envKeys, []),
-          ["HTTP_PATH_PREFIX"]
-        ))
-      } : {}
+      # HTTP_PATH_PREFIX is appended by env.standard without replacing chart envKeys.
+      {}
     )
   })
 
@@ -92,6 +92,28 @@ locals {
       }
       tls_secret = "${monitor_name}-secret"
     }
+  })
+
+  # Chart defaults leave ingress.enabled=true. Anything not on the load balancer gets no Ingress:
+  # private_services, restrict_public_exposure exclusions, and services with no public URL.
+  # ingress_scheme=internal is a different case. Those services stay in public_* and keep an
+  # Ingress, with scheme=internal and class nginx.
+  unexposed_microservice_values = yamlencode({
+    for microservice_name, microservice_config in var.microservices : microservice_name => {
+      ingress = {
+        enabled = false
+      }
+    }
+    if !contains(keys(var.public_microservices), microservice_name)
+  })
+
+  unexposed_monitor_values = yamlencode({
+    for monitor_name, monitor_config in var.monitors : monitor_name => {
+      ingress = {
+        enabled = false
+      }
+    }
+    if !contains(keys(var.public_monitors), monitor_name)
   })
 
   flipt_values = yamlencode({
@@ -184,9 +206,14 @@ locals {
             try(nonsensitive(var.helm_values).global.podAnnotations, {}),
             { "reloader.stakater.com/auto" = "true" }
           )
-          env = {
-            HOST_ENV = "AZURE_K8"
-          }
+          env = merge(
+            { HOST_ENV = "AZURE_K8" },
+            {
+              for key, value in try(nonsensitive(var.helm_values).global.env, {}) :
+              key => value
+              if strcontains(key, "SYNC") && value != null
+            },
+          )
         },
         local.docker_pull_secret_global_values
       )
@@ -250,11 +277,13 @@ resource "helm_release" "paragon_on_prem" {
     local.flipt_values,
     local.microservice_values,
     local.public_microservice_values,
+    local.unexposed_microservice_values,
     local.secret_hash
   ]
 
   depends_on = [
     helm_release.ingress,
+    terraform_data.knative_serving_ready,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
     kubernetes_config_map.feature_flag_content,
@@ -328,6 +357,7 @@ resource "helm_release" "paragon_monitoring" {
     local.global_values,
     local.monitor_values,
     local.public_monitor_values,
+    local.unexposed_monitor_values,
     local.secret_hash
   ]
 

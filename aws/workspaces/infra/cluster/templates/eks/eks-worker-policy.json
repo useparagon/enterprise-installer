@@ -72,6 +72,7 @@
         "elasticloadbalancing:RemoveListenerCertificates",
         "elasticloadbalancing:RemoveTags",
         "elasticloadbalancing:SetIpAddressType",
+        "elasticloadbalancing:SetRulePriorities",
         "elasticloadbalancing:SetSecurityGroups",
         "elasticloadbalancing:SetSubnets",
         "elasticloadbalancing:SetWebAcl"

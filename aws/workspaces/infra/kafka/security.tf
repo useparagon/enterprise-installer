@@ -8,7 +8,7 @@ resource "aws_security_group" "msk" {
     from_port   = 80
     to_port     = 9096
     protocol    = "tcp"
-    cidr_blocks = var.private_subnet.*.cidr_block
+    cidr_blocks = var.private_subnet[*].cidr_block
   }
 
   egress {

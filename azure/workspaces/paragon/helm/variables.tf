@@ -1,5 +1,6 @@
 variable "resource_group" {
   description = "The resource group to associate resources."
+  type        = any
 }
 
 variable "workspace" {
@@ -9,11 +10,6 @@ variable "workspace" {
 
 variable "cluster_name" {
   description = "The name of the EKS cluster."
-  type        = string
-}
-
-variable "docker_registry_server" {
-  description = "Container registry server for image pull credentials (e.g. docker.io or artifactory.example.com). Must match the host portion of global.imageRegistry when using a private registry."
   type        = string
 }
 
@@ -33,25 +29,6 @@ variable "create_docker_pull_secret" {
   description = "Create the registry pull secret in the paragon namespace. Set false when the customer pre-provisions the secret and sets global.imagePullSecrets in helm_values."
   type        = bool
   default     = true
-}
-
-variable "docker_username" {
-  description = "Docker username to pull images."
-  type        = string
-  default     = null
-}
-
-variable "docker_password" {
-  description = "Docker password to pull images."
-  type        = string
-  default     = null
-  sensitive   = true
-}
-
-variable "docker_email" {
-  description = "Docker email to pull images."
-  type        = string
-  default     = null
 }
 
 variable "env_secret_name" {
@@ -176,6 +153,15 @@ variable "public_monitors" {
   }))
 }
 
+variable "public_services" {
+  description = "Hosts on the shared front door (public microservices, monitors, and managed-sync when restrict drops api-sync from public_microservices)."
+  type = map(object({
+    port             = optional(number)
+    healthcheck_path = optional(string)
+    public_url       = string
+  }))
+}
+
 variable "ingress_scheme" {
   description = "Whether the load balancer is 'internet-facing' (public) or 'internal' (private)"
   type        = string
@@ -217,22 +203,15 @@ variable "agc_subnet_cidr" {
   default     = null
 }
 
-variable "azure_subscription_id" {
-  description = "Azure subscription ID for cert-manager azureDNS solver."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "domain" {
-  description = "Root domain for wildcard certificate."
-  type        = string
-  default     = null
-}
-
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
+}
+
+variable "restrict_public_exposure" {
+  description = "When true, force-enables the health-checker subchart even if customer values disable it."
+  type        = bool
+  default     = false
 }
 
 variable "managed_sync_enabled" {
@@ -243,6 +222,59 @@ variable "managed_sync_enabled" {
 variable "managed_sync_version" {
   description = "The version of the Managed Sync helm chart to install."
   type        = string
+}
+
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts."
+  type        = string
+}
+
+variable "domain" {
+  description = "Enterprise deployment domain (agentos.<domain> public hostname)."
+  type        = string
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled."
+  type        = bool
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "The published Agent OS chart version."
+  type        = string
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL for Agent OS."
+  type        = string
+}
+
+variable "agent_os_helm_values" {
+  description = "Installer chart overrides."
+  type        = any
+}
+
+variable "agent_os_file_values" {
+  description = "Chart overrides from the agentOs.values section of the customer's values.yaml."
+  type        = any
+}
+
+# Agent OS workload identity is supplied by the parent workspace.
+variable "agent_os_workload_identity_client_id" {
+  description = "Client ID of the Agent OS user-assigned workload identity."
+  type        = string
+  default     = null
+}
+
+variable "agent_os_workload_identity_ready" {
+  description = "Opaque revision proving the Agent OS federation and blob role assignment exist."
+  type        = string
+  default     = null
 }
 
 variable "key_vault_name" {

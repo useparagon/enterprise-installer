@@ -7,6 +7,17 @@ Call with: include "ingress.standard" $
 {{- $name := .Chart.Name -}}
 {{- $fullName := include (printf "%s.fullname" $name) . -}}
 {{- $svcPort := .Values.service.port -}}
+{{- /* Empty className must match the controller that owns this cloud. nginx on AWS conflicts with the alb annotation and fails the release. Internal GCP uses gce-internal; internet-facing GCP uses gce. */ -}}
+{{- $ingressClass := .Values.ingress.className -}}
+{{- if not $ingressClass -}}
+{{- if eq .Values.global.env.HOST_ENV "AWS_K8" -}}
+{{- $ingressClass = "alb" -}}
+{{- else if eq .Values.global.env.HOST_ENV "GCP_K8" -}}
+{{- $ingressClass = ternary "gce-internal" "gce" (eq (default "" .Values.ingress.scheme) "internal") -}}
+{{- else -}}
+{{- $ingressClass = "nginx" -}}
+{{- end -}}
+{{- end -}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -58,7 +69,7 @@ metadata:
     service.beta.kubernetes.io/azure-load-balancer-internal: "true"
     {{- end }}
     {{- else if eq .Values.global.env.HOST_ENV "GCP_K8" }}
-    kubernetes.io/ingress.class: {{ .Values.ingress.className | default "gce" }}
+    kubernetes.io/ingress.class: {{ $ingressClass }}
     ingress.gcp.kubernetes.io/pre-shared-cert: {{ .Values.ingress.certificate }}
     ingress.kubernetes.io/healthcheck-path: {{ .Values.ingress.healthcheck_path | default "/healthz" }}
     kubernetes.io/ingress.allow-http: "true"
@@ -73,7 +84,7 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     {{- end }}
 spec:
-  ingressClassName: {{ .Values.ingress.className | default "nginx" }}
+  ingressClassName: {{ $ingressClass }}
   {{- if or (eq .Values.global.env.HOST_ENV "AZURE_K8") (not (or (eq .Values.global.env.HOST_ENV "AWS_K8") (eq .Values.global.env.HOST_ENV "GCP_K8"))) }}
   tls:
     - hosts:

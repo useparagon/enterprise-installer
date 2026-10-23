@@ -1,6 +1,3 @@
-data "azurerm_resource_group" "this" {
-  name = var.resource_group_name
-}
 
 locals {
   waf_policy_name = "${var.workspace}-waf"

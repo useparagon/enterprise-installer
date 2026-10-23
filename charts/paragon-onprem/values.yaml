@@ -16,8 +16,10 @@ subchart:
   hades:
     enabled: true
   health-checker:
-    enabled: false
+    enabled: true
   hermes:
+    enabled: true
+  ocs-code-runner:
     enabled: true
   passport:
     enabled: true
@@ -71,4 +73,13 @@ global:
     repository: alpine/kubectl
     tag: "1.36.2"
   namespace: paragon
+  # Custom CA bundle for Redis and/or Postgres TLS (see charts/values.placeholder.yaml).
+  # caCerts:
+  #   enabled: true
+  #   sources:
+  #     - configMapName: postgres-ca
+  #       key: ca.pem
+  # redisCaCert:
+  #   enabled: true
+  #   secretName: redis-ca-cert
   env: {}

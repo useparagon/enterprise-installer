@@ -12,12 +12,14 @@ locals {
   subchart_enabled = merge(
     { for name in keys(var.microservices) : name => { enabled = true } },
     try(nonsensitive(var.helm_values.subchart), {}),
+    var.restrict_public_exposure ? { health-checker = { enabled = true } } : {},
   )
 
   # Hostnames that need Certificate CRs when nginx Ingress is gone (AGC direct).
   # Path-routed services share path-routing.<domain> on the hostless listener —
   # do not issue unused per-service certs that AGC will never present.
   agc_direct_certificate_hosts = merge(
+    { for name, cfg in var.public_services : name => replace(replace(cfg.public_url, "https://", ""), "http://", "") if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true) && !contains(keys(var.public_microservices), name) },
     {
       for name, cfg in var.public_microservices :
       name => cfg.origin_host
@@ -39,7 +41,7 @@ locals {
 resource "azurerm_key_vault_access_policy" "aks_access_to_kv" {
   key_vault_id = data.azurerm_key_vault.paragon.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = data.azurerm_kubernetes_cluster.cluster.kubelet_identity.0.object_id
+  object_id    = data.azurerm_kubernetes_cluster.cluster.kubelet_identity[0].object_id
 
   secret_permissions = [
     "Get",
@@ -54,9 +56,11 @@ resource "helm_release" "cert_manager" {
 
   force_update     = false
   create_namespace = false
+  timeout          = 900
+  wait             = true
 
   set {
-    name  = "installCRDs"
+    name  = "crds.enabled"
     value = true
   }
 
@@ -83,6 +87,8 @@ resource "azurerm_public_ip" "ingress" {
 }
 
 resource "helm_release" "ingress" {
+  count = var.agc_direct ? 0 : 1
+
   name       = "ingress-nginx"
   namespace  = kubernetes_namespace.paragon.id
   repository = "https://kubernetes.github.io/ingress-nginx"

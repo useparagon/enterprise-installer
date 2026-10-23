@@ -48,11 +48,6 @@ variable "namespace" {
   type        = string
 }
 
-variable "domain" {
-  description = "Root domain used for the HTTPS listener hostname (*.domain)."
-  type        = string
-}
-
 variable "nginx_service_name" {
   description = "ingress-nginx controller Service name used as the AGC backend during transition."
   type        = string
@@ -69,9 +64,14 @@ variable "public_services" {
   description = "Public services for direct routing, normalized to origin host and optional path prefix."
   type = map(object({
     host             = string
-    path_prefix      = string
-    healthcheck_path = string
+    path_prefix      = optional(string, "")
+    healthcheck_path = optional(string, "/healthz")
     port             = number
+    routes = optional(list(object({
+      path    = string
+      service = string
+      port    = number
+    })), [])
   }))
   default = {}
 }

@@ -96,7 +96,7 @@ variable "excluded_microservices" {
 }
 
 variable "private_services" {
-  description = "Services that should not be publicly exposed (filtered from public_microservices and public_monitors)."
+  description = "Services that get no Ingress. Removed from public_microservices and public_monitors on both internet-facing and internal load balancers. ingress_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict_public_exposure is true, allowlisted services can still be listed here."
   type        = list(string)
   default     = []
 }
@@ -411,8 +411,8 @@ variable "uptime_company" {
   default     = null
 }
 
-variable "health_checker_enabled" {
-  description = "Specifies that health checker is enabled."
+variable "restrict_public_exposure" {
+  description = "When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private_services to further restrict allowlisted endpoints."
   type        = bool
   default     = false
 }
@@ -442,25 +442,6 @@ variable "hoop_api_key" {
   default     = null
 }
 
-variable "hoop_slack_bot_token" {
-  description = "Slack bot token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "hoop_slack_app_token" {
-  description = "Slack app token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "hoop_slack_channel_ids" {
-  description = "Slack channel IDs to notify for connections that require reviews."
-  type        = list(string)
-  default     = []
-}
 
 variable "hoop_all_access_groups" {
   description = "Additional access-control groups allowed when customer_facing is false."
@@ -526,13 +507,7 @@ variable "hoop_image_repository" {
 variable "hoop_image_tag" {
   description = "Container image tag for the Hoop agent."
   type        = string
-  default     = "1.2.1"
-}
-
-variable "hoop_grafana_connection" {
-  description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
-  type        = bool
-  default     = false
+  default     = "1.2.2"
 }
 
 variable "hoop_k8s_connections" {
@@ -624,6 +599,73 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "paragon_helm_repository" {
+  description = "Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository."
+  type        = string
+  default     = "https://helm.useparagon.com"
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = !var.agent_os_enabled || try(length(trimspace(var.agent_os_version)) > 0, false)
+    error_message = "Set agent_os_version to a published chart containing Enterprise defaults when enabling Agent OS."
+  }
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL for the independent Agent OS release."
+  type        = string
+  default     = "https://helm.useparagon.com"
+}
+
+variable "agent_os_helm_values" {
+  description = "Optional Agent OS chart overrides layered after cloud integration and before agentOs.values from values.yaml."
+  type        = any
+  default     = {}
+}
+
+variable "agent_os_app_config" {
+  description = "Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_admin_config" {
+  description = "Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_vendor_config" {
+  description = "Optional first-apply seed for the operator-owned Agent OS vendor secret. After create, Terraform ignores changes so console or out-of-band keys are preserved."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "platform_version" {
+  description = "Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML."
+  type        = string
+  default     = null
+}
+
 locals {
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
   hash                  = substr(sha256(var.azure_subscription_id), 0, 8)
@@ -677,7 +719,19 @@ locals {
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
   helm_yaml_path = abspath(var.helm_yaml_path)
-  helm_vars      = yamldecode(fileexists(local.helm_yaml_path) && var.helm_yaml == null ? file(local.helm_yaml_path) : var.helm_yaml)
+  # Prefer TF_VAR_helm_yaml, then the values file, else empty global.env (CI / fresh checkout).
+  helm_vars = yamldecode(
+    var.helm_yaml != null ? var.helm_yaml : (
+      fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
+    )
+  )
+
+  installer_chart_version = trimspace(file("${path.module}/../../../scripts/installer-chart-version.txt"))
+  effective_platform_version = coalesce(
+    var.platform_version,
+    try(local.helm_vars.global.env.VERSION, null),
+    "",
+  )
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "AZURE")
 
@@ -716,6 +770,11 @@ locals {
       "healthcheck_path" = "/health"
       "port"             = try(local.helm_vars.global.env["FLIPT_PORT"], 1722)
       "public_url"       = try(local.helm_vars.global.env["FLIPT_PUBLIC_URL"], null)
+    }
+    "ocs-code-runner" = {
+      "healthcheck_path" = "/healthz"
+      "port"             = 8080
+      "public_url"       = null
     }
     "hades" = {
       "healthcheck_path" = "/healthz"
@@ -832,7 +891,10 @@ locals {
     }
   }
 
-  all_microservices = merge(local.monorepo_microservices, var.managed_sync_enabled ? local.managed_sync_microservices : {})
+  all_microservices = merge(
+    local.monorepo_microservices,
+    var.managed_sync_enabled ? local.managed_sync_microservices : {},
+  )
 
   microservices = {
     for microservice, config in local.all_microservices :
@@ -840,12 +902,26 @@ locals {
     if !contains(var.excluded_microservices, microservice)
   }
 
+  restrict_public_exposure = var.restrict_public_exposure
+
+  restricted_public_microservice_allowlist = toset([
+    "api-triggerkit",
+    "connect",
+    "dashboard",
+    "health-checker",
+    "hermes",
+    "worker-proxy",
+    "zeus",
+  ])
+
   path_routing_origin_host = "path-routing.${var.domain}"
 
   public_microservices_base = {
     for microservice, config in local.microservices :
     microservice => config
-    if lookup(config, "public_url", null) != null && !contains(var.private_services, microservice)
+    if lookup(config, "public_url", null) != null && lookup(config, "public_url", "") != "" && !contains(var.private_services, microservice) && (
+      !local.restrict_public_exposure || contains(local.restricted_public_microservice_allowlist, microservice)
+    )
   }
 
   path_routed_public_prefixes = {
@@ -894,10 +970,14 @@ locals {
     })
   }
 
+  uptime_excluded_microservices = toset([
+    "cache-replay",
+  ])
+
   uptime_services = {
     for microservice, config in local.public_microservices :
     microservice => config
-    if var.ingress_scheme != "internal" && (microservice == "health-checker" || !var.health_checker_enabled)
+    if var.ingress_scheme != "internal" && !contains(local.uptime_excluded_microservices, microservice)
   }
 
   monitors = {
@@ -947,13 +1027,37 @@ locals {
     }
   }
 
-  public_monitors = var.monitors_enabled ? {
+  # Internet-facing monitor Ingress (Grafana when it has a public_url). Restrict mode keeps monitors internal (Hoop).
+  public_monitors = var.monitors_enabled && !local.restrict_public_exposure ? {
     for monitor, config in local.monitors :
     monitor => config
-    if lookup(config, "public_url", null) != null && !contains(var.private_services, monitor)
+    if lookup(config, "public_url", null) != null && lookup(config, "public_url", "") != "" && !contains(var.private_services, monitor)
   } : {}
 
-  public_services = merge(local.public_microservices, local.public_monitors)
+  # Managed Sync uses sync.${domain} via its Helm ingress; keep DNS/AGC listeners when
+  # restrict_public_exposure omits api-sync from public_microservices (key api-sync → api-sync-secret).
+  managed_sync_public_dns = var.managed_sync_enabled && contains(keys(local.microservices), "api-sync") && !contains(keys(local.public_microservices), "api-sync") && !contains(var.private_services, "api-sync") ? {
+    "api-sync" = local.microservices["api-sync"]
+  } : {}
+
+  agent_os_public_url = try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
+  agent_os_port       = try(tonumber(local.helm_vars.global.env["AGENT_OS_PORT"]), 3000)
+  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+
+  agent_os_public_dns = var.agent_os_enabled ? {
+    agentos = {
+      healthcheck_path = "/readyz"
+      port             = local.agent_os_port
+      public_url       = local.agent_os_public_url
+    }
+  } : {}
+
+  public_services = merge(
+    local.public_microservices,
+    local.public_monitors,
+    local.managed_sync_public_dns,
+    local.agent_os_public_dns,
+  )
 
   helm_keys_to_remove = [
     "POSTGRES_HOST",
@@ -1031,6 +1135,7 @@ locals {
         ORGANIZATION           = var.organization
         PARAGON_DOMAIN         = var.domain
         PLATFORM_ENV           = "enterprise"
+        VERSION                = local.effective_platform_version
 
         # Service ports
         ACCOUNT_PORT            = try(local.microservices.account.port, null)
@@ -1194,6 +1299,11 @@ locals {
           local.cloud_storage_type == "AZURE" ? "https://${local.storage_output.root_user}.blob.core.windows.net" : null,
         )
 
+        # OCS knative code-runner (on-prem substitute for WORKER_SHARED_OCS_LAMBDA_NAME).
+        # Pods receive this only when service-inputs.json lists the key.
+        # Storage offload uses CLOUD_STORAGE_* (same contract as platform createOcsRuntime).
+        WORKER_SHARED_OCS_KNATIVE_SERVICE_URL = try(local.helm_vars.global.env["WORKER_SHARED_OCS_KNATIVE_SERVICE_URL"], "http://ocs-code-runner")
+
         # Monitor configurations
         MONITOR_BULL_EXPORTER_HOST               = "http://bull-exporter"
         MONITOR_BULL_EXPORTER_PORT               = try(local.monitors["bull-exporter"].port, null)
@@ -1228,9 +1338,10 @@ locals {
         MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
         }, {
         for key, value in local.helm_vars.global.env :
-        key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+        key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
-        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {},
+        { VERSION = local.effective_platform_version },
       )
     })
   })
@@ -1260,7 +1371,12 @@ locals {
     key => tostring(value)
     if value != null && tostring(value) != "" && local.helm_is_secret_env_key[key]
   }
-  helm_values_public = merge(local.helm_values, {
+  # agentOs is installer-only metadata for a separate Helm release. It must
+  # not be forwarded to the existing Paragon/Managed Sync charts.
+  helm_values_public = merge({
+    for key, value in local.helm_values : key => value
+    if key != "agentOs"
+    }, {
     global = merge(local.helm_values.global, {
       env = {
         for key, value in local.helm_values.global.env :

@@ -44,12 +44,8 @@ module "helm" {
   cluster_host                           = local.gke_connect_gateway_host
   cluster_name                           = local.cluster_name
   docker_cfg_secret_name                 = var.create_docker_pull_secret && var.docker_username != null && var.docker_password != null ? local.runtime_secret_names.docker_cfg : null
-  docker_email                           = var.docker_email
-  docker_password                        = var.docker_password
-  docker_registry_server                 = var.docker_registry_server
   docker_pull_secret_name                = var.docker_pull_secret_name
   create_docker_pull_secret              = var.create_docker_pull_secret
-  docker_username                        = var.docker_username
   domain                                 = var.domain
   env_secret_name                        = google_secret_manager_secret.env.secret_id
   external_secrets_service_account_email = google_service_account.eso.email
@@ -60,7 +56,6 @@ module "helm" {
   ]))
   feature_flags_content = local.feature_flags_content
   flipt_options         = local.flipt_options
-  gcp_creds             = local.gcp_creds
   gcp_project_id        = local.gcp_project_id
   helm_values           = local.helm_values_public
   secrets_revision = sha256(jsonencode({
@@ -69,6 +64,10 @@ module "helm" {
     managed_sync    = var.managed_sync_enabled ? google_secret_manager_secret_version.managed_sync[0].name : null
     openobserve     = google_secret_manager_secret_version.openobserve[0].name
     openobserve_gcs = local.openobserve_gcs_enabled ? google_secret_manager_secret_version.openobserve_gcs[0].name : null
+    agent_os_app    = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_app[0].name : null
+    agent_os_admin  = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_admin[0].name : null
+    agent_os_broker = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_broker[0].name : null
+    agent_os_vendor = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_vendor[0].name : null
   }))
   ingress_scheme              = var.ingress_scheme
   k8s_version                 = var.k8s_version
@@ -76,6 +75,13 @@ module "helm" {
   managed_sync_enabled        = var.managed_sync_enabled
   managed_sync_secret_name    = var.managed_sync_enabled ? local.runtime_secret_names.managed_sync : null
   managed_sync_version        = var.managed_sync_version
+  paragon_helm_repository     = var.paragon_helm_repository
+  agent_os_enabled            = var.agent_os_enabled
+  agent_os_version            = var.agent_os_version
+  agent_os_helm_repository    = var.agent_os_helm_repository
+  agent_os_helm_values        = var.agent_os_helm_values
+  agent_os_file_values        = try(local.helm_vars.agentOs.values, {})
+  agent_os_service_account    = local.agent_os_service_account
   microservices               = local.microservices
   monitor_version             = local.monitor_version
   monitors                    = local.monitors
@@ -86,11 +92,11 @@ module "helm" {
   openobserve_secret_name     = google_secret_manager_secret.openobserve[0].secret_id
   public_microservices        = local.public_microservices
   public_monitors             = local.public_monitors
+  restrict_public_exposure    = local.restrict_public_exposure
   public_services             = local.public_services
   redis_ca_cert_secret_name   = local.infra_secret_names.redis_ca_cert
   region                      = var.region
   storage_service_account     = local.storage_service_account
-  infra_vars                  = local.infra_vars
   waf_security_policy_name    = local.waf_active ? module.waf[0].security_policy_name : ""
   waf_logs_sample_rate        = var.waf_logs_sample_rate
   workspace                   = local.workspace
@@ -108,16 +114,12 @@ module "hoop" {
   hoop_image_tag                = var.hoop_image_tag
   hoop_key                      = var.hoop_key
   hoop_agent_id                 = var.hoop_agent_id
-  hoop_slack_bot_token          = var.hoop_slack_bot_token
-  hoop_slack_app_token          = var.hoop_slack_app_token
-  hoop_slack_channel_ids        = var.hoop_slack_channel_ids
   all_access_groups             = var.hoop_all_access_groups
   restricted_access_groups      = var.hoop_restricted_access_groups
   reviewers_access_groups       = var.hoop_reviewers_access_groups
   hoop_postgres_guardrail_rules = var.hoop_postgres_guardrail_rules
   hoop_redis_guardrail_rules    = var.hoop_redis_guardrail_rules
   customer_facing               = var.customer_facing
-  hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   custom_connections            = var.hoop_custom_connections
   k8s_connections               = var.hoop_k8s_connections
@@ -136,7 +138,6 @@ module "monitors" {
   grafana_admin_password = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
   pgadmin_admin_email    = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
   pgadmin_admin_password = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
-  workspace              = local.workspace
 }
 
 module "uptime" {

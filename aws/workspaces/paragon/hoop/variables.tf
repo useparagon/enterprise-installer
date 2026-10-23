@@ -66,12 +66,6 @@ variable "hoop_redis_guardrail_rules" {
   default     = ["182f59b2-5d5d-4ab8-978e-94472b3915fc"]
 }
 
-variable "hoop_grafana_connection" {
-  description = "Whether to create a Hoop TCP connection to Grafana (grafana.paragon:4500)."
-  type        = bool
-  default     = false
-}
-
 variable "customer_facing" {
   description = "Whether the connections are customer-facing (true limits access to dev-team-oncall/dev-team-managers/admin, false adds dev-team-engineering)."
   type        = bool
@@ -96,25 +90,6 @@ variable "reviewers_access_groups" {
   default     = ["dev-team-managers"]
 }
 
-variable "hoop_slack_bot_token" {
-  description = "Slack bot token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "hoop_slack_app_token" {
-  description = "Slack app token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "hoop_slack_channel_ids" {
-  description = "Slack channel IDs to notify for connections that require reviews."
-  type        = list(string)
-  default     = []
-}
 
 variable "infra_vars" {
   description = "Infrastructure variables from infra-output.json."

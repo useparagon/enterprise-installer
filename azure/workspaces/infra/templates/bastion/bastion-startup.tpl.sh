@@ -115,27 +115,6 @@ sudo apt-get install -y nodejs
 sudo npm install -g npx
 node --version
 
-# install terraform
-writeLog "installing terraform"
-curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg
-echo "deb [signed-by=/etc/apt/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-sudo apt-get update -y
-sudo apt-get install -y terraform
-terraform version
-
-# install docker
-writeLog "installing docker"
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
-sudo apt-get update -y
-sudo apt-get install -y \
-    containerd.io \
-    docker-ce \
-    docker-ce-cli \
-    docker-compose-plugin
-sudo usermod -a -G docker ubuntu
-systemctl disable containerd.service
-
 # Create and configure aliases file
 writeLog "configuring aliases for ubuntu"
 cat > /home/ubuntu/.bash_aliases << 'EOF'
@@ -149,6 +128,7 @@ alias kl="kubectl logs"
 alias krr="kubectl get deployments --no-headers -o custom-columns=\":metadata.name\" | xargs -I {} kubectl rollout restart deployment/{}"
 alias kw="watch kubectl get pods"
 alias kwf="watch -- 'kubectl get pods | grep -v fluent | grep -v node-exporter'"
+alias kwn='watch -- "kubectl get pods | grep -v '\'' Running * 0'\''"'
 
 kls() {
   local name=$1

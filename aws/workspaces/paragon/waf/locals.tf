@@ -37,9 +37,9 @@ locals {
     for idx, key in local.managed_rule_keys : {
       key = key
       rule = {
-        name            = var.waf_managed_rule_groups[key].name
-        vendor_name     = coalesce(var.waf_managed_rule_groups[key].vendor_name, "AWS")
-        override_action = coalesce(var.waf_managed_rule_groups[key].override_action, "none")
+        name                         = var.waf_managed_rule_groups[key].name
+        vendor_name                  = coalesce(var.waf_managed_rule_groups[key].vendor_name, "AWS")
+        override_action              = coalesce(var.waf_managed_rule_groups[key].override_action, "none")
         bot_control_inspection_level = var.waf_managed_rule_groups[key].bot_control_inspection_level
         rule_action_overrides = merge(
           {

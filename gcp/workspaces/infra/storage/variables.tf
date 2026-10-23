@@ -10,6 +10,7 @@ variable "workspace" {
 
 variable "region" {
   description = "The region where to host Google Cloud Organization resources."
+  type        = string
 }
 
 variable "disable_deletion_protection" {
@@ -36,4 +37,9 @@ variable "managed_sync_enabled" {
   description = "Whether to create the Managed Sync GCS bucket."
   type        = bool
   default     = false
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS GCS bucket."
+  type        = bool
 }

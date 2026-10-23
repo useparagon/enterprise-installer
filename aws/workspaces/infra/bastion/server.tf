@@ -40,7 +40,7 @@ resource "aws_key_pair" "bastion" {
 }
 
 module "bastion" {
-  source = "github.com/useparagon/terraform-aws-bastion"
+  source = "github.com/useparagon/terraform-aws-bastion?ref=4082e811219aa609e357f5dde58a4d1b49d1ba4f"
 
   name = local.bastion_name
 
@@ -49,11 +49,11 @@ module "bastion" {
   log_expiry_days = 365
 
   # networking
-  auto_scaling_group_subnets = var.private_subnet.*.id
+  auto_scaling_group_subnets = var.private_subnet[*].id
   cidrs                      = var.ssh_whitelist
   create_dns_record          = false
   create_elb                 = !local.only_cloudflare_tunnel
-  elb_subnets                = var.public_subnet.*.id
+  elb_subnets                = var.public_subnet[*].id
   is_lb_private              = local.only_cloudflare_tunnel
   private_ssh_port           = local.ssh_port
   public_ssh_port            = local.ssh_port

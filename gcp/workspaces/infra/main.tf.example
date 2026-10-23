@@ -6,6 +6,10 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 4.42"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
     google = {
       source  = "hashicorp/google"
       version = ">= 7.19.0, < 8.0.0"

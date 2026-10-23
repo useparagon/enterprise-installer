@@ -4,13 +4,13 @@ locals {
   host_public_services = {
     for name, svc in var.public_services :
     name => svc
-    if svc.path_prefix == ""
+    if try(svc.path_prefix, "") == ""
   }
 
   path_public_services = var.path_based_routing_enabled ? {
     for name, svc in var.public_services :
     name => svc
-    if svc.path_prefix != ""
+    if try(svc.path_prefix, "") != ""
   } : {}
 
   https_listeners = {
@@ -178,24 +178,18 @@ locals {
               : local.https_listeners[name].listener
             )
           }]
-          rules = [
-            merge(
+          rules = concat(
+            length(svc.routes) == 0 ? [merge(
               contains(keys(local.path_public_services), name) ? {
-                matches = [{
-                  path = {
-                    type  = "PathPrefix"
-                    value = svc.path_prefix
-                  }
-                }]
+                matches = [{ path = { type = "PathPrefix", value = svc.path_prefix } }]
               } : {},
-              {
-                backendRefs = [{
-                  name = name
-                  port = svc.port
-                }]
-              },
-            )
-          ]
+              { backendRefs = [{ name = name, port = svc.port }] }
+            )] : [],
+            [for route in svc.routes : {
+              matches     = [{ path = { type = "PathPrefix", value = route.path } }]
+              backendRefs = [{ name = route.service, port = route.port }]
+            }]
+          )
         },
         contains(keys(local.path_public_services), name) ? {} : {
           hostnames = [svc.host]

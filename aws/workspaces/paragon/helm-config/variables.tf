@@ -5,10 +5,12 @@ variable "aws_region" {
 
 variable "base_helm_values" {
   description = "The base configuration for the values for the helm chart."
+  type        = any
 }
 
 variable "infra_values" {
   description = "The values from the infrastructure workspace."
+  type        = any
 }
 
 variable "domain" {
