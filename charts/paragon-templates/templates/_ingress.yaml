@@ -7,7 +7,7 @@ Call with: include "ingress.standard" $
 {{- $name := .Chart.Name -}}
 {{- $fullName := include (printf "%s.fullname" $name) . -}}
 {{- $svcPort := .Values.service.port -}}
-{{- /* Empty className must match the controller that owns this cloud. nginx on AWS conflicts with the alb annotation and fails the release. Internal GCP uses gce-internal; internet-facing GCP uses gce. */ -}}
+{{- /* Default ingress class must match the cloud provider. */ -}}
 {{- $ingressClass := .Values.ingress.className -}}
 {{- if not $ingressClass -}}
 {{- if eq .Values.global.env.HOST_ENV "AWS_K8" -}}
@@ -18,6 +18,8 @@ Call with: include "ingress.standard" $
 {{- $ingressClass = "nginx" -}}
 {{- end -}}
 {{- end -}}
+{{- $hostless := and (eq .Values.global.env.HOST_ENV "AWS_K8") (.Values.ingress.hostless | default false) -}}
+{{- $path := .Values.ingress.path | default "/" -}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -94,7 +96,9 @@ spec:
   loadBalancerIP: {{ .Values.ingress.loadBalancerIP }}
   {{- end }}
   rules:
-    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "hermes") }}
+    {{- /* Connect SDK paths must stay host-agnostic even when path routing is on,
+         so traffic that still lands on connect.<domain> reaches hermes/worker-proxy. */}}
+    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "hermes") (not $hostless) }}
     - http:
         paths:
           - path: /projects/*/sdk/triggers/*
@@ -105,7 +109,7 @@ spec:
                 port:
                   number: {{ $svcPort }}
     {{- end }}
-    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "worker-proxy") }}
+    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "worker-proxy") (not $hostless) }}
     - http:
         paths:
           - path: /projects/*/sdk/proxy/*
@@ -116,6 +120,48 @@ spec:
                 port:
                   number: {{ $svcPort }}
     {{- end }}
+    {{- if and $hostless (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "connect") .Values.ingress.connect_sdk_routes }}
+    - http:
+        paths:
+          - path: {{ $path }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+          - path: {{ printf "%s/projects/*/sdk/triggers/*" $path }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: hermes
+                port:
+                  number: {{ .Values.ingress.connect_sdk_routes.hermes_port }}
+          - path: {{ printf "%s/projects/*/sdk/proxy/*" $path }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: worker-proxy
+                port:
+                  number: {{ .Values.ingress.connect_sdk_routes.worker_proxy_port }}
+          - path: {{ printf "%s/*" $path }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+    {{- else if $hostless }}
+    - http:
+        paths:
+          - path: {{ $path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+    {{- else }}
     - host: {{ include (printf "%s.ingressHost" $name) . }}
       http:
         paths:
@@ -126,6 +172,7 @@ spec:
                 name: {{ $fullName }}
                 port:
                   number: {{ $svcPort }}
+    {{- end }}
 {{- end }}
 {{- end -}}
 

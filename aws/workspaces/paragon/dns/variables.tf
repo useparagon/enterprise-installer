@@ -30,7 +30,14 @@ variable "public_services" {
     port             = optional(number)
     healthcheck_path = optional(string)
     public_url       = string
+    path_prefix      = optional(string, "")
   }))
+}
+
+variable "path_based_routing_enabled" {
+  description = "Resolve path-routed services to their TLS-valid internal origin hostname."
+  type        = bool
+  default     = false
 }
 
 variable "record_ttl" {

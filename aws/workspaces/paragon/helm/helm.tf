@@ -76,11 +76,23 @@ locals {
   })
 
   microservice_values = yamlencode({
-    for microservice_name, microservice_config in var.microservices : microservice_name => {
-      env = {
-        SERVICE = microservice_name
-      }
-    }
+    for microservice_name, microservice_config in var.microservices : microservice_name => merge(
+      {
+        env = merge(
+          {
+            SERVICE = microservice_name
+          },
+          {
+            for key, value in {
+              HTTP_PATH_PREFIX = try(var.public_microservices[microservice_name].path_prefix, "")
+            } : key => value
+            if var.path_based_routing_enabled && value != ""
+          }
+        )
+      },
+      # HTTP_PATH_PREFIX is appended by env.standard without replacing chart envKeys.
+      {}
+    )
   })
 
   public_microservice_values = yamlencode({
@@ -88,11 +100,30 @@ locals {
       ingress = merge(
         {
           className          = "alb"
-          host               = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
+          host               = microservice_config.public_host
           scheme             = var.ingress_scheme
           certificate        = var.certificate
           load_balancer_name = var.workspace
           logs_bucket        = var.logs_bucket
+        },
+        {
+          for key, value in {
+            # Hostless Prefix rule is the ONLY public Ingress for each routed service.
+            group_order = -100
+            hostless    = true
+            path        = microservice_config.path_prefix
+          } : key => value
+          if var.path_based_routing_enabled && microservice_config.path_prefix != ""
+        },
+        {
+          for key, value in {
+            # Connect SDK requests still target the Hermes/worker-proxy services.
+            connect_sdk_routes = {
+              hermes_port       = try(var.microservices["hermes"].port, 1702)
+              worker_proxy_port = try(var.microservices["worker-proxy"].port, 1715)
+            }
+          } : key => value
+          if var.path_based_routing_enabled && microservice_config.path_prefix != "" && microservice_name == "connect"
         },
         var.waf_web_acl_arn != "" ? { wafv2_acl_arn = var.waf_web_acl_arn } : {}
       )
