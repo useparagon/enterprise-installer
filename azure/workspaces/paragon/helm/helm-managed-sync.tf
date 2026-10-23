@@ -27,12 +27,23 @@ locals {
   # the openfga schema. With prehookEnabled: false they race and migrate fails when the
   # database does not exist yet, leaving openfga pods stuck in wait-for-migration.
   managed_sync_azure_values = yamlencode({
+    # Azure Event Hubs topics are pre-provisioned by Terraform; Kafka AdminClient
+    # cannot create them. Enable event publishing, not topic creation.
+    global = {
+      env = merge(
+        # Event Hubs does not support Kafka AdminClient topic creation, regardless
+        # of whether Agent OS is enabled.
+        { MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = "true" },
+        var.agent_os_enabled ? { MANAGED_SYNC_STATUS_EVENTS_ENABLED = "true" } : {},
+      )
+    }
     ingress = {
       class     = "nginx"
       className = "nginx"
     }
     "api-sync" = {
       ingress = {
+        enabled   = !var.agc_direct
         class     = "nginx"
         className = "nginx"
         host      = local.api_sync_host
@@ -72,7 +83,7 @@ resource "helm_release" "managed_sync" {
 
   name             = "paragon-managed-sync"
   description      = "Managed Sync"
-  repository       = "https://paragon-helm-production.s3.amazonaws.com"
+  repository       = var.paragon_helm_repository
   chart            = "managed-sync"
   version          = var.managed_sync_version
   namespace        = kubernetes_namespace.paragon.id
@@ -80,7 +91,10 @@ resource "helm_release" "managed_sync" {
   cleanup_on_fail  = true
   atomic           = true
   verify           = false
-  timeout          = 600 # 10 minutes
+  timeout          = var.agent_os_enabled ? 900 : 600
+  # Parent chart renders ScaledObject; KEDA CRDs come from the subchart. OpenAPI
+  # validation runs before subchart CRDs exist (and manual CRD fixes break Helm ownership).
+  disable_openapi_validation = true
 
   values = [
     local.global_values_minus_env,

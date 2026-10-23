@@ -20,9 +20,9 @@ USAGE = (
 IGNORED_SERVICES = [
     "embassy",
     "prometheus-ecs-discovery",
-    "redis-streams-exporter",
     "alb-log-parser",
     "minio",
+    "ocs-code-runner",
 ]
 
 CHART_CATEGORIES = {

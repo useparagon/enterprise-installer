@@ -15,11 +15,6 @@ variable "cloudflare_zone_id" {
   type        = string
 }
 
-variable "domain" {
-  description = "The domain used for the application. Used to generate an SSL certificate and associates CNAMEs."
-  type        = string
-}
-
 variable "ingress_loadbalancer" {
   description = "The Ingress Load Balancer for our Microservices"
   type        = string

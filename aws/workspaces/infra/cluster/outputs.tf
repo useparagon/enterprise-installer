@@ -34,8 +34,9 @@ output "worker_security_group_ids" {
 output "karpenter" {
   description = "AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace."
   value = var.enable_karpenter ? {
-    node_role_name     = module.iam[0].node_iam_role_name
-    security_group_ids = local.eks_worker_security_group_ids
-    ebs_kms_key_arn    = module.ebs_kms_key.key_arn
+    node_role_name      = module.iam[0].node_iam_role_name
+    security_group_ids  = local.eks_worker_security_group_ids
+    ebs_kms_key_arn     = module.ebs_kms_key.key_arn
+    agent_os_node_pools = local.agent_os_karpenter_node_pools
   } : null
 }

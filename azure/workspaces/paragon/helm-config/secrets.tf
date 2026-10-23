@@ -124,158 +124,166 @@ locals {
     password = try(var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_HTTP_PASSWORD"], random_password.queue_exporter_password.result)
   }
 
-  managed_sync_secrets = {
-    HOST_ENV       = "AZURE_K8"
-    LOG_LEVEL      = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
-    TRIAL_DISABLED = try(var.base_helm_values.global.env["TRIAL_DISABLED"], "true")
-
-    PLATFORM_ENV = try(var.base_helm_values.global.env["PLATFORM_ENV"], "enterprise")
-    NODE_ENV     = try(var.base_helm_values.global.env["NODE_ENV"], "production")
-    LICENSE      = try(var.base_helm_values.global.env["LICENSE"], null)
-
-    FEATURE_FLAG_PLATFORM_ENABLED  = try(var.base_helm_values.global.env["FEATURE_FLAG_PLATFORM_ENABLED"], "true")
-    FEATURE_FLAG_PLATFORM_ENDPOINT = try(var.base_helm_values.global.env["FEATURE_FLAG_PLATFORM_ENDPOINT"], "http://flipt:${var.microservices.flipt.port}")
-
-    WORKFLOW_REDIS_URL             = try(var.base_helm_values.global.env["WORKFLOW_REDIS_URL"], local.workflow_redis_url)
-    WORKFLOW_REDIS_CLUSTER_ENABLED = try(var.base_helm_values.global.env["WORKFLOW_REDIS_CLUSTER_ENABLED"], local.workflow_redis_from_infra.cluster, false)
-
-    CLOUD_STORAGE_TYPE                = local.storage_type
-    CLOUD_STORAGE_PUBLIC_BUCKET       = local.storage_config.buckets.public
-    CLOUD_STORAGE_USER                = local.storage_config.user
-    CLOUD_STORAGE_PASS                = local.storage_config.pass
-    CLOUD_STORAGE_MANAGED_SYNC_BUCKET = local.storage_config.buckets.managed_sync
-    CLOUD_STORAGE_PUBLIC_URL          = local.storage_config.public_url
-    CLOUD_STORAGE_PRIVATE_URL         = local.storage_config.public_url
-
-    // TODO: make `MANAGED_SYNC_URL` communicate via private DNS instead of open internet
-    MANAGED_SYNC_URL              = try(var.base_helm_values.global.env["MANAGED_SYNC_URL"], "https://sync.${var.domain}")
-    PARAGON_PROXY_BASE_URL        = try("http://worker-proxy:${var.microservices["worker-proxy"].port}", null)
-    PARAGON_ZEUS_BASE_URL         = try("http://zeus:${var.microservices.zeus.port}", null)
-    API_TRIGGERKIT_PRIVATE_URL    = try(var.base_helm_values.global.env["API_TRIGGERKIT_PRIVATE_URL"], "http://api-triggerkit:${var.microservices["api-triggerkit"].port}")
-    WORKER_ACTIONKIT_PRIVATE_URL  = try(var.base_helm_values.global.env["WORKER_ACTIONKIT_PRIVATE_URL"], "http://worker-actionkit:${var.microservices["worker-actionkit"].port}")
-    WORKER_EVENT_LOGS_PRIVATE_URL = try(var.base_helm_values.global.env["WORKER_EVENT_LOGS_PRIVATE_URL"], "http://worker-eventlogs:${var.microservices["worker-eventlogs"].port}")
-
-    MANAGED_SYNC_PRIVATE_KEY     = replace(tls_private_key.managed_sync_signing_key.private_key_pem, "\n", "\\n")
-    MANAGED_SYNC_AUTH_PUBLIC_KEY = replace(tls_private_key.managed_sync_signing_key.public_key_pem, "\n", "\\n")
-
-    MANAGED_SYNC_ETCD_HOSTS = join(",", [for i in range(3) : "http://etcd-${i}.etcd-headless:2379"])
-
-    MANAGED_SYNC_KAFKA_BROKER_URLS    = local.kafka_config.broker_urls
-    MANAGED_SYNC_KAFKA_SASL_USERNAME  = local.kafka_config.sasl_username
-    MANAGED_SYNC_KAFKA_SASL_PASSWORD  = local.kafka_config.sasl_password
-    MANAGED_SYNC_KAFKA_SASL_MECHANISM = local.kafka_config.sasl_mechanism
-    MANAGED_SYNC_KAFKA_SSL_ENABLED    = local.kafka_config.ssl_enabled
-
-    # Event Hubs (Kafka) requires replication factor = 1 and limits partitions. There is also a 10 topic limit for Standard SKU.
-    MANAGED_SYNC_KAFKA_SKIP_DLT_TOPIC_CREATION           = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SKIP_DLT_TOPIC_CREATION"], true)
-    MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_PARTITION_COUNT    = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_PARTITION_COUNT"], 2)
-    MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_REPLICATION_FACTOR = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_REPLICATION_FACTOR"], 1)
-
-    # Redis from infra when present (managed-sync, then cache). Do not override from
-    # base_helm_values when infra provides credentials.
-    MANAGED_SYNC_REDIS_URL             = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
-    MANAGED_SYNC_REDIS_PASSWORD        = local.redis_config.password != null ? local.redis_config.password : ""
-    MANAGED_SYNC_REDIS_CLUSTER_ENABLED = local.redis_config.cluster_enabled
-    MANAGED_SYNC_REDIS_TLS_ENABLED     = tostring(local.redis_config.redis_tls_enabled)
-    MANAGED_SYNC_REDIS_CA_CERT         = local.redis_config.redis_ca_certificate != null ? local.redis_config.redis_ca_certificate : ""
-
-    SYNC_INSTANCE_POSTGRES_HOST        = local.postgres_config.sync_instance.host
-    SYNC_INSTANCE_POSTGRES_PORT        = local.postgres_config.sync_instance.port
-    SYNC_INSTANCE_POSTGRES_USERNAME    = local.postgres_config.sync_instance.username
-    SYNC_INSTANCE_POSTGRES_PASSWORD    = local.postgres_config.sync_instance.password
-    SYNC_INSTANCE_POSTGRES_DATABASE    = local.postgres_config.sync_instance.database
-    SYNC_INSTANCE_POSTGRES_SSL_ENABLED = true
-
-    SYNC_PROJECT_POSTGRES_HOST        = local.postgres_config.sync_project.host
-    SYNC_PROJECT_POSTGRES_PORT        = local.postgres_config.sync_project.port
-    SYNC_PROJECT_POSTGRES_USERNAME    = local.postgres_config.sync_project.username
-    SYNC_PROJECT_POSTGRES_PASSWORD    = local.postgres_config.sync_project.password
-    SYNC_PROJECT_POSTGRES_DATABASE    = local.postgres_config.sync_project.database
-    SYNC_PROJECT_POSTGRES_SSL_ENABLED = true
-
-    OPENFGA_HTTP_URL             = "http://openfga:6200"
-    OPENFGA_POSTGRES_HOST        = local.postgres_config.openfga.host
-    OPENFGA_POSTGRES_PORT        = local.postgres_config.openfga.port
-    OPENFGA_POSTGRES_USERNAME    = local.postgres_config.openfga.username
-    OPENFGA_POSTGRES_PASSWORD    = local.postgres_config.openfga.password
-    OPENFGA_POSTGRES_DATABASE    = local.postgres_config.openfga.database
-    OPENFGA_POSTGRES_SSL_ENABLED = true
-    OPENFGA_POSTGRES_URI         = "postgres://${local.postgres_config.openfga.username}:${local.postgres_config.openfga.password}@${local.postgres_config.openfga.host}:${local.postgres_config.openfga.port}/${local.postgres_config.openfga.database}?sslmode=require"
-    OPENFGA_AUTH_PRESHARED_KEY   = random_string.openfga_preshared_key.result
-
-    ADMIN_POSTGRES_HOST        = local.postgres_config.admin.host
-    ADMIN_POSTGRES_PORT        = local.postgres_config.admin.port
-    ADMIN_POSTGRES_USERNAME    = local.postgres_config.admin.username
-    ADMIN_POSTGRES_PASSWORD    = local.postgres_config.admin.password
-    ADMIN_POSTGRES_DATABASE    = local.postgres_config.admin.database
-    ADMIN_POSTGRES_SSL_ENABLED = true
-
-    # same values as admin postgres instance, mapped to these additional keys for monorepo
-    MANAGED_SYNC_POSTGRES_HOST        = local.postgres_config.admin.host
-    MANAGED_SYNC_POSTGRES_PORT        = local.postgres_config.admin.port
-    MANAGED_SYNC_POSTGRES_DATABASE    = local.postgres_config.admin.database
-    MANAGED_SYNC_POSTGRES_USERNAME    = local.postgres_config.admin.username
-    MANAGED_SYNC_POSTGRES_PASSWORD    = local.postgres_config.admin.password
-    MANAGED_SYNC_POSTGRES_SSL_ENABLED = true
-
-    OPENFGA_HTTP_PORT           = 6200
-    OPENFGA_GRPC_PORT           = 6201
-    OPENFGA_AUTH_METHOD         = "preshared"
-    OPENFGA_AUTH_PRESHARED_KEYS = sha256(local.postgres_config.openfga.password)
-    OPENFGA_HTTP_URL            = "http://openfga:${6200}"
-
-    # monitoring config
-    MANAGED_SYNC_ENABLED         = true
-    MONITOR_MANAGED_SYNC_ENABLED = true // TODO (PARA-14774): remove `MONITOR_MANAGED_SYNC_ENABLED` when key renamed
-
-    # TODO (PARA-14774): remove `MONITOR_MANAGED_SYNC_KAFKA_*` keys when keys are renamed
-    MONITOR_MANAGED_SYNC_KAFKA_BROKER_URLS    = local.kafka_config.broker_urls
-    MONITOR_MANAGED_SYNC_KAFKA_SASL_USERNAME  = local.kafka_config.sasl_username
-    MONITOR_MANAGED_SYNC_KAFKA_SASL_PASSWORD  = local.kafka_config.sasl_password
-    MONITOR_MANAGED_SYNC_KAFKA_SASL_MECHANISM = local.kafka_config.sasl_mechanism
-    MONITOR_MANAGED_SYNC_KAFKA_SSL_ENABLED    = local.kafka_config.ssl_enabled
-
-    MONITOR_QUEUE_EXPORTER_PRIVATE_URL = try(
-      var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_PRIVATE_URL"],
-      "http://queue-exporter:${var.microservices["queue-exporter"].port}"
-    )
-    MONITOR_QUEUE_EXPORTER_PORT = try(
-      var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_PORT"],
-      var.base_helm_values.global.env["MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_PORT"], # TODO (PARA-14774): remove after keys renamed
-      var.microservices["queue-exporter"].port,
-      1806
-    )
-    MONITOR_QUEUE_EXPORTER_USERNAME = try(
-      var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_USERNAME"],
-      var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_HTTP_USERNAME"],              # TODO (PARA-14774): remove after keys renamed
-      var.base_helm_values.global.env["MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HTTP_USERNAME"], # TODO (PARA-14774): remove after keys renamed
-      random_string.queue_exporter_username.result
-    )
-    MONITOR_QUEUE_EXPORTER_PASSWORD = try(
-      var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_PASSWORD"],
-      var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_HTTP_PASSWORD"],              # TODO (PARA-14774): remove after keys renamed
-      var.base_helm_values.global.env["MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HTTP_PASSWORD"], # TODO (PARA-14774): remove after keys renamed
-      random_password.queue_exporter_password.result
-    )
-
-    # TODO (PARA-14774): remove after keys renamed
-    MONITOR_QUEUE_EXPORTER_HTTP_USERNAME              = local.queue_exporter_config.username
-    MONITOR_QUEUE_EXPORTER_HTTP_PASSWORD              = local.queue_exporter_config.password
-    MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HTTP_USERNAME = local.queue_exporter_config.username
-    MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HTTP_PASSWORD = local.queue_exporter_config.password
-
-    # TODO (PARA-14774): remove `MONITOR_MANAGED_SYNC_POSTGRES_*` keys when keys are renamed
-    MONITOR_MANAGED_SYNC_POSTGRES_HOST        = local.postgres_config.admin.host
-    MONITOR_MANAGED_SYNC_POSTGRES_PORT        = local.postgres_config.admin.port
-    MONITOR_MANAGED_SYNC_POSTGRES_USERNAME    = local.postgres_config.admin.username
-    MONITOR_MANAGED_SYNC_POSTGRES_PASSWORD    = local.postgres_config.admin.password
-    MONITOR_MANAGED_SYNC_POSTGRES_DATABASE    = local.postgres_config.admin.database
-    MONITOR_MANAGED_SYNC_POSTGRES_SSL_ENABLED = true
-
-    # not used at the moment
-    # MONITOR_KUBE_STATE_METRICS_HTTP_USERNAME = ""
-    # MONITOR_KUBE_STATE_METRICS_HTTP_PASSWORD = ""
+  managed_sync_sync_env_from_values = {
+    for key, value in try(var.base_helm_values.global.env, {}) :
+    key => tostring(value)
+    if strcontains(key, "SYNC") && value != null && tostring(value) != ""
   }
+
+  managed_sync_secrets = merge(
+    {
+      HOST_ENV       = "AZURE_K8"
+      LOG_LEVEL      = try(var.base_helm_values.global.env["LOG_LEVEL"], "debug")
+      TRIAL_DISABLED = try(var.base_helm_values.global.env["TRIAL_DISABLED"], "true")
+
+      PLATFORM_ENV = try(var.base_helm_values.global.env["PLATFORM_ENV"], "enterprise")
+      NODE_ENV     = try(var.base_helm_values.global.env["NODE_ENV"], "production")
+      LICENSE      = try(var.base_helm_values.global.env["LICENSE"], null)
+
+      FEATURE_FLAG_PLATFORM_ENABLED  = try(var.base_helm_values.global.env["FEATURE_FLAG_PLATFORM_ENABLED"], "true")
+      FEATURE_FLAG_PLATFORM_ENDPOINT = try(var.base_helm_values.global.env["FEATURE_FLAG_PLATFORM_ENDPOINT"], "http://flipt:${var.microservices.flipt.port}")
+
+      WORKFLOW_REDIS_URL             = try(var.base_helm_values.global.env["WORKFLOW_REDIS_URL"], local.workflow_redis_url)
+      WORKFLOW_REDIS_CLUSTER_ENABLED = try(var.base_helm_values.global.env["WORKFLOW_REDIS_CLUSTER_ENABLED"], local.workflow_redis_from_infra.cluster, false)
+
+      CLOUD_STORAGE_TYPE                = local.storage_type
+      CLOUD_STORAGE_PUBLIC_BUCKET       = local.storage_config.buckets.public
+      CLOUD_STORAGE_USER                = local.storage_config.user
+      CLOUD_STORAGE_PASS                = local.storage_config.pass
+      CLOUD_STORAGE_MANAGED_SYNC_BUCKET = local.storage_config.buckets.managed_sync
+      CLOUD_STORAGE_PUBLIC_URL          = local.storage_config.public_url
+      CLOUD_STORAGE_PRIVATE_URL         = local.storage_config.public_url
+
+      // TODO: make `MANAGED_SYNC_URL` communicate via private DNS instead of open internet
+      MANAGED_SYNC_URL              = try(var.base_helm_values.global.env["MANAGED_SYNC_URL"], "https://sync.${var.domain}")
+      PARAGON_PROXY_BASE_URL        = try("http://worker-proxy:${var.microservices["worker-proxy"].port}", null)
+      PARAGON_ZEUS_BASE_URL         = try("http://zeus:${var.microservices.zeus.port}", null)
+      API_TRIGGERKIT_PRIVATE_URL    = try(var.base_helm_values.global.env["API_TRIGGERKIT_PRIVATE_URL"], "http://api-triggerkit:${var.microservices["api-triggerkit"].port}")
+      WORKER_ACTIONKIT_PRIVATE_URL  = try(var.base_helm_values.global.env["WORKER_ACTIONKIT_PRIVATE_URL"], "http://worker-actionkit:${var.microservices["worker-actionkit"].port}")
+      WORKER_EVENT_LOGS_PRIVATE_URL = try(var.base_helm_values.global.env["WORKER_EVENT_LOGS_PRIVATE_URL"], "http://worker-eventlogs:${var.microservices["worker-eventlogs"].port}")
+
+      MANAGED_SYNC_PRIVATE_KEY     = replace(tls_private_key.managed_sync_signing_key.private_key_pem, "\n", "\\n")
+      MANAGED_SYNC_AUTH_PUBLIC_KEY = replace(tls_private_key.managed_sync_signing_key.public_key_pem, "\n", "\\n")
+
+      MANAGED_SYNC_ETCD_HOSTS = join(",", [for i in range(3) : "http://etcd-${i}.etcd-headless:2379"])
+
+      MANAGED_SYNC_KAFKA_BROKER_URLS    = local.kafka_config.broker_urls
+      MANAGED_SYNC_KAFKA_SASL_USERNAME  = local.kafka_config.sasl_username
+      MANAGED_SYNC_KAFKA_SASL_PASSWORD  = local.kafka_config.sasl_password
+      MANAGED_SYNC_KAFKA_SASL_MECHANISM = local.kafka_config.sasl_mechanism
+      MANAGED_SYNC_KAFKA_SSL_ENABLED    = local.kafka_config.ssl_enabled
+
+      # Event Hubs (Kafka) requires replication factor = 1 and limits partitions. There is also a 10 topic limit for Standard SKU.
+      MANAGED_SYNC_KAFKA_SKIP_DLT_TOPIC_CREATION           = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_SKIP_DLT_TOPIC_CREATION"], true)
+      MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_PARTITION_COUNT    = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_PARTITION_COUNT"], 2)
+      MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_REPLICATION_FACTOR = try(var.base_helm_values.global.env["MANAGED_SYNC_KAFKA_TOPICS_DEFAULT_REPLICATION_FACTOR"], 1)
+
+      # Redis from infra when present (managed-sync, then cache). Do not override from
+      # base_helm_values when infra provides credentials.
+      MANAGED_SYNC_REDIS_URL             = local.redis_from_infra != null ? local.managed_sync_redis_url : try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.managed_sync_redis_url)
+      MANAGED_SYNC_REDIS_PASSWORD        = local.redis_config.password != null ? local.redis_config.password : ""
+      MANAGED_SYNC_REDIS_CLUSTER_ENABLED = local.redis_config.cluster_enabled
+      MANAGED_SYNC_REDIS_TLS_ENABLED     = tostring(local.redis_config.redis_tls_enabled)
+      MANAGED_SYNC_REDIS_CA_CERT         = local.redis_config.redis_ca_certificate != null ? local.redis_config.redis_ca_certificate : ""
+
+      SYNC_INSTANCE_POSTGRES_HOST        = local.postgres_config.sync_instance.host
+      SYNC_INSTANCE_POSTGRES_PORT        = local.postgres_config.sync_instance.port
+      SYNC_INSTANCE_POSTGRES_USERNAME    = local.postgres_config.sync_instance.username
+      SYNC_INSTANCE_POSTGRES_PASSWORD    = local.postgres_config.sync_instance.password
+      SYNC_INSTANCE_POSTGRES_DATABASE    = local.postgres_config.sync_instance.database
+      SYNC_INSTANCE_POSTGRES_SSL_ENABLED = true
+
+      SYNC_PROJECT_POSTGRES_HOST        = local.postgres_config.sync_project.host
+      SYNC_PROJECT_POSTGRES_PORT        = local.postgres_config.sync_project.port
+      SYNC_PROJECT_POSTGRES_USERNAME    = local.postgres_config.sync_project.username
+      SYNC_PROJECT_POSTGRES_PASSWORD    = local.postgres_config.sync_project.password
+      SYNC_PROJECT_POSTGRES_DATABASE    = local.postgres_config.sync_project.database
+      SYNC_PROJECT_POSTGRES_SSL_ENABLED = true
+
+      OPENFGA_HTTP_URL             = "http://openfga:6200"
+      OPENFGA_POSTGRES_HOST        = local.postgres_config.openfga.host
+      OPENFGA_POSTGRES_PORT        = local.postgres_config.openfga.port
+      OPENFGA_POSTGRES_USERNAME    = local.postgres_config.openfga.username
+      OPENFGA_POSTGRES_PASSWORD    = local.postgres_config.openfga.password
+      OPENFGA_POSTGRES_DATABASE    = local.postgres_config.openfga.database
+      OPENFGA_POSTGRES_SSL_ENABLED = true
+      OPENFGA_POSTGRES_URI         = "postgres://${local.postgres_config.openfga.username}:${local.postgres_config.openfga.password}@${local.postgres_config.openfga.host}:${local.postgres_config.openfga.port}/${local.postgres_config.openfga.database}?sslmode=require"
+      OPENFGA_AUTH_PRESHARED_KEY   = random_string.openfga_preshared_key.result
+
+      ADMIN_POSTGRES_HOST        = local.postgres_config.admin.host
+      ADMIN_POSTGRES_PORT        = local.postgres_config.admin.port
+      ADMIN_POSTGRES_USERNAME    = local.postgres_config.admin.username
+      ADMIN_POSTGRES_PASSWORD    = local.postgres_config.admin.password
+      ADMIN_POSTGRES_DATABASE    = local.postgres_config.admin.database
+      ADMIN_POSTGRES_SSL_ENABLED = true
+
+      # same values as admin postgres instance, mapped to these additional keys for monorepo
+      MANAGED_SYNC_POSTGRES_HOST        = local.postgres_config.admin.host
+      MANAGED_SYNC_POSTGRES_PORT        = local.postgres_config.admin.port
+      MANAGED_SYNC_POSTGRES_DATABASE    = local.postgres_config.admin.database
+      MANAGED_SYNC_POSTGRES_USERNAME    = local.postgres_config.admin.username
+      MANAGED_SYNC_POSTGRES_PASSWORD    = local.postgres_config.admin.password
+      MANAGED_SYNC_POSTGRES_SSL_ENABLED = true
+
+      OPENFGA_HTTP_PORT           = 6200
+      OPENFGA_GRPC_PORT           = 6201
+      OPENFGA_AUTH_METHOD         = "preshared"
+      OPENFGA_AUTH_PRESHARED_KEYS = sha256(local.postgres_config.openfga.password)
+
+      # monitoring config
+      MANAGED_SYNC_ENABLED         = true
+      MONITOR_MANAGED_SYNC_ENABLED = true // TODO (PARA-14774): remove `MONITOR_MANAGED_SYNC_ENABLED` when key renamed
+
+      # TODO (PARA-14774): remove `MONITOR_MANAGED_SYNC_KAFKA_*` keys when keys are renamed
+      MONITOR_MANAGED_SYNC_KAFKA_BROKER_URLS    = local.kafka_config.broker_urls
+      MONITOR_MANAGED_SYNC_KAFKA_SASL_USERNAME  = local.kafka_config.sasl_username
+      MONITOR_MANAGED_SYNC_KAFKA_SASL_PASSWORD  = local.kafka_config.sasl_password
+      MONITOR_MANAGED_SYNC_KAFKA_SASL_MECHANISM = local.kafka_config.sasl_mechanism
+      MONITOR_MANAGED_SYNC_KAFKA_SSL_ENABLED    = local.kafka_config.ssl_enabled
+
+      MONITOR_QUEUE_EXPORTER_PRIVATE_URL = try(
+        var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_PRIVATE_URL"],
+        "http://queue-exporter:${var.microservices["queue-exporter"].port}"
+      )
+      MONITOR_QUEUE_EXPORTER_PORT = try(
+        var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_PORT"],
+        var.base_helm_values.global.env["MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_PORT"], # TODO (PARA-14774): remove after keys renamed
+        var.microservices["queue-exporter"].port,
+        1806
+      )
+      MONITOR_QUEUE_EXPORTER_USERNAME = try(
+        var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_USERNAME"],
+        var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_HTTP_USERNAME"],              # TODO (PARA-14774): remove after keys renamed
+        var.base_helm_values.global.env["MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HTTP_USERNAME"], # TODO (PARA-14774): remove after keys renamed
+        random_string.queue_exporter_username.result
+      )
+      MONITOR_QUEUE_EXPORTER_PASSWORD = try(
+        var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_PASSWORD"],
+        var.base_helm_values.global.env["MONITOR_QUEUE_EXPORTER_HTTP_PASSWORD"],              # TODO (PARA-14774): remove after keys renamed
+        var.base_helm_values.global.env["MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HTTP_PASSWORD"], # TODO (PARA-14774): remove after keys renamed
+        random_password.queue_exporter_password.result
+      )
+
+      # TODO (PARA-14774): remove after keys renamed
+      MONITOR_QUEUE_EXPORTER_HTTP_USERNAME              = local.queue_exporter_config.username
+      MONITOR_QUEUE_EXPORTER_HTTP_PASSWORD              = local.queue_exporter_config.password
+      MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HTTP_USERNAME = local.queue_exporter_config.username
+      MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HTTP_PASSWORD = local.queue_exporter_config.password
+
+      # TODO (PARA-14774): remove `MONITOR_MANAGED_SYNC_POSTGRES_*` keys when keys are renamed
+      MONITOR_MANAGED_SYNC_POSTGRES_HOST        = local.postgres_config.admin.host
+      MONITOR_MANAGED_SYNC_POSTGRES_PORT        = local.postgres_config.admin.port
+      MONITOR_MANAGED_SYNC_POSTGRES_USERNAME    = local.postgres_config.admin.username
+      MONITOR_MANAGED_SYNC_POSTGRES_PASSWORD    = local.postgres_config.admin.password
+      MONITOR_MANAGED_SYNC_POSTGRES_DATABASE    = local.postgres_config.admin.database
+      MONITOR_MANAGED_SYNC_POSTGRES_SSL_ENABLED = true
+
+      # not used at the moment
+      # MONITOR_KUBE_STATE_METRICS_HTTP_USERNAME = ""
+      # MONITOR_KUBE_STATE_METRICS_HTTP_PASSWORD = ""
+    },
+    local.managed_sync_sync_env_from_values,
+  )
 }
 
 resource "random_string" "postgres_username" {

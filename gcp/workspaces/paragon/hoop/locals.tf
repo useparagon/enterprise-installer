@@ -13,9 +13,7 @@ locals {
 
   slack_enabled = (
     var.hoop_enabled &&
-    try(var.hoop_slack_bot_token, null) != null && var.hoop_slack_bot_token != "" &&
-    try(var.hoop_slack_app_token, null) != null && var.hoop_slack_app_token != "" &&
-    length(var.hoop_slack_channel_ids) > 0
+    length(local.review_required_connections) > 0
   )
 
   postgres_connections = try(var.infra_vars.postgres.value, null) != null ? {
@@ -149,8 +147,8 @@ locals {
         }
       }
     },
-    # grafana (private monitoring UI; not exposed when listed in private_services)
-    var.hoop_grafana_connection ? {
+    # grafana (cluster-internal monitoring UI; Hoop TCP when the hoop module is enabled)
+    {
       "grafana" = {
         name    = "${local.connection_prefix}-grafana"
         type    = "application"
@@ -174,7 +172,7 @@ locals {
           cloud           = local.detected_cloud
         }
       }
-    } : {},
+    },
     # redis-insight
     try(var.infra_vars.redis.value, null) != null ? {
       "redis-insight" = {

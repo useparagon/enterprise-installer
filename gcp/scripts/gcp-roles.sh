@@ -27,6 +27,9 @@ ROLES=(
    "roles/iam.serviceAccountKeyAdmin"        # Optional SA keys (storage / Kafka SASL PLAIN)
    "roles/iam.serviceAccountUser"            # Attach / impersonate SAs
    "roles/redis.admin"                       # Memorystore Redis
+   "roles/memorystore.admin"                 # Memorystore for Valkey
+   "roles/networkconnectivity.consumerNetworkAdmin" # PSC service connection policies for Valkey
+   "roles/servicedirectory.editor"            # Auto-registered PSC endpoints for Valkey
    "roles/resourcemanager.projectIamAdmin"   # IAM bindings (bastion, installer, node SA, WI, ESO)
    "roles/secretmanager.admin"               # Infra + app Secret Manager secrets/versions
    "roles/storage.admin"                     # GCS buckets + bucket IAM

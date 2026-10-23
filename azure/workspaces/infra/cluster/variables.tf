@@ -1,9 +1,11 @@
 variable "resource_group" {
   description = "The resource group to associate resources."
+  type        = any
 }
 
 variable "private_subnet" {
   description = "Private subnet accessible only within the virtual network to deploy to."
+  type        = any
 }
 
 variable "aks_nsg_id" {
@@ -24,12 +26,6 @@ variable "workspace" {
 variable "tags" {
   description = "Default tags to apply to resources"
   type        = map(string)
-}
-
-variable "agc_subnet_enabled" {
-  description = "When true, enable AKS OIDC issuer and workload identity for the AGC ALB controller. Left off so brownfield applies without AGC do not mutate the cluster."
-  type        = bool
-  default     = false
 }
 
 variable "k8s_version" {
@@ -65,6 +61,37 @@ variable "k8s_ondemand_node_instance_type" {
 variable "k8s_spot_node_instance_type" {
   description = "The compute instance type to use for Kubernetes spot nodes."
   type        = string
+}
+
+variable "agent_os_enabled" {
+  type = bool
+}
+
+variable "agent_os_index_vm_size" {
+  type = string
+}
+
+variable "agent_os_index_min_count" {
+  type = number
+}
+
+variable "agent_os_index_max_count" {
+  type = number
+}
+
+variable "agent_os_extract_vm_size" {
+  description = "Compute-optimized AMD VM size for the Agent OS extraction node pool."
+  type        = string
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction node pool."
+  type        = number
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction node pool."
+  type        = number
 }
 
 variable "k8s_sku_tier" {

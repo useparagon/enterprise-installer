@@ -3,21 +3,19 @@ variable "workspace" {
   type        = string
 }
 
-variable "aws_region" {
-  description = "The AWS region resources are created in."
-  type        = string
-}
-
 variable "vpc" {
   description = "The VPC to create resources in."
+  type        = any
 }
 
 variable "public_subnet" {
   description = "The public subnets within the VPC."
+  type        = any
 }
 
 variable "private_subnet" {
   description = "The private subnets within the VPC."
+  type        = any
 }
 
 variable "elasticache_node_type" {
@@ -38,6 +36,24 @@ variable "elasticache_multiple_instances" {
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync."
   type        = bool
+}
+
+variable "valkey_kms_key_arn" {
+  description = "KMS key ARN shared by all Valkey instances for at-rest encryption and CloudWatch logs."
+  type        = string
+}
+
+variable "valkey_instances" {
+  description = "Resolved shared Valkey instances keyed by logical service name."
+  type = map(object({
+    node_type               = string
+    multi_az                = bool
+    cluster_enabled         = bool
+    engine_version          = string
+    tls_enabled             = bool
+    snapshot_retention_days = number
+    log_retention_days      = number
+  }))
 }
 
 locals {

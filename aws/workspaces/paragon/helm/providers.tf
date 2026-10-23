@@ -1,16 +1,22 @@
 terraform {
+  required_version = ">= 1.9.0"
+
   required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.70"
+    }
     helm = {
       source  = "hashicorp/helm"
       version = "~> 2.17.0"
     }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = ">= 2.12.0"
-    }
     kubectl = {
       source  = "alekc/kubectl"
       version = ">= 2.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.12.0"
     }
     time = {
       source  = "hashicorp/time"
@@ -18,6 +24,7 @@ terraform {
     }
   }
 }
+
 
 # Refresh EKS tokens via exec so long Helm rollouts do not fail when a static
 # STS token expires mid-apply (~15 minutes).

@@ -16,6 +16,39 @@ global:
     # Unset = Grafana 1000 GiB default; 0 disables alerts. Example:
     # HERMES_POSTGRES_MAX_STORAGE_BYTES: "1073741824000"
 
+    # Opt-in Postgres server certificate verification (requires platform release with
+    # POSTGRES_SSL_REJECT_UNAUTHORIZED support). The chart mounts a combined CA bundle;
+    # do not enable until your platform release supports verify-full Postgres TLS.
+    # POSTGRES_SSL_REJECT_UNAUTHORIZED: "true"
+
+  # Custom CA certificates for Redis and/or external Postgres (e.g. RDS, Memorystore).
+  # Sources are concatenated into one PEM bundle; workloads and migration Jobs receive
+  # NODE_EXTRA_CA_CERTS and PGSSLROOTCERT pointing at the bundle path.
+  #
+  # Redis-only (GCP Memorystore — Terraform may set redisCaCert for you):
+  # redisCaCert:
+  #   enabled: true
+  #   secretName: redis-ca-cert
+  #
+  # Postgres-only (create the ConfigMap or Secret in the paragon namespace first):
+  # caCerts:
+  #   enabled: true
+  #   sources:
+  #     - configMapName: postgres-ca
+  #       key: ca.pem
+  #
+  # Redis + Postgres together:
+  # caCerts:
+  #   enabled: true
+  #   sources:
+  #     - secretName: redis-ca-cert
+  #       key: server-ca.pem
+  #     - configMapName: postgres-ca
+  #       key: ca.pem
+  #
+  # Managed Sync (when enabled): set verify flags in global.env; keys containing SYNC
+  # are forwarded to the managed-sync release (e.g. MANAGED_SYNC_POSTGRES_SSL_REJECT_UNAUTHORIZED).
+
 # Optional examples. Uncomment to customize per chart.
 # subchart:
 #   cache-replay:
@@ -24,6 +57,15 @@ global:
 #     enabled: false
 #   kafka-exporter:
 #     enabled: false
+#   ocs-code-runner:
+#     enabled: false
+#
+# OCS knative code-runner (on-prem custom-code runtime). Deploys
+# useparagon/ocs-code-runner-knative as a serving.knative.dev/v1 Service.
+# Requires Knative Serving + Kourier.
+# ocs-code-runner:
+#   image:
+#     tag: latest
 
 # Optional example for per-service resource tuning.
 # hades:

@@ -7,6 +7,12 @@ Each subchart has its own files/service-inputs.json containing only that service
 
 {{- define "service.inputs" -}}
 {{- $root := .root | default . -}}
-{{- /* Load the service-inputs.json - it contains this service's data */}}
-{{- $root.Files.Get "files/service-inputs.json" -}}
+{{- /* Load the service-inputs.json - it contains this service's data. */}}
+{{- /* Charts outside the monorepo (health-checker) have no file; return {} so fromJson succeeds. */}}
+{{- $raw := $root.Files.Get "files/service-inputs.json" -}}
+{{- if $raw -}}
+{{- $raw -}}
+{{- else -}}
+{}
+{{- end -}}
 {{- end -}}

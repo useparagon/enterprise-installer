@@ -26,7 +26,8 @@ permissions:
 
 jobs:
   package:
-    name: Package Helm Charts
+    # Caller name is omitted so the UI shows "package / Package Helm Charts"
+    # instead of duplicating the reusable workflow job name.
     uses: ./.github/workflows/package-charts.yaml
     with:
       version: ${{ inputs.version }}
@@ -35,9 +36,8 @@ jobs:
   push-ecr:
     name: Push Helm Charts to ECR
     needs: package
-    runs-on:
-      - self-hosted
-      - self-hosted-lite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       ECR_REGISTRY: 055987364777.dkr.ecr.us-east-1.amazonaws.com
       ECR_REPOSITORY_PREFIX: paragon-ci
@@ -50,7 +50,7 @@ jobs:
         run: rm -rf "$GITHUB_WORKSPACE/dist-helm"
 
       - name: Download packaged charts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: helm-packages
           path: dist-helm
@@ -121,7 +121,7 @@ jobs:
           done
 
   publish-production:
-    name: Publish Production Helm Charts
+    # Caller name omitted to avoid "Publish Production Helm Charts / …" duplication.
     needs: push-ecr
     uses: ./.github/workflows/release-charts.yaml
     with:

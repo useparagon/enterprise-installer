@@ -3,12 +3,8 @@ module "helm" {
 
   cluster_name               = local.cluster_name
   docker_cfg_secret_name     = var.create_docker_pull_secret && length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].name : null
-  docker_email               = var.docker_email
-  docker_password            = var.docker_password
-  docker_registry_server     = var.docker_registry_server
   docker_pull_secret_name    = var.docker_pull_secret_name
   create_docker_pull_secret  = var.create_docker_pull_secret
-  docker_username            = var.docker_username
   env_secret_name            = azurerm_key_vault_secret.env.name
   external_secrets_client_id = azurerm_user_assigned_identity.external_secrets.client_id
   external_secrets_tenant_id = data.azurerm_client_config.current.tenant_id
@@ -22,24 +18,38 @@ module "helm" {
   flipt_options                         = local.flipt_options
   helm_values                           = local.helm_values_public
   secrets_revision = sha256(jsonencode({
-    env          = azurerm_key_vault_secret.env.version
-    docker_cfg   = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
-    managed_sync = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
-    openobserve  = azurerm_key_vault_secret.openobserve[0].version
+    env             = azurerm_key_vault_secret.env.version
+    docker_cfg      = length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].version : null
+    managed_sync    = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].version : null
+    openobserve     = azurerm_key_vault_secret.openobserve[0].version
+    agent_os_app    = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_app[0].version : null
+    agent_os_admin  = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_admin[0].version : null
+    agent_os_broker = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_broker[0].version : null
+    agent_os_vendor = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_vendor[0].version : null
   }))
-  ingress_scheme           = var.ingress_scheme
-  nginx_public             = local.nginx_public
-  agc_active               = local.agc_active
-  agc_direct               = local.agc_direct
-  agc_subnet_cidr          = try(local.infra_vars.network.value.agc_subnet_cidr, null)
-  azure_subscription_id    = var.azure_subscription_id
-  domain                   = var.domain
-  key_vault_name           = data.azurerm_key_vault.paragon.name
-  k8s_version              = var.k8s_version
-  logs_bucket              = local.logs_bucket
-  managed_sync_enabled     = var.managed_sync_enabled
-  managed_sync_secret_name = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
-  managed_sync_version     = var.managed_sync_version
+  ingress_scheme                       = var.ingress_scheme
+  nginx_public                         = local.nginx_public
+  agc_active                           = local.agc_active
+  agc_direct                           = local.agc_direct
+  agc_subnet_cidr                      = try(local.infra_vars.network.value.agc_subnet_cidr, null)
+  key_vault_name                       = data.azurerm_key_vault.paragon.name
+  k8s_version                          = var.k8s_version
+  logs_bucket                          = local.logs_bucket
+  managed_sync_enabled                 = var.managed_sync_enabled
+  managed_sync_secret_name             = var.managed_sync_enabled ? azurerm_key_vault_secret.managed_sync[0].name : null
+  managed_sync_version                 = var.managed_sync_version
+  agent_os_enabled                     = var.agent_os_enabled
+  domain                               = var.domain
+  agent_os_version                     = var.agent_os_version
+  agent_os_helm_repository             = var.agent_os_helm_repository
+  agent_os_helm_values                 = var.agent_os_helm_values
+  agent_os_file_values                 = try(local.helm_vars.agentOs.values, {})
+  agent_os_workload_identity_client_id = var.agent_os_enabled ? azurerm_user_assigned_identity.agent_os[0].client_id : null
+  agent_os_workload_identity_ready = var.agent_os_enabled ? sha256(join(":", [
+    azurerm_federated_identity_credential.agent_os[0].id,
+    azurerm_role_assignment.agent_os_storage[0].id,
+  ])) : null
+  paragon_helm_repository  = var.paragon_helm_repository
   microservices            = local.microservices
   monitor_version          = local.monitor_version
   monitors                 = local.monitors
@@ -49,6 +59,8 @@ module "helm" {
   openobserve_secret_name  = azurerm_key_vault_secret.openobserve[0].name
   public_microservices     = local.public_microservices
   public_monitors          = local.public_monitors
+  public_services          = local.public_services
+  restrict_public_exposure = local.restrict_public_exposure
   resource_group           = local.infra_vars.resource_group.value
   workspace                = local.workspace
 }
@@ -75,16 +87,12 @@ module "hoop" {
   hoop_image_tag                = var.hoop_image_tag
   hoop_key                      = var.hoop_key
   hoop_agent_id                 = var.hoop_agent_id
-  hoop_slack_bot_token          = var.hoop_slack_bot_token
-  hoop_slack_app_token          = var.hoop_slack_app_token
-  hoop_slack_channel_ids        = var.hoop_slack_channel_ids
   all_access_groups             = var.hoop_all_access_groups
   restricted_access_groups      = var.hoop_restricted_access_groups
   reviewers_access_groups       = var.hoop_reviewers_access_groups
   hoop_postgres_guardrail_rules = var.hoop_postgres_guardrail_rules
   hoop_redis_guardrail_rules    = var.hoop_redis_guardrail_rules
   customer_facing               = var.customer_facing
-  hoop_grafana_connection       = var.hoop_grafana_connection
   namespace_paragon             = module.helm.namespace_paragon
   azure_subscription_id         = var.azure_subscription_id
   azure_tenant_id               = coalesce(var.azure_tenant_id, data.azurerm_client_config.current.tenant_id)
@@ -110,7 +118,6 @@ module "monitors" {
   grafana_admin_password = try(local.helm_vars.global.env["MONITOR_GRAFANA_SECURITY_ADMIN_PASSWORD"], null)
   pgadmin_admin_email    = try(local.helm_vars.global.env["MONITOR_PGADMIN_EMAIL"], null)
   pgadmin_admin_password = try(local.helm_vars.global.env["MONITOR_PGADMIN_PASSWORD"], null)
-  workspace              = local.workspace
 }
 
 module "uptime" {
@@ -135,6 +142,7 @@ locals {
   onprem_subchart_enabled = merge(
     { for name in keys(local.microservices) : name => { enabled = true } },
     try(local.helm_vars.subchart, {}),
+    local.restrict_public_exposure ? { health-checker = { enabled = true } } : {},
   )
 
   # Per-host backends and HTTPS listeners for AGC, limited to services Helm publishes.
@@ -154,7 +162,6 @@ module "dns" {
   enabled              = local.cloudflare_dns_enabled
   cloudflare_api_token = var.cloudflare_api_token
   cloudflare_zone_id   = var.cloudflare_zone_id
-  domain               = var.domain
   ingress_loadbalancer = local.dns_ingress_target
   public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
   ttl                  = local.dns_record_ttl
@@ -164,7 +171,6 @@ module "dns_zone" {
   source = "./dns-zone"
 
   enabled              = local.azure_dns_enabled
-  workspace            = local.workspace
   resource_group_name  = local.infra_vars.resource_group.value.name
   domain               = var.domain
   dns_provider         = local.has_cloudflare_credentials ? "cloudflare" : "none"
@@ -232,10 +238,23 @@ module "agc" {
   cluster_name           = local.cluster_name
   subnet_id              = try(local.infra_vars.network.value.agc_subnet_id, null)
   namespace              = module.helm.namespace_paragon.metadata[0].name
-  domain                 = var.domain
-  public_services        = local.agc_public_routes
+  public_services        = merge(local.agc_public_routes, local.agent_os_agc_routes)
   waf_enabled            = local.waf_active
   waf_policy_id          = local.waf_active ? module.waf[0].policy_id : null
   alb_controller_version = var.agc_alb_controller_version
   tags                   = local.default_tags
+}
+
+locals {
+  # AGC direct routing: one HTTPS listener, path-specific backends (nginx Ingress is off).
+  agent_os_agc_routes = var.agent_os_enabled && local.agc_direct ? {
+    agentos = {
+      host = local.agent_os_host
+      port = local.agent_os_port
+      routes = [
+        { path = "/api/context", service = "context-api", port = local.agent_os_port },
+        { path = "/api/tools", service = "tools-api", port = 3002 },
+      ]
+    }
+  } : {}
 }

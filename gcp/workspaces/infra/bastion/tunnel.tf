@@ -78,6 +78,6 @@ resource "cloudflare_zero_trust_access_policy" "tunnel" {
   precedence     = "1"
 
   include {
-    group = cloudflare_zero_trust_access_group.tunnel.*.id
+    group = cloudflare_zero_trust_access_group.tunnel[*].id
   }
 }

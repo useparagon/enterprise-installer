@@ -1,9 +1,72 @@
+locals {
+  api_sync_host = replace(replace(try(var.microservices["api-sync"].public_url, ""), "https://", ""), "http://", "")
+
+  # Single values document for chart-specific overrides (keep one entry in helm_release.values
+  # so plan/apply does not churn on yaml fragment ordering).
+  managed_sync_chart_values = yamlencode(merge({
+    # openfga-migrate is a post-install hook while the openfga ServiceAccount is normally
+    # a regular resource. On first install, the cluster can create the Job before the SA is
+    # visible, producing: serviceaccount "openfga" not found.
+    openfga = {
+      enabled = true
+      serviceAccount = {
+        annotations = {
+          "helm.sh/hook"        = "pre-install,pre-upgrade"
+          "helm.sh/hook-weight" = "-10"
+        }
+      }
+    }
+    # queue-exporter.common defaults to shared: false and renders a standalone Ingress
+    # (chart-example.local, internal NLB group). Disable it on AWS; sync traffic uses the
+    # parent chart Ingress on the shared paragon ALB group (ingress.loadBalancerName).
+    queue-exporter = {
+      common = {
+        ingress = {
+          enabled = false
+        }
+      }
+    }
+    bootstrap = {
+      postgres = {
+        configOpenFGA = {
+          prehookEnabled = true
+        }
+        configProject = {
+          prehookEnabled = true
+        }
+        configSyncInstance = {
+          prehookEnabled = true
+        }
+      }
+    }
+    ingress = {
+      className = "alb"
+      annotations = merge(
+        {
+          "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "false"
+        },
+        var.waf_web_acl_arn != "" ? {
+          "alb.ingress.kubernetes.io/wafv2-acl-arn" = var.waf_web_acl_arn
+        } : {}
+      )
+    }
+    }, var.agent_os_enabled ? {
+    # Leave existing Managed Sync values untouched until Agent OS is enabled.
+    global = {
+      env = {
+        MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = "false"
+        MANAGED_SYNC_STATUS_EVENTS_ENABLED             = "true"
+      }
+    }
+  } : {}))
+}
+
 resource "helm_release" "managed_sync" {
   count = var.managed_sync_enabled ? 1 : 0
 
   name             = "paragon-managed-sync"
   description      = "Managed Sync"
-  repository       = "https://paragon-helm-production.s3.amazonaws.com"
+  repository       = var.paragon_helm_repository
   chart            = "managed-sync"
   version          = var.managed_sync_version
   namespace        = local.paragon_namespace
@@ -12,19 +75,14 @@ resource "helm_release" "managed_sync" {
   atomic           = true
   verify           = false
   timeout          = 900 # 15 minutes
+  # Parent chart renders ScaledObject; KEDA CRDs come from the subchart. OpenAPI
+  # validation runs before subchart CRDs exist (and manual CRD fixes break Helm ownership).
+  disable_openapi_validation = true
 
   values = [
     local.global_values_minus_env,
+    local.managed_sync_chart_values,
     local.secret_hash,
-    yamlencode({
-      ingress = {
-        annotations = {
-          # Same ALB group as paragon-onprem. Harmless with auto frontend SGs (annotation
-          # ignored); required if a future chart sets alb.ingress.kubernetes.io/security-groups.
-          "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "false"
-        }
-      }
-    }),
   ]
 
   set {
@@ -39,7 +97,7 @@ resource "helm_release" "managed_sync" {
 
   set {
     name  = "ingress.host"
-    value = replace(replace(var.microservices["api-sync"].public_url, "https://", ""), "http://", "")
+    value = local.api_sync_host
   }
 
   set {

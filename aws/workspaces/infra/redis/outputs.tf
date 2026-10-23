@@ -1,3 +1,21 @@
+output "valkey" {
+  value = {
+    for key, config in var.valkey_instances :
+    key => {
+      host = (
+        config.cluster_enabled
+        ? aws_elasticache_replication_group.valkey[key].configuration_endpoint_address
+        : aws_elasticache_replication_group.valkey[key].primary_endpoint_address
+      )
+      port     = aws_elasticache_replication_group.valkey[key].port
+      password = config.tls_enabled ? random_password.valkey_auth[key].result : null
+      ssl      = config.tls_enabled
+      cluster  = config.cluster_enabled
+    }
+  }
+  sensitive = true
+}
+
 output "elasticache" {
   value = var.elasticache_multiple_instances ? {
     for key, value in local.redis_instances :

@@ -10,15 +10,15 @@ image:
   repository: fluent/fluent-bit
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: '3.2.10'
+  tag: '5.1.2'
 
 testFramework:
   enabled: false
   namespace:
   image:
     repository: busybox
-    pullPolicy: Always
-    tag: latest
+    pullPolicy: IfNotPresent
+    tag: '1.37.0'
     digest:
 
 imagePullSecrets: []
@@ -79,13 +79,16 @@ hostAliases: []
 #     - "foo.local"
 #     - "bar.local"
 
-securityContext: {}
-#   capabilities:
-#     drop:
-#     - ALL
-#   readOnlyRootFilesystem: true
-#   runAsNonRoot: true
-#   runAsUser: 1000
+# Distroless fluent-bit still runs as root so it can tail host container logs.
+# Do not set runAsNonRoot / runAsUser: 1000 here — /var/log/containers is root-owned.
+securityContext:
+  allowPrivilegeEscalation: false
+  privileged: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
 
 service:
   type: ClusterIP
@@ -540,7 +543,19 @@ hotReload:
   enabled: false
   image:
     repository: ghcr.io/jimmidyson/configmap-reload
-    tag: v0.11.1
+    tag: v0.15.0
     digest:
     pullPolicy: IfNotPresent
   resources: {}
+  securityContext:
+    privileged: false
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault

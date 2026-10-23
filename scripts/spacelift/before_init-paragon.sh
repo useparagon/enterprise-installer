@@ -50,6 +50,11 @@ resolve_chart_tag() {
     return 0
   fi
 
+  if [[ -n "${TF_VAR_platform_version:-}" ]]; then
+    printf '%s' "${TF_VAR_platform_version}"
+    return 0
+  fi
+
   local values_file=""
   if [[ -n "${TF_VAR_helm_yaml_path:-}" && -f "${TF_VAR_helm_yaml_path}" ]]; then
     values_file="${TF_VAR_helm_yaml_path}"
@@ -58,7 +63,7 @@ resolve_chart_tag() {
   fi
 
   if [[ -z "${values_file}" ]]; then
-    echo "ERROR: set PARAGON_CHART_TAG or mount paragon-values.yaml (TF_VAR_helm_yaml_path) with global.env.VERSION" >&2
+    echo "ERROR: set PARAGON_CHART_TAG, TF_VAR_platform_version, or a values file (TF_VAR_helm_yaml_path) with global.env.VERSION" >&2
     return 1
   fi
 
@@ -131,6 +136,15 @@ fi
 
 echo "Running prepare.sh -p ${CLOUD} -t ${CHART_TAG}"
 ./prepare.sh -p "${CLOUD}" -t "${CHART_TAG}"
+
+# prepare.sh seeds .secure/values.yaml from placeholder when missing; on Spacelift
+# the real file is the context mount at TF_VAR_helm_yaml_path — sync it so local
+# paths and stale placeholder LICENSE cannot win over the mount.
+if [[ -n "${TF_VAR_helm_yaml_path:-}" && -f "${TF_VAR_helm_yaml_path}" ]]; then
+  mkdir -p "${WS}/.secure"
+  cp "${TF_VAR_helm_yaml_path}" "${WS}/.secure/values.yaml"
+  echo "Synced ${TF_VAR_helm_yaml_path} → ${WS}/.secure/values.yaml"
+fi
 
 rm -f "${WS}/vars.auto.tfvars"
 rm -f "${REPO_ROOT}/${CLOUD}/workspaces/infra/vars.auto.tfvars"

@@ -1,0 +1,69 @@
+# Lint and validate Terraform on every pull request that touches IaC.
+name: PR Validation
+
+on:
+  pull_request:
+    paths:
+      - "aws/**"
+      - "azure/**"
+      - "gcp/**"
+      - ".tflint.hcl"
+      - ".github/workflows/pull-request.yaml"
+
+concurrency:
+  group: pull-request-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4.3.1
+        with:
+          fetch-depth: 1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.9.8
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.61.0
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive -diff
+
+      - name: Validate and lint workspaces
+        run: |
+          set -euo pipefail
+          for workspace in \
+            aws/workspaces/infra \
+            aws/workspaces/paragon \
+            azure/workspaces/infra \
+            azure/workspaces/paragon \
+            gcp/workspaces/infra \
+            gcp/workspaces/paragon
+          do
+            echo "::group::${workspace}"
+            (
+              cd "${workspace}"
+              # main.tf and .secure/ are gitignored; mirror prepare.sh so init/tflint can load config
+              cp main.tf.example main.tf
+              if [[ "${workspace}" == */paragon ]]; then
+                mkdir -p .secure
+                cp "${GITHUB_WORKSPACE}/charts/values.placeholder.yaml" .secure/values.yaml
+              fi
+              terraform init -backend=false -input=false
+              terraform validate
+              tflint --config "${GITHUB_WORKSPACE}/.tflint.hcl" --recursive
+            )
+            echo "::endgroup::"
+          done

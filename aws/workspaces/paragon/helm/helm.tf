@@ -10,6 +10,14 @@ locals {
   # instead of failing the apply, so blank is treated the same as unset.
   docker_credentials_set = local.docker_username != "" && local.docker_password != ""
 
+  # Plan-time gate for docker-cfg (ESO sync or TF-managed secret). Do not infer from
+  # kubernetes_secret.data length — that is unknown during destroy when the cluster
+  # secret is already gone.
+  docker_pull_credentials_available = (
+    (var.install_external_secrets && var.docker_cfg_secret_name != null) ||
+    (!var.install_external_secrets && local.docker_credentials_set)
+  )
+
   helm_values_yaml = yamlencode(nonsensitive(var.helm_values))
 
   subchart_values = yamlencode({
@@ -26,7 +34,12 @@ locals {
           }
         }
       ),
-      try(nonsensitive(var.helm_values.subchart), {})
+      try(nonsensitive(var.helm_values.subchart), {}),
+      var.restrict_public_exposure ? {
+        health-checker = {
+          enabled = true
+        }
+      } : {}
     )
   })
 
@@ -112,6 +125,28 @@ locals {
     }
   })
 
+  # Chart defaults leave ingress.enabled=true. Anything not on the load balancer gets no Ingress:
+  # private_services, restrict_public_exposure exclusions, and services with no public URL.
+  # ingress_scheme=internal is a different case. Those services stay in public_* and keep an
+  # Ingress, with scheme=internal and the cloud class (alb here).
+  unexposed_microservice_values = yamlencode({
+    for microservice_name, microservice_config in var.microservices : microservice_name => {
+      ingress = {
+        enabled = false
+      }
+    }
+    if !contains(keys(var.public_microservices), microservice_name)
+  })
+
+  unexposed_monitor_values = yamlencode({
+    for monitor_name, monitor_config in var.monitors : monitor_name => {
+      ingress = {
+        enabled = false
+      }
+    }
+    if !contains(keys(var.public_monitors), monitor_name)
+  })
+
   docker_pull_secret_global_values = var.create_docker_pull_secret ? {
     imagePullSecrets = concat(
       try(nonsensitive(var.helm_values.global.imagePullSecrets), []),
@@ -171,9 +206,14 @@ locals {
             try(nonsensitive(var.helm_values).global.podAnnotations, {}),
             { "reloader.stakater.com/auto" = "true" }
           )
-          env = {
-            HOST_ENV = "AWS_K8"
-          }
+          env = merge(
+            { HOST_ENV = "AWS_K8" },
+            {
+              for key, value in try(nonsensitive(var.helm_values).global.env, {}) :
+              key => value
+              if strcontains(key, "SYNC") && value != null
+            },
+          )
         },
         local.docker_pull_secret_global_values
       )
@@ -203,6 +243,10 @@ resource "kubernetes_namespace" "paragon" {
       "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
     }
   }
+
+  timeouts {
+    delete = "15m"
+  }
 }
 
 locals {
@@ -229,7 +273,7 @@ resource "kubernetes_secret" "docker_login" {
   count = (
     var.create_docker_pull_secret &&
     !var.install_external_secrets &&
-    local.docker_credentials_set
+    local.docker_pull_credentials_available
   ) ? 1 : 0
 
   metadata {
@@ -242,7 +286,7 @@ resource "kubernetes_secret" "docker_login" {
   data = {
     ".dockerconfigjson" = jsonencode({
       auths = {
-        "${var.docker_registry_server}" = {
+        (var.docker_registry_server) = {
           "username" = local.docker_username
           "password" = local.docker_password
           "email"    = var.docker_email != null ? var.docker_email : ""
@@ -254,6 +298,12 @@ resource "kubernetes_secret" "docker_login" {
 }
 
 # ingress controller; provisions load balancer
+#
+# The controller runs on worker nodes (no IRSA) and uses the infra eks-worker-policy.
+# Ingress group membership changes (e.g. restrict_public_exposure) call
+# elasticloadbalancing:SetRulePriorities; missing that action leaves Ingress
+# objects Terminating and stale listener rules until IAM is fixed and the
+# controller reconciles the group.
 #
 # Upgrade order (per cluster, before paragon terraform apply):
 #   1. kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
@@ -437,12 +487,14 @@ resource "helm_release" "paragon_on_prem" {
     local.flipt_values,
     local.microservice_values,
     local.public_microservice_values,
+    local.unexposed_microservice_values,
     local.secret_hash
   ]
 
   depends_on = [
     module.karpenter,
     helm_release.ingress,
+    terraform_data.knative_serving_ready,
     data.kubernetes_secret.paragon_secrets,
     data.kubernetes_secret.docker_cfg,
     kubernetes_secret.docker_login,
@@ -522,6 +574,7 @@ resource "helm_release" "paragon_monitoring" {
     local.global_values,
     local.monitor_values,
     local.public_monitor_values,
+    local.unexposed_monitor_values,
     local.secret_hash
   ]
 

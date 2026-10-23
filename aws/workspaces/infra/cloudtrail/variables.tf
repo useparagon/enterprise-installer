@@ -1,9 +1,11 @@
 variable "workspace" {
   description = "The name of the workspace resources are being created in."
+  type        = string
 }
 
 variable "aws_region" {
   description = "The AWS region resources are created in."
+  type        = string
 }
 
 variable "master_guardduty_account_id" {

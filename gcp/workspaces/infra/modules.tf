@@ -10,8 +10,6 @@ module "network" {
 module "postgres" {
   source = "./postgres"
 
-  auditlogs_lock_enabled         = var.auditlogs_lock_enabled
-  auditlogs_retention_days       = var.auditlogs_retention_days
   disable_deletion_protection    = var.disable_deletion_protection
   gcp_project_id                 = local.gcp_project_id
   managed_sync_enabled           = var.managed_sync_enabled
@@ -19,41 +17,45 @@ module "postgres" {
   postgres_disk_autoresize_limit = var.postgres_disk_autoresize_limit
   postgres_multiple_instances    = var.postgres_multiple_instances
   postgres_tier                  = var.postgres_tier
-  private_subnet                 = module.network.private_subnet
   region                         = var.region
   workspace                      = local.workspace
+  agent_os_enabled               = var.agent_os_enabled
+  agent_os_postgres              = var.agent_os_postgres
 }
 
 module "redis" {
   source = "./redis"
 
-  gcp_project_id       = local.gcp_project_id
-  multi_redis          = var.redis_multiple_instances
-  network              = module.network.network
-  private_subnet       = module.network.private_subnet
-  redis_memory_size    = var.redis_memory_size
-  region               = var.region
-  region_zone          = var.region_zone
-  region_zone_backup   = var.region_zone_backup
-  workspace            = local.workspace
-  managed_sync_enabled = var.managed_sync_enabled
+  gcp_project_id              = local.gcp_project_id
+  multi_redis                 = var.redis_multiple_instances
+  network                     = module.network.network
+  redis_memory_size           = var.redis_memory_size
+  region                      = var.region
+  region_zone                 = var.region_zone
+  region_zone_backup          = var.region_zone_backup
+  workspace                   = local.workspace
+  managed_sync_enabled        = var.managed_sync_enabled
+  private_subnet              = module.network.private_subnet
+  disable_deletion_protection = var.disable_deletion_protection
+  agent_os_enabled            = var.agent_os_enabled
+  agent_os_valkey             = local.agent_os_valkey
 }
 
 module "kafka" {
   count  = var.managed_sync_enabled ? 1 : 0
   source = "./kafka"
 
-  gcp_project_id               = local.gcp_project_id
-  region                       = var.region
-  workspace                    = local.workspace
-  private_subnet_uri           = module.network.private_subnet.self_link
-  gmk_vcpu_count               = var.gmk_vcpu_count
-  gmk_memory_bytes             = var.gmk_memory_gib * 1024 * 1024 * 1024
-  gmk_disk_size_gib            = var.gmk_disk_size_gib
-  gmk_auto_rebalance           = var.gmk_auto_rebalance
-  gmk_kafka_version            = var.gmk_kafka_version
-  gmk_sasl_mechanism           = var.gmk_sasl_mechanism
-  gmk_sasl_plain_key_file_path = var.gmk_sasl_plain_key_file_path
+  gcp_project_id        = local.gcp_project_id
+  region                = var.region
+  workspace             = local.workspace
+  private_subnet_uri    = module.network.private_subnet.self_link
+  gmk_vcpu_count        = var.gmk_vcpu_count
+  gmk_memory_bytes      = var.gmk_memory_gib * 1024 * 1024 * 1024
+  gmk_disk_size_gib     = var.gmk_disk_size_gib
+  gmk_auto_rebalance    = var.gmk_auto_rebalance
+  gmk_sasl_mechanism    = var.gmk_sasl_mechanism
+  gmk_bootstrap_address = var.gmk_bootstrap_address
+  agent_os_enabled      = var.agent_os_enabled
 }
 
 module "storage" {
@@ -67,6 +69,7 @@ module "storage" {
   use_storage_account_key     = var.use_storage_account_key
   workspace                   = local.workspace
   managed_sync_enabled        = var.managed_sync_enabled
+  agent_os_enabled            = var.agent_os_enabled
 }
 
 # Pods share one KSA (managed-sync-service-account) annotated with the storage
@@ -97,6 +100,13 @@ module "cluster" {
   region_zone                     = var.region_zone
   region_zone_backup              = var.region_zone_backup
   workspace                       = local.workspace
+  agent_os_enabled                = var.agent_os_enabled
+  agent_os_index_machine_type     = var.agent_os_index_machine_type
+  agent_os_index_min_count        = var.agent_os_index_min_count
+  agent_os_index_max_count        = var.agent_os_index_max_count
+  agent_os_extract_machine_type   = var.agent_os_extract_machine_type
+  agent_os_extract_min_count      = var.agent_os_extract_min_count
+  agent_os_extract_max_count      = var.agent_os_extract_max_count
 }
 
 module "bastion" {

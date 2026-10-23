@@ -1,5 +1,6 @@
 variable "workspace" {
   description = "The name of the workspace resources are being created in."
+  type        = string
 }
 
 variable "force_destroy" {
@@ -9,6 +10,7 @@ variable "force_destroy" {
 
 variable "app_bucket_expiration" {
   description = "The number of days to retain S3 app data before deleting"
+  type        = number
 }
 
 variable "auditlogs_retention_days" {
@@ -24,6 +26,16 @@ variable "auditlogs_lock_enabled" {
 variable "managed_sync_enabled" {
   description = "Whether to enable managed sync."
   type        = bool
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create the Agent OS bucket."
+  type        = bool
+}
+
+variable "agent_os_kms_key_arn" {
+  description = "KMS key ARN used to encrypt the Agent OS bucket."
+  type        = string
 }
 
 variable "s3_kms_encryption_enabled" {

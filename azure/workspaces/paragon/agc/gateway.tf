@@ -142,12 +142,28 @@ locals {
           sectionName = local.https_listeners[name].listener
         }]
         hostnames = [svc.host]
-        rules = [{
-          backendRefs = [{
-            name = name
-            port = svc.port
-          }]
-        }]
+        rules = concat(
+          length(svc.routes) == 0 ? [{
+            backendRefs = [{
+              name = name
+              port = svc.port
+            }]
+          }] : [],
+          [
+            for route in svc.routes : {
+              matches = [{
+                path = {
+                  type  = "PathPrefix"
+                  value = route.path
+                }
+              }]
+              backendRefs = [{
+                name = route.service
+                port = route.port
+              }]
+            }
+          ]
+        )
       }
     })
   }

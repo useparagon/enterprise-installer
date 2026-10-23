@@ -5,10 +5,12 @@ variable "gcp_project_id" {
 
 variable "network" {
   description = "The Virtual network  where our resources will be deployed"
+  type        = any
 }
 
 variable "private_subnet" {
   description = "The private subnet in our virtual network"
+  type        = any
 }
 
 variable "region" {
@@ -78,4 +80,35 @@ variable "k8s_master_authorized_networks" {
     display_name = optional(string, "")
   }))
   default = []
+}
+
+variable "agent_os_enabled" {
+  type = bool
+}
+
+variable "agent_os_index_machine_type" {
+  type = string
+}
+
+variable "agent_os_index_min_count" {
+  type = number
+}
+
+variable "agent_os_index_max_count" {
+  type = number
+}
+
+variable "agent_os_extract_machine_type" {
+  description = "Compute-optimized AMD machine type for the Agent OS extraction node pool."
+  type        = string
+}
+
+variable "agent_os_extract_min_count" {
+  description = "Minimum nodes in the Agent OS extraction node pool."
+  type        = number
+}
+
+variable "agent_os_extract_max_count" {
+  description = "Maximum nodes in the Agent OS extraction node pool."
+  type        = number
 }

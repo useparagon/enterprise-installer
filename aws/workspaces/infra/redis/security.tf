@@ -8,7 +8,7 @@ resource "aws_security_group" "elasticache" {
     from_port   = 6379
     to_port     = 6379
     protocol    = "tcp"
-    cidr_blocks = var.public_subnet.*.cidr_block
+    cidr_blocks = var.public_subnet[*].cidr_block
   }
 
   ingress {
@@ -16,7 +16,7 @@ resource "aws_security_group" "elasticache" {
     from_port   = 6379
     to_port     = 6379
     protocol    = "tcp"
-    cidr_blocks = var.private_subnet.*.cidr_block
+    cidr_blocks = var.private_subnet[*].cidr_block
   }
 
   egress {
@@ -33,5 +33,39 @@ resource "aws_security_group" "elasticache" {
 
   tags = {
     Name = "${var.workspace}-elasticache"
+  }
+}
+
+# Shared Valkey security group. Today Agent OS is the only consumer; future
+# migrated Valkey instances reuse the same private-subnet ingress policy.
+resource "aws_security_group" "valkey" {
+  count = length(var.valkey_instances) > 0 ? 1 : 0
+
+  name_prefix = "${var.workspace}-valkey"
+  description = "Security access rules for Valkey."
+  vpc_id      = var.vpc.id
+
+  ingress {
+    description = "Allow private workloads on port 6379."
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = var.private_subnet[*].cidr_block
+  }
+
+  egress {
+    description = "Allow all outbound traffic."
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name = "${var.workspace}-valkey"
   }
 }

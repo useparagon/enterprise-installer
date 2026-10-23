@@ -7,6 +7,9 @@ NOTE: The following APIs must be enabled for the project in the [GCP Console](ht
 - Cloud SQL Admin API
 - Compute Engine API
 - Google Cloud Memorystore for Redis API
+- Memorystore for Valkey API
+- Network Connectivity API
+- Service Consumer Management API
 - Service Networking API
 - Secret Manager API
 - Kubernetes Engine API
@@ -19,6 +22,13 @@ The infra workspace registers the cluster with Fleet. The paragon workspace
 uses Connect Gateway for Terraform Helm and Kubernetes operations, allowing a
 public automation worker to manage a private GKE control plane without a
 private runner or public endpoint.
+
+## Agent OS Kafka
+
+Agent OS reuses the existing Google Managed Kafka cluster and receives a
+dedicated Kafka identity when `agent_os_enabled = true`. Managed Sync creates
+the Context topics through Kafka; Terraform must not create duplicates.
+Apply `infra` before `paragon`.
 
 ## Postgres disk autoresize limit
 
@@ -33,12 +43,14 @@ private runner or public endpoint.
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
 | <a name="requirement_google"></a> [google](#requirement\_google) | >= 7.19.0, < 8.0.0 |
 | <a name="requirement_google-beta"></a> [google-beta](#requirement\_google-beta) | ~> 7.0 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
 | <a name="provider_google"></a> [google](#provider\_google) | 7.33.0 |
+| <a name="provider_random"></a> [random](#provider\_random) | 3.9.0 |
 
 ## Modules
 
@@ -57,6 +69,8 @@ private runner or public endpoint.
 | Name | Type |
 | ---- | ---- |
 | [google_gke_hub_membership.cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/gke_hub_membership) | resource |
+| [google_project_iam_member.storage_managedkafka_client](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_iam_member) | resource |
+| [google_secret_manager_secret.runtime_agent_os](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
@@ -65,6 +79,7 @@ private runner or public endpoint.
 | [google_secret_manager_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_redis_ca_cert](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
 | [google_secret_manager_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret) | resource |
+| [google_secret_manager_secret_version.runtime_agent_os](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_bastion](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_kafka](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
@@ -73,11 +88,25 @@ private runner or public endpoint.
 | [google_secret_manager_secret_version.runtime_redis](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_redis_ca_cert](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
 | [google_secret_manager_secret_version.runtime_storage](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/secret_manager_secret_version) | resource |
+| [random_password.agent_os_capability_broker_password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
+| [random_password.agent_os_capability_broker_service_token](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
+| [random_password.agent_os_capability_broker_signing_key](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
+| [random_password.agent_os_extraction_api_key](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
+| [random_string.agent_os_capability_broker_username](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive. | `bool` | `false` | no |
+| <a name="input_agent_os_extract_machine_type"></a> [agent\_os\_extract\_machine\_type](#input\_agent\_os\_extract\_machine\_type) | Extract GKE machine type. Default c2d-standard-16 (16 vCPU; 4 pods/node). | `string` | `"c2d-standard-16"` | no |
+| <a name="input_agent_os_extract_max_count"></a> [agent\_os\_extract\_max\_count](#input\_agent\_os\_extract\_max\_count) | Max extract nodes. Staging 3, production 8 (covers 30 pods at 4/node). | `number` | `8` | no |
+| <a name="input_agent_os_extract_min_count"></a> [agent\_os\_extract\_min\_count](#input\_agent\_os\_extract\_min\_count) | Minimum nodes in the Agent OS extraction GKE node pool. | `number` | `1` | no |
+| <a name="input_agent_os_index_machine_type"></a> [agent\_os\_index\_machine\_type](#input\_agent\_os\_index\_machine\_type) | GKE machine type for the Agent OS index node pool. | `string` | `"n2-highmem-8"` | no |
+| <a name="input_agent_os_index_max_count"></a> [agent\_os\_index\_max\_count](#input\_agent\_os\_index\_max\_count) | Maximum number of nodes in the Agent OS index GKE node pool. | `number` | `4` | no |
+| <a name="input_agent_os_index_min_count"></a> [agent\_os\_index\_min\_count](#input\_agent\_os\_index\_min\_count) | Minimum number of nodes in the Agent OS index GKE node pool. | `number` | `2` | no |
+| <a name="input_agent_os_postgres"></a> [agent\_os\_postgres](#input\_agent\_os\_postgres) | Agent OS Cloud SQL instances keyed by instance name. Each entry can be sized and changed independently. | <pre>map(object({<br/>    instance_class         = optional(string, "db-custom-2-4096")<br/>    allocated_storage      = optional(number, 100)<br/>    max_allocated_storage  = optional(number, 1000)<br/>    engine_version         = optional(string, "POSTGRES_16")<br/>    multi_az               = optional(bool, true)<br/>    read_replica           = optional(bool, false)<br/>    replica_instance_class = optional(string, "db-custom-1-3840")<br/>    storage_type           = optional(string, "PD_SSD")<br/>  }))</pre> | <pre>{<br/>  "agent_os": {}<br/>}</pre> | no |
+| <a name="input_agent_os_valkey"></a> [agent\_os\_valkey](#input\_agent\_os\_valkey) | Overrides for Agent OS Memorystore for Valkey instances. Each key is a logical cache name (cache).<br/>Merged per key with agent\_os\_valkey\_default (node\_type, multi\_az, cluster\_enabled, engine\_version).<br/>Null uses defaults only. | <pre>map(object({<br/>    node_type       = optional(string)<br/>    multi_az        = optional(bool)<br/>    cluster_enabled = optional(bool)<br/>    engine_version  = optional(string)<br/>  }))</pre> | `null` | no |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to lock the GCS audit logs bucket retention policy. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
 | <a name="input_bastion_enabled"></a> [bastion\_enabled](#input\_bastion\_enabled) | Whether to create the bastion host and its associated Cloudflare tunnel. | `bool` | `true` | no |
@@ -99,10 +128,8 @@ private runner or public endpoint.
 | <a name="input_gcp_project_id"></a> [gcp\_project\_id](#input\_gcp\_project\_id) | The id of the Google Cloud Project. Required if not using `gcp_credential_json_file`. | `string` | `null` | no |
 | <a name="input_gmk_auto_rebalance"></a> [gmk\_auto\_rebalance](#input\_gmk\_auto\_rebalance) | Whether to enable automatic partition rebalancing across brokers (can add load). | `bool` | `false` | no |
 | <a name="input_gmk_disk_size_gib"></a> [gmk\_disk\_size\_gib](#input\_gmk\_disk\_size\_gib) | Disk size in GiB per broker for the GMK cluster. | `number` | `100` | no |
-| <a name="input_gmk_kafka_version"></a> [gmk\_kafka\_version](#input\_gmk\_kafka\_version) | Kafka version for the Google Managed Kafka cluster (version offered by the service). | `string` | `"3.7.1"` | no |
 | <a name="input_gmk_memory_gib"></a> [gmk\_memory\_gib](#input\_gmk\_memory\_gib) | Memory in GiB for the GMK cluster (1-8 GiB per vCPU). | `number` | `6` | no |
 | <a name="input_gmk_sasl_mechanism"></a> [gmk\_sasl\_mechanism](#input\_gmk\_sasl\_mechanism) | SASL mechanism: plain (module creates SA key and outputs in kafka.cluster\_password) or oauthbearer (Workload Identity). | `string` | `"plain"` | no |
-| <a name="input_gmk_sasl_plain_key_file_path"></a> [gmk\_sasl\_plain\_key\_file\_path](#input\_gmk\_sasl\_plain\_key\_file\_path) | Optional path to your own Kafka SA key JSON for SASL/PLAIN. When empty, the module creates the key and outputs it in kafka.cluster\_password. | `string` | `""` | no |
 | <a name="input_gmk_vcpu_count"></a> [gmk\_vcpu\_count](#input\_gmk\_vcpu\_count) | Number of vCPUs for the GMK cluster (minimum 3 in GCP). | `number` | `3` | no |
 | <a name="input_k8s_disable_public_endpoint"></a> [k8s\_disable\_public\_endpoint](#input\_k8s\_disable\_public\_endpoint) | Used to disable public endpoint on GKE cluster. | `bool` | `true` | no |
 | <a name="input_k8s_master_authorized_networks"></a> [k8s\_master\_authorized\_networks](#input\_k8s\_master\_authorized\_networks) | List of CIDRs allowed to reach the GKE control plane (Master Authorized Networks). Use [{ cidr\_block = "0.0.0.0/0", display\_name = "all" }] to allow all IPs (e.g. from any country). Empty list = only cluster nodes (restricted). | <pre>list(object({<br/>    cidr_block   = string<br/>    display_name = optional(string, "")<br/>  }))</pre> | `[]` | no |
@@ -141,6 +168,7 @@ private runner or public endpoint.
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
 | <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
 | <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. |
+| <a name="output_tracking"></a> [tracking](#output\_tracking) | Non-sensitive deployment metadata for external environment tracking. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->
 

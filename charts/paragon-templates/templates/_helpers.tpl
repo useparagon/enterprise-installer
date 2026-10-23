@@ -1,4 +1,34 @@
 {{/*
+Reloader-only annotations YAML. Input: map of annotations (template context `.`).
+*/}}
+{{- define "paragon.annotations.reloaderOnlyYaml" -}}
+{{- $result := dict -}}
+{{- range $k, $v := . -}}
+{{- if or (hasPrefix "reloader.stakater.com/" $k) (hasPrefix "secret.reloader.stakater.com/" $k) (hasPrefix "configmap.reloader.stakater.com/" $k) -}}
+{{- $result = merge $result (dict $k $v) -}}
+{{- end -}}
+{{- end -}}
+{{- if gt (len $result) 0 -}}
+{{- toYaml $result -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Non-Reloader pod template annotations YAML. Input: map of annotations (template context `.`).
+*/}}
+{{- define "paragon.annotations.podTemplateOnlyYaml" -}}
+{{- $result := dict -}}
+{{- range $k, $v := . -}}
+{{- if not (or (hasPrefix "reloader.stakater.com/" $k) (hasPrefix "secret.reloader.stakater.com/" $k) (hasPrefix "configmap.reloader.stakater.com/" $k)) -}}
+{{- $result = merge $result (dict $k $v) -}}
+{{- end -}}
+{{- end -}}
+{{- if gt (len $result) 0 -}}
+{{- toYaml $result -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Returns non-empty when a path segment looks like a registry host
 (e.g. artifactory.example.com, localhost:5000, registry:5000).
 Input: path segment string.

@@ -10,10 +10,7 @@ variable "workspace" {
 
 variable "network" {
   description = "The Virtual network where our resources will be deployed"
-}
-
-variable "private_subnet" {
-  description = "The private subnet in our virtual network"
+  type        = any
 }
 
 variable "region" {
@@ -43,20 +40,29 @@ variable "disable_deletion_protection" {
   type        = bool
 }
 
-variable "auditlogs_retention_days" {
-  description = "The number of days to retain audit logs before deletion."
-  type        = number
-}
-
-variable "auditlogs_lock_enabled" {
-  description = "Whether to enable S3 Object Lock for the audit logs bucket."
-  type        = bool
-}
-
 variable "managed_sync_enabled" {
   description = "Whether to create a dedicated Postgres instance for Managed Sync."
   type        = bool
   default     = false
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create the dedicated Agent OS Cloud SQL instance."
+  type        = bool
+}
+
+variable "agent_os_postgres" {
+  description = "Resolved Agent OS Cloud SQL instances keyed by instance name. Defaults are owned by the workspace root."
+  type = map(object({
+    instance_class         = string
+    allocated_storage      = number
+    max_allocated_storage  = number
+    engine_version         = string
+    multi_az               = bool
+    read_replica           = bool
+    replica_instance_class = string
+    storage_type           = string
+  }))
 }
 
 locals {

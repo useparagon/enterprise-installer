@@ -42,6 +42,10 @@ dependencies:
     repository: file://charts/hermes
     version: __PARAGON_VERSION__
     condition: subchart.hermes.enabled
+  - name: ocs-code-runner
+    repository: file://charts/ocs-code-runner
+    version: __PARAGON_VERSION__
+    condition: subchart.ocs-code-runner.enabled
   - name: passport
     repository: file://charts/passport
     version: __PARAGON_VERSION__

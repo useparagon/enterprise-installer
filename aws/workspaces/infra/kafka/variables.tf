@@ -8,13 +8,9 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "force_destroy" {
-  description = "Whether to enable force destroy."
-  type        = bool
-}
-
 variable "private_subnet" {
   description = "The private subnets within the VPC."
+  type        = any
 }
 
 variable "msk_instance_type" {
@@ -35,4 +31,14 @@ variable "msk_kafka_num_broker_nodes" {
 variable "msk_autoscaling_enabled" {
   description = "Whether to enable autoscaling for the MSK cluster."
   type        = bool
+}
+
+variable "agent_os_enabled" {
+  description = "Whether to create a dedicated Agent OS SCRAM identity on this MSK cluster."
+  type        = bool
+}
+
+variable "secrets_recovery_window_in_days" {
+  description = "Secrets Manager deletion recovery window for the MSK SCRAM credentials secret. Set to 0 for immediate deletion so names are free after destroy."
+  type        = number
 }

@@ -1,21 +1,26 @@
 variable "workspace" {
   description = "The name of the workspace resources are being created in."
+  type        = string
 }
 
 variable "aws_region" {
   description = "The AWS region resources are created in."
+  type        = string
 }
 
 variable "vpc_id" {
   description = "The id of the VPC to create resources in."
+  type        = string
 }
 
 variable "public_subnet" {
   description = "Public subnet accessible to the outside world."
+  type        = any
 }
 
 variable "private_subnet" {
   description = "Private subnet accessible only within the VPC."
+  type        = any
 }
 
 variable "ssh_whitelist" {

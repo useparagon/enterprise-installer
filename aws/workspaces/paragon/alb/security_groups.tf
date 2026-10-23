@@ -3,7 +3,7 @@ locals {
   # the microservice charts enable ingress by default, so internal workers get
   # target groups too.
   alb_target_ports = [
-    for service in values(merge(var.microservices, var.public_monitors)) : service.port
+    for service in values(merge(var.microservices, var.public_services)) : service.port
   ]
 }
 
