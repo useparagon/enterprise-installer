@@ -82,7 +82,7 @@ variable "bastion_security_group_id" {
 }
 
 variable "create_autoscaling_linked_role" {
-  description = "Whether or not to create an IAM role for autoscaling."
+  description = "Create the account autoscaling IAM service-linked role. When disabling after it was created, state-rm this instance before apply so the role is left in AWS."
   type        = bool
 }
 

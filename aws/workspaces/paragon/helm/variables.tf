@@ -134,6 +134,11 @@ variable "certificate" {
   type        = string
 }
 
+variable "domain" {
+  description = "Enterprise deployment domain (agentos.<domain> public hostname)."
+  type        = string
+}
+
 variable "alb_backend_security_group_id" {
   description = "Existing security group attached to the ALB as the controller backend SG and used as the source of Terraform worker target-port rules."
   type        = string

@@ -14,7 +14,7 @@ Parameters:
 {{- $namespaceTemplate := .namespaceTemplate -}}
 {{- $tag := .tag -}}
 {{- $name := $root.Chart.Name -}}
-{{- $redisCaCertEnabled := and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "redisCaCert") (kindIs "map" $root.Values.global.redisCaCert) (hasKey $root.Values.global.redisCaCert "enabled") $root.Values.global.redisCaCert.enabled -}}
+{{- $ca := include "caCerts.configYaml" (dict "root" $root) | fromYaml -}}
 {{- $podAnnotations := dict -}}
 {{- if and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "podAnnotations") (kindIs "map" $root.Values.global.podAnnotations) -}}
 {{- $podAnnotations = merge $podAnnotations $root.Values.global.podAnnotations -}}
@@ -22,6 +22,8 @@ Parameters:
 {{- if $root.Values.podAnnotations -}}
 {{- $podAnnotations = merge $podAnnotations $root.Values.podAnnotations -}}
 {{- end -}}
+{{- $reloaderAnnotationsYaml := include "paragon.annotations.reloaderOnlyYaml" $podAnnotations -}}
+{{- $podTemplateAnnotationsYaml := include "paragon.annotations.podTemplateOnlyYaml" $podAnnotations -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -32,6 +34,10 @@ metadata:
   {{- end }}
   labels:
     {{- include (printf "%s.labels" $name) $root | nindent 4 }}
+  {{- if $reloaderAnnotationsYaml }}
+  annotations:
+    {{- $reloaderAnnotationsYaml | nindent 4 }}
+  {{- end }}
 spec:
   {{- if not (and $root.Values.autoscaling $root.Values.autoscaling.enabled) }}
   replicas: {{ $root.Values.replicaCount | default 1 }}
@@ -41,9 +47,9 @@ spec:
       {{- include (printf "%s.selectorLabels" $name) $root | nindent 6 }}
   template:
     metadata:
-      {{- if $podAnnotations }}
+      {{- if $podTemplateAnnotationsYaml }}
       annotations:
-        {{- toYaml $podAnnotations | nindent 8 }}
+        {{- $podTemplateAnnotationsYaml | nindent 8 }}
       {{- end }}
       labels:
         {{- include (printf "%s.selectorLabels" $name) $root | nindent 8 }}
@@ -57,6 +63,10 @@ spec:
       serviceAccountName: {{ include (printf "%s.serviceAccountName" $name) $root }}
       securityContext:
         {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      {{- if $ca.enabled }}
+      initContainers:
+        {{- include "caCerts.initContainers" (dict "root" $root) | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ $name }}
           securityContext:
@@ -93,22 +103,14 @@ spec:
             {{- toYaml $root.Values.resources | nindent 12 }}
           env:
             {{- include "env.standard" $root | nindent 12 }}
-            {{- if $redisCaCertEnabled }}
-            # Point Node.js to the Redis CA certificate bundle
-            - name: NODE_EXTRA_CA_CERTS
-              value: /etc/ssl/redis-ca/server-ca.pem
-            {{- end }}
-          {{- if $redisCaCertEnabled }}
+            {{- include "caCerts.containerEnv" (dict "root" $root) | nindent 12 }}
+          {{- if $ca.enabled }}
           volumeMounts:
-            - name: redis-ca-cert
-              mountPath: /etc/ssl/redis-ca
-              readOnly: true
+            {{- include "caCerts.containerVolumeMounts" (dict "root" $root) | nindent 12 }}
           {{- end }}
-      {{- if $redisCaCertEnabled }}
+      {{- if $ca.enabled }}
       volumes:
-        - name: redis-ca-cert
-          secret:
-            secretName: {{ $root.Values.global.redisCaCert.secretName | default "redis-ca-cert" }}
+        {{- include "caCerts.volumes" (dict "root" $root) | nindent 8 }}
       {{- end }}
       {{- $tsEnabled := true -}}
       {{- if $root.Values.topologySpread -}}

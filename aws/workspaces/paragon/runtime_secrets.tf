@@ -37,20 +37,15 @@ data "aws_secretsmanager_secret_version" "env" {
 
 resource "aws_secretsmanager_secret_version" "env_paragon_overlay" {
   secret_id = data.aws_secretsmanager_secret.env.id
-  # Infra owns the base secret and wins on conflicts; this workspace only overlays
-  # chart-specific keys that infra does not compute.
+  # Start from the current env secret (infra base + prior overlays), then apply
+  # helm-mounted customer secrets last so LICENSE and other chart secretKeys from
+  # paragon-values.yaml can replace stale values (e.g. prepare.sh placeholder).
   secret_string = jsonencode(merge(
-    local.helm_secret_values,
+    # Keep the original Redis delivery contract for both backends. Terraform
+    # selects the physical endpoint before building helm_secret_values; the
+    # existing paragon-secrets consumer receives the selected values.
     jsondecode(data.aws_secretsmanager_secret_version.env.secret_string),
-    # The Infra-owned /env still contains Redis 6 until its decommission.
-    # On cutover, select Valkey in this existing Secret rather than using a
-    # second ESO overlay or a separate application secret.
-    local.valkey_cutover ? {
-      for key, value in local.helm_secret_values :
-      key => value
-      if key == "REDIS_URL" || endswith(key, "_REDIS_URL") ||
-      endswith(key, "_REDIS_TLS_ENABLED") || endswith(key, "_REDIS_CLUSTER_ENABLED")
-    } : {},
+    local.helm_secret_values
   ))
 
   lifecycle {

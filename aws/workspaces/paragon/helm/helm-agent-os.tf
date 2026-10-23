@@ -1,4 +1,8 @@
 locals {
+  agent_os_public_url = try(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
+  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+  agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
+
   # The Agent OS chart owns Enterprise application defaults, migration hooks,
   # Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
   # Terraform supplies only AWS identity, tenant integration and secret rollout.
@@ -19,6 +23,10 @@ locals {
           region = var.aws_region
         }
 
+        services = {
+          context-api = local.agent_os_port
+        }
+
         env = {
           HOST_ENV                              = "AWS_K8"
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
@@ -34,6 +42,23 @@ locals {
     }
 
   }
+
+  # Same shared ALB group as Managed Sync (workspace), but keep a distinct
+  # Ingress object name — managed-sync already owns metadata.name = workspace.
+  agent_os_aws_ingress_values = yamlencode({
+    ingress = {
+      annotations = merge(
+        {
+          "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "false"
+          "alb.ingress.kubernetes.io/group.name"                          = var.workspace
+          "alb.ingress.kubernetes.io/load-balancer-name"                  = var.workspace
+        },
+        var.waf_web_acl_arn != "" ? {
+          "alb.ingress.kubernetes.io/wafv2-acl-arn" = var.waf_web_acl_arn
+        } : {}
+      )
+    }
+  })
 }
 
 resource "helm_release" "agent_os" {
@@ -53,15 +78,48 @@ resource "helm_release" "agent_os" {
   wait_for_jobs    = true
   timeout          = 900 # 15 minutes, consistent with Paragon and Managed Sync
 
-  # Helm owns application defaults; tenant-specific AWS integration is
-  # layered before these two override surfaces:
-  #   1. Terraform: agent_os_helm_values
-  #   2. .secure/values.yaml: agentOs.values (highest precedence)
   values = [
     yamlencode(local.agent_os_aws_values),
+    local.agent_os_aws_ingress_values,
     yamlencode(var.agent_os_helm_values),
     yamlencode(var.agent_os_file_values),
   ]
+
+  set {
+    name  = "ingress.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "ingress.host"
+    value = local.agent_os_host
+  }
+
+  set {
+    name  = "ingress.certificate"
+    value = var.certificate
+  }
+
+  # Chart metadata.name; ALB group is workspace via ingress.annotations above.
+  set {
+    name  = "ingress.loadBalancerName"
+    value = "agent-os"
+  }
+
+  set {
+    name  = "ingress.scheme"
+    value = var.ingress_scheme
+  }
+
+  set {
+    name  = "ingress.listenPorts[0].HTTP"
+    value = "80"
+  }
+
+  set {
+    name  = "ingress.listenPorts[1].HTTPS"
+    value = "443"
+  }
 
   depends_on = [
     helm_release.managed_sync,

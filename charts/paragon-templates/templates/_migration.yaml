@@ -6,6 +6,7 @@ Call with: include "migration.standard" (dict "root" $ "imageName" "postgres-zeu
 {{- $root := .root -}}
 {{- $imageName := .imageName -}}
 {{- $name := $root.Chart.Name -}}
+{{- $ca := include "caCerts.configYaml" (dict "root" $root) | fromYaml -}}
 {{- $podAnnotations := dict -}}
 {{- if and $root.Values.global (kindIs "map" $root.Values.global) (hasKey $root.Values.global "podAnnotations") (kindIs "map" $root.Values.global.podAnnotations) -}}
 {{- $podAnnotations = merge $podAnnotations $root.Values.global.podAnnotations -}}
@@ -59,6 +60,10 @@ spec:
       serviceAccountName: default
       securityContext:
         {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      {{- if $ca.enabled }}
+      initContainers:
+        {{- include "caCerts.initContainers" (dict "root" $root) | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ $imageName | quote }}
           securityContext:
@@ -69,10 +74,19 @@ spec:
             {{- toYaml $root.Values.resources | nindent 12 }}
           env:
             {{- include "env.standard" $root | nindent 12 }}
+            {{- include "caCerts.containerEnv" (dict "root" $root) | nindent 12 }}
             # Override after env.standard so migrations can run longer than runtime query limits.
             - name: POSTGRES_QUERY_TIMEOUT_MILLIS
               value: {{ $migration.queryTimeoutMillis | quote }}
+          {{- if $ca.enabled }}
+          volumeMounts:
+            {{- include "caCerts.containerVolumeMounts" (dict "root" $root) | nindent 12 }}
+          {{- end }}
       restartPolicy: Never
+      {{- if $ca.enabled }}
+      volumes:
+        {{- include "caCerts.volumes" (dict "root" $root) | nindent 8 }}
+      {{- end }}
       {{- with $root.Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
