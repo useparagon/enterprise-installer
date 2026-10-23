@@ -335,25 +335,6 @@ variable "hoop_api_key" {
   default     = null
 }
 
-variable "hoop_slack_bot_token" {
-  description = "Slack bot token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "hoop_slack_app_token" {
-  description = "Slack app token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "hoop_slack_channel_ids" {
-  description = "Slack channel IDs to notify for connections that require reviews."
-  type        = list(string)
-  default     = []
-}
 
 variable "hoop_all_access_groups" {
   description = "Additional access-control groups allowed when customer_facing is false."
@@ -419,7 +400,7 @@ variable "hoop_image_repository" {
 variable "hoop_image_tag" {
   description = "Container image tag for the Hoop agent."
   type        = string
-  default     = "1.2.1"
+  default     = "1.2.2"
 }
 
 variable "hoop_k8s_connections" {
@@ -517,6 +498,67 @@ variable "paragon_helm_repository" {
   default     = "https://helm.useparagon.com"
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = !var.agent_os_enabled || try(length(trimspace(var.agent_os_version)) > 0, false)
+    error_message = "Set agent_os_version to a published chart containing Enterprise defaults when enabling Agent OS."
+  }
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL for the independent Agent OS release."
+  type        = string
+  default     = "https://helm.useparagon.com"
+}
+
+variable "agent_os_helm_values" {
+  description = "Optional Agent OS chart overrides layered after cloud integration and before agentOs.values from values.yaml."
+  type        = any
+  default     = {}
+}
+
+variable "agent_os_app_config" {
+  description = "Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_admin_config" {
+  description = "Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_vendor_config" {
+  description = "Optional first-apply seed for the operator-owned Agent OS vendor secret. After create, Terraform ignores changes so console or out-of-band keys are preserved."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "platform_version" {
+  description = "Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML."
+  type        = string
+  default     = null
+}
+
 locals {
   # hash of subscription ID to help ensure uniqueness of resources like bucket names
   hash                  = substr(sha256(var.azure_subscription_id), 0, 8)
@@ -575,6 +617,13 @@ locals {
     var.helm_yaml != null ? var.helm_yaml : (
       fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
     )
+  )
+
+  installer_chart_version = trimspace(file("${path.module}/../../../scripts/installer-chart-version.txt"))
+  effective_platform_version = coalesce(
+    var.platform_version,
+    try(local.helm_vars.global.env.VERSION, null),
+    "",
   )
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "AZURE")
@@ -735,7 +784,10 @@ locals {
     }
   }
 
-  all_microservices = merge(local.monorepo_microservices, var.managed_sync_enabled ? local.managed_sync_microservices : {})
+  all_microservices = merge(
+    local.monorepo_microservices,
+    var.managed_sync_enabled ? local.managed_sync_microservices : {},
+  )
 
   microservices = {
     for microservice, config in local.all_microservices :
@@ -833,10 +885,23 @@ locals {
     "api-sync" = local.microservices["api-sync"]
   } : {}
 
+  agent_os_public_url = try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
+  agent_os_port       = try(tonumber(local.helm_vars.global.env["AGENT_OS_PORT"]), 3000)
+  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+
+  agent_os_public_dns = var.agent_os_enabled ? {
+    agentos = {
+      healthcheck_path = "/readyz"
+      port             = local.agent_os_port
+      public_url       = local.agent_os_public_url
+    }
+  } : {}
+
   public_services = merge(
     local.public_microservices,
     local.public_monitors,
     local.managed_sync_public_dns,
+    local.agent_os_public_dns,
   )
 
   helm_keys_to_remove = [
@@ -915,6 +980,7 @@ locals {
         ORGANIZATION           = var.organization
         PARAGON_DOMAIN         = var.domain
         PLATFORM_ENV           = "enterprise"
+        VERSION                = local.effective_platform_version
 
         # Service ports
         ACCOUNT_PORT            = try(local.microservices.account.port, null)
@@ -1117,9 +1183,10 @@ locals {
         MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
         }, {
         for key, value in local.helm_vars.global.env :
-        key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+        key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
-        var.managed_sync_enabled ? module.managed_sync_config[0].config : {}
+        var.managed_sync_enabled ? module.managed_sync_config[0].config : {},
+        { VERSION = local.effective_platform_version },
       )
     })
   })
@@ -1149,7 +1216,12 @@ locals {
     key => tostring(value)
     if value != null && tostring(value) != "" && local.helm_is_secret_env_key[key]
   }
-  helm_values_public = merge(local.helm_values, {
+  # agentOs is installer-only metadata for a separate Helm release. It must
+  # not be forwarded to the existing Paragon/Managed Sync charts.
+  helm_values_public = merge({
+    for key, value in local.helm_values : key => value
+    if key != "agentOs"
+    }, {
     global = merge(local.helm_values.global, {
       env = {
         for key, value in local.helm_values.global.env :

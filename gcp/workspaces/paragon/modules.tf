@@ -64,6 +64,10 @@ module "helm" {
     managed_sync    = var.managed_sync_enabled ? google_secret_manager_secret_version.managed_sync[0].name : null
     openobserve     = google_secret_manager_secret_version.openobserve[0].name
     openobserve_gcs = local.openobserve_gcs_enabled ? google_secret_manager_secret_version.openobserve_gcs[0].name : null
+    agent_os_app    = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_app[0].name : null
+    agent_os_admin  = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_admin[0].name : null
+    agent_os_broker = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_broker[0].name : null
+    agent_os_vendor = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_vendor[0].name : null
   }))
   ingress_scheme              = var.ingress_scheme
   k8s_version                 = var.k8s_version
@@ -72,6 +76,12 @@ module "helm" {
   managed_sync_secret_name    = var.managed_sync_enabled ? local.runtime_secret_names.managed_sync : null
   managed_sync_version        = var.managed_sync_version
   paragon_helm_repository     = var.paragon_helm_repository
+  agent_os_enabled            = var.agent_os_enabled
+  agent_os_version            = var.agent_os_version
+  agent_os_helm_repository    = var.agent_os_helm_repository
+  agent_os_helm_values        = var.agent_os_helm_values
+  agent_os_file_values        = try(local.helm_vars.agentOs.values, {})
+  agent_os_service_account    = local.agent_os_service_account
   microservices               = local.microservices
   monitor_version             = local.monitor_version
   monitors                    = local.monitors
@@ -104,9 +114,6 @@ module "hoop" {
   hoop_image_tag                = var.hoop_image_tag
   hoop_key                      = var.hoop_key
   hoop_agent_id                 = var.hoop_agent_id
-  hoop_slack_bot_token          = var.hoop_slack_bot_token
-  hoop_slack_app_token          = var.hoop_slack_app_token
-  hoop_slack_channel_ids        = var.hoop_slack_channel_ids
   all_access_groups             = var.hoop_all_access_groups
   restricted_access_groups      = var.hoop_restricted_access_groups
   reviewers_access_groups       = var.hoop_reviewers_access_groups

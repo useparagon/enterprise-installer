@@ -49,17 +49,102 @@ as they all share an external hostname. Leaving
 `path_based_routing_enabled=false` preserves the existing host-based
 defaults in unrelated installations.
 
+## Agent OS configuration
+
+Agent OS is deployed as a separate Helm release when `agent_os_enabled = true`.
+The installer derives standard chart values from Terraform and the existing
+Paragon/Managed Sync configuration. Its `agentOs` section stays commented
+out in `.secure/values.yaml` until activation, when only the external Voyage
+API key needs to be provided. The installer never forwards the `agentOs`
+metadata wrapper to the regular Paragon chart.
+
+**Chart version and deployment enablement are controlled only by Terraform inputs**, never
+by `agentOs` keys in values.yaml. Example `vars.auto.tfvars`:
+
+```hcl
+managed_sync_enabled = true
+agent_os_enabled     = false # Switch to true after infra and Managed Sync are ready
+agent_os_version     = "0.3.0-beta.3" # Use the compatible published chart for this environment
+```
+
+The infra workspace requires both `managed_sync_enabled = true` and
+`valkey_enabled = true` before `agent_os_enabled` can be true. In the paragon
+workspace, Managed Sync must also be enabled before Agent OS.
+
+On AWS Enterprise, enabling Agent OS also configures Managed Sync to create its
+context Kafka topics and publish sync lifecycle events. Specifically,
+`helm/helm-managed-sync.tf` sets `MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION=false`
+and `MANAGED_SYNC_STATUS_EVENTS_ENABLED=true` when `agent_os_enabled = true`.
+Managed Sync version 1.0.75 or later is required for the context-topic flag
+(PARA-27285). The Managed Sync Helm release runs before Agent OS; without Agent OS,
+the on-prem defaults continue to skip these topics and status events.
+
+Agent OS settings (cloud identity, service URLs/ports, model selection, node
+selectors, tolerations, replicas, Bifrost enablement) are supplied by Terraform
+in `helm/helm-agent-os.tf` and/or the Agent OS chart. The only field normally
+needed in `.secure/values.yaml` is the external Voyage API key, kept commented
+out until Agent OS is enabled:
+
+```yaml
+# agentOs:
+#   secrets:
+#     vendor:
+#       VOYAGE_API_KEY: ""
+```
+
+The separate `agent_os_helm_values` Terraform variable remains available
+for optional chart-root overrides. If present, `agentOs.values` in the
+shared YAML is still supported at highest precedence, but no overrides are
+necessary for the standard Enterprise deployment.
+
+Secrets must not be placed in `agentOs.values` or `global.env`: Helm stores
+release values. Instead, uncomment `agentOs.secrets.vendor` in `.secure/values.yaml`
+and supply the actual key before enabling Agent OS:
+
+```yaml
+agentOs:
+  secrets:
+    vendor:
+      VOYAGE_API_KEY: "<your Voyage AI key>"
+```
+
+Terraform merges this field into the AWS Secrets Manager secret
+`paragon/<workspace>/agent-os/vendor`, and External Secrets merges it into
+the Kubernetes `agent-os-app` Secret used by Bifrost. The installer rejects
+Agent OS activation without a nonempty Voyage API key. A blank placeholder is
+ignored, not written as the API key.
+
+For Enterprise, the Paragon and Managed Sync monorepos use `LICENSE` as the
+default service-plane token. Agent OS takes `MANAGED_SYNC_ACCESS_TOKEN`,
+`ZEUS_ACCESS_TOKEN`, and `WORKER_ACTIONKIT_ACCESS_TOKEN` from the effective
+Paragon/Managed Sync configuration, with a fallback to `LICENSE`. Any explicit
+tokens remain authoritative. The service-plane tokens and vendor keys are stored
+in Secrets Manager, never embedded into the Agent OS Helm release.
+
+This implementation currently targets AWS; Azure and GCP enterprise installers
+do not yet have the corresponding Agent OS Helm/secret integration.
+
+## Custom CA certificates (Redis / Postgres)
+
+On-prem and BYO databases that require custom CAs (for example Redis with TLS or
+RDS with enforced SSL) use `global.caCerts` in `.secure/values.yaml`. The chart
+mounts each listed Secret or ConfigMap PEM, concatenates them into one bundle, and
+sets `NODE_EXTRA_CA_CERTS` and `PGSSLROOTCERT` on Paragon Deployments, StatefulSets,
+and database migration Jobs.
+
+`global.redisCaCert` remains supported (GCP Memorystore may set it via Terraform).
+Prefer listing Postgres CAs under `global.caCerts.sources`; use a single `caCerts`
+block when both Redis and Postgres need trust anchors.
+
+Optional opt-in verification: `POSTGRES_SSL_REJECT_UNAUTHORIZED` in `global.env`
+(for platform) and `MANAGED_SYNC_POSTGRES_SSL_REJECT_UNAUTHORIZED` when Managed Sync
+is enabled. These stay off by default until the corresponding application release
+supports verify-full. See commented examples in `charts/values.placeholder.yaml`.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-| Name | Version |
-| ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
-| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
-| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 2.0 |
-| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
+No requirements.
 
 ## Providers
 
@@ -88,20 +173,33 @@ defaults in unrelated installations.
 | ---- | ---- |
 | [aws_iam_role.eso](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.eso_secrets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_secretsmanager_secret_version.agent_os_admin_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.agent_os_app_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.agent_os_vendor_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.docker_cfg_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.env_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.managed_sync_paragon_overlay](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [terraform_data.agent_os_karpenter_pools](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [terraform_data.runtime_secrets_populated](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_eks_cluster.cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/eks_cluster) | data source |
 | [aws_iam_policy_document.eso_assume](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.eso_secrets](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_secretsmanager_secret.agent_os_admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret.agent_os_app](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret.agent_os_broker](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret.agent_os_vendor](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
 | [aws_secretsmanager_secret.docker_cfg](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
 | [aws_secretsmanager_secret.env](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
 | [aws_secretsmanager_secret.managed_sync](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
 | [aws_secretsmanager_secret.openobserve](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret) | data source |
+| [aws_secretsmanager_secret_version.agent_os_admin](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.agent_os_app](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.agent_os_broker](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.agent_os_vendor](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.docker_cfg](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.env](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
+| [aws_secretsmanager_secret_version.infra_agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_kafka](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
 | [aws_secretsmanager_secret_version.infra_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/secretsmanager_secret_version) | data source |
@@ -114,6 +212,13 @@ defaults in unrelated installations.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agent_os_admin_config"></a> [agent\_os\_admin\_config](#input\_agent\_os\_admin\_config) | Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-owned base payload. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_app_config"></a> [agent\_os\_app\_config](#input\_agent\_os\_app\_config) | Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. | `bool` | `false` | no |
+| <a name="input_agent_os_helm_repository"></a> [agent\_os\_helm\_repository](#input\_agent\_os\_helm\_repository) | Helm repository URL used to install Agent OS. | `string` | `"https://helm.useparagon.com"` | no |
+| <a name="input_agent_os_helm_values"></a> [agent\_os\_helm\_values](#input\_agent\_os\_helm\_values) | Additional Agent OS chart values supplied through Terraform. Applied after generated AWS defaults and before .secure/values.yaml agentOs.values. | `any` | `{}` | no |
+| <a name="input_agent_os_vendor_config"></a> [agent\_os\_vendor\_config](#input\_agent\_os\_vendor\_config) | Optional Agent OS vendor keys merged onto the operator-owned secret. An empty map cannot wipe keys already in Secrets Manager. | `map(string)` | `{}` | no |
+| <a name="input_agent_os_version"></a> [agent\_os\_version](#input\_agent\_os\_version) | Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS. | `string` | `null` | no |
 | <a name="input_aws_access_key_id"></a> [aws\_access\_key\_id](#input\_aws\_access\_key\_id) | AWS Access Key for AWS account to provision resources on. Null when using ambient credentials (Spacelift AWS integration) with aws\_assume\_role\_arn. | `string` | `null` | no |
 | <a name="input_aws_assume_role_arn"></a> [aws\_assume\_role\_arn](#input\_aws\_assume\_role\_arn) | Optional IAM role ARN to assume (e.g. customer Terraform role when running from Spacelift). | `string` | `null` | no |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | The AWS region resources are created in. | `string` | n/a | yes |
@@ -144,16 +249,13 @@ defaults in unrelated installations.
 | <a name="input_hoop_custom_connections"></a> [hoop\_custom\_connections](#input\_hoop\_custom\_connections) | Custom Hoop connections defined via tfvars. Map of connection names to their configuration. | <pre>map(object({<br/>    type                  = string<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "disabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string))<br/>    secrets               = map(string)<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_enabled"></a> [hoop\_enabled](#input\_hoop\_enabled) | Whether to enable Hoop agent. hoop\_key, hoop\_api\_key, and hoop\_agent\_id must be set if this is true. | `bool` | `true` | no |
 | <a name="input_hoop_image_repository"></a> [hoop\_image\_repository](#input\_hoop\_image\_repository) | Public container image repository for the Hoop agent. Private registries are not supported: hoopagent-chart cannot set imagePullSecrets. | `string` | `"useparagon/hoop-agent-tools"` | no |
-| <a name="input_hoop_image_tag"></a> [hoop\_image\_tag](#input\_hoop\_image\_tag) | Container image tag for the Hoop agent. | `string` | `"1.2.1"` | no |
+| <a name="input_hoop_image_tag"></a> [hoop\_image\_tag](#input\_hoop\_image\_tag) | Container image tag for the Hoop agent. | `string` | `"1.2.2"` | no |
 | <a name="input_hoop_k8s_connections"></a> [hoop\_k8s\_connections](#input\_hoop\_k8s\_connections) | Kubernetes Hoop connections defined via tfvars. Map of connection names to their configuration. If empty, a default k8s-admin connection will be created. | <pre>map(object({<br/>    type                  = optional(string, "custom")<br/>    subtype               = optional(string)<br/>    access_mode_runbooks  = optional(string, "enabled")<br/>    access_mode_exec      = optional(string, "enabled")<br/>    access_mode_connect   = optional(string, "enabled")<br/>    access_schema         = optional(string, "disabled")<br/>    command               = optional(list(string), ["bash"])<br/>    remote_url            = optional(string, "https://kubernetes.default.svc.cluster.local")<br/>    insecure              = optional(string, "true")<br/>    namespace             = optional(string, "paragon")<br/>    secrets               = optional(map(string), {})<br/>    tags                  = optional(map(string), {})<br/>    guardrail_rules       = optional(list(string), [])<br/>    reviewers             = optional(list(string), [])<br/>    access_control_groups = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | <a name="input_hoop_key"></a> [hoop\_key](#input\_hoop\_key) | Hoop agent key (token). Only used if hoop\_enabled is true. | `string` | `null` | no |
 | <a name="input_hoop_postgres_guardrail_rules"></a> [hoop\_postgres\_guardrail\_rules](#input\_hoop\_postgres\_guardrail\_rules) | Guardrail rule IDs for PostgreSQL connections. | `list(string)` | <pre>[<br/>  "a85115f6-5ef3-4618-b70c-f7cccdc62c5a"<br/>]</pre> | no |
 | <a name="input_hoop_redis_guardrail_rules"></a> [hoop\_redis\_guardrail\_rules](#input\_hoop\_redis\_guardrail\_rules) | Guardrail rule IDs for Redis connections. | `list(string)` | <pre>[<br/>  "182f59b2-5d5d-4ab8-978e-94472b3915fc"<br/>]</pre> | no |
 | <a name="input_hoop_restricted_access_groups"></a> [hoop\_restricted\_access\_groups](#input\_hoop\_restricted\_access\_groups) | Base access-control groups allowed for all connections. | `list(string)` | <pre>[<br/>  "dev-team-oncall",<br/>  "dev-team-managers",<br/>  "admin"<br/>]</pre> | no |
 | <a name="input_hoop_reviewers_access_groups"></a> [hoop\_reviewers\_access\_groups](#input\_hoop\_reviewers\_access\_groups) | Reviewer groups required for customer-facing app connections. | `list(string)` | <pre>[<br/>  "dev-team-managers"<br/>]</pre> | no |
-| <a name="input_hoop_slack_app_token"></a> [hoop\_slack\_app\_token](#input\_hoop\_slack\_app\_token) | Slack app token for the Hoop Slack plugin. | `string` | `null` | no |
-| <a name="input_hoop_slack_bot_token"></a> [hoop\_slack\_bot\_token](#input\_hoop\_slack\_bot\_token) | Slack bot token for the Hoop Slack plugin. | `string` | `null` | no |
-| <a name="input_hoop_slack_channel_ids"></a> [hoop\_slack\_channel\_ids](#input\_hoop\_slack\_channel\_ids) | Slack channel IDs to notify for connections that require reviews. | `list(string)` | `[]` | no |
 | <a name="input_hoop_version"></a> [hoop\_version](#input\_hoop\_version) | Hoopagent Helm chart version. | `string` | `"1.184.2"` | no |
 | <a name="input_infra_json"></a> [infra\_json](#input\_infra\_json) | JSON string of `infra` workspace variables to use instead of `infra_json_path` | `string` | `null` | no |
 | <a name="input_infra_json_path"></a> [infra\_json\_path](#input\_infra\_json\_path) | Deprecated legacy path to infra workspace output JSON. Prefer reading infra handoff secrets from Secrets Manager (PARA-21726). | `string` | `null` | no |
@@ -164,12 +266,16 @@ defaults in unrelated installations.
 | <a name="input_karpenter_node_pools"></a> [karpenter\_node\_pools](#input\_karpenter\_node\_pools) | Karpenter NodePool definitions. Map key is the NodePool name. | <pre>map(object({<br/>    capacity_types = list(string)<br/>    instance_types = list(string)<br/>    cpu_limit      = string<br/>    memory_limit   = string<br/>    nodes_limit    = number<br/>    weight         = number<br/>    labels         = optional(map(string))<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = optional(string)<br/>      effect = string<br/>    })))<br/>  }))</pre> | <pre>{<br/>  "default-ondemand": {<br/>    "capacity_types": [<br/>      "on-demand"<br/>    ],<br/>    "cpu_limit": "60",<br/>    "instance_types": [<br/>      "m6a.xlarge"<br/>    ],<br/>    "memory_limit": "210Gi",<br/>    "nodes_limit": 20,<br/>    "weight": 25<br/>  },<br/>  "default-spot": {<br/>    "capacity_types": [<br/>      "spot"<br/>    ],<br/>    "cpu_limit": "160",<br/>    "instance_types": [<br/>      "t3a.xlarge",<br/>      "t3.xlarge",<br/>      "m5a.xlarge",<br/>      "m5.xlarge",<br/>      "m6a.xlarge",<br/>      "m6i.xlarge",<br/>      "m7a.xlarge",<br/>      "m7i.xlarge",<br/>      "r5a.xlarge"<br/>    ],<br/>    "memory_limit": "610Gi",<br/>    "nodes_limit": 40,<br/>    "weight": 75<br/>  }<br/>}</pre> | no |
 | <a name="input_karpenter_node_volume_size_gib"></a> [karpenter\_node\_volume\_size\_gib](#input\_karpenter\_node\_volume\_size\_gib) | Bottlerocket container data volume size in GiB for Karpenter worker nodes (/dev/xvdb). | `number` | `50` | no |
 | <a name="input_managed_sync_enabled"></a> [managed\_sync\_enabled](#input\_managed\_sync\_enabled) | Whether to enable managed sync. | `bool` | `false` | no |
-| <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
 | <a name="input_managed_sync_version"></a> [managed\_sync\_version](#input\_managed\_sync\_version) | The version of the Managed Sync helm chart to install. | `string` | `"latest"` | no |
 | <a name="input_migrated_workspace"></a> [migrated\_workspace](#input\_migrated\_workspace) | Optional existing workspace name to reuse when reading Secrets Manager handoff secrets (instead of deriving paragon-<org>-<hash>). | `string` | `null` | no |
 | <a name="input_monitor_version"></a> [monitor\_version](#input\_monitor\_version) | The version of the Paragon monitors to install. | `string` | `null` | no |
 | <a name="input_monitors_enabled"></a> [monitors\_enabled](#input\_monitors\_enabled) | Specifies that monitors are enabled. | `bool` | `false` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | The name of the organization that's deploying Paragon. | `string` | n/a | yes |
+| <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input\_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
+| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Route Paragon public HTTP services with hostless ALB Prefix rules. With path\_routing\_base\_path and path\_routing\_public\_host, generate /<base>/<service> routes for every exposed Paragon HTTP service. | `bool` | `false` | no |
+| <a name="input_path_routing_base_path"></a> [path\_routing\_base\_path](#input\_path\_routing\_base\_path) | When path routing is enabled, prefix every exposed Paragon HTTP service with this base path (for example /paragon/account). Blank retains explicit *\_PUBLIC\_URL paths. | `string` | `""` | no |
+| <a name="input_path_routing_public_host"></a> [path\_routing\_public\_host](#input\_path\_routing\_public\_host) | External reverse proxy DNS hostname (without scheme or path) for all Paragon services when path\_routing\_base\_path is set. This hostname is managed by the proxy operator, not by the Paragon Route53 module. | `string` | `""` | no |
+| <a name="input_platform_version"></a> [platform\_version](#input\_platform\_version) | Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML. | `string` | `null` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that get no Ingress. Removed from public\_microservices and public\_monitors on both internet-facing and internal load balancers. ingress\_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict\_public\_exposure is true, allowlisted services can still be listed here. | `list(string)` | `[]` | no |
 | <a name="input_restrict_public_exposure"></a> [restrict\_public\_exposure](#input\_restrict\_public\_exposure) | When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private\_services to further restrict allowlisted endpoints. Removing many Ingresses from the shared ALB group requires elasticloadbalancing:SetRulePriorities on the load balancer controller IAM principal (see infra eks-worker-policy); without it, deleted Ingress objects can remain Terminating while ALB rules stay active until the controller reconciles. | `bool` | `false` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
@@ -196,6 +302,7 @@ defaults in unrelated installations.
 | <a name="output_openobserve_password"></a> [openobserve\_password](#output\_openobserve\_password) | n/a |
 | <a name="output_pgadmin_admin_email"></a> [pgadmin\_admin\_email](#output\_pgadmin\_admin\_email) | PGAdmin admin login email. |
 | <a name="output_pgadmin_admin_password"></a> [pgadmin\_admin\_password](#output\_pgadmin\_admin\_password) | PGAdmin admin login password. |
+| <a name="output_tracking"></a> [tracking](#output\_tracking) | Non-sensitive deployment metadata for external environment tracking. |
 | <a name="output_uptime_webhook"></a> [uptime\_webhook](#output\_uptime\_webhook) | Uptime webhook URL |
 | <a name="output_waf_logs_bucket"></a> [waf\_logs\_bucket](#output\_waf\_logs\_bucket) | S3 bucket name for WAF traffic logs when WAF is enabled, otherwise null. |
 | <a name="output_waf_web_acl_arn"></a> [waf\_web\_acl\_arn](#output\_waf\_web\_acl\_arn) | ARN of the regional WAFv2 Web ACL when WAF is enabled, otherwise null. |

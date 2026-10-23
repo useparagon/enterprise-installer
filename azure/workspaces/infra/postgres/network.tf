@@ -22,8 +22,9 @@ resource "azurerm_subnet_network_security_group_association" "postgres" {
 }
 
 locals {
-  # azure does not allow dns name to match the database name
-  postgres_dns_name = length(local.postgres_instances) == 1 ? "${var.workspace}-dns.postgres.database.azure.com" : "${var.workspace}.postgres.database.azure.com"
+  # Keep the DNS zone stable when Agent OS is toggled. Single-instance installs keep
+  # the legacy Paragon server plus the optional dedicated Agent OS server in this map.
+  postgres_dns_name = contains(keys(local.postgres_instances), "paragon") ? "${var.workspace}-dns.postgres.database.azure.com" : "${var.workspace}.postgres.database.azure.com"
 }
 
 resource "azurerm_private_dns_zone" "postgres" {

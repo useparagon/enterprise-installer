@@ -1,6 +1,13 @@
 resource "aws_iam_service_linked_role" "autoscaling" {
   count            = var.create_autoscaling_linked_role ? 1 : 0
   aws_service_name = "autoscaling.amazonaws.com"
+
+  # Account-wide SLR; do not delete via Terraform when other stacks or ASGs still use it.
+  # To set create_autoscaling_linked_role = false, state-rm this instance first so apply
+  # does not call iam:DeleteServiceLinkedRole (customer policies often omit aws-service-role/*).
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 locals {

@@ -31,6 +31,43 @@ variable "paragon_helm_repository" {
   type        = string
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+variable "agent_os_version" {
+  description = "The published Agent OS Helm chart version."
+  type        = string
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL for Agent OS."
+  type        = string
+}
+
+variable "agent_os_helm_values" {
+  description = "Installer chart overrides."
+  type        = any
+}
+
+variable "agent_os_file_values" {
+  description = "Chart overrides from agentOs.values in the customer's values.yaml."
+  type        = any
+}
+
+variable "agent_os_service_account" {
+  description = "GCP service account email for Agent OS Workload Identity. Null when Agent OS is disabled."
+  type        = string
+  default     = null
+}
+
 variable "region" {
   description = "The region where to host Google Cloud Organization resources."
   type        = string

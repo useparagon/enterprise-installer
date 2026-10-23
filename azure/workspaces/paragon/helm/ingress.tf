@@ -42,9 +42,11 @@ resource "helm_release" "cert_manager" {
 
   force_update     = false
   create_namespace = false
+  timeout          = 900
+  wait             = true
 
   set {
-    name  = "installCRDs"
+    name  = "crds.enabled"
     value = true
   }
 
@@ -71,6 +73,8 @@ resource "azurerm_public_ip" "ingress" {
 }
 
 resource "helm_release" "ingress" {
+  count = var.agc_direct ? 0 : 1
+
   name       = "ingress-nginx"
   namespace  = kubernetes_namespace.paragon.id
   repository = "https://kubernetes.github.io/ingress-nginx"

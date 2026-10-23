@@ -50,8 +50,11 @@ output "redis" {
 
 output "redis_managed" {
   description = "Azure Managed Redis 7.4 endpoints (null when redis_managed_enabled is false). Use during migration for kubectl trial routing while output redis still points at legacy."
-  value       = var.redis_managed_enabled ? module.redis_managed[0].redis : null
-  sensitive   = true
+  value = var.redis_managed_enabled ? {
+    for name, config in module.redis_managed[0].redis :
+    name => config if name != "agent_os"
+  } : null
+  sensitive = true
 }
 
 output "redis_managed_export_storage" {

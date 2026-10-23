@@ -38,6 +38,7 @@ module "helm" {
   source = "./helm"
 
   certificate                   = module.alb.certificate
+  domain                        = var.domain
   alb_backend_security_group_id = module.alb.backend_security_group_id
   aws_region                    = var.aws_region
   aws_access_key_id             = var.aws_access_key_id
@@ -66,6 +67,11 @@ module "helm" {
   managed_sync_enabled          = var.managed_sync_enabled
   managed_sync_secret_name      = local.runtime_managed_sync_secret_name
   managed_sync_version          = var.managed_sync_version
+  agent_os_enabled              = var.agent_os_enabled
+  agent_os_version              = var.agent_os_version
+  agent_os_helm_repository      = var.agent_os_helm_repository
+  agent_os_helm_values          = var.agent_os_helm_values
+  agent_os_file_values          = local.agent_os_file_values
   paragon_helm_repository       = var.paragon_helm_repository
   microservices                 = local.microservices
   monitor_version               = local.monitor_version
@@ -90,7 +96,7 @@ module "helm" {
   } : null
   karpenter_node_os_volume_size_gib = var.karpenter_node_os_volume_size_gib
   karpenter_node_volume_size_gib    = var.karpenter_node_volume_size_gib
-  karpenter_node_pools              = var.karpenter_node_pools
+  karpenter_node_pools              = local.karpenter_node_pools
   karpenter_defaults                = var.karpenter_defaults
   workspace                         = local.workspace
 
@@ -102,15 +108,16 @@ module "helm" {
 module "dns" {
   source = "./dns"
 
-  domain                     = var.domain
-  public_services            = local.public_services
-  path_based_routing_enabled = var.path_based_routing_enabled
-  route53_zone_id            = module.alb.route53_zone_id
-  workspace                  = local.workspace
-  cluster_name               = local.cluster_name
-  release_ingress            = module.helm.release_ingress
-  release_paragon_logging    = module.helm.release_paragon_logging
-  release_paragon_on_prem    = module.helm.release_paragon_on_prem
+  domain                        = var.domain
+  public_services               = local.public_services
+  path_based_routing_enabled    = var.path_based_routing_enabled
+  route53_zone_id               = module.alb.route53_zone_id
+  workspace                     = local.workspace
+  cluster_name                  = local.cluster_name
+  release_ingress               = module.helm.release_ingress
+  release_paragon_logging       = module.helm.release_paragon_logging
+  release_paragon_on_prem       = module.helm.release_paragon_on_prem
+  ingress_alb_dns_name_fallback = module.helm.alb_dns_name
 }
 
 module "managed_sync_config" {
@@ -132,9 +139,12 @@ module "pod_identity" {
   source = "./pod-identity"
   count  = try(local.storage_output.role_arn, null) != null ? 1 : 0
 
-  cluster_name = local.cluster_name
-  namespace    = module.helm.namespace_paragon.id
-  s3_role_arn  = local.storage_output.role_arn
+  cluster_name             = local.cluster_name
+  namespace                = module.helm.namespace_paragon.id
+  s3_role_arn              = local.storage_output.role_arn
+  agent_os_enabled         = var.agent_os_enabled
+  agent_os_service_account = "agent-os"
+  agent_os_role_arn        = var.agent_os_enabled ? local.agent_os_handoff.pod_identity_role_arn : null
   service_accounts = setunion(
     toset(keys(local.monorepo_microservices)),
     toset(["ocs-code-runner"]),
@@ -175,9 +185,6 @@ module "hoop" {
   hoop_image_tag                = var.hoop_image_tag
   hoop_key                      = var.hoop_key
   hoop_agent_id                 = var.hoop_agent_id
-  hoop_slack_bot_token          = var.hoop_slack_bot_token
-  hoop_slack_app_token          = var.hoop_slack_app_token
-  hoop_slack_channel_ids        = var.hoop_slack_channel_ids
   all_access_groups             = var.hoop_all_access_groups
   restricted_access_groups      = var.hoop_restricted_access_groups
   reviewers_access_groups       = var.hoop_reviewers_access_groups

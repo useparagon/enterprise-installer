@@ -26,6 +26,12 @@ resource "kubernetes_namespace" "knative_serving" {
   metadata {
     name = "knative-serving"
   }
+
+  # Knative and Kourier annotate this namespace after installation. Do not
+  # remove their controller-owned labels on subsequent Terraform plans.
+  lifecycle {
+    ignore_changes = [metadata[0].labels]
+  }
 }
 
 locals {
@@ -34,7 +40,11 @@ locals {
     kubernetes_secret.docker_login[0].data,
     tomap({})
   )
-  knative_serving_pull_secret = var.create_docker_pull_secret && length(local.knative_image_pull_data) > 0
+  # Use resource counts: Secret data may be unknown during the first plan.
+  knative_serving_pull_secret = var.create_docker_pull_secret && (
+    length(data.kubernetes_secret.docker_cfg) > 0 ||
+    length(kubernetes_secret.docker_login) > 0
+  )
 }
 
 # Same docker-cfg as paragon workloads. Knative's revision controller lives in

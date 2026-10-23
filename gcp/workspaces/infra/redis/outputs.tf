@@ -1,3 +1,30 @@
+output "agent_os" {
+  value = var.agent_os_enabled && contains(keys(local.agent_os_valkey_instances), "cache") ? {
+    host    = try(local.agent_os_valkey_endpoints["cache"].ip_address, null)
+    port    = try(local.agent_os_valkey_endpoints["cache"].port, null)
+    ssl     = true
+    cluster = local.agent_os_valkey_instances["cache"].cluster_enabled
+    # A blank CA is valid: Agent OS uses system trust roots when no custom CA is set.
+    ca_certificate = try(join("\n", flatten([
+      for chain in google_memorystore_instance.agent_os["cache"].managed_server_ca[0].ca_certs :
+      chain.certificates
+    ])), "")
+  } : null
+  sensitive = true
+
+  precondition {
+    condition = (
+      !var.agent_os_enabled ||
+      (
+        try(local.agent_os_valkey_endpoints["cache"].ip_address, null) != null &&
+        try(local.agent_os_valkey_endpoints["cache"].port > 0, false)
+      )
+    )
+    error_message = "Agent OS Valkey must expose a primary/discovery PSC IP address and port."
+  }
+}
+
+
 output "redis" {
   value = var.multi_redis ? {
     for key, value in local.redis_instances :

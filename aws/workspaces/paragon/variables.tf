@@ -33,6 +33,11 @@ variable "aws_assume_role_arn" {
 variable "organization" {
   description = "The name of the organization that's deploying Paragon."
   type        = string
+
+  validation {
+    condition     = length(var.organization) <= 16
+    error_message = "organization must be at most 16 characters so paragon-{organization}-{hash} can fit the 28-character workspace limit."
+  }
 }
 
 variable "domain" {
@@ -270,10 +275,10 @@ variable "path_based_routing_enabled" {
 
   validation {
     condition = !var.path_based_routing_enabled || alltrue([
-      for prefix in values(local.path_routed_public_prefixes) :
-      length(prefix) <= 126
+      for service, prefix in local.path_routed_public_prefixes :
+      length(prefix) <= (service == "connect" ? 102 : 126)
     ])
-    error_message = "AWS path prefixes can be at most 126 characters because the Load Balancer Controller also emits a trailing /* pattern and ALB limits each path pattern to 128 characters."
+    error_message = "AWS paths support at most 126 prefix characters, or 102 for Connect SDK trigger patterns (26-character suffix), due to the ALB 128-character path-pattern limit."
   }
 }
 
@@ -416,25 +421,6 @@ variable "hoop_api_key" {
   default     = null
 }
 
-variable "hoop_slack_bot_token" {
-  description = "Slack bot token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "hoop_slack_app_token" {
-  description = "Slack app token for the Hoop Slack plugin."
-  type        = string
-  sensitive   = true
-  default     = null
-}
-
-variable "hoop_slack_channel_ids" {
-  description = "Slack channel IDs to notify for connections that require reviews."
-  type        = list(string)
-  default     = []
-}
 
 variable "hoop_all_access_groups" {
   description = "Additional access-control groups allowed when customer_facing is false."
@@ -500,7 +486,7 @@ variable "hoop_image_repository" {
 variable "hoop_image_tag" {
   description = "Container image tag for the Hoop agent."
   type        = string
-  default     = "1.2.1"
+  default     = "1.2.2"
 }
 
 variable "hoop_k8s_connections" {
@@ -599,10 +585,73 @@ variable "managed_sync_version" {
   default     = "latest"
 }
 
+variable "agent_os_enabled" {
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Managed Sync remains independently deployable."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.agent_os_enabled || var.managed_sync_enabled
+    error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
+  }
+}
+
+
+variable "agent_os_version" {
+  description = "Published Agent OS Helm chart version. Must be set explicitly when enabling Agent OS."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = !var.agent_os_enabled || try(length(trimspace(var.agent_os_version)) > 0, false)
+    error_message = "Set agent_os_version to a published chart containing Enterprise defaults when enabling Agent OS."
+  }
+}
+
+variable "agent_os_helm_repository" {
+  description = "Helm repository URL used to install Agent OS."
+  type        = string
+  default     = "https://helm.useparagon.com"
+}
+
+variable "agent_os_helm_values" {
+  description = "Additional Agent OS chart values supplied through Terraform. Applied after generated AWS defaults and before .secure/values.yaml agentOs.values."
+  type        = any
+  default     = {}
+  sensitive   = true
+}
+
+variable "agent_os_app_config" {
+  description = "Additional Agent OS app secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_admin_config" {
+  description = "Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-owned base payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
+variable "agent_os_vendor_config" {
+  description = "Optional Agent OS vendor keys merged onto the operator-owned secret. An empty map cannot wipe keys already in Secrets Manager."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+}
+
 variable "paragon_helm_repository" {
   description = "Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository."
   type        = string
   default     = "https://helm.useparagon.com"
+}
+
+variable "platform_version" {
+  description = "Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML."
+  type        = string
+  default     = null
 }
 
 variable "waf_enabled" {
@@ -760,10 +809,22 @@ locals {
   # output; null-safe when neither is present.
   storage_output = try(local.infra_vars.storage.value, local.infra_vars.minio.value, {})
 
-  default_workspace = coalesce(var.migrated_workspace, "paragon-${var.organization}-${local.hash}")
-  workspace         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace
+  # Must match aws/workspaces/infra: ElastiCache replication_group "${workspace}-redis-cache" (max 40).
+  workspace_max_length = 28
+  default_workspace = coalesce(
+    var.migrated_workspace,
+    substr("paragon-${var.organization}-${local.hash}", 0, local.workspace_max_length)
+  )
+  workspace = local.use_legacy_infra_json ? try(local.legacy_infra_vars.workspace.value, local.default_workspace) : local.default_workspace
 
   waf_active = var.waf_enabled && var.ingress_scheme == "internet-facing"
+
+  # Agent OS capacity is owned by infra. This workspace only renders the
+  # Karpenter NodePools from the cluster handoff.
+  karpenter_node_pools = merge(
+    var.karpenter_node_pools,
+    var.agent_os_enabled ? try(local.infra_vars.karpenter.value.agent_os_node_pools, {}) : {},
+  )
 
   # use default where standard value can be determined
   cluster_name        = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
@@ -777,6 +838,41 @@ locals {
     var.helm_yaml != null ? var.helm_yaml : (
       fileexists(local.helm_yaml_path) ? file(local.helm_yaml_path) : "global:\n  env: {}"
     )
+  )
+
+  # Agent OS shares .secure/values.yaml with Paragon but owns an isolated chart.
+  # agentOs is installer metadata/overrides and must never be forwarded to the
+  # Paragon chart itself. The chart-root override lives at agentOs.values.
+  agent_os_file_config  = try(local.helm_vars.agentOs, {})
+  agent_os_file_values  = try(local.agent_os_file_config.values, {})
+  agent_os_file_secrets = try(local.agent_os_file_config.secrets, {})
+  agent_os_file_app_config = {
+    for key, value in try(local.agent_os_file_secrets.app, {}) :
+    key => tostring(value)
+    if value != null
+  }
+  agent_os_file_admin_config = {
+    for key, value in try(local.agent_os_file_secrets.admin, {}) :
+    key => tostring(value)
+    if value != null
+  }
+  agent_os_file_vendor_config = {
+    for key, value in try(local.agent_os_file_secrets.vendor, {}) :
+    key => tostring(value)
+    # An empty placeholder in the optional values file must not overwrite
+    # a provisioned provider key with an empty string.
+    if value != null && trimspace(tostring(value)) != ""
+  }
+  paragon_helm_vars = {
+    for key, value in local.helm_vars :
+    key => value
+    if key != "agentOs"
+  }
+  installer_chart_version = trimspace(file("${path.module}/../../../scripts/installer-chart-version.txt"))
+  effective_platform_version = coalesce(
+    var.platform_version,
+    try(local.helm_vars.global.env.VERSION, null),
+    "",
   )
 
   cloud_storage_type = try(local.helm_vars.global.env["CLOUD_STORAGE_TYPE"], "S3")
@@ -1095,10 +1191,24 @@ locals {
     "api-sync" = local.microservices["api-sync"]
   } : {}
 
+  # Agent OS publishes one hostname. Customers override it the same way as other services,
+  # for example AGENT_OS_PUBLIC_URL = "https://foobar-agentos.something.com".
+  agent_os_public_url = try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
+  agent_os_port       = try(tonumber(local.helm_vars.global.env["AGENT_OS_PORT"]), 3000)
+
+  agent_os_public_dns = var.agent_os_enabled ? {
+    agentos = {
+      healthcheck_path = "/readyz"
+      port             = local.agent_os_port
+      public_url       = local.agent_os_public_url
+    }
+  } : {}
+
   public_services = merge(
     local.public_microservices,
     local.public_monitors,
     local.managed_sync_public_dns,
+    local.agent_os_public_dns,
   )
 
   helm_keys_to_remove = [
@@ -1137,7 +1247,7 @@ locals {
 
   pg_config = try(local.infra_vars.monitoring.value.pg_config, {})
 
-  helm_values = merge(local.helm_vars, {
+  helm_values = merge(local.paragon_helm_vars, {
     global = merge(local.helm_vars.global, {
       env = merge(
         {
@@ -1151,6 +1261,7 @@ locals {
           PARAGON_DOMAIN         = var.domain
           PLATFORM_ENV           = "enterprise"
           REGION                 = var.aws_region
+          VERSION                = local.effective_platform_version
 
           # Service ports
           ACCOUNT_PORT            = try(local.microservices.account.port, null)
@@ -1352,7 +1463,7 @@ locals {
           MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
           }, {
           for key, value in local.helm_vars.global.env :
-          key => value if value != null && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+          key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
         var.managed_sync_enabled ? module.managed_sync_config[0].config : {},
         # A single proxy DNS/base path becomes the PUBLIC_URL contract for all
@@ -1364,7 +1475,8 @@ locals {
             "worker-auditlogs" = "WORKER_AUDIT_LOGS_PUBLIC_URL"
           }, service, "${upper(replace(service, "-", "_"))}_PUBLIC_URL") => config.public_url
           if contains(keys(local.monorepo_microservices), service)
-        } : {}
+        } : {},
+        { VERSION = local.effective_platform_version },
       )
     })
   })

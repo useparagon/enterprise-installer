@@ -1,5 +1,14 @@
 # Paragon Azure Infrastructure
 
+## Resource group ownership (greenfield vs bootstrap)
+
+Greenfield installations leave `import_existing_resource_group = false` (the default),
+so Terraform creates `module.network.azurerm_resource_group.main` normally.
+If a least-privilege bootstrap created the resource group before Terraform,
+set `import_existing_resource_group = true` in the infra workspace variables to
+import the existing group instead. For an existing installation already recorded
+in Terraform state, leave the flag at its default.
+
 ## Azure credentials
 
 `azure_subscription_id` remains required for stable resource naming. Prefer
@@ -23,6 +32,14 @@ assigned on the cluster, so startup tolerates a login with no subscription
 listed and reads the admin kubeconfig from the cluster resource in that case.
 
 Do not commit real credentials to git.
+
+## Agent OS Event Hubs
+
+With `agent_os_enabled = true`, Terraform replaces the **existing** Event Hubs
+namespace with Premium (1 PU by default via `eventhub_capacity`) and provisions
+all 19 Managed Sync 1.0.75 topics. This **destroys existing Kafka topics and
+retained events**; review `terraform plan` before applying. No parallel
+namespace is created. Apply `infra` before `paragon`.
 
 ## Postgres Flexible Server storage
 
@@ -232,12 +249,14 @@ nsg_malicious_ips = [
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.0 |
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
 | <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.77.0 |
+| <a name="provider_random"></a> [random](#provider\_random) | 3.9.0 |
 
 ## Modules
 
@@ -258,6 +277,7 @@ nsg_malicious_ips = [
 | ---- | ---- |
 | [azurerm_key_vault.paragon](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault) | resource |
 | [azurerm_key_vault_access_policy.terraform](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_access_policy) | resource |
+| [azurerm_key_vault_secret.runtime_agent_os](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_bastion](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_kafka](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_network](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
@@ -265,6 +285,9 @@ nsg_malicious_ips = [
 | [azurerm_key_vault_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_redis_managed](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [random_password.agent_os_capability_broker_service_token](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
+| [random_password.agent_os_capability_broker_signing_key](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
+| [random_password.agent_os_extraction_api_key](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
 
 ## Inputs
@@ -272,6 +295,15 @@ nsg_malicious_ips = [
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_agc_subnet_enabled"></a> [agc\_subnet\_enabled](#input\_agc\_subnet\_enabled) | Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required before enabling agc\_enabled in the paragon workspace. | `bool` | `false` | no |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive. | `bool` | `false` | no |
+| <a name="input_agent_os_eventhub_message_retention"></a> [agent\_os\_eventhub\_message\_retention](#input\_agent\_os\_eventhub\_message\_retention) | Retention in days for the Managed Sync instance-status Event Hubs that Agent OS also uses. | `number` | `7` | no |
+| <a name="input_agent_os_eventhub_partition_count"></a> [agent\_os\_eventhub\_partition\_count](#input\_agent\_os\_eventhub\_partition\_count) | Partition count for the Managed Sync instance-status Event Hubs that Agent OS also uses. Partitions cannot be decreased after creation. | `number` | `2` | no |
+| <a name="input_agent_os_extract_max_count"></a> [agent\_os\_extract\_max\_count](#input\_agent\_os\_extract\_max\_count) | Max extract nodes. Staging 3, production 8 (covers 30 pods at 4/node). | `number` | `8` | no |
+| <a name="input_agent_os_extract_min_count"></a> [agent\_os\_extract\_min\_count](#input\_agent\_os\_extract\_min\_count) | Minimum nodes in the Agent OS extraction AKS node pool. | `number` | `1` | no |
+| <a name="input_agent_os_extract_vm_size"></a> [agent\_os\_extract\_vm\_size](#input\_agent\_os\_extract\_vm\_size) | Extract AKS VM size. Default Standard\_F32as\_v6 for production; staging can override to Standard\_F16as\_v6. | `string` | `"Standard_F32as_v6"` | no |
+| <a name="input_agent_os_index_max_count"></a> [agent\_os\_index\_max\_count](#input\_agent\_os\_index\_max\_count) | Maximum number of nodes in the Agent OS index AKS node pool. | `number` | `4` | no |
+| <a name="input_agent_os_index_min_count"></a> [agent\_os\_index\_min\_count](#input\_agent\_os\_index\_min\_count) | Minimum number of nodes in the Agent OS index AKS node pool. | `number` | `2` | no |
+| <a name="input_agent_os_index_vm_size"></a> [agent\_os\_index\_vm\_size](#input\_agent\_os\_index\_vm\_size) | VM size for the Agent OS index AKS node pool. | `string` | `"Standard_E8as_v5"` | no |
 | <a name="input_auditlogs_lock_enabled"></a> [auditlogs\_lock\_enabled](#input\_auditlogs\_lock\_enabled) | Whether to lock the audit logs container immutability policy. | `bool` | `false` | no |
 | <a name="input_auditlogs_retention_days"></a> [auditlogs\_retention\_days](#input\_auditlogs\_retention\_days) | The number of days to retain audit logs before deletion. | `number` | `365` | no |
 | <a name="input_azure_client_id"></a> [azure\_client\_id](#input\_azure\_client\_id) | Optional Azure client ID. Leave null to use environment-provided credentials such as ARM\_*. | `string` | `null` | no |
@@ -288,9 +320,11 @@ nsg_malicious_ips = [
 | <a name="input_cloudflare_tunnel_zone_id"></a> [cloudflare\_tunnel\_zone\_id](#input\_cloudflare\_tunnel\_zone\_id) | Zone ID for Cloudflare domain | `string` | `""` | no |
 | <a name="input_environment"></a> [environment](#input\_environment) | Type of environment being deployed to. | `string` | `"enterprise"` | no |
 | <a name="input_eventhub_auto_inflate_enabled"></a> [eventhub\_auto\_inflate\_enabled](#input\_eventhub\_auto\_inflate\_enabled) | Whether to enable auto-inflate for the Event Hubs namespace. | `bool` | `true` | no |
-| <a name="input_eventhub_capacity"></a> [eventhub\_capacity](#input\_eventhub\_capacity) | The capacity units for the Event Hubs namespace (1-20 for Standard, 1-8 for Premium). | `number` | `1` | no |
+| <a name="input_eventhub_capacity"></a> [eventhub\_capacity](#input\_eventhub\_capacity) | Standard Event Hubs throughput units (1-20); separate from Premium processing units. | `number` | `1` | no |
 | <a name="input_eventhub_maximum_throughput_units"></a> [eventhub\_maximum\_throughput\_units](#input\_eventhub\_maximum\_throughput\_units) | The maximum throughput units for auto-inflate (only applicable when auto\_inflate\_enabled is true). | `number` | `20` | no |
 | <a name="input_eventhub_namespace_sku"></a> [eventhub\_namespace\_sku](#input\_eventhub\_namespace\_sku) | The SKU name for the Event Hubs namespace (Basic, Standard, Premium). | `string` | `"Standard"` | no |
+| <a name="input_eventhub_premium_processing_units"></a> [eventhub\_premium\_processing\_units](#input\_eventhub\_premium\_processing\_units) | Premium Event Hubs processing units when Agent OS is enabled (100 event hubs per PU). | `number` | `1` | no |
+| <a name="input_import_existing_resource_group"></a> [import\_existing\_resource\_group](#input\_import\_existing\_resource\_group) | Import an already-created bootstrap resource group. Keep false for greenfield and when the group is already in Terraform state. | `bool` | `false` | no |
 | <a name="input_k8s_default_node_pool_vm_size"></a> [k8s\_default\_node\_pool\_vm\_size](#input\_k8s\_default\_node\_pool\_vm\_size) | VM size for the AKS default (system) node pool. Must be available in the target region (e.g. Standard\_B2s\_v2 in japaneast). | `string` | `"Standard_B2s"` | no |
 | <a name="input_k8s_dns_service_ip"></a> [k8s\_dns\_service\_ip](#input\_k8s\_dns\_service\_ip) | IP address within k8s\_service\_cidr for the cluster DNS service. Immutable after cluster creation. | `string` | `"172.16.0.10"` | no |
 | <a name="input_k8s_load_balancer_sku"></a> [k8s\_load\_balancer\_sku](#input\_k8s\_load\_balancer\_sku) | SKU for the AKS load balancer. | `string` | `"standard"` | no |
@@ -314,7 +348,7 @@ nsg_malicious_ips = [
 | <a name="input_nsg_malicious_ips"></a> [nsg\_malicious\_ips](#input\_nsg\_malicious\_ips) | Optional CIDR prefixes denied by subnet NSG inbound/outbound rules (public, private, redis). Empty skips those rules. Azure allows at most 4000 prefixes per rule. | `list(string)` | `[]` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
 | <a name="input_postgres_base_sku_name"></a> [postgres\_base\_sku\_name](#input\_postgres\_base\_sku\_name) | PostgreSQL SKU for secondary instances. Use GP\_Standard\_D2ads\_v5 for HA support. SKU availability may vary by Azure region. | `string` | `"B_Standard_B2s"` | no |
-| <a name="input_postgres_instances"></a> [postgres\_instances](#input\_postgres\_instances) | Per-instance PostgreSQL overrides. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed\_sync, paragon).<br/>Both sku and redundant must be set on each entry you include. Omitted keys use built-in defaults (no HA). Null uses defaults for all instances. | <pre>map(object({<br/>    sku       = string<br/>    redundant = bool<br/>  }))</pre> | `null` | no |
+| <a name="input_postgres_instances"></a> [postgres\_instances](#input\_postgres\_instances) | Per-instance PostgreSQL overrides. Each key is a logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed\_sync, paragon, agent\_os).<br/>Both sku and redundant must be set on each entry you include. Omitted keys and null optional fields retain their built-in defaults. | <pre>map(object({<br/>    sku        = string<br/>    redundant  = bool<br/>    storage_mb = optional(number)<br/>    version    = optional(string)<br/>  }))</pre> | `null` | no |
 | <a name="input_postgres_management_lock_enabled"></a> [postgres\_management\_lock\_enabled](#input\_postgres\_management\_lock\_enabled) | When true, apply Azure CanNotDelete management locks on Postgres Flexible Servers (opt-in). | `bool` | `false` | no |
 | <a name="input_postgres_multiple_instances"></a> [postgres\_multiple\_instances](#input\_postgres\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_postgres_sku_name"></a> [postgres\_sku\_name](#input\_postgres\_sku\_name) | PostgreSQL SKU name (e.g. `B_Standard_B2s` or `GP_Standard_D2ds_v5`) | `string` | `"GP_Standard_D2ds_v5"` | no |
@@ -327,7 +361,7 @@ nsg_malicious_ips = [
 | <a name="input_redis_managed_enabled"></a> [redis\_managed\_enabled](#input\_redis\_managed\_enabled) | Deploy Azure Managed Redis (Redis 7.4). When false, the redis-managed module is not created. May be true alongside redis\_enabled during customer migration (both modules run in parallel). | `bool` | `false` | no |
 | <a name="input_redis_managed_export_storage_enabled"></a> [redis\_managed\_export\_storage\_enabled](#input\_redis\_managed\_export\_storage\_enabled) | Create blob storage and grant Managed Redis identities access for on-demand RDB export (CLI/portal). | `bool` | `false` | no |
 | <a name="input_redis_managed_export_storage_replication_type"></a> [redis\_managed\_export\_storage\_replication\_type](#input\_redis\_managed\_export\_storage\_replication\_type) | Replication type for the optional Managed Redis export storage account. | `string` | `"LRS"` | no |
-| <a name="input_redis_managed_instances"></a> [redis\_managed\_instances](#input\_redis\_managed\_instances) | Overrides for Azure Managed Redis instances (Redis 7.4). Each key is a logical name (cache, queue, system, managed-sync).<br/>Merged per key with redis\_managed\_instances\_default (sku, ha\_enabled, cluster\_enabled, persistence\_*). Null uses defaults only. | <pre>map(object({<br/>    sku                   = optional(string)<br/>    ha_enabled            = optional(bool)<br/>    cluster_enabled       = optional(bool)<br/>    persistence_mode      = optional(string)<br/>    persistence_frequency = optional(string)<br/>  }))</pre> | `null` | no |
+| <a name="input_redis_managed_instances"></a> [redis\_managed\_instances](#input\_redis\_managed\_instances) | Overrides for Azure Managed Redis instances (Redis 7.4). Each key is a logical name (cache, queue, system, managed-sync, agent\_os).<br/>Merged per key with redis\_managed\_instances\_default (sku, ha\_enabled, cluster\_enabled, persistence\_*). Null uses defaults only. | <pre>map(object({<br/>    sku                   = optional(string)<br/>    ha_enabled            = optional(bool)<br/>    cluster_enabled       = optional(bool)<br/>    persistence_mode      = optional(string)<br/>    persistence_frequency = optional(string)<br/>  }))</pre> | `null` | no |
 | <a name="input_redis_managed_public_network_access"></a> [redis\_managed\_public\_network\_access](#input\_redis\_managed\_public\_network\_access) | Public network access for Azure Managed Redis (Disabled recommended). | `string` | `"Disabled"` | no |
 | <a name="input_redis_multiple_instances"></a> [redis\_multiple\_instances](#input\_redis\_multiple\_instances) | Whether or not to create multiple Redis instances. | `bool` | `true` | no |
 | <a name="input_redis_sku_name"></a> [redis\_sku\_name](#input\_redis\_sku\_name) | The SKU Name of the Redis cache (`Basic`, `Standard` or `Premium`). | `string` | `"Premium"` | no |
@@ -352,6 +386,7 @@ nsg_malicious_ips = [
 | <a name="output_redis_managed_export_storage"></a> [redis\_managed\_export\_storage](#output\_redis\_managed\_export\_storage) | Blob storage for on-demand Azure Managed Redis RDB export (null when disabled or legacy Redis). |
 | <a name="output_resource_group"></a> [resource\_group](#output\_resource\_group) | Resource Group that infrastructure was deployed to. |
 | <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. |
+| <a name="output_tracking"></a> [tracking](#output\_tracking) | Non-sensitive deployment metadata for external environment tracking. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->
 
