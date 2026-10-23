@@ -49,7 +49,7 @@ resource "aws_secretsmanager_secret_version" "env_paragon_overlay" {
       for key, value in local.helm_secret_values :
       key => value
       if key == "REDIS_URL" || endswith(key, "_REDIS_URL") ||
-        endswith(key, "_REDIS_TLS_ENABLED") || endswith(key, "_REDIS_CLUSTER_ENABLED")
+      endswith(key, "_REDIS_TLS_ENABLED") || endswith(key, "_REDIS_CLUSTER_ENABLED")
     } : {},
   ))
 
@@ -261,7 +261,7 @@ data "aws_secretsmanager_secret_version" "openobserve" {
 }
 
 locals {
-  runtime_env_secret_name = data.aws_secretsmanager_secret.env.name
+  runtime_env_secret_name          = data.aws_secretsmanager_secret.env.name
   runtime_docker_cfg_secret_name   = local.runtime_docker_cfg_sync_enabled ? data.aws_secretsmanager_secret.docker_cfg.name : null
   runtime_openobserve_secret_name  = data.aws_secretsmanager_secret.openobserve.name
   runtime_managed_sync_secret_name = var.managed_sync_enabled ? data.aws_secretsmanager_secret.managed_sync[0].name : null

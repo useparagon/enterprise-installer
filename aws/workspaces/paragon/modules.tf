@@ -125,11 +125,11 @@ module "managed_sync_config" {
   source = "./helm-config"
   count  = var.managed_sync_enabled ? 1 : 0
 
-  aws_region = var.aws_region
+  aws_region       = var.aws_region
   base_helm_values = local.selected_helm_vars
-  infra_values  = local.infra_vars
-  domain        = var.domain
-  microservices = local.microservices
+  infra_values     = local.infra_vars
+  domain           = var.domain
+  microservices    = local.microservices
 }
 
 # EKS Pod Identity: associate every Paragon onprem ServiceAccount with the S3 role.

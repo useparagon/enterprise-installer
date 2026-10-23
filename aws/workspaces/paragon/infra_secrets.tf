@@ -91,6 +91,8 @@ locals {
     role => try(local.physical_redis_connections[role], local.physical_redis_connections.cache, null)
   }
 
+  active_redis_required_roles = concat(["cache", "queue", "system", "workflow"], var.managed_sync_enabled ? ["managed_sync"] : [])
+
   provider_infra_vars = merge(
     {
       workspace                 = { value = local.workspace }

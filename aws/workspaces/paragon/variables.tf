@@ -1038,7 +1038,7 @@ locals {
         for key, value in local.helm_vars.global.env :
         key => value
         if !contains(["REDIS_HOST", "REDIS_PORT", "REDIS_URL", "REDIS_CLUSTER", "REDIS_SSL"], key) &&
-          !can(regex("^(CACHE|QUEUE|SYSTEM|WORKFLOW|MANAGED_SYNC)_REDIS_(URL|TLS_ENABLED|CLUSTER_ENABLED)$", key))
+        !can(regex("^(CACHE|QUEUE|SYSTEM|WORKFLOW|MANAGED_SYNC)_REDIS_(URL|TLS_ENABLED|CLUSTER_ENABLED)$", key))
       }
     })
   }) : local.helm_vars
