@@ -7,6 +7,9 @@ Environment variables helper
 {{- if and $.Values.envKeys (kindIs "slice" $.Values.envKeys) }}
   {{- $envKeys = uniq (concat $envKeys $.Values.envKeys) }}
 {{- end }}
+{{- if and $.Values.env (kindIs "map" $.Values.env) (hasKey $.Values.env "HTTP_PATH_PREFIX") }}
+  {{- $envKeys = uniq (append $envKeys "HTTP_PATH_PREFIX") }}
+{{- end }}
 {{- range $key := $envKeys }}
 {{- if and $.Values.env (kindIs "map" $.Values.env) (hasKey $.Values.env $key) }}
 - name: {{ $key }}

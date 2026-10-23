@@ -27,11 +27,20 @@ locals {
   })
 
   microservice_values = yamlencode({
-    for microservice_name, microservice_config in var.microservices : microservice_name => {
-      env = {
-        SERVICE = microservice_name
-      }
-    }
+    for microservice_name, microservice_config in var.microservices : microservice_name => merge(
+      {
+        env = merge(
+          {
+            SERVICE = microservice_name
+          },
+          var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
+            HTTP_PATH_PREFIX = var.public_microservices[microservice_name].path_prefix
+          } : {}
+        )
+      },
+      # HTTP_PATH_PREFIX is appended by env.standard without replacing chart envKeys.
+      {}
+    )
   })
 
   # Cloud Armor attaches to the backend service behind each public Service.

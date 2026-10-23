@@ -37,7 +37,7 @@ spec:
                 for name in $(kubectl get $kind -n paragon -l app.kubernetes.io/instance=paragon-on-prem -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}'); do
                   echo "Restarting $kind/$name"
                   kubectl rollout restart "$kind/$name" -n paragon
-                  kubectl rollout status "$kind/$name" -n paragon --timeout=300s      
+                  kubectl rollout status "$kind/$name" -n paragon --timeout=300s
                 done
               done
           restartPolicy: OnFailure
