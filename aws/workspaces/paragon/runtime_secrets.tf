@@ -41,10 +41,43 @@ resource "aws_secretsmanager_secret_version" "env_paragon_overlay" {
   # chart-specific keys that infra does not compute.
   secret_string = jsonencode(merge(
     local.helm_secret_values,
-    jsondecode(data.aws_secretsmanager_secret_version.env.secret_string)
+    jsondecode(data.aws_secretsmanager_secret_version.env.secret_string),
+    # The Infra-owned /env still contains Redis 6 until its decommission.
+    # On cutover, select Valkey in this existing Secret rather than using a
+    # second ESO overlay or a separate application secret.
+    local.valkey_cutover ? {
+      for key, value in local.helm_secret_values :
+      key => value
+      if key == "REDIS_URL" || endswith(key, "_REDIS_URL") ||
+        endswith(key, "_REDIS_TLS_ENABLED") || endswith(key, "_REDIS_CLUSTER_ENABLED")
+    } : {},
   ))
 
   lifecycle {
+    precondition {
+      condition = !var.valkey_migration || alltrue([
+        for role in local.active_redis_required_roles :
+        try(local.active_redis_connections[role].host != "" && local.active_redis_connections[role].port > 0, false)
+      ])
+      error_message = "Valkey cutover requires a valid physical Valkey endpoint for every active role, including shared Managed Sync."
+    }
+
+    precondition {
+      # Migration pairs are physical instances, not logical application roles.
+      # Workflow aliases Cache and Agent OS has its own independent Valkey.
+      condition = !var.valkey_migration || !var.redis_enabled || (
+        length(setsubtract(
+          toset([for role in keys(local.physical_redis_connections) : role if contains(["cache", "queue", "system", "managed_sync"], role)]),
+          toset(keys(local.physical_valkey_connections))
+        )) == 0 &&
+        length(setsubtract(
+          toset(keys(local.physical_valkey_connections)),
+          toset([for role in keys(local.physical_redis_connections) : role if contains(["cache", "queue", "system", "managed_sync"], role)])
+        )) == 0
+      )
+      error_message = "Physical Redis and Valkey migration pairs must match one-to-one before cutover."
+    }
+
     precondition {
       condition     = length(local.chart_service_inputs) > 0
       error_message = "No charts/**/files/service-inputs.json under ${path.root}/charts. Run ./prepare.sh -p aws before apply so secretKeys/envKeys can be classified."
@@ -228,7 +261,7 @@ data "aws_secretsmanager_secret_version" "openobserve" {
 }
 
 locals {
-  runtime_env_secret_name          = data.aws_secretsmanager_secret.env.name
+  runtime_env_secret_name = data.aws_secretsmanager_secret.env.name
   runtime_docker_cfg_secret_name   = local.runtime_docker_cfg_sync_enabled ? data.aws_secretsmanager_secret.docker_cfg.name : null
   runtime_openobserve_secret_name  = data.aws_secretsmanager_secret.openobserve.name
   runtime_managed_sync_secret_name = var.managed_sync_enabled ? data.aws_secretsmanager_secret.managed_sync[0].name : null

@@ -26,11 +26,13 @@ module "alb" {
   microservices            = local.microservices
   public_services          = local.public_services
   vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
-  worker_security_group_ids = coalescelist(
+  # Security group IDs are AWS resource identifiers, not credentials. The
+  # secrets-backed infra JSON wrapper marks them sensitive as a side effect.
+  worker_security_group_ids = nonsensitive(coalescelist(
     try(compact(local.infra_vars.worker_security_group_ids.value), []),
     try(compact(local.infra_vars.karpenter.value.security_group_ids), []),
     [data.aws_eks_cluster.cluster.vpc_config[0].cluster_security_group_id],
-  )
+  ))
   workspace = local.workspace
 }
 
@@ -53,6 +55,8 @@ module "helm" {
   create_docker_pull_secret     = var.create_docker_pull_secret
   docker_username               = var.docker_username
   env_secret_name               = local.runtime_env_secret_name
+  valkey_enabled                = var.valkey_enabled
+  redis_enabled                 = var.redis_enabled
   eso_role_arn                  = local.eso_role_arn
   feature_flags_content         = local.feature_flags_content
   flipt_options                 = local.flipt_options
@@ -121,11 +125,11 @@ module "managed_sync_config" {
   source = "./helm-config"
   count  = var.managed_sync_enabled ? 1 : 0
 
-  aws_region       = var.aws_region
-  base_helm_values = local.helm_vars
-  infra_values     = local.infra_vars
-  domain           = var.domain
-  microservices    = local.microservices
+  aws_region = var.aws_region
+  base_helm_values = local.selected_helm_vars
+  infra_values  = local.infra_vars
+  domain        = var.domain
+  microservices = local.microservices
 }
 
 # EKS Pod Identity: associate every Paragon onprem ServiceAccount with the S3 role.

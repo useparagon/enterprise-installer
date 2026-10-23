@@ -23,7 +23,7 @@ output "monitoring" {
 }
 
 output "redis" {
-  description = "Connection information for Redis."
+  description = "Physical Redis 6 connections only; never switched to Valkey."
   value       = local.redis_connections
   sensitive   = true
 }
