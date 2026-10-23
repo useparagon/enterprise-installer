@@ -22,8 +22,9 @@ variable "ingress_loadbalancer" {
 
 variable "public_services" {
   type = map(object({
-    port       = number
-    public_url = string
+    port        = number
+    public_url  = string
+    origin_host = optional(string)
   }))
 }
 
@@ -39,11 +40,17 @@ locals {
     for key, svc in var.public_services :
     key => (
       length(trimsuffix(
-        replace(replace(svc.public_url, "https://", ""), "http://", ""),
+        coalesce(
+          try(svc.origin_host, null),
+          replace(replace(svc.public_url, "https://", ""), "http://", "")
+        ),
         ".${var.domain}"
       )) > 0
       ? trimsuffix(
-        replace(replace(svc.public_url, "https://", ""), "http://", ""),
+        coalesce(
+          try(svc.origin_host, null),
+          replace(replace(svc.public_url, "https://", ""), "http://", "")
+        ),
         ".${var.domain}"
       )
       : "@"

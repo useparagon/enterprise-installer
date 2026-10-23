@@ -28,6 +28,8 @@ module "helm" {
     agent_os_vendor = var.agent_os_enabled ? azurerm_key_vault_secret.agent_os_vendor[0].version : null
   }))
   ingress_scheme                       = var.ingress_scheme
+  path_based_routing_enabled           = var.path_based_routing_enabled
+  azure_subscription_id                = var.azure_subscription_id
   nginx_public                         = local.nginx_public
   agc_active                           = local.agc_active
   agc_direct                           = local.agc_direct
@@ -135,6 +137,23 @@ locals {
   # (and a rollback to nginx) propagates quickly.
   dns_record_ttl = local.agc_active && !local.dns_target_agc ? 60 : 300
 
+  dns_public_services = merge(
+    {
+      for name, cfg in local.public_services :
+      name => cfg
+      # Path-routed external proxy hosts are not in the Paragon zone. Only the
+      # shared path-routing.<domain> origin is published for those services.
+      if try(cfg.path_prefix, "") == ""
+    },
+    var.path_based_routing_enabled && length(local.path_routed_public_prefixes) > 0 ? {
+      "path-routing" = {
+        port        = 443
+        public_url  = "https://${local.path_routing_origin_host}"
+        origin_host = local.path_routing_origin_host
+      }
+    } : {},
+  )
+
   # Match helm/helm.tf subchart_values: every microservice is forced on, then
   # helm_values.subchart overrides (later merge wins). Do NOT read the chart's
   # values.yaml defaults — those keep cache-replay/health-checker off while Helm
@@ -145,12 +164,15 @@ locals {
     local.restrict_public_exposure ? { health-checker = { enabled = true } } : {},
   )
 
-  # Per-host backends and HTTPS listeners for AGC, limited to services Helm publishes.
+  # AGC routes are normalized at the workspace boundary. Path-routed services
+  # share path-routing.<domain> TLS while HTTPRoute matching stays hostless.
   agc_public_routes = {
     for name, cfg in local.public_services :
     name => {
-      host = replace(replace(cfg.public_url, "https://", ""), "http://", "")
-      port = cfg.port
+      host             = try(cfg.origin_host, replace(replace(cfg.public_url, "https://", ""), "http://", ""))
+      path_prefix      = try(cfg.path_prefix, "")
+      healthcheck_path = try(cfg.healthcheck_path, "/healthz")
+      port             = cfg.port
     }
     if try(local.onprem_subchart_enabled[name].enabled, true)
   }
@@ -163,7 +185,7 @@ module "dns" {
   cloudflare_api_token = var.cloudflare_api_token
   cloudflare_zone_id   = var.cloudflare_zone_id
   ingress_loadbalancer = local.dns_ingress_target
-  public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
+  public_services      = var.ingress_scheme == "internal" ? {} : local.dns_public_services
   ttl                  = local.dns_record_ttl
 }
 
@@ -187,7 +209,7 @@ module "dns_records" {
   resource_group_name  = module.dns_zone.resource_group_name
   domain               = var.domain
   ingress_loadbalancer = local.dns_ingress_target
-  public_services      = var.ingress_scheme == "internal" ? {} : local.public_services
+  public_services      = var.ingress_scheme == "internal" ? {} : local.dns_public_services
   record_ttl           = local.dns_record_ttl
 }
 
@@ -230,19 +252,21 @@ resource "terraform_data" "agc_requires_subnet" {
 module "agc" {
   source = "./agc"
 
-  enabled                = local.agc_active
-  direct_routing         = var.agc_direct_routing
-  workspace              = local.workspace
-  resource_group_name    = local.infra_vars.resource_group.value.name
-  location               = local.infra_vars.resource_group.value.location
-  cluster_name           = local.cluster_name
-  subnet_id              = try(local.infra_vars.network.value.agc_subnet_id, null)
-  namespace              = module.helm.namespace_paragon.metadata[0].name
-  public_services        = merge(local.agc_public_routes, local.agent_os_agc_routes)
-  waf_enabled            = local.waf_active
-  waf_policy_id          = local.waf_active ? module.waf[0].policy_id : null
-  alb_controller_version = var.agc_alb_controller_version
-  tags                   = local.default_tags
+  enabled                    = local.agc_active
+  direct_routing             = var.agc_direct_routing
+  path_based_routing_enabled = var.path_based_routing_enabled
+  domain                     = var.domain
+  workspace                  = local.workspace
+  resource_group_name        = local.infra_vars.resource_group.value.name
+  location                   = local.infra_vars.resource_group.value.location
+  cluster_name               = local.cluster_name
+  subnet_id                  = try(local.infra_vars.network.value.agc_subnet_id, null)
+  namespace                  = module.helm.namespace_paragon.metadata[0].name
+  public_services            = merge(local.agc_public_routes, local.agent_os_agc_routes)
+  waf_enabled                = local.waf_active
+  waf_policy_id              = local.waf_active ? module.waf[0].policy_id : null
+  alb_controller_version     = var.agc_alb_controller_version
+  tags                       = local.default_tags
 }
 
 locals {
