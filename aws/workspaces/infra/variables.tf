@@ -152,7 +152,7 @@ variable "elasticache_node_type" {
 }
 
 variable "elasticache_multiple_instances" {
-  description = "Whether or not to create multiple ElastiCache instances. Used for higher volume installations."
+  description = "Use separate physical Redis and Valkey instances for Cache, Queue, System, and enabled Managed Sync when true; otherwise share Cache. Agent OS remains independent."
   type        = bool
   default     = true
 }
@@ -592,11 +592,11 @@ variable "redis_enabled" {
     condition = var.redis_enabled || (
       var.valkey_enabled &&
       try(var.valkey_instances["cache"].enabled, true) &&
-      (var.valkey_shared || (
+      (!var.elasticache_multiple_instances || (
         try(var.valkey_instances["queue"].enabled, true) &&
         try(var.valkey_instances["system"].enabled, true)
       )) &&
-      (!var.managed_sync_enabled || var.valkey_shared || try(var.valkey_instances["managed_sync"].enabled, true))
+      (!var.managed_sync_enabled || !var.elasticache_multiple_instances || try(var.valkey_instances["managed_sync"].enabled, true))
     )
     error_message = "Keep Redis until the Paragon valkey_migration=true cutover and soak finish; all Valkey roles must be enabled before deleting Redis."
   }
@@ -605,10 +605,10 @@ variable "redis_enabled" {
 variable "valkey_instances" {
   description = <<-EOT
     Per-physical-instance overrides for cache, queue, system, managed_sync and agent_os.
-    When valkey_shared=true, all application roles including Managed Sync use cache;
-    Agent OS retains its independent Valkey instance.
-    The root builds the default catalog from valkey_enabled, valkey_shared and
-    managed_sync_enabled. Entries here only override or explicitly disable roles.
+    When elasticache_multiple_instances=false, all application roles including
+    Managed Sync share cache; Agent OS retains its independent Valkey instance.
+    The root builds the physical catalog from elasticache_multiple_instances,
+    valkey_enabled and managed_sync_enabled. Entries here only override or disable roles.
     Agent OS is created only when agent_os_enabled && managed_sync_enabled && valkey_enabled.
     TLS is supported only on agent_os. The other instances stay TLS-off because the
     *_REDIS_* secret contract has no AUTH token.
@@ -633,6 +633,16 @@ variable "valkey_instances" {
   validation {
     condition     = length(setsubtract(toset(keys(var.valkey_instances)), toset(["cache", "queue", "system", "managed_sync", "agent_os"]))) == 0
     error_message = "Valkey catalog supports only cache, queue, system, managed_sync and agent_os."
+  }
+
+  validation {
+    condition = var.elasticache_multiple_instances || (
+      try(var.valkey_instances["cache"].enabled, true) &&
+      !contains(keys(var.valkey_instances), "queue") &&
+      !contains(keys(var.valkey_instances), "system") &&
+      !contains(keys(var.valkey_instances), "managed_sync")
+    )
+    error_message = "elasticache_multiple_instances=false requires Cache enabled and no separate Queue, System or Managed Sync Valkey overrides."
   }
 
   validation {
@@ -676,23 +686,6 @@ variable "valkey_instances" {
     )
     error_message = "Agent OS cannot be disabled through valkey_instances, and Managed Sync Valkey requires managed_sync_enabled."
   }
-}
-
-variable "valkey_shared" {
-  description = "Use one physical cache Valkey for all application roles, including Managed Sync. Agent OS keeps its independent Valkey."
-  type        = bool
-  default     = false
-
-  validation {
-    condition = !var.valkey_shared || (
-      try(var.valkey_instances["cache"].enabled, true) &&
-      !contains(keys(var.valkey_instances), "queue") &&
-      !contains(keys(var.valkey_instances), "system") &&
-      !contains(keys(var.valkey_instances), "managed_sync")
-    )
-    error_message = "valkey_shared requires cache enabled and no separate queue/system/managed_sync overrides."
-  }
-
 }
 
 variable "agent_os_index_instance_types" {
@@ -926,9 +919,9 @@ locals {
   # Callers only need valkey_instances when overriding a role's settings.
   valkey_instance_enabled = {
     cache        = try(var.valkey_instances["cache"].enabled, true)
-    queue        = !var.valkey_shared && try(var.valkey_instances["queue"].enabled, true)
-    system       = !var.valkey_shared && try(var.valkey_instances["system"].enabled, true)
-    managed_sync = var.managed_sync_enabled && !var.valkey_shared && try(var.valkey_instances["managed_sync"].enabled, true)
+    queue        = var.elasticache_multiple_instances && try(var.valkey_instances["queue"].enabled, true)
+    system       = var.elasticache_multiple_instances && try(var.valkey_instances["system"].enabled, true)
+    managed_sync = var.managed_sync_enabled && var.elasticache_multiple_instances && try(var.valkey_instances["managed_sync"].enabled, true)
     agent_os     = var.agent_os_enabled && var.managed_sync_enabled
   }
 
@@ -936,9 +929,9 @@ locals {
   # system into the cache Valkey, so those Redis instances are sources too.
   redis_migration_source = {
     cache        = local.valkey_instance_enabled.cache
-    queue        = local.valkey_instance_enabled.queue || (var.valkey_shared && local.valkey_instance_enabled.cache)
-    system       = local.valkey_instance_enabled.system || (var.valkey_shared && local.valkey_instance_enabled.cache)
-    managed_sync = var.managed_sync_enabled && (local.valkey_instance_enabled.managed_sync || (var.valkey_shared && local.valkey_instance_enabled.cache))
+    queue        = local.valkey_instance_enabled.queue || (!var.elasticache_multiple_instances && local.valkey_instance_enabled.cache)
+    system       = local.valkey_instance_enabled.system || (!var.elasticache_multiple_instances && local.valkey_instance_enabled.cache)
+    managed_sync = var.managed_sync_enabled && (local.valkey_instance_enabled.managed_sync || (!var.elasticache_multiple_instances && local.valkey_instance_enabled.cache))
   }
 
   redis_kea_on_cluster = var.redis_enabled && var.elasticache_multiple_instances && (
@@ -972,7 +965,7 @@ locals {
   # to the same physical cache Valkey. Agent OS always remains independent.
   valkey_role_instances = {
     for role in ["cache", "queue", "system", "workflow", "managed_sync", "agent_os"] :
-    role => (role == "workflow" || (var.valkey_shared && contains(["queue", "system", "managed_sync"], role)) ? "cache" : role)
+    role => (role == "workflow" || (!var.elasticache_multiple_instances && contains(["queue", "system", "managed_sync"], role)) ? "cache" : role)
   }
 
   # Physical Redis 6 connections never change when the application switches to Valkey.

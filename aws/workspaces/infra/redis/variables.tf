@@ -29,7 +29,7 @@ variable "elasticache_multi_az" {
 }
 
 variable "elasticache_multiple_instances" {
-  description = "Whether or not to create multiple Redis instances."
+  description = "Legacy Redis physical topology selector, shared with the Valkey catalog in the parent workspace."
   type        = bool
 }
 
