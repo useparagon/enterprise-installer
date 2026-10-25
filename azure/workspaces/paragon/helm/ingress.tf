@@ -10,7 +10,7 @@ locals {
   # microservice forced on, then helm_values.subchart overrides. Avoids issuing
   # LE certs for hosts Helm does not actually publish (e.g. cache-replay).
   subchart_enabled = merge(
-    { for name in keys(var.microservices) : name => { enabled = true } },
+    { for name in keys(var.microservices) : name => { enabled = name != "health-checker" } },
     try(nonsensitive(var.helm_values.subchart), {}),
     var.restrict_public_exposure ? { health-checker = { enabled = true } } : {},
   )

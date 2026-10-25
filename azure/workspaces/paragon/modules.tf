@@ -140,7 +140,7 @@ locals {
   # values.yaml defaults — those keep cache-replay/health-checker off while Helm
   # still deploys them, which would omit AGC HTTPS listeners for live hosts.
   onprem_subchart_enabled = merge(
-    { for name in keys(local.microservices) : name => { enabled = true } },
+    { for name in keys(local.microservices) : name => { enabled = name != "health-checker" } },
     try(local.helm_vars.subchart, {}),
     local.restrict_public_exposure ? { health-checker = { enabled = true } } : {},
   )

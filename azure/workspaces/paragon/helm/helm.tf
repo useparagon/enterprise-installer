@@ -8,7 +8,7 @@ locals {
       merge(
         {
           for microservice in keys(var.microservices) : microservice => {
-            enabled = true
+            enabled = microservice != "health-checker"
           }
         },
         {
@@ -106,6 +106,14 @@ locals {
     }
     if !contains(keys(var.public_monitors), monitor_name)
   })
+
+  health_checker_values = yamlencode(
+    var.restrict_public_exposure ? {
+      health-checker = {
+        replicaCount = 1
+      }
+    } : {}
+  )
 
   flipt_values = yamlencode({
     flipt = {
@@ -269,6 +277,7 @@ resource "helm_release" "paragon_on_prem" {
     local.microservice_values,
     local.public_microservice_values,
     local.unexposed_microservice_values,
+    local.health_checker_values,
     local.secret_hash
   ]
 
