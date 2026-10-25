@@ -45,7 +45,11 @@ resource "aws_secretsmanager_secret_version" "env_paragon_overlay" {
     # selects the physical endpoint before building helm_secret_values; the
     # existing paragon-secrets consumer receives the selected values.
     jsondecode(data.aws_secretsmanager_secret_version.env.secret_string),
-    local.helm_secret_values
+    local.helm_secret_values,
+    # REDIS_URL is a legacy shared application contract and may not appear in
+    # chart service-inputs secretKeys. Force the selected physical endpoint on
+    # cutover so the infra-owned Source value cannot survive the overlay.
+    local.valkey_cutover ? { REDIS_URL = local.default_redis_url } : {}
   ))
 
   lifecycle {

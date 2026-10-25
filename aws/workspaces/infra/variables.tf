@@ -695,17 +695,6 @@ variable "valkey_shared" {
 
 }
 
-variable "redis_role_backend" {
-  description = "Deprecated: application endpoint cutover is now controlled only by valkey_migration in the paragon workspace. Must remain empty."
-  type        = map(string)
-  default     = {}
-
-  validation {
-    condition     = length(var.redis_role_backend) == 0
-    error_message = "Do not cut over Redis in infra. Use valkey_migration = true/false in the paragon workspace."
-  }
-}
-
 variable "agent_os_index_instance_types" {
   description = "Instance types for the Agent OS index managed node group / Karpenter NodePool."
   type        = list(string)
@@ -984,12 +973,6 @@ locals {
   valkey_role_instances = {
     for role in ["cache", "queue", "system", "workflow", "managed_sync", "agent_os"] :
     role => (role == "workflow" || (var.valkey_shared && contains(["queue", "system", "managed_sync"], role)) ? "cache" : role)
-  }
-
-  valkey_role_connections = {
-    for role, instance in local.valkey_role_instances :
-    role => module.redis.valkey[instance]
-    if contains(keys(module.redis.valkey), instance)
   }
 
   # Physical Redis 6 connections never change when the application switches to Valkey.
