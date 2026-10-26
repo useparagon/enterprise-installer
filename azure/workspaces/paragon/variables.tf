@@ -230,6 +230,23 @@ variable "path_based_routing_enabled" {
     error_message = "The shared external path-routing host must not be path-routing.<domain>, which is reserved for the Paragon origin."
   }
 
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue([
+      for host in setunion(local.path_routing_public_hosts, toset([lower(local.path_routing_origin_host)])) :
+      (!var.managed_sync_enabled || host != lower(replace(
+        try(local.microservices["api-sync"].public_url, "https://sync.${var.domain}"),
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))) &&
+      (!var.agent_os_enabled || host != lower(replace(
+        local.agent_os_public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      )))
+    ])
+    error_message = "The shared path-routing public host and path-routing.<domain> origin must not match the Managed Sync or Agent OS listener host. Those hostname-specific Gateway listeners take precedence over the hostless path listener."
+  }
+
 }
 
 variable "agc_dns_cutover" {
