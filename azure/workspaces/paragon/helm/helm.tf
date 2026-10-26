@@ -82,7 +82,7 @@ locals {
       ingress = {
         enabled   = !var.agc_direct
         className = "nginx"
-        host      = replace(replace(monitor_config.public_url, "https://", ""), "http://", "")
+        host      = monitor_config.origin_host
         scheme    = var.ingress_scheme
         agc       = var.agc_active
         annotations = {

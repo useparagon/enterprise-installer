@@ -168,7 +168,7 @@ locals {
   agc_public_routes = {
     for name, cfg in local.public_services :
     name => {
-      host             = try(cfg.origin_host, replace(replace(cfg.public_url, "https://", ""), "http://", ""))
+      host             = cfg.origin_host
       path_prefix      = try(cfg.path_prefix, "")
       healthcheck_path = try(cfg.healthcheck_path, "/healthz")
       port             = cfg.port

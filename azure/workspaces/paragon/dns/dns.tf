@@ -13,14 +13,7 @@ resource "cloudflare_record" "cname" {
 
   # Path-routed public URLs belong to the external reverse proxy. DNS keeps
   # the Paragon-domain origin hostname that proxy targets.
-  name = replace(
-    coalesce(
-      try(each.value.origin_host, null),
-      replace(replace(each.value.public_url, "https://", ""), "http://", "")
-    ),
-    ".${data.cloudflare_zone.zone[0].name}",
-    ""
-  )
+  name = replace(each.value.origin_host, ".${data.cloudflare_zone.zone[0].name}", "")
 
   content = var.ingress_loadbalancer
   ttl     = var.ttl

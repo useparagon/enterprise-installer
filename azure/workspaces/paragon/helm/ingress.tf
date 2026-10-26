@@ -19,7 +19,10 @@ locals {
   # Path-routed services share path-routing.<domain> on the hostless listener —
   # do not issue unused per-service certs that AGC will never present.
   agc_direct_certificate_hosts = merge(
-    { for name, cfg in var.public_services : name => replace(replace(cfg.public_url, "https://", ""), "http://", "") if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true) && !contains(keys(var.public_microservices), name) },
+    {
+      for name, cfg in var.public_services : name => cfg.origin_host
+      if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true) && !contains(keys(var.public_microservices), name) && try(cfg.origin_host, "") != ""
+    },
     {
       for name, cfg in var.public_microservices :
       name => cfg.origin_host
@@ -27,8 +30,8 @@ locals {
     },
     {
       for name, cfg in var.public_monitors :
-      name => replace(replace(cfg.public_url, "https://", ""), "http://", "")
-      if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true)
+      name => cfg.origin_host
+      if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true) && try(cfg.origin_host, "") != ""
     },
     var.path_based_routing_enabled && anytrue([
       for cfg in var.public_microservices : cfg.path_prefix != ""

@@ -157,7 +157,7 @@ locals {
     }
   })
 
-  # Direct routing: legacy services remain host-based. Path-routed services attach
+  # Direct routing: default services remain host-based. Path-routed services attach
   # to the shared hostless listener and match only their configured PathPrefix.
   direct_route_yaml = {
     for name, svc in var.public_services :

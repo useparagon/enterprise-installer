@@ -24,7 +24,7 @@ variable "public_services" {
   type = map(object({
     port        = number
     public_url  = string
-    origin_host = optional(string)
+    origin_host = string
   }))
 }
 
@@ -39,20 +39,8 @@ locals {
   record_names = {
     for key, svc in var.public_services :
     key => (
-      length(trimsuffix(
-        coalesce(
-          try(svc.origin_host, null),
-          replace(replace(svc.public_url, "https://", ""), "http://", "")
-        ),
-        ".${var.domain}"
-      )) > 0
-      ? trimsuffix(
-        coalesce(
-          try(svc.origin_host, null),
-          replace(replace(svc.public_url, "https://", ""), "http://", "")
-        ),
-        ".${var.domain}"
-      )
+      length(trimsuffix(svc.origin_host, ".${var.domain}")) > 0
+      ? trimsuffix(svc.origin_host, ".${var.domain}")
       : "@"
     )
   }

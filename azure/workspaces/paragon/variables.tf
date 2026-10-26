@@ -1047,7 +1047,9 @@ locals {
   # Internet-facing monitor Ingress (Grafana when it has a public_url). Restrict mode keeps monitors internal (Hoop).
   public_monitors = var.monitors_enabled && !local.restrict_public_exposure ? {
     for monitor, config in local.monitors :
-    monitor => config
+    monitor => merge(config, {
+      origin_host = replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
+    })
     if lookup(config, "public_url", null) != null && lookup(config, "public_url", "") != "" && !contains(var.private_services, monitor)
   } : {}
 
@@ -1069,12 +1071,18 @@ locals {
     }
   } : {}
 
-  public_services = merge(
-    local.public_microservices,
-    local.public_monitors,
-    local.managed_sync_public_dns,
-    local.agent_os_public_dns,
-  )
+  public_services = {
+    for name, cfg in merge(
+      local.public_microservices,
+      local.public_monitors,
+      local.managed_sync_public_dns,
+      local.agent_os_public_dns,
+    ) :
+    name => merge(cfg, {
+      # Host is derived once here. DNS, certificates, and AGC read origin_host.
+      origin_host = try(cfg.origin_host, replace(cfg.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+    })
+  }
 
   helm_keys_to_remove = [
     "POSTGRES_HOST",

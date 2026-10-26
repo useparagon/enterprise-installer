@@ -25,7 +25,7 @@ variable "public_services" {
   type = map(object({
     port        = number
     public_url  = string
-    origin_host = optional(string)
+    origin_host = string
   }))
 }
 

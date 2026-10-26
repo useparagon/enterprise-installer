@@ -148,8 +148,9 @@ variable "monitors" {
 variable "public_monitors" {
   description = "The monitors running within the system exposed to the load balancer"
   type = map(object({
-    port       = number
-    public_url = string
+    port        = number
+    public_url  = string
+    origin_host = optional(string)
   }))
 }
 
@@ -159,6 +160,7 @@ variable "public_services" {
     port             = optional(number)
     healthcheck_path = optional(string)
     public_url       = string
+    origin_host      = optional(string)
   }))
 }
 
