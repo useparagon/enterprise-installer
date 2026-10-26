@@ -59,6 +59,12 @@ metadata:
     {{- if and .Values.ingress.wafv2_acl_arn (ne .Values.ingress.wafv2_acl_arn "none") }}
     alb.ingress.kubernetes.io/wafv2-acl-arn: {{ .Values.ingress.wafv2_acl_arn }}
     {{- end }}
+    {{- if and $hostless (eq $name "connect") .Values.ingress.connect_sdk_routes }}
+    {{- /* SDK paths stay on the Connect URL, but Hermes and worker-proxy only strip their own HTTP_PATH_PREFIX. */}}
+    {{- $sdkRewrite := printf "[{\"type\":\"url\",\"urlRewriteConfig\":{\"rewrites\":[{\"regex\":\"^%s(/projects/.*)$\",\"replace\":\"%s\"}]}}]" ($path | trimSuffix "/") `$1` }}
+    alb.ingress.kubernetes.io/transforms.hermes: {{ $sdkRewrite | quote }}
+    alb.ingress.kubernetes.io/transforms.worker-proxy: {{ $sdkRewrite | quote }}
+    {{- end }}
     {{- else if eq .Values.global.env.HOST_ENV "AZURE_K8" }}
     kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: letsencrypt-prod
