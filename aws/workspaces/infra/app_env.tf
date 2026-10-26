@@ -6,8 +6,15 @@
 
 locals {
   argocd_postgres = module.postgres.rds
-  argocd_redis    = local.redis_connections
-  argocd_storage  = module.storage.s3
+  # Redis 6 while it still exists. After decommission the env secret must carry
+  # the logical Valkey roles; an empty map makes the URL keys null and the
+  # replace drops them. Agent OS keeps its own Valkey and stays out of this map.
+  argocd_redis = var.redis_enabled ? local.redis_connections : {
+    for role, instance in local.valkey_role_instances :
+    role => module.redis.valkey[instance]
+    if contains(keys(module.redis.valkey), instance) && role != "agent_os"
+  }
+  argocd_storage = module.storage.s3
 
   argocd_cloud_storage_type = "S3"
 

@@ -100,14 +100,22 @@ locals {
   })
 
   monitor_values = yamlencode({
-    for monitor_name, monitor_config in var.monitors : monitor_name => {
+    for monitor_name, monitor_config in var.monitors : monitor_name => merge({
       image = {
         tag = var.monitor_version
       }
       ingress = {
         logs_bucket = var.logs_bucket
       }
-    }
+      }, {
+      # Add Redis exporter settings without changing values for other monitors.
+      for key, value in {
+        envKeys = ["REDIS_ADDR"]
+        env = {
+          REDIS_ADDR = var.redis_exporter_addr
+        }
+      } : key => value if monitor_name == "redis-exporter"
+    })
   })
 
   public_monitor_values = yamlencode({

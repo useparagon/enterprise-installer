@@ -172,6 +172,11 @@ variable "monitor_version" {
   type        = string
 }
 
+variable "redis_exporter_addr" {
+  description = "Redis-compatible URI for the active cache backend (Redis or Valkey), used only by redis-exporter."
+  type        = string
+}
+
 variable "monitors" {
   description = "The monitors running within the system."
   type = map(object({

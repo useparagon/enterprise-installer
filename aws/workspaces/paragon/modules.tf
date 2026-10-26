@@ -103,6 +103,9 @@ module "helm" {
   karpenter_defaults                = var.karpenter_defaults
   workspace                         = local.workspace
 
+  # Only redis-exporter needs the Redis-compatible active cache URI.
+  redis_exporter_addr = nonsensitive("${try(local.active_redis_connections.cache.ssl, false) ? "rediss" : "redis"}://${local.active_redis_connections.cache.host}:${local.active_redis_connections.cache.port}")
+
   runtime_secrets_ready = terraform_data.runtime_secrets_populated.id
   # Hash SM version IDs (not terraform_data.id, which is stable across input updates).
   secrets_revision = sha256(jsonencode(terraform_data.runtime_secrets_populated.output))
