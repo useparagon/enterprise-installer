@@ -353,6 +353,19 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || alltrue([
+      for host in local.path_routing_public_hosts :
+      (!var.managed_sync_enabled || host != lower("sync.${var.domain}")) &&
+      (!var.agent_os_enabled || host != lower(replace(
+        try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], "https://agentos.${var.domain}"),
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      )))
+    ])
+    error_message = "The shared path-routing public host must not be sync.<domain> or the Agent OS host. GCP matches those host rules before hostless path rules, and the Managed Sync catch-all path would take the traffic."
+  }
+
+  validation {
     condition = !var.path_based_routing_enabled || !var.managed_sync_enabled || alltrue([
       for prefix in values(local.path_routed_public_prefixes) :
       alltrue([
