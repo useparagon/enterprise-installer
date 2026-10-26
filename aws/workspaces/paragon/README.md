@@ -9,7 +9,7 @@ hostname and a service-specific prefix:
 ```hcl
 path_based_routing_enabled = true
 path_routing_base_path     = "/paragon"
-path_routing_public_host   = "proxy-path-test.staging.pgn.so"
+path_routing_public_host   = "proxy.example.com"
 ```
 
 The host and base path are specified **once**. Terraform generates paths
@@ -17,7 +17,7 @@ The host and base path are specified **once**. Terraform generates paths
 `/paragon/dashboard`, `/paragon/hermes`, `/paragon/passport`,
 `/paragon/zeus`, `/paragon/worker-proxy`, and every other exposed
 Paragon HTTP worker/service. It also sets their effective `*_PUBLIC_URL`
-values to `https://proxy-path-test.staging.pgn.so/paragon/<service>` in
+values to `https://proxy.example.com/paragon/<service>` in
 Helm and sets `HTTP_PATH_PREFIX=/paragon/<service>` individually.
 `worker-auditlogs` uses `WORKER_AUDIT_LOGS_PUBLIC_URL` and `worker-eventlogs` uses `WORKER_EVENT_LOGS_PUBLIC_URL`. `PUBLIC_UPLOAD_PROXY_BASE_URL` follows the path-routed Zeus URL.
 
