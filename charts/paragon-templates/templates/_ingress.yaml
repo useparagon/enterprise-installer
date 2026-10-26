@@ -61,7 +61,7 @@ metadata:
     {{- end }}
     {{- if and $hostless (eq $name "connect") .Values.ingress.connect_sdk_routes }}
     {{- /* SDK paths stay on the Connect URL, but Hermes and worker-proxy only strip their own HTTP_PATH_PREFIX. */}}
-    {{- $sdkRewrite := printf "[{\"type\":\"url\",\"urlRewriteConfig\":{\"rewrites\":[{\"regex\":\"^%s(/projects/.*)$\",\"replace\":\"%s\"}]}}]" ($path | trimSuffix "/") `$1` }}
+    {{- $sdkRewrite := printf "[{\"type\":\"url-rewrite\",\"urlRewriteConfig\":{\"rewrites\":[{\"regex\":\"^%s(/projects/.*)$\",\"replace\":\"%s\"}]}}]" ($path | trimSuffix "/") `$1` }}
     alb.ingress.kubernetes.io/transforms.hermes: {{ $sdkRewrite | quote }}
     alb.ingress.kubernetes.io/transforms.worker-proxy: {{ $sdkRewrite | quote }}
     {{- end }}
