@@ -30,6 +30,23 @@ existing Agent OS secret handoff and logical `context`/`tools` databases.
 The legacy Paragon/Managed Sync RDS resources continue unchanged; adding
 a legacy workload to the new map is **not** an automatic migration.
 
+## Valkey instance catalog
+
+`valkey_instances` holds per-role sizing and options (node type, TLS,
+cluster mode, snapshots). Defaults mirror legacy Redis (`cache.r6g.large`
+for cache and managed sync, `cache.t4g.medium` / `cache.t4g.micro` for queue
+and system). `elasticache_multiple_instances` still controls physical
+topology for Valkey after Redis is removed; it does not read
+`elasticache_node_type` or `elasticache_multi_az`.
+
+```hcl
+valkey_instances = {
+  cache = {
+    node_type = "cache.r6g.xlarge" # override default sizing only
+  }
+}
+```
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 

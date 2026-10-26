@@ -146,19 +146,19 @@ variable "rds_max_allocated_storage" {
 
 # elasticache
 variable "elasticache_node_type" {
-  description = "The ElastiCache node type used for Redis."
+  description = "ElastiCache node type for legacy Redis OSS only. Valkey sizing lives in valkey_instances."
   type        = string
   default     = "cache.r6g.large"
 }
 
 variable "elasticache_multiple_instances" {
-  description = "Use separate physical Redis and Valkey instances for Cache, Queue, System, and enabled Managed Sync when true; otherwise share Cache. Agent OS remains independent."
+  description = "Physical ElastiCache topology for Valkey (and legacy Redis while redis_enabled). When true, separate cache (cluster), queue, system, and managed_sync instances; when false, one shared cache instance. Agent OS remains independent."
   type        = bool
   default     = true
 }
 
 variable "elasticache_multi_az" {
-  description = "Whether or not to enable multi-AZ in each ElastiCache instance."
+  description = "Multi-AZ for legacy Redis OSS replication groups only. Valkey multi-AZ is set per role in valkey_instances."
   type        = bool
   default     = true
 }
@@ -604,14 +604,11 @@ variable "redis_enabled" {
 
 variable "valkey_instances" {
   description = <<-EOT
-    Per-physical-instance overrides for cache, queue, system, managed_sync and agent_os.
-    When elasticache_multiple_instances=false, all application roles including
-    Managed Sync share cache; Agent OS retains its independent Valkey instance.
-    The root builds the physical catalog from elasticache_multiple_instances,
-    valkey_enabled and managed_sync_enabled. Entries here only override or disable roles.
-    Agent OS is created only when agent_os_enabled && managed_sync_enabled && valkey_enabled.
-    TLS is supported only on agent_os. The other instances stay TLS-off because the
-    *_REDIS_* secret contract has no AUTH token.
+    Valkey physical catalog and per-role overrides (cache, queue, system, managed_sync, agent_os).
+    Built-in defaults mirror legacy Redis sizing (cache.r6g.large cache/MS, t4g.medium queue, t4g.micro system).
+    elasticache_multiple_instances controls which physical instances exist and cache/MS cluster mode;
+    valkey_enabled, managed_sync_enabled, and agent_os_enabled gate optional roles.
+    TLS defaults to false except agent_os (true); other roles may set tls_enabled when the app secret contract supports AUTH.
     snapshot_name applies only at creation. Setting or changing it later replaces the replication group.
   EOT
   type = map(object({
@@ -628,7 +625,27 @@ variable "valkey_instances" {
     kms_key_arn             = optional(string)
     snapshot_name           = optional(string)
   }))
-  default = {}
+  default = {
+    cache = {
+      node_type = "cache.r6g.large"
+    }
+    queue = {
+      node_type       = "cache.t4g.medium"
+      cluster_enabled = false
+      multi_az        = false
+    }
+    system = {
+      node_type       = "cache.t4g.micro"
+      cluster_enabled = false
+      multi_az        = false
+    }
+    managed_sync = {
+      node_type = "cache.r6g.large"
+    }
+    agent_os = {
+      tls_enabled = true
+    }
+  }
 
   validation {
     condition     = length(setsubtract(toset(keys(var.valkey_instances)), toset(["cache", "queue", "system", "managed_sync", "agent_os"]))) == 0
@@ -889,11 +906,11 @@ locals {
     [local.caller_arn]
   )))
 
-  # Resolve Valkey defaults in the root, like the Redis and RDS catalogs.
-  # The child module receives a fully configured map.
+  # Resolve Valkey in the root (like RDS). Sizing matches legacy Redis defaults but does not
+  # read elasticache_node_type or elasticache_multi_az; topology still uses elasticache_multiple_instances.
   valkey_instance_defaults = {
-    node_type               = "cache.t4g.medium"
-    multi_az                = true
+    node_type               = "cache.r6g.large"
+    multi_az                = false
     cluster_enabled         = false
     engine_version          = "7.2"
     tls_enabled             = false
@@ -905,14 +922,24 @@ locals {
     snapshot_name           = null
   }
 
-  valkey_role_defaults = {
-    cache        = { node_type = var.elasticache_node_type, cluster_enabled = var.elasticache_multiple_instances, multi_az = var.elasticache_multi_az }
+  valkey_builtin_role_defaults = {
+    cache        = { node_type = "cache.r6g.large" }
     queue        = { node_type = "cache.t4g.medium", cluster_enabled = false, multi_az = false }
     system       = { node_type = "cache.t4g.micro", cluster_enabled = false, multi_az = false }
-    managed_sync = { node_type = var.elasticache_node_type, cluster_enabled = var.elasticache_multiple_instances, multi_az = var.elasticache_multi_az }
-    # The existing Agent OS instance uses authenticated rediss://, so this
-    # legacy default must not be silently changed or force-replaced.
+    managed_sync = { node_type = "cache.r6g.large" }
+    # Agent OS already uses authenticated rediss://; do not change silently.
     agent_os = { tls_enabled = true }
+  }
+
+  valkey_topology_role_defaults = {
+    cache = {
+      cluster_enabled = var.elasticache_multiple_instances
+      multi_az        = var.elasticache_multiple_instances
+    }
+    managed_sync = {
+      cluster_enabled = var.elasticache_multiple_instances
+      multi_az        = var.elasticache_multiple_instances
+    }
   }
 
   # The root controls the default topology, as with the legacy Redis catalog.
@@ -952,10 +979,11 @@ locals {
   ]))
 
   valkey_instances = {
-    for name, defaults in local.valkey_role_defaults :
+    for name, _ in local.valkey_builtin_role_defaults :
     name => merge(
       local.valkey_instance_defaults,
-      defaults,
+      local.valkey_builtin_role_defaults[name],
+      lookup(local.valkey_topology_role_defaults, name, {}),
       { for key, value in try(var.valkey_instances[name], {}) : key => value if value != null && key != "enabled" }
     )
     if var.valkey_enabled && local.valkey_instance_enabled[name]

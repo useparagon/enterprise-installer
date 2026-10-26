@@ -29,7 +29,7 @@ variable "elasticache_multi_az" {
 }
 
 variable "elasticache_multiple_instances" {
-  description = "Legacy Redis physical topology selector, shared with the Valkey catalog in the parent workspace."
+  description = "Legacy Redis physical topology selector (parent workspace elasticache_multiple_instances)."
   type        = bool
 }
 
