@@ -29,7 +29,6 @@ module "helm" {
   }))
   ingress_scheme                       = var.ingress_scheme
   path_based_routing_enabled           = var.path_based_routing_enabled
-  azure_subscription_id                = var.azure_subscription_id
   nginx_public                         = local.nginx_public
   agc_active                           = local.agc_active
   agc_direct                           = local.agc_direct
@@ -255,7 +254,6 @@ module "agc" {
   enabled                    = local.agc_active
   direct_routing             = var.agc_direct_routing
   path_based_routing_enabled = var.path_based_routing_enabled
-  domain                     = var.domain
   workspace                  = local.workspace
   resource_group_name        = local.infra_vars.resource_group.value.name
   location                   = local.infra_vars.resource_group.value.location

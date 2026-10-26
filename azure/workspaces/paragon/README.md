@@ -43,7 +43,16 @@ CAs and applies it to workloads and migration Jobs (`NODE_EXTRA_CA_CERTS`,
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
+| <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.0 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
+| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
+| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 1.17.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
+| <a name="requirement_time"></a> [time](#requirement\_time) | >= 0.9.0 |
 
 ## Providers
 
