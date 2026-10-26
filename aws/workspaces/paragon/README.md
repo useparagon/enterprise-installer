@@ -19,7 +19,7 @@ The host and base path are specified **once**. Terraform generates paths
 Paragon HTTP worker/service. It also sets their effective `*_PUBLIC_URL`
 values to `https://proxy-path-test.staging.pgn.so/paragon/<service>` in
 Helm and sets `HTTP_PATH_PREFIX=/paragon/<service>` individually.
-`worker-auditlogs` uses the environment key `WORKER_AUDIT_LOGS_PUBLIC_URL`.
+`worker-auditlogs` uses `WORKER_AUDIT_LOGS_PUBLIC_URL` and `worker-eventlogs` uses `WORKER_EVENT_LOGS_PUBLIC_URL`. `PUBLIC_UPLOAD_PROXY_BASE_URL` follows the path-routed Zeus URL.
 
 **No shadow Ingress:** the normal service Ingress becomes a hostless AWS ALB
 `Prefix` rule. The original host rules are replaced. ALB health checks and
@@ -144,7 +144,14 @@ supports verify-full. See commented examples in `charts/values.placeholder.yaml`
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-No requirements.
+| Name | Version |
+| ---- | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
+| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
+| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
+| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 2.0 |
+| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
 
 ## Providers
 

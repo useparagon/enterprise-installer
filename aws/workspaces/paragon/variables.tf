@@ -1326,7 +1326,7 @@ locals {
           HERMES_PUBLIC_URL             = try(local.microservices.hermes.public_url, null)
           PASSPORT_PUBLIC_URL           = try(local.microservices.passport.public_url, null)
           PHEME_PUBLIC_URL              = try(local.microservices.pheme.public_url, null)
-          PUBLIC_UPLOAD_PROXY_BASE_URL  = try("${local.microservices.zeus.public_url}/public-upload-proxy", null)
+          PUBLIC_UPLOAD_PROXY_BASE_URL  = try("${try(local.public_microservices.zeus.public_url, local.microservices.zeus.public_url)}/public-upload-proxy", null)
           RELEASE_PUBLIC_URL            = try(local.microservices.release.public_url, null)
           WORKER_ACTIONKIT_PUBLIC_URL   = try(local.microservices["worker-actionkit"].public_url, null)
           WORKER_ACTIONS_PUBLIC_URL     = try(local.microservices["worker-actions"].public_url, null)
@@ -1469,13 +1469,19 @@ locals {
         # A single proxy DNS/base path becomes the PUBLIC_URL contract for all
         # exposed Paragon microservices and workers. Do this AFTER user values
         # so the same URL reaches every application's env and generated Helm chart.
-        var.path_based_routing_enabled && var.path_routing_base_path != "" ? {
-          for service, config in local.public_microservices :
-          lookup({
-            "worker-auditlogs" = "WORKER_AUDIT_LOGS_PUBLIC_URL"
-          }, service, "${upper(replace(service, "-", "_"))}_PUBLIC_URL") => config.public_url
-          if contains(keys(local.monorepo_microservices), service)
-        } : {},
+        var.path_based_routing_enabled && var.path_routing_base_path != "" ? merge(
+          {
+            for service, config in local.public_microservices :
+            lookup({
+              "worker-auditlogs" = "WORKER_AUDIT_LOGS_PUBLIC_URL"
+              "worker-eventlogs" = "WORKER_EVENT_LOGS_PUBLIC_URL"
+            }, service, "${upper(replace(service, "-", "_"))}_PUBLIC_URL") => config.public_url
+            if contains(keys(local.monorepo_microservices), service)
+          },
+          contains(keys(local.public_microservices), "zeus") ? {
+            PUBLIC_UPLOAD_PROXY_BASE_URL = "${local.public_microservices.zeus.public_url}/public-upload-proxy"
+          } : {}
+        ) : {},
         { VERSION = local.effective_platform_version },
       )
     })
