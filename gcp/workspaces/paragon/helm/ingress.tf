@@ -75,8 +75,9 @@ resource "kubectl_manifest" "frontend_config" {
       name      = google_compute_region_url_map.frontend_config.name
       namespace = kubernetes_namespace_v1.paragon.id
     }
+    # CRD field is camelCase redirectToHttps; snake_case is dropped and spec stays {}.
     spec = {
-      redirect_to_https = {
+      redirectToHttps = {
         enabled = true
       }
     }
@@ -169,6 +170,7 @@ resource "kubectl_manifest" "ingress" {
   })
 
   depends_on = [
+    kubectl_manifest.frontend_config,
     helm_release.paragon_on_prem,
     helm_release.paragon_monitoring,
     helm_release.paragon_logging,
