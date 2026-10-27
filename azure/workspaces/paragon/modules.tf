@@ -173,8 +173,40 @@ locals {
       healthcheck_path = try(cfg.healthcheck_path, "/healthz")
       port             = cfg.port
     }
-    if try(local.onprem_subchart_enabled[name].enabled, true)
+    if try(local.onprem_subchart_enabled[name].enabled, true) && !(
+      name == "api-sync" && try(cfg.path_prefix, "") != ""
+    )
   }
+
+  # Managed Sync keeps one host listener until its public URL carries a path.
+  # The chart does not strip that prefix; the Managed Sync team owns that.
+  managed_sync_path_routes = [
+    { path = "/api/sync-projects", service = "api-project", port = try(local.microservices["api-project"].port, 1804) },
+    { path = "/api/catalog", service = "api-project", port = try(local.microservices["api-project"].port, 1804) },
+    { path = "/api/syncs", service = "api-sync", port = try(local.microservices["api-sync"].port, 1800) },
+    { path = "/api/permissions", service = "api-sync", port = try(local.microservices["api-sync"].port, 1800) },
+    { path = "/api/webhooks", service = "api-webhook", port = try(local.microservices["api-webhook"].port, 1809) },
+    { path = "/worker/sync", service = "worker-sync", port = try(local.microservices["worker-sync"].port, 1802) },
+    { path = "/worker/history/sync", service = "worker-history-sync", port = try(local.microservices["worker-history-sync"].port, 1807) },
+    { path = "/", service = "api-sync", port = try(local.microservices["api-sync"].port, 1800) },
+  ]
+
+  managed_sync_agc_routes = (
+    var.managed_sync_enabled && local.agc_direct &&
+    try(local.public_microservices["api-sync"].path_prefix, "") != ""
+    ) ? {
+    "api-sync" = {
+      host             = local.public_microservices["api-sync"].origin_host
+      port             = local.public_microservices["api-sync"].port
+      path_prefix      = local.public_microservices["api-sync"].path_prefix
+      healthcheck_path = "/healthz"
+      routes = [
+        for route in local.managed_sync_path_routes : merge(route, {
+          path = route.path == "/" ? local.public_microservices["api-sync"].path_prefix : "${local.public_microservices["api-sync"].path_prefix}${route.path}"
+        })
+      ]
+    }
+  } : {}
 }
 
 module "dns" {
@@ -260,7 +292,7 @@ module "agc" {
   cluster_name               = local.cluster_name
   subnet_id                  = try(local.infra_vars.network.value.agc_subnet_id, null)
   namespace                  = module.helm.namespace_paragon.metadata[0].name
-  public_services            = merge(local.agc_public_routes, local.agent_os_agc_routes)
+  public_services            = merge(local.agc_public_routes, local.agent_os_agc_routes, local.managed_sync_agc_routes)
   waf_enabled                = local.waf_active
   waf_policy_id              = local.waf_active ? module.waf[0].policy_id : null
   alb_controller_version     = var.agc_alb_controller_version
@@ -271,11 +303,17 @@ locals {
   # AGC direct routing: one HTTPS listener, path-specific backends (nginx Ingress is off).
   agent_os_agc_routes = var.agent_os_enabled && local.agc_direct ? {
     agentos = {
-      host = local.agent_os_host
-      port = local.agent_os_port
+      host             = local.agent_os_host
+      port             = local.agent_os_port
+      path_prefix      = var.path_based_routing_enabled ? local.agent_os_path_prefix : ""
+      healthcheck_path = "/readyz"
       routes = [
-        { path = "/api/context", service = "context-api", port = local.agent_os_port },
-        { path = "/api/tools", service = "tools-api", port = 3002 },
+        for route in [
+          { path = "/api/context", service = "context-api", port = local.agent_os_port },
+          { path = "/api/tools", service = "tools-api", port = 3002 },
+          ] : merge(route, {
+            path = var.path_based_routing_enabled && local.agent_os_path_prefix != "" ? "${local.agent_os_path_prefix}${route.path}" : route.path
+        })
       ]
     }
   } : {}

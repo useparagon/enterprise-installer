@@ -200,8 +200,27 @@ locals {
 
   # Explicit probes keep the backend check on /healthz (or the service's existing
   # healthcheck_path). AGC does not inherit HTTPRoute PathPrefix for probes.
+  # One policy per backend Service. Multi-route releases (Managed Sync, Agent OS)
+  # do not have a Service named after the route map key.
+  path_health_check_targets = length(local.path_public_services) == 0 ? {} : merge([
+    for name, svc in local.path_public_services : (
+      length(svc.routes) == 0 ? {
+        name = {
+          service = name
+          path    = svc.healthcheck_path
+        }
+        } : {
+        for route in svc.routes :
+        route.service => {
+          service = route.service
+          path    = svc.healthcheck_path
+        }
+      }
+    )
+  ]...)
+
   path_health_check_yaml = {
-    for name, svc in local.path_public_services :
+    for name, target in local.path_health_check_targets :
     name => yamlencode({
       apiVersion = "alb.networking.azure.io/v1"
       kind       = "HealthCheckPolicy"
@@ -213,12 +232,12 @@ locals {
         targetRef = {
           group     = ""
           kind      = "Service"
-          name      = name
+          name      = target.service
           namespace = var.namespace
         }
         default = {
           http = {
-            path = svc.healthcheck_path
+            path = target.path
           }
         }
       }
