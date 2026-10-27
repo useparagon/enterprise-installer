@@ -305,9 +305,8 @@ resource "aws_kms_alias" "agent_os" {
   target_key_id = aws_kms_key.agent_os[0].key_id
 }
 
-# One workspace-level KMS key protects every Valkey replication group and its
-# CloudWatch logs. Today only agent_os exists in the Valkey catalog; future
-# Redis migrations reuse this key for cache/queue/system/managed_sync.
+# One workspace-level KMS key encrypts every Valkey CloudWatch log group.
+# Replication groups use it unless a role sets kms_key_arn.
 data "aws_iam_policy_document" "valkey_kms" {
   count = local.valkey_enabled ? 1 : 0
 

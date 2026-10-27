@@ -612,6 +612,7 @@ variable "valkey_instances" {
     elasticache_multiple_instances controls which physical instances exist and cache/MS cluster mode;
     valkey_enabled creates the Paragon catalog except on an Agent OS stack, where platform_valkey_enabled is the opt-in. managed_sync_enabled and agent_os_enabled gate their own roles.
     TLS defaults to false except agent_os (true); other roles may set tls_enabled when the app secret contract supports AUTH.
+    kms_key_arn overrides at-rest encryption for that replication group only. CloudWatch logs stay on the workspace Valkey key.
     snapshot_name applies only at creation. Setting or changing it later replaces the replication group.
   EOT
   type = map(object({

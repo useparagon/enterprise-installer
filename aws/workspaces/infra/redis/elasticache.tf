@@ -370,7 +370,9 @@ resource "aws_cloudwatch_log_group" "valkey" {
 
   name              = "/aws/elasticache/${local.valkey_names[each.key]}-valkey"
   retention_in_days = each.value.log_retention_days
-  kms_key_id        = coalesce(each.value.kms_key_arn, var.valkey_kms_key_arn)
+  # A role kms_key_arn encrypts the replication group only. Log delivery needs
+  # logs.amazonaws.com on the key, which the workspace Valkey key already allows.
+  kms_key_id = var.valkey_kms_key_arn
 }
 
 # Preserve addresses for existing single-instance Redis resources.

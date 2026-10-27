@@ -50,7 +50,7 @@ variable "redis_kea_parameter_groups" {
 }
 
 variable "valkey_kms_key_arn" {
-  description = "KMS key ARN shared by all Valkey instances for at-rest encryption and CloudWatch logs."
+  description = "Workspace KMS key ARN. Encrypts every Valkey CloudWatch log group, and each replication group that does not set kms_key_arn."
   type        = string
 }
 
