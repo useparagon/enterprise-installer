@@ -21,7 +21,7 @@ locals {
   agc_direct_certificate_hosts = merge(
     {
       for name, cfg in var.public_services : name => cfg.origin_host
-      if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true) && !contains(keys(var.public_microservices), name) && try(cfg.origin_host, "") != ""
+      if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true) && !contains(keys(var.public_microservices), name) && try(cfg.origin_host, "") != "" && cfg.origin_host != "path-routing.${var.domain}"
     },
     {
       for name, cfg in var.public_microservices :
@@ -33,9 +33,10 @@ locals {
       name => cfg.origin_host
       if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true) && try(cfg.origin_host, "") != ""
     },
-    var.path_based_routing_enabled && anytrue([
-      for cfg in var.public_microservices : cfg.path_prefix != ""
-      ]) ? {
+    var.path_based_routing_enabled && (
+      anytrue([for cfg in var.public_microservices : cfg.path_prefix != ""]) ||
+      anytrue([for cfg in values(var.public_services) : try(cfg.origin_host, "") == "path-routing.${var.domain}"])
+      ) ? {
       "path-routing" = "path-routing.${var.domain}"
     } : {},
   )

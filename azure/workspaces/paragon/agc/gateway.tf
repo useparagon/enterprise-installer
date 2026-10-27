@@ -205,14 +205,14 @@ locals {
   path_health_check_targets = length(local.path_public_services) == 0 ? {} : merge([
     for name, svc in local.path_public_services : (
       length(svc.routes) == 0 ? {
-        name = {
+        (name) = {
           service = name
           path    = svc.healthcheck_path
         }
         } : {
-        for route in svc.routes :
-        route.service => {
-          service = route.service
+        for service in distinct([for route in svc.routes : route.service]) :
+        service => {
+          service = service
           path    = svc.healthcheck_path
         }
       }

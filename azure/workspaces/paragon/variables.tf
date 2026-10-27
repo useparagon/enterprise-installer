@@ -1058,6 +1058,8 @@ locals {
       healthcheck_path = "/readyz"
       port             = local.agent_os_port
       public_url       = local.agent_os_public_url
+      path_prefix      = var.path_based_routing_enabled ? local.agent_os_path_prefix : ""
+      origin_host      = var.path_based_routing_enabled && local.agent_os_path_prefix != "" ? local.path_routing_origin_host : local.agent_os_host
     }
   } : {}
 

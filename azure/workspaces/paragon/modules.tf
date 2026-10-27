@@ -144,7 +144,10 @@ locals {
       # shared path-routing.<domain> origin is published for those services.
       if try(cfg.path_prefix, "") == ""
     },
-    var.path_based_routing_enabled && length(local.path_routed_public_prefixes) > 0 ? {
+    var.path_based_routing_enabled && (
+      length(local.path_routed_public_prefixes) > 0 ||
+      (var.agent_os_enabled && local.agent_os_path_prefix != "")
+      ) ? {
       "path-routing" = {
         port        = 443
         public_url  = "https://${local.path_routing_origin_host}"
