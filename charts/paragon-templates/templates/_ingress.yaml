@@ -102,9 +102,10 @@ spec:
   loadBalancerIP: {{ .Values.ingress.loadBalancerIP }}
   {{- end }}
   rules:
-    {{- /* Connect SDK paths must stay host-agnostic even when path routing is on,
-         so traffic that still lands on connect.<domain> reaches hermes/worker-proxy. */}}
-    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "hermes") (not $hostless) }}
+    {{- /* Unprefixed SDK paths stay on these Ingresses after the service becomes
+         hostless. connect.<domain> still points at the ALB, and Hermes and
+         worker-proxy listen on /projects/.../sdk/... with no path prefix. */}}
+    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "hermes") }}
     - http:
         paths:
           - path: /projects/*/sdk/triggers/*
@@ -115,7 +116,7 @@ spec:
                 port:
                   number: {{ $svcPort }}
     {{- end }}
-    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "worker-proxy") (not $hostless) }}
+    {{- if and (eq .Values.global.env.HOST_ENV "AWS_K8") (eq $name "worker-proxy") }}
     - http:
         paths:
           - path: /projects/*/sdk/proxy/*
