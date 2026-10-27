@@ -610,6 +610,7 @@ variable "valkey_instances" {
     valkey_enabled, managed_sync_enabled, and agent_os_enabled gate optional roles.
     TLS defaults to false except agent_os (true); other roles may set tls_enabled when the app secret contract supports AUTH.
     snapshot_name applies only at creation. Setting or changing it later replaces the replication group.
+    Leave this empty to use the built-in role defaults. A key here is an override, not the catalog.
   EOT
   type = map(object({
     enabled                 = optional(bool, true)
@@ -625,27 +626,7 @@ variable "valkey_instances" {
     kms_key_arn             = optional(string)
     snapshot_name           = optional(string)
   }))
-  default = {
-    cache = {
-      node_type = "cache.r6g.large"
-    }
-    queue = {
-      node_type       = "cache.t4g.medium"
-      cluster_enabled = false
-      multi_az        = false
-    }
-    system = {
-      node_type       = "cache.t4g.micro"
-      cluster_enabled = false
-      multi_az        = false
-    }
-    managed_sync = {
-      node_type = "cache.r6g.large"
-    }
-    agent_os = {
-      tls_enabled = true
-    }
-  }
+  default = {}
 
   validation {
     condition     = length(setsubtract(toset(keys(var.valkey_instances)), toset(["cache", "queue", "system", "managed_sync", "agent_os"]))) == 0
@@ -927,8 +908,14 @@ locals {
     queue        = { node_type = "cache.t4g.medium", cluster_enabled = false, multi_az = false }
     system       = { node_type = "cache.t4g.micro", cluster_enabled = false, multi_az = false }
     managed_sync = { node_type = "cache.r6g.large" }
-    # Agent OS already uses authenticated rediss://; do not change silently.
-    agent_os = { tls_enabled = true }
+    # Keep the Agent OS cluster that already exists: t4g.medium, Multi-AZ, 7-day snapshots.
+    agent_os = {
+      node_type               = "cache.t4g.medium"
+      multi_az                = true
+      cluster_enabled         = false
+      snapshot_retention_days = 7
+      tls_enabled             = true
+    }
   }
 
   valkey_topology_role_defaults = {
@@ -954,11 +941,16 @@ locals {
 
   # Redis roles whose data will be copied to Valkey. Shared mode copies queue and
   # system into the cache Valkey, so those Redis instances are sources too.
-  redis_migration_source = {
+  redis_migration_source = var.valkey_enabled ? {
     cache        = local.valkey_instance_enabled.cache
     queue        = local.valkey_instance_enabled.queue || (!var.elasticache_multiple_instances && local.valkey_instance_enabled.cache)
     system       = local.valkey_instance_enabled.system || (!var.elasticache_multiple_instances && local.valkey_instance_enabled.cache)
     managed_sync = var.managed_sync_enabled && (local.valkey_instance_enabled.managed_sync || (!var.elasticache_multiple_instances && local.valkey_instance_enabled.cache))
+    } : {
+    cache        = false
+    queue        = false
+    system       = false
+    managed_sync = false
   }
 
   redis_kea_on_cluster = var.redis_enabled && var.elasticache_multiple_instances && (
