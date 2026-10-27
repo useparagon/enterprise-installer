@@ -126,7 +126,7 @@ variable "agc_direct_routing" {
 }
 
 variable "path_based_routing_enabled" {
-  description = "Enable shared-host path-prefixed public routes. Azure path routing requires AGC direct routing; ingress-nginx is not used for this mode."
+  description = "Publish Paragon HTTP microservices and workers on one shared hostname, with a path per service, instead of a subdomain per service. Defaults to false. When enabled, those public URLs use the shared host and health checks stay on /healthz."
   type        = bool
   default     = false
 
