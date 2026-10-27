@@ -64,7 +64,7 @@ locals {
 
   route53_anchor_origin_name = local.route53_anchor_service == null ? "" : (
     var.path_based_routing_enabled && try(local.route53_anchor_service.path_prefix, "") != "" ?
-    local.route53_anchor_service_name :
+    (local.route53_anchor_service_name == "api-sync" ? "sync" : local.route53_anchor_service_name) :
     trim(replace(
       replace(
         replace(local.route53_anchor_service.public_url, var.domain, ""),
@@ -111,9 +111,12 @@ resource "aws_route53_record" "microservice" {
   for_each = var.enabled ? var.public_services : {}
 
   zone_id = var.route53_zone_id
-  # External proxy hostname belongs to the customer. Keep service-specific
-  # Paragon origin CNAME for TLS/SNI while ALB routes by path, not Host.
-  name = var.path_based_routing_enabled && try(each.value.path_prefix, "") != "" ? each.key : replace(
+  # External proxy hostname belongs to the customer. Keep the service-specific
+  # Paragon origin CNAME for TLS/SNI while the ALB routes by path, not Host.
+  # Managed Sync's map key is api-sync; its chart ingress stays on sync.<domain>.
+  name = var.path_based_routing_enabled && try(each.value.path_prefix, "") != "" ? (
+    each.key == "api-sync" ? "sync" : each.key
+    ) : replace(
     replace(
       replace(each.value.public_url, var.domain, ""),
       "https://",

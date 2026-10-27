@@ -1077,10 +1077,13 @@ locals {
 
   # Path-routed services keep <service>.<domain> as Terraform-managed ALB origins.
   # The external reverse-proxy hostname must remain distinct from every such origin.
-  path_routing_origin_hosts = toset([
-    for service in keys(local.path_routed_public_prefixes) :
-    lower("${service}.${var.domain}")
-  ])
+  path_routing_origin_hosts = setunion(
+    toset([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower("${service == "api-sync" ? "sync" : service}.${var.domain}")
+    ]),
+    var.agent_os_enabled && local.agent_os_path_prefix != "" ? toset([lower("agentos.${var.domain}")]) : toset([])
+  )
 
   public_microservices = {
     for microservice, config in local.public_microservices_base :
@@ -1190,6 +1193,9 @@ locals {
       healthcheck_path = "/readyz"
       port             = local.agent_os_port
       public_url       = local.agent_os_public_url
+      # A path in the public URL must not become the Route53 name. The chart
+      # ingress stays on agentos.<domain>; the ALB path rule is hostless.
+      path_prefix = var.path_based_routing_enabled ? local.agent_os_path_prefix : ""
     }
   } : {}
 
