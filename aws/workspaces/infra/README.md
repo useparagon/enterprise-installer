@@ -38,8 +38,11 @@ managed sync, `cache.t4g.medium` / `cache.t4g.micro` for queue and system).
 Agent OS stays `cache.t4g.medium` with Multi-AZ. Snapshots are 5 days, the same as the other Valkey roles.
 `elasticache_multiple_instances` still controls physical topology for Valkey
 after Redis is removed; it does not read `elasticache_node_type` or
-`elasticache_multi_az`. Keyspace events are set on Redis only while
-`valkey_enabled` is true.
+`elasticache_multi_az`. `valkey_enabled` creates the Paragon catalog.
+An Agent OS install already has that flag set for its own Valkey, so set
+`platform_valkey_enabled = true` there to add cache, queue, system, and
+managed sync. Keyspace events are set on Redis only while that catalog
+is created.
 
 ```hcl
 valkey_instances = {

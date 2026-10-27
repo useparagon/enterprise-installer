@@ -41,8 +41,9 @@ resource "aws_secretsmanager_secret_version" "runtime_redis" {
 
 # Physical Valkey connections do not change during cutover or rollback.
 # Agent OS has independent credentials and is excluded from migration secrets.
+# Count follows the Paragon catalog, so an Agent OS stack does not get an empty secret.
 resource "aws_secretsmanager_secret" "runtime_valkey" {
-  count                   = var.valkey_enabled ? 1 : 0
+  count                   = local.platform_valkey ? 1 : 0
   name                    = "${local.runtime_secret_prefix}/valkey"
   description             = "Raw Valkey connections independent of the application cutover"
   recovery_window_in_days = var.secrets_recovery_window_in_days
@@ -54,7 +55,7 @@ resource "aws_secretsmanager_secret" "runtime_valkey" {
 }
 
 resource "aws_secretsmanager_secret_version" "runtime_valkey" {
-  count     = var.valkey_enabled ? 1 : 0
+  count     = local.platform_valkey ? 1 : 0
   secret_id = aws_secretsmanager_secret.runtime_valkey[0].id
 
   secret_string = jsonencode({

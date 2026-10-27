@@ -460,7 +460,13 @@ variable "managed_sync_enabled" {
 }
 
 variable "valkey_enabled" {
-  description = "Whether to enable creation of Valkey instances from valkey_instances. Independent from legacy Redis so both can run in parallel during migrations."
+  description = "Create the Paragon Valkey catalog (cache, queue, system, managed_sync) alongside legacy Redis. An existing Agent OS stack already sets this for its own Valkey; it does not add the Paragon catalog there."
+  type        = bool
+  default     = false
+}
+
+variable "platform_valkey_enabled" {
+  description = "On an Agent OS stack, also create the Paragon Valkey catalog. Leave false on existing Agent OS installs. Ignored when agent_os_enabled is false; valkey_enabled selects the catalog there. elasticache_multiple_instances still chooses one shared instance or one per role."
   type        = bool
   default     = false
 }
@@ -584,8 +590,9 @@ variable "redis_enabled" {
   default     = true
 
   validation {
+    # Same condition as local.platform_valkey. Variable validation cannot read locals.
     condition = var.redis_enabled || (
-      var.valkey_enabled &&
+      (var.agent_os_enabled ? var.platform_valkey_enabled : var.valkey_enabled) &&
       try(var.valkey_instances["cache"].enabled, true) &&
       (!var.elasticache_multiple_instances || (
         try(var.valkey_instances["queue"].enabled, true) &&
@@ -593,7 +600,7 @@ variable "redis_enabled" {
       )) &&
       (!var.managed_sync_enabled || !var.elasticache_multiple_instances || try(var.valkey_instances["managed_sync"].enabled, true))
     )
-    error_message = "Keep Redis until the Paragon valkey_migration=true cutover and soak finish; all Valkey roles must be enabled before deleting Redis."
+    error_message = "Keep Redis until the Paragon valkey_migration=true cutover and soak finish. The Paragon Valkey catalog must exist (valkey_enabled, or platform_valkey_enabled when Agent OS is on) and every Valkey role must be enabled before deleting Redis."
   }
 }
 
@@ -603,7 +610,7 @@ variable "valkey_instances" {
     Built-in defaults mirror legacy Redis sizing (cache.r6g.large cache/MS, t4g.medium queue, t4g.micro system).
     Leave this empty to use the built-in role defaults. A key here is an override, not the catalog.
     elasticache_multiple_instances controls which physical instances exist and cache/MS cluster mode;
-    valkey_enabled, managed_sync_enabled, and agent_os_enabled gate optional roles.
+    valkey_enabled creates the Paragon catalog except on an Agent OS stack, where platform_valkey_enabled is the opt-in. managed_sync_enabled and agent_os_enabled gate their own roles.
     TLS defaults to false except agent_os (true); other roles may set tls_enabled when the app secret contract supports AUTH.
     snapshot_name applies only at creation. Setting or changing it later replaces the replication group.
   EOT
@@ -936,9 +943,9 @@ locals {
 
   # Redis roles whose data will be copied to Valkey. Shared mode copies queue and
   # system into the cache Valkey, so those Redis instances are sources too.
-  # Existing Agent OS stacks already set valkey_enabled. That flag must not
-  # add the Paragon catalog or turn on Redis keyspace events.
-  platform_valkey = var.valkey_enabled && !var.agent_os_enabled
+  # Existing Agent OS stacks already set valkey_enabled for their own instance.
+  # platform_valkey_enabled is what adds the Paragon catalog there.
+  platform_valkey = var.agent_os_enabled ? var.platform_valkey_enabled : var.valkey_enabled
 
   redis_migration_source = local.platform_valkey ? {
     cache        = local.valkey_instance_enabled.cache
