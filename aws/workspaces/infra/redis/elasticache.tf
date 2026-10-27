@@ -226,7 +226,7 @@ locals {
   # trailing hyphen from the cut so the hash separator is not a second hyphen.
   valkey_resource_ids = {
     for key, name in local.valkey_names :
-    key => length(name) <= 32 ? name : "${regexreplace(substr(name, 0, 25), "-+$", "")}-${substr(sha1(name), 0, 6)}"
+    key => length(name) <= 32 ? name : "${replace(substr(name, 0, 25), "/-+$/", "")}-${substr(sha1(name), 0, 6)}"
   }
 }
 
