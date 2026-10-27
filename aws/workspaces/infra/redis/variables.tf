@@ -64,10 +64,11 @@ variable "valkey_instances" {
     tls_enabled             = bool
     snapshot_retention_days = number
     log_retention_days      = number
-    num_node_groups         = number
-    replicas_per_node_group = number
-    kms_key_arn             = string
-    snapshot_name           = string
+    # Null means unset. The replication group coalesces these at create time.
+    num_node_groups         = optional(number)
+    replicas_per_node_group = optional(number)
+    kms_key_arn             = optional(string)
+    snapshot_name           = optional(string)
   }))
 }
 
