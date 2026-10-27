@@ -311,19 +311,12 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || length(distinct([
-      for service in keys(local.path_routed_public_prefixes) :
-      lower(replace(
-        local.public_microservices_base[service].public_url,
-        "/^https?:\\/\\/([^\\/?#]+).*$/",
-        "$1"
-      ))
-    ])) <= 1
+    condition     = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) <= 1
     error_message = "Path-based routing requires all path-routed services to share the same public host (external reverse-proxy hostname)."
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue(concat(
+    condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || alltrue(concat(
       [
         for service, config in local.public_microservices_base :
         !contains(
@@ -344,7 +337,7 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || !contains(
+    condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || !contains(
       local.path_routing_public_hosts,
       lower(local.path_routing_origin_host)
     )
@@ -1335,14 +1328,19 @@ locals {
     trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
   ) ? "/${trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}" : ""
 
-  path_routing_public_hosts = toset([
-    for service in keys(local.path_routed_public_prefixes) :
-    lower(replace(
-      local.public_microservices_base[service].public_url,
-      "/^https?:\\/\\/([^\\/?#]+).*$/",
-      "$1"
-    ))
-  ])
+  path_routing_public_hosts = setunion(
+    toset([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ]),
+    var.agent_os_enabled && local.agent_os_path_prefix != "" ? toset([
+      lower(replace(local.agent_os_public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+    ]) : toset([])
+  )
 
   path_routing_reserved_hosts = setunion(
     local.path_routing_public_hosts,

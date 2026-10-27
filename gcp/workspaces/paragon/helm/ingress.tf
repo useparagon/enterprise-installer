@@ -4,6 +4,7 @@ locals {
   agent_os_host       = replace(local.agent_os_public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
   agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
   agent_os_path_prefix = (
+    var.agent_os_enabled &&
     var.path_based_routing_enabled &&
     trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
   ) ? "/${trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}" : ""
@@ -45,7 +46,8 @@ locals {
       )
     ],
     var.managed_sync_enabled && local.managed_sync_path_prefix == "" ? [local.managed_sync_host] : [],
-    var.agent_os_enabled && local.agent_os_path_prefix == "" ? [local.agent_os_host] : []
+    var.agent_os_enabled && local.agent_os_path_prefix == "" ? [local.agent_os_host] : [],
+    local.agent_os_path_prefix != "" ? ["path-routing.${var.domain}"] : []
   ))
 
   # Create a hash of domains to version the certificate name
