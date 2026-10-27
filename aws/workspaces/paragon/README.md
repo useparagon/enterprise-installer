@@ -1,5 +1,17 @@
 # Paragon AWS Deployment
 
+## Shared-host path routing
+
+Publish the Paragon HTTP microservices and workers on one hostname, with a path per service, instead of a subdomain per service.
+
+The load balancer selects the service by that path. The flag defaults to off. When enabled, those services' public URLs use the shared host and health checks stay on `/healthz`.
+
+```hcl
+path_based_routing_enabled = true
+path_routing_base_path     = "/paragon"
+path_routing_public_host   = "proxy.example.com"
+```
+
 ## Agent OS configuration
 
 Agent OS is deployed as a separate Helm release when `agent_os_enabled = true`.
@@ -100,7 +112,8 @@ supports verify-full. See commented examples in `charts/values.placeholder.yaml`
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
-| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | >= 0.0.19 |
+| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
+| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 2.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
 
 ## Providers
@@ -229,6 +242,9 @@ supports verify-full. See commented examples in `charts/values.placeholder.yaml`
 | <a name="input_monitors_enabled"></a> [monitors\_enabled](#input\_monitors\_enabled) | Specifies that monitors are enabled. | `bool` | `false` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | The name of the organization that's deploying Paragon. | `string` | n/a | yes |
 | <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input\_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
+| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Publish Paragon HTTP microservices and workers on one shared hostname, with a path per service, instead of a subdomain per service. Defaults to false. When enabled, those public URLs use the shared host and health checks stay on /healthz. | `bool` | `false` | no |
+| <a name="input_path_routing_base_path"></a> [path\_routing\_base\_path](#input\_path\_routing\_base\_path) | Base path for each exposed Paragon HTTP service when path routing is enabled. Example: /paragon. | `string` | `""` | no |
+| <a name="input_path_routing_public_host"></a> [path\_routing\_public\_host](#input\_path\_routing\_public\_host) | Shared hostname for path-routed Paragon services, without scheme or path. Example: proxy.example.com. | `string` | `""` | no |
 | <a name="input_platform_version"></a> [platform\_version](#input\_platform\_version) | Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML. | `string` | `null` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that get no Ingress. Removed from public\_microservices and public\_monitors on both internet-facing and internal load balancers. ingress\_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict\_public\_exposure is true, allowlisted services can still be listed here. | `list(string)` | `[]` | no |
 | <a name="input_restrict_public_exposure"></a> [restrict\_public\_exposure](#input\_restrict\_public\_exposure) | When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private\_services to further restrict allowlisted endpoints. Removing many Ingresses from the shared ALB group requires elasticloadbalancing:SetRulePriorities on the load balancer controller IAM principal (see infra eks-worker-policy); without it, deleted Ingress objects can remain Terminating while ALB rules stay active until the controller reconciles. | `bool` | `false` | no |
