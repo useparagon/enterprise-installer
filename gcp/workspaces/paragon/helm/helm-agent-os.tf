@@ -22,7 +22,7 @@ locals {
           context-api = local.agent_os_port
         }
 
-        env = {
+        env = merge({
           HOST_ENV                              = "GCP_K8"
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
@@ -32,7 +32,9 @@ locals {
           PARAGON_ACTIONKIT_URL                 = "http://worker-actionkit:${var.microservices["worker-actionkit"].port}"
           CAPABILITY_BROKER_ACTIONKIT_URL       = "http://worker-actionkit:${var.microservices["worker-actionkit"].port}"
           AGENT_OS_SECRET_REVISION              = var.secrets_revision
-        }
+          }, local.agent_os_path_prefix != "" ? {
+          HTTP_PATH_PREFIX = local.agent_os_path_prefix
+        } : {})
       }
     }
 

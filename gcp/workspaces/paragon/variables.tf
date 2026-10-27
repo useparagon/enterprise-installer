@@ -271,14 +271,6 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || alltrue([
-      for config in local.public_microservices_base :
-      length(regexall("^https?://[^/?#]+(/[^?#]*)?$", config.public_url)) == 1
-    ])
-    error_message = "Public microservice URLs must be absolute HTTP(S) URLs without query strings or fragments."
-  }
-
-  validation {
     condition = var.path_based_routing_enabled || alltrue([
       for config in local.public_microservices_base :
       length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
@@ -287,11 +279,8 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || alltrue([
-      for config in local.public_monitors :
-      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
-    ])
-    error_message = "Path-based routing currently applies to Paragon services only; public monitor URLs must remain host-based."
+    condition     = var.path_based_routing_enabled || !var.agent_os_enabled || trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") == ""
+    error_message = "A path-bearing AGENT_OS_PUBLIC_URL requires path_based_routing_enabled=true."
   }
 
   validation {
@@ -309,6 +298,16 @@ variable "path_based_routing_enabled" {
       ]
     ]))
     error_message = "Path-based public route prefixes must not overlap by path namespace; each service needs a distinct path prefix."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || !var.agent_os_enabled || local.agent_os_path_prefix == "" || alltrue([
+      for prefix in values(local.path_routed_public_prefixes) :
+      prefix != local.agent_os_path_prefix &&
+      !startswith(prefix, "${local.agent_os_path_prefix}/") &&
+      !startswith(local.agent_os_path_prefix, "${prefix}/")
+    ])
+    error_message = "The Agent OS path prefix must not overlap another path-routed service."
   }
 
   validation {
@@ -355,14 +354,14 @@ variable "path_based_routing_enabled" {
   validation {
     condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || alltrue([
       for host in local.path_routing_public_hosts :
-      (!var.managed_sync_enabled || host != lower("sync.${var.domain}")) &&
-      (!var.agent_os_enabled || host != lower(replace(
+      (!var.managed_sync_enabled || contains(keys(local.path_routed_public_prefixes), "api-sync") || host != lower("sync.${var.domain}")) &&
+      (!var.agent_os_enabled || !var.path_based_routing_enabled || local.agent_os_path_prefix != "" || host != lower(replace(
         try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], "https://agentos.${var.domain}"),
         "/^https?:\\/\\/([^\\/?#]+).*$/",
         "$1"
       )))
     ])
-    error_message = "The shared path-routing public host must not be sync.<domain> or the Agent OS host. GCP matches those host rules before hostless path rules, and the Managed Sync catch-all path would take the traffic."
+    error_message = "The shared path-routing public host must not match a Managed Sync or Agent OS host rule. Path-routed services use the hostless listener instead."
   }
 
   validation {
@@ -1330,6 +1329,11 @@ locals {
     microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
     if trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
   }
+
+  agent_os_public_url = try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], "https://agentos.${var.domain}")
+  agent_os_path_prefix = (
+    trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+  ) ? "/${trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}" : ""
 
   path_routing_public_hosts = toset([
     for service in keys(local.path_routed_public_prefixes) :
