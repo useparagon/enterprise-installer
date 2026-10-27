@@ -87,14 +87,15 @@ module "helm" {
   public_monitors               = local.public_monitors
   restrict_public_exposure      = local.restrict_public_exposure
   waf_web_acl_arn               = local.waf_active ? module.waf[0].web_acl_arn : ""
-  enable_legacy_mng_pools       = local.legacy_mng_pools_enabled
-  karpenter_enabled             = local.infra_karpenter_enabled
+  enable_legacy_mng_pools       = try(local.infra_vars.enable_legacy_mng_pools.value, true)
+  karpenter_enabled             = try(local.infra_vars.enable_karpenter.value, false)
   karpenter_aws = (
-    local.infra_karpenter_enabled && local.infra_karpenter_configured
+    try(local.infra_vars.enable_karpenter.value, false) &&
+    try(local.infra_vars.karpenter.value, null) != null
     ) ? {
-    node_role_name     = nonsensitive(local.infra_vars.karpenter.value.node_role_name)
-    security_group_ids = nonsensitive(local.infra_vars.karpenter.value.security_group_ids)
-    ebs_kms_key_arn    = nonsensitive(local.infra_vars.karpenter.value.ebs_kms_key_arn)
+    node_role_name     = local.infra_vars.karpenter.value.node_role_name
+    security_group_ids = local.infra_vars.karpenter.value.security_group_ids
+    ebs_kms_key_arn    = local.infra_vars.karpenter.value.ebs_kms_key_arn
   } : null
   karpenter_node_os_volume_size_gib = var.karpenter_node_os_volume_size_gib
   karpenter_node_volume_size_gib    = var.karpenter_node_volume_size_gib
