@@ -180,19 +180,12 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || length(distinct([
-      for service in keys(local.path_routed_public_prefixes) :
-      lower(replace(
-        local.public_microservices_base[service].public_url,
-        "/^https?:\\/\\/([^\\/?#]+).*$/",
-        "$1"
-      ))
-    ])) <= 1
+    condition     = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) <= 1
     error_message = "Path-based routing requires all path-routed services to share the same public host (external reverse-proxy hostname)."
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue(concat(
+    condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || alltrue(concat(
       [
         for service, config in local.public_microservices_base :
         !contains(
@@ -213,7 +206,7 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || !contains(
+    condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || !contains(
       local.path_routing_public_hosts,
       lower(local.path_routing_origin_host)
     )
@@ -221,7 +214,7 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || length(local.path_routed_public_prefixes) == 0 || alltrue([
+    condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || alltrue([
       for host in setunion(local.path_routing_public_hosts, toset([lower(local.path_routing_origin_host)])) :
       (!var.managed_sync_enabled || contains(keys(local.path_routed_public_prefixes), "api-sync") || host != lower(replace(
         try(local.microservices["api-sync"].public_url, "https://sync.${var.domain}"),
@@ -937,14 +930,21 @@ locals {
     if trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
   }
 
-  path_routing_public_hosts = toset([
-    for service in keys(local.path_routed_public_prefixes) :
-    lower(replace(
-      local.public_microservices_base[service].public_url,
-      "/^https?:\\/\\/([^\\/?#]+).*$/",
-      "$1"
-    ))
-  ])
+  # Agent OS is not in path_routed_public_prefixes. Its public host has to be
+  # in this set so the shared-host checks still run when it is the only path route.
+  path_routing_public_hosts = setunion(
+    toset([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ]),
+    var.agent_os_enabled && local.agent_os_path_prefix != "" ? toset([
+      lower(replace(local.agent_os_public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+    ]) : toset([])
+  )
 
   path_routing_reserved_hosts = setunion(
     local.path_routing_public_hosts,
