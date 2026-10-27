@@ -995,13 +995,9 @@ locals {
     role => (role == "workflow" || (!var.elasticache_multiple_instances && contains(["queue", "system", "managed_sync"], role)) ? "cache" : role)
   }
 
-  # Physical Redis 6 connections never change when the application switches to Valkey.
-  # Paragon owns the cutover through var.valkey_migration; migration pods continue
-  # to read the original Redis and separate Valkey secrets in both directions.
-  redis_connections = merge(
-    module.redis.elasticache,
-    var.redis_enabled ? { workflow = module.redis.elasticache.cache } : {},
-  )
+  # Physical Redis 6 endpoints only (ElastiCache module keys). Workflow is a logical
+  # chart role that shares cache; app_env and paragon resolve it from cache.
+  redis_connections = var.redis_enabled ? module.redis.elasticache : {}
 
   valkey_enabled = length(local.valkey_instances) > 0
 }
