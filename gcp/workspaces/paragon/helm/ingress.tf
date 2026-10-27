@@ -127,35 +127,17 @@ resource "kubectl_manifest" "ingress" {
     spec = {
       ingressClassName = var.ingress_scheme == "internal" ? "gce-internal" : "gce"
       loadBalancerIP   = google_compute_global_address.loadbalancer.address
-      rules = concat(
-        [
-          for name, svc in local.host_public_services : {
-            host = coalesce(
-              try(svc.origin_host, null),
-              replace(replace(svc.public_url, "https://", ""), "http://", "")
-            )
-            http = {
-              paths = [{
-                path     = "/"
-                pathType = "Prefix"
-                backend = {
-                  service = {
-                    name = name
-                    port = {
-                      number = svc.port
-                    }
-                  }
-                }
-              }]
-            }
-          }
-        ],
-        (length(local.path_public_services) > 0 || local.managed_sync_path_prefix != "" || local.agent_os_path_prefix != "") ? [{
-          http = {
-            paths = concat(
-              [
-                for name, svc in local.path_public_services : {
-                  path     = svc.path_prefix
+      rules = [
+        for rule in concat(
+          [
+            for name, svc in local.host_public_services : {
+              host = coalesce(
+                try(svc.origin_host, null),
+                replace(replace(svc.public_url, "https://", ""), "http://", "")
+              )
+              http = {
+                paths = [{
+                  path     = "/"
                   pathType = "Prefix"
                   backend = {
                     service = {
@@ -165,11 +147,67 @@ resource "kubectl_manifest" "ingress" {
                       }
                     }
                   }
-                }
-              ],
-              local.managed_sync_path_prefix != "" ? [
+                }]
+              }
+            }
+          ],
+          (length(local.path_public_services) > 0 || local.managed_sync_path_prefix != "" || local.agent_os_path_prefix != "") ? [{
+            # Same object shape as the host rules. A null host is dropped below
+            # so the path rule stays hostless and Kubernetes does not see host: null.
+            host = null
+            http = {
+              paths = concat(
+                [
+                  for name, svc in local.path_public_services : {
+                    path     = svc.path_prefix
+                    pathType = "Prefix"
+                    backend = {
+                      service = {
+                        name = name
+                        port = {
+                          number = svc.port
+                        }
+                      }
+                    }
+                  }
+                ],
+                local.managed_sync_path_prefix != "" ? [
+                  for route in local.managed_sync_routes : {
+                    path     = route.path == "/" ? local.managed_sync_path_prefix : "${local.managed_sync_path_prefix}${route.path}"
+                    pathType = "Prefix"
+                    backend = {
+                      service = {
+                        name = route.service
+                        port = {
+                          number = route.port
+                        }
+                      }
+                    }
+                  }
+                ] : [],
+                local.agent_os_path_prefix != "" ? [
+                  for route in local.agent_os_routes : {
+                    path     = "${local.agent_os_path_prefix}${route.path}"
+                    pathType = "Prefix"
+                    backend = {
+                      service = {
+                        name = route.service
+                        port = {
+                          number = route.port
+                        }
+                      }
+                    }
+                  }
+                ] : [],
+              )
+            }
+          }] : [],
+          var.managed_sync_enabled && local.managed_sync_path_prefix == "" ? [{
+            host = local.managed_sync_host
+            http = {
+              paths = [
                 for route in local.managed_sync_routes : {
-                  path     = route.path == "/" ? local.managed_sync_path_prefix : "${local.managed_sync_path_prefix}${route.path}"
+                  path     = route.path
                   pathType = "Prefix"
                   backend = {
                     service = {
@@ -180,10 +218,15 @@ resource "kubectl_manifest" "ingress" {
                     }
                   }
                 }
-              ] : [],
-              local.agent_os_path_prefix != "" ? [
+              ]
+            }
+          }] : [],
+          var.agent_os_enabled && local.agent_os_path_prefix == "" ? [{
+            host = local.agent_os_host
+            http = {
+              paths = [
                 for route in local.agent_os_routes : {
-                  path     = "${local.agent_os_path_prefix}${route.path}"
+                  path     = route.path
                   pathType = "Prefix"
                   backend = {
                     service = {
@@ -194,49 +237,13 @@ resource "kubectl_manifest" "ingress" {
                     }
                   }
                 }
-              ] : [],
-            )
-          }
-        }] : [],
-        var.managed_sync_enabled && local.managed_sync_path_prefix == "" ? [{
-          host = local.managed_sync_host
-          http = {
-            paths = [
-              for route in local.managed_sync_routes : {
-                path     = route.path
-                pathType = "Prefix"
-                backend = {
-                  service = {
-                    name = route.service
-                    port = {
-                      number = route.port
-                    }
-                  }
-                }
-              }
-            ]
-          }
-        }] : [],
-        var.agent_os_enabled && local.agent_os_path_prefix == "" ? [{
-          host = local.agent_os_host
-          http = {
-            paths = [
-              for route in local.agent_os_routes : {
-                path     = route.path
-                pathType = "Prefix"
-                backend = {
-                  service = {
-                    name = route.service
-                    port = {
-                      number = route.port
-                    }
-                  }
-                }
-              }
-            ]
-          }
-        }] : []
-      )
+              ]
+            }
+          }] : []
+          ) : {
+          for key, value in rule : key => value if value != null
+        }
+      ]
     }
   })
 
