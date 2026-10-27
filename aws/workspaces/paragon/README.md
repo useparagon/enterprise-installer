@@ -2,52 +2,15 @@
 
 ## Shared-host path routing
 
-**Direct cutover for AWS (PARA-25255).** Enable this option to route every
-publicly exposed Paragon microservice and HTTP worker through one reverse-proxy
-hostname and a service-specific prefix:
+Publish the Paragon HTTP microservices and workers on one hostname, with a path per service, instead of a subdomain per service.
+
+The load balancer selects the service by that path. The flag defaults to off. When enabled, those services' public URLs use the shared host and health checks stay on `/healthz`.
 
 ```hcl
 path_based_routing_enabled = true
 path_routing_base_path     = "/paragon"
 path_routing_public_host   = "proxy.example.com"
 ```
-
-The host and base path are specified **once**. Terraform generates paths
-`/paragon/account`, `/paragon/api-triggerkit`, `/paragon/connect`,
-`/paragon/dashboard`, `/paragon/hermes`, `/paragon/passport`,
-`/paragon/zeus`, `/paragon/worker-proxy`, and every other exposed
-Paragon HTTP worker/service. It also sets their effective `*_PUBLIC_URL`
-values to `https://proxy.example.com/paragon/<service>` in
-Helm and sets `HTTP_PATH_PREFIX=/paragon/<service>` individually.
-`worker-auditlogs` uses `WORKER_AUDIT_LOGS_PUBLIC_URL` and `worker-eventlogs` uses `WORKER_EVENT_LOGS_PUBLIC_URL`. `PUBLIC_UPLOAD_PROXY_BASE_URL` follows the path-routed Zeus URL.
-
-**No shadow Ingress:** the normal service Ingress becomes a hostless AWS ALB
-`Prefix` rule. The original host rules are replaced. ALB health checks and
-Kubernetes probes stay unprefixed on `/healthz`. The existing special
-unprefixed `/projects/*/sdk/*` forwarding rules are removed in path mode,
-and the Connect prefixed SDK trigger/proxy rules remain.
-
-The proxy hostname is **not** created in Paragon's Route53 module; configure
-the DNS record to point to the separate Nginx endpoint. Each Paragon origin
-`<service>.<domain>` CNAME remains pointed at the ALB for verified TLS/SNI
-when Nginx forwards the original HTTP URI. Enable `path_based_routing_enabled`
-only when application images include the `HTTP_PATH_PREFIX` middleware.
-
-The path setting applies to the monorepo microservices/workers exposed through
-the Paragon Helm chart, respecting the actual public/private/excluded services.
-Managed Sync (`api-sync`) has its own Helm ingress and application; the path
-handling for Managed Sync is a **separate application/chart dependency**.
-Grafana and other third-party monitoring UIs do not use the Nest middleware.
-Dashboard is Next.js and needs a matching frontend base path/asset-routing
-implementation for full browser functionality; an ALB route and Nest
-middleware alone cannot provide it.
-
-**Explicit URL mode:** when `path_routing_base_path` and
-`path_routing_public_host` are both empty, the previous implementation still
-supports path-bearing `*_PUBLIC_URL` values on selected services, as long
-as they all share an external hostname. Leaving
-`path_based_routing_enabled=false` preserves the existing host-based
-defaults in unrelated installations.
 
 ## Agent OS configuration
 
@@ -279,9 +242,9 @@ supports verify-full. See commented examples in `charts/values.placeholder.yaml`
 | <a name="input_monitors_enabled"></a> [monitors\_enabled](#input\_monitors\_enabled) | Specifies that monitors are enabled. | `bool` | `false` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | The name of the organization that's deploying Paragon. | `string` | n/a | yes |
 | <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input\_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
-| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Route Paragon public HTTP services with hostless ALB Prefix rules. With path\_routing\_base\_path and path\_routing\_public\_host, generate /<base>/<service> routes for every exposed Paragon HTTP service. | `bool` | `false` | no |
-| <a name="input_path_routing_base_path"></a> [path\_routing\_base\_path](#input\_path\_routing\_base\_path) | When path routing is enabled, prefix every exposed Paragon HTTP service with this base path (for example /paragon/account). Blank retains explicit *\_PUBLIC\_URL paths. | `string` | `""` | no |
-| <a name="input_path_routing_public_host"></a> [path\_routing\_public\_host](#input\_path\_routing\_public\_host) | External reverse proxy DNS hostname (without scheme or path) for all Paragon services when path\_routing\_base\_path is set. This hostname is managed by the proxy operator, not by the Paragon Route53 module. | `string` | `""` | no |
+| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Publish Paragon HTTP microservices and workers on one shared hostname, with a path per service, instead of a subdomain per service. Defaults to false. When enabled, those public URLs use the shared host and health checks stay on /healthz. | `bool` | `false` | no |
+| <a name="input_path_routing_base_path"></a> [path\_routing\_base\_path](#input\_path\_routing\_base\_path) | Base path for each exposed Paragon HTTP service when path routing is enabled. Example: /paragon. | `string` | `""` | no |
+| <a name="input_path_routing_public_host"></a> [path\_routing\_public\_host](#input\_path\_routing\_public\_host) | Shared hostname for path-routed Paragon services, without scheme or path. Example: proxy.example.com. | `string` | `""` | no |
 | <a name="input_platform_version"></a> [platform\_version](#input\_platform\_version) | Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML. | `string` | `null` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that get no Ingress. Removed from public\_microservices and public\_monitors on both internet-facing and internal load balancers. ingress\_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict\_public\_exposure is true, allowlisted services can still be listed here. | `list(string)` | `[]` | no |
 | <a name="input_restrict_public_exposure"></a> [restrict\_public\_exposure](#input\_restrict\_public\_exposure) | When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private\_services to further restrict allowlisted endpoints. Removing many Ingresses from the shared ALB group requires elasticloadbalancing:SetRulePriorities on the load balancer controller IAM principal (see infra eks-worker-policy); without it, deleted Ingress objects can remain Terminating while ALB rules stay active until the controller reconciles. | `bool` | `false` | no |

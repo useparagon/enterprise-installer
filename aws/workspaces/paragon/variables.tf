@@ -132,7 +132,7 @@ variable "ingress_scheme" {
 }
 
 variable "path_routing_base_path" {
-  description = "When path routing is enabled, prefix every exposed Paragon HTTP service with this base path (for example /paragon/account). Blank retains explicit *_PUBLIC_URL paths."
+  description = "Base path for each exposed Paragon HTTP service when path routing is enabled. Example: /paragon."
   type        = string
   default     = ""
 
@@ -148,7 +148,7 @@ variable "path_routing_base_path" {
 }
 
 variable "path_routing_public_host" {
-  description = "External reverse proxy DNS hostname (without scheme or path) for all Paragon services when path_routing_base_path is set. This hostname is managed by the proxy operator, not by the Paragon Route53 module."
+  description = "Shared hostname for path-routed Paragon services, without scheme or path. Example: proxy.example.com."
   type        = string
   default     = ""
 
@@ -157,12 +157,12 @@ variable "path_routing_public_host" {
       length(var.path_routing_public_host) <= 253 &&
       length(regexall("^[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)+$", var.path_routing_public_host)) == 1
     )
-    error_message = "path_routing_public_host must be a DNS hostname without https:// or a path (e.g. proxy.staging.pgn.so)."
+    error_message = "path_routing_public_host must be a DNS hostname without https:// or a path (e.g. proxy.example.com)."
   }
 }
 
 variable "path_based_routing_enabled" {
-  description = "Route Paragon public HTTP services with hostless ALB Prefix rules. With path_routing_base_path and path_routing_public_host, generate /<base>/<service> routes for every exposed Paragon HTTP service."
+  description = "Publish Paragon HTTP microservices and workers on one shared hostname, with a path per service, instead of a subdomain per service. Defaults to false. When enabled, those public URLs use the shared host and health checks stay on /healthz."
   type        = bool
   default     = false
 
