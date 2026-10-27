@@ -222,12 +222,11 @@ locals {
   }
 
   # Replication group IDs are capped at 40 characters. Keep readable IDs when
-  # possible and append a stable hash when truncation is required.
+  # possible and append a stable hash when truncation is required. Drop a
+  # trailing hyphen from the cut so the hash separator is not a second hyphen.
   valkey_resource_ids = {
-    for key, _ in var.valkey_instances :
-    key => length(local.valkey_names[key]) <= 32
-    ? local.valkey_names[key]
-    : "${substr(local.valkey_names[key], 0, 25)}-${substr(sha1(local.valkey_names[key]), 0, 6)}"
+    for key, name in local.valkey_names :
+    key => length(name) <= 32 ? name : "${regexreplace(substr(name, 0, 25), "-+$", "")}-${substr(sha1(name), 0, 6)}"
   }
 }
 
