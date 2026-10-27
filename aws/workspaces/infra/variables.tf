@@ -908,12 +908,12 @@ locals {
     queue        = { node_type = "cache.t4g.medium", cluster_enabled = false, multi_az = false }
     system       = { node_type = "cache.t4g.micro", cluster_enabled = false, multi_az = false }
     managed_sync = { node_type = "cache.r6g.large" }
-    # Keep the Agent OS cluster that already exists: t4g.medium, Multi-AZ, 7-day snapshots.
+    # Keep the Agent OS node type and Multi-AZ. Snapshots match the other Valkey roles.
     agent_os = {
       node_type               = "cache.t4g.medium"
       multi_az                = true
       cluster_enabled         = false
-      snapshot_retention_days = 7
+      snapshot_retention_days = 5
       tls_enabled             = true
     }
   }

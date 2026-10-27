@@ -35,7 +35,7 @@ a legacy workload to the new map is **not** an automatic migration.
 `valkey_instances` is empty by default. Set it only to override a role.
 Built-in sizing mirrors legacy Redis (`cache.r6g.large` for cache and
 managed sync, `cache.t4g.medium` / `cache.t4g.micro` for queue and system).
-Agent OS stays `cache.t4g.medium` with Multi-AZ and 7-day snapshots.
+Agent OS stays `cache.t4g.medium` with Multi-AZ. Snapshots are 5 days, the same as the other Valkey roles.
 `elasticache_multiple_instances` still controls physical topology for Valkey
 after Redis is removed; it does not read `elasticache_node_type` or
 `elasticache_multi_az`. Keyspace events are set on Redis only while
