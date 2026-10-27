@@ -702,8 +702,13 @@ locals {
   cluster_name = local.use_legacy_infra_json ? try(local.legacy_infra_vars.cluster_name.value, local.workspace) : local.workspace
   # Kubernetes version is public cluster metadata, not a credential.
   cluster_k8s_version = nonsensitive(try(local.infra_vars.k8s_version.value, var.k8s_version))
-  logs_bucket         = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
-  auditlogs_bucket    = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
+  # infra_vars is sensitive because it also carries datastore secrets. These
+  # flags only select cluster shape and are used in count.
+  legacy_mng_pools_enabled   = nonsensitive(try(local.infra_vars.enable_legacy_mng_pools.value, true))
+  infra_karpenter_enabled    = nonsensitive(try(local.infra_vars.enable_karpenter.value, false))
+  infra_karpenter_configured = nonsensitive(try(local.infra_vars.karpenter.value, null) != null)
+  logs_bucket                = local.use_legacy_infra_json ? try(local.legacy_infra_vars.logs_bucket.value, "${local.workspace}-logs") : "${local.workspace}-logs"
+  auditlogs_bucket           = local.use_legacy_infra_json ? try(local.legacy_infra_vars.auditlogs_bucket.value, "${local.workspace}-auditlogs") : "${local.workspace}-auditlogs"
 
   helm_yaml_path = abspath(var.helm_yaml_path)
   # Prefer TF_VAR_helm_yaml, then the values file, else empty global.env (CI / fresh checkout).
