@@ -27,11 +27,20 @@ locals {
   })
 
   microservice_values = yamlencode({
-    for microservice_name, microservice_config in var.microservices : microservice_name => {
-      env = {
-        SERVICE = microservice_name
-      }
-    }
+    for microservice_name, microservice_config in var.microservices : microservice_name => merge(
+      {
+        env = merge(
+          {
+            SERVICE = microservice_name
+          },
+          var.path_based_routing_enabled && try(var.public_microservices[microservice_name].path_prefix, "") != "" ? {
+            HTTP_PATH_PREFIX = var.public_microservices[microservice_name].path_prefix
+          } : {}
+        )
+      },
+      # HTTP_PATH_PREFIX is appended by env.standard without replacing chart envKeys.
+      {}
+    )
   })
 
   # managed-sync chart (useparagon-internal/managed-sync) shared ingress requires root-level
@@ -47,7 +56,7 @@ locals {
         enabled   = !var.agc_direct
         class     = "nginx" # used for managed sync
         className = "nginx"
-        host      = replace(replace(microservice_config.public_url, "https://", ""), "http://", "")
+        host      = microservice_config.origin_host
         scheme    = var.ingress_scheme
         agc       = var.agc_active
         annotations = {
@@ -73,7 +82,7 @@ locals {
       ingress = {
         enabled   = !var.agc_direct
         className = "nginx"
-        host      = replace(replace(monitor_config.public_url, "https://", ""), "http://", "")
+        host      = monitor_config.origin_host
         scheme    = var.ingress_scheme
         agc       = var.agc_active
         annotations = {

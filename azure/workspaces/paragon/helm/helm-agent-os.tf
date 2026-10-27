@@ -1,7 +1,11 @@
 locals {
   agent_os_public_url = try(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
-  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+  agent_os_host       = replace(local.agent_os_public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
   agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
+  agent_os_path_prefix = (
+    var.path_based_routing_enabled &&
+    trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+  ) ? "/${trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}" : ""
 
   # The Agent OS chart owns Enterprise application defaults, migration hooks,
   # Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
@@ -27,7 +31,7 @@ locals {
           context-api = local.agent_os_port
         }
 
-        env = {
+        env = merge({
           HOST_ENV                              = "AZURE_K8"
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
@@ -37,7 +41,9 @@ locals {
           PARAGON_ACTIONKIT_URL                 = "http://worker-actionkit:${var.microservices["worker-actionkit"].port}"
           CAPABILITY_BROKER_ACTIONKIT_URL       = "http://worker-actionkit:${var.microservices["worker-actionkit"].port}"
           AGENT_OS_SECRET_REVISION              = var.secrets_revision
-        }
+          }, local.agent_os_path_prefix != "" ? {
+          HTTP_PATH_PREFIX = local.agent_os_path_prefix
+        } : {})
       }
     }
 

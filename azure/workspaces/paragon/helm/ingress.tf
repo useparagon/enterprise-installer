@@ -16,12 +16,30 @@ locals {
   )
 
   # Hostnames that need Certificate CRs when nginx Ingress is gone (AGC direct).
-  # public_services includes managed_sync_public_dns (sync host when restrict drops api-sync).
-  agc_direct_certificate_hosts = {
-    for name, cfg in var.public_services :
-    name => replace(replace(cfg.public_url, "https://", ""), "http://", "")
-    if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true)
-  }
+  # Path-routed services share path-routing.<domain> on the hostless listener —
+  # do not issue unused per-service certs that AGC will never present.
+  agc_direct_certificate_hosts = merge(
+    {
+      for name, cfg in var.public_services : name => cfg.origin_host
+      if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true) && !contains(keys(var.public_microservices), name) && try(cfg.origin_host, "") != "" && cfg.origin_host != "path-routing.${var.domain}"
+    },
+    {
+      for name, cfg in var.public_microservices :
+      name => cfg.origin_host
+      if try(local.subchart_enabled[name].enabled, true) && try(cfg.path_prefix, "") == ""
+    },
+    {
+      for name, cfg in var.public_monitors :
+      name => cfg.origin_host
+      if lookup(cfg, "public_url", null) != null && try(local.subchart_enabled[name].enabled, true) && try(cfg.origin_host, "") != ""
+    },
+    var.path_based_routing_enabled && (
+      anytrue([for cfg in var.public_microservices : cfg.path_prefix != ""]) ||
+      anytrue([for cfg in values(var.public_services) : try(cfg.origin_host, "") == "path-routing.${var.domain}"])
+      ) ? {
+      "path-routing" = "path-routing.${var.domain}"
+    } : {},
+  )
 }
 
 resource "azurerm_key_vault_access_policy" "aks_access_to_kv" {

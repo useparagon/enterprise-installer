@@ -11,8 +11,9 @@ locals {
 resource "cloudflare_record" "cname" {
   for_each = var.enabled ? var.public_services : {}
 
-  # strip protocol and domain from URL to get subdomain
-  name = replace(replace(each.value.public_url, "https://", ""), ".${data.cloudflare_zone.zone[0].name}", "")
+  # Path-routed public URLs belong to the external reverse proxy. DNS keeps
+  # the Paragon-domain origin hostname that proxy targets.
+  name = replace(each.value.origin_host, ".${data.cloudflare_zone.zone[0].name}", "")
 
   content = var.ingress_loadbalancer
   ttl     = var.ttl
