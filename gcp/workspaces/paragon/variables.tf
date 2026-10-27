@@ -260,6 +260,117 @@ variable "ingress_scheme" {
   default     = "external"
 }
 
+variable "path_based_routing_enabled" {
+  description = "Publish Paragon HTTP microservices and workers on one shared hostname, with a path per service, instead of a subdomain per service. Defaults to false. When enabled, those public URLs use the shared host and health checks stay on /healthz."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.path_based_routing_enabled || var.ingress_scheme == "external"
+    error_message = "path_based_routing_enabled=true requires ingress_scheme=external (external reverse-proxy + path-routing.<domain> certs are an external-LB design)."
+  }
+
+  validation {
+    condition = var.path_based_routing_enabled || alltrue([
+      for config in local.public_microservices_base :
+      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
+    ])
+    error_message = "A path-bearing *_PUBLIC_URL requires path_based_routing_enabled=true."
+  }
+
+  validation {
+    condition     = var.path_based_routing_enabled || !var.agent_os_enabled || trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") == ""
+    error_message = "A path-bearing AGENT_OS_PUBLIC_URL requires path_based_routing_enabled=true."
+  }
+
+  validation {
+    condition     = !var.path_based_routing_enabled || length(values(local.path_routed_public_prefixes)) == length(distinct(values(local.path_routed_public_prefixes)))
+    error_message = "Path-based public routes must use unique service path prefixes because routing does not depend on the incoming Host header."
+  }
+
+  # Kubernetes Prefix matches path elements, so /foo overlaps /foo/bar
+  # but not /foobar. Exact duplicates are covered by the validation above.
+  validation {
+    condition = !var.path_based_routing_enabled || alltrue(flatten([
+      for service, prefix in local.path_routed_public_prefixes : [
+        for other_service, other_prefix in local.path_routed_public_prefixes :
+        service == other_service || !startswith(other_prefix, "${prefix}/")
+      ]
+    ]))
+    error_message = "Path-based public route prefixes must not overlap by path namespace; each service needs a distinct path prefix."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || !var.agent_os_enabled || local.agent_os_path_prefix == "" || alltrue([
+      for prefix in values(local.path_routed_public_prefixes) :
+      prefix != local.agent_os_path_prefix &&
+      !startswith(prefix, "${local.agent_os_path_prefix}/") &&
+      !startswith(local.agent_os_path_prefix, "${prefix}/")
+    ])
+    error_message = "The Agent OS path prefix must not overlap another path-routed service."
+  }
+
+  validation {
+    condition     = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) <= 1
+    error_message = "Path-based routing requires all path-routed services to share the same public host (external reverse-proxy hostname)."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || alltrue(concat(
+      [
+        for service, config in local.public_microservices_base :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+        if !contains(keys(local.path_routed_public_prefixes), service)
+      ],
+      [
+        for config in local.public_monitors :
+        !contains(
+          local.path_routing_reserved_hosts,
+          lower(replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+        )
+      ]
+    ))
+    error_message = "Host-based public services and monitors must not use the shared path-routing public host or path-routing.<domain> origin because GCP evaluates host rules before path rules."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || !contains(
+      local.path_routing_public_hosts,
+      lower(local.path_routing_origin_host)
+    )
+    error_message = "The shared external path-routing host must not be path-routing.<domain>, which is reserved for the Paragon origin."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || length(local.path_routing_public_hosts) == 0 || alltrue([
+      for host in local.path_routing_public_hosts :
+      (!var.managed_sync_enabled || contains(keys(local.path_routed_public_prefixes), "api-sync") || host != lower("sync.${var.domain}")) &&
+      (!var.agent_os_enabled || !var.path_based_routing_enabled || local.agent_os_path_prefix != "" || host != lower(replace(
+        try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], "https://agentos.${var.domain}"),
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      )))
+    ])
+    error_message = "The shared path-routing public host must not match a Managed Sync or Agent OS host rule. Path-routed services use the hostless listener instead."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || !var.managed_sync_enabled || alltrue([
+      for prefix in values(local.path_routed_public_prefixes) :
+      alltrue([
+        for reserved in local.managed_sync_reserved_path_prefixes :
+        prefix != reserved &&
+        !startswith(prefix, "${reserved}/") &&
+        !startswith(reserved, "${prefix}/")
+      ])
+    ])
+    error_message = "Path-based public route prefixes must not collide with Managed Sync ingress path namespaces (/api/syncs, /api/webhooks, etc.)."
+  }
+}
+
 variable "k8s_version" {
   description = "The version of Kubernetes to run in the cluster."
   type        = string
@@ -1195,12 +1306,65 @@ locals {
     "zeus",
   ])
 
-  public_microservices = {
+  path_routing_origin_host            = "path-routing.${var.domain}"
+  managed_sync_reserved_path_prefixes = toset(["/api/sync-projects", "/api/catalog", "/api/syncs", "/api/permissions", "/api/webhooks", "/worker/sync", "/worker/history/sync"])
+
+  public_microservices_base = {
     for microservice, config in local.microservices :
     microservice => config
     if config.public_url != null && config.public_url != "" && !contains(var.private_services, microservice) && (
       !local.restrict_public_exposure || contains(local.restricted_public_microservice_allowlist, microservice)
     )
+  }
+
+  path_routed_public_prefixes = {
+    for microservice, config in local.public_microservices_base :
+    microservice => "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
+    if trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+  }
+
+  agent_os_public_url = try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], "https://agentos.${var.domain}")
+  agent_os_path_prefix = (
+    trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+  ) ? "/${trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}" : ""
+
+  path_routing_public_hosts = setunion(
+    toset([
+      for service in keys(local.path_routed_public_prefixes) :
+      lower(replace(
+        local.public_microservices_base[service].public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ))
+    ]),
+    var.agent_os_enabled && local.agent_os_path_prefix != "" ? toset([
+      lower(replace(local.agent_os_public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1"))
+    ]) : toset([])
+  )
+
+  path_routing_reserved_hosts = setunion(
+    local.path_routing_public_hosts,
+    toset([lower(local.path_routing_origin_host)])
+  )
+
+  public_microservices = {
+    for microservice, config in local.public_microservices_base :
+    microservice => merge(config, {
+      public_host = var.path_based_routing_enabled ? replace(
+        config.public_url,
+        "/^https?:\\/\\/([^\\/?#]+).*$/",
+        "$1"
+      ) : replace(replace(config.public_url, "https://", ""), "http://", "")
+      path_prefix = lookup(local.path_routed_public_prefixes, microservice, "")
+      origin_host = (
+        var.path_based_routing_enabled &&
+        lookup(local.path_routed_public_prefixes, microservice, "") != ""
+        ) ? local.path_routing_origin_host : (
+        var.path_based_routing_enabled
+        ? replace(config.public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
+        : replace(replace(config.public_url, "https://", ""), "http://", "")
+      )
+    })
   }
 
   uptime_excluded_microservices = toset([

@@ -1,8 +1,14 @@
 locals {
   managed_sync_host   = "sync.${var.domain}"
   agent_os_public_url = try(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"], "https://agentos.${var.domain}")
-  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+  agent_os_host       = replace(local.agent_os_public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
   agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
+  agent_os_path_prefix = (
+    var.agent_os_enabled &&
+    var.path_based_routing_enabled &&
+    trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+  ) ? "/${trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}" : ""
+  managed_sync_path_prefix = try(var.public_microservices["api-sync"].path_prefix, "")
   agent_os_routes = [
     { path = "/api/context", service = "context-api", port = local.agent_os_port },
     { path = "/api/tools", service = "tools-api", port = 3002 },
@@ -18,13 +24,30 @@ locals {
     { path = "/", service = "api-sync", port = 1800 },
   ]
 
+  # api-sync is routed by the Managed Sync path table below, not as one backend.
+  path_public_services = var.path_based_routing_enabled ? {
+    for name, service in var.public_microservices :
+    name => service
+    if service.path_prefix != "" && name != "api-sync"
+  } : {}
+
+  host_public_services = {
+    for name, service in var.public_services :
+    name => service
+    if try(service.path_prefix, "") == ""
+  }
+
   unique_domains = distinct(concat(
     [
       for service in values(var.public_services) :
-      replace(replace(service.public_url, "https://", ""), "http://", "")
+      coalesce(
+        try(service.origin_host, null),
+        replace(replace(service.public_url, "https://", ""), "http://", "")
+      )
     ],
-    var.managed_sync_enabled ? [local.managed_sync_host] : [],
-    var.agent_os_enabled ? [local.agent_os_host] : []
+    var.managed_sync_enabled && local.managed_sync_path_prefix == "" ? [local.managed_sync_host] : [],
+    var.agent_os_enabled && local.agent_os_path_prefix == "" ? [local.agent_os_host] : [],
+    local.agent_os_path_prefix != "" ? ["path-routing.${var.domain}"] : []
   ))
 
   # Create a hash of domains to version the certificate name
@@ -107,65 +130,123 @@ resource "kubectl_manifest" "ingress" {
     spec = {
       ingressClassName = var.ingress_scheme == "internal" ? "gce-internal" : "gce"
       loadBalancerIP   = google_compute_global_address.loadbalancer.address
-      rules = concat(
-        [
-          for name, svc in var.public_services : {
-            host = replace(svc.public_url, "https://", "")
-            http = {
-              paths = [{
-                path     = "/"
-                pathType = "Prefix"
-                backend = {
-                  service = {
-                    name = name
-                    port = {
-                      number = svc.port
+      rules = [
+        for rule in concat(
+          [
+            for name, svc in local.host_public_services : {
+              host = coalesce(
+                try(svc.origin_host, null),
+                replace(replace(svc.public_url, "https://", ""), "http://", "")
+              )
+              http = {
+                paths = [{
+                  path     = "/"
+                  pathType = "Prefix"
+                  backend = {
+                    service = {
+                      name = name
+                      port = {
+                        number = svc.port
+                      }
                     }
                   }
-                }
-              }]
+                }]
+              }
             }
-          }
-        ],
-        var.managed_sync_enabled ? [{
-          host = local.managed_sync_host
-          http = {
-            paths = [
-              for route in local.managed_sync_routes : {
-                path     = route.path
-                pathType = "Prefix"
-                backend = {
-                  service = {
-                    name = route.service
-                    port = {
-                      number = route.port
+          ],
+          (length(local.path_public_services) > 0 || local.managed_sync_path_prefix != "" || local.agent_os_path_prefix != "") ? [{
+            # Same object shape as the host rules. A null host is dropped below
+            # so the path rule stays hostless and Kubernetes does not see host: null.
+            host = null
+            http = {
+              paths = concat(
+                [
+                  for name, svc in local.path_public_services : {
+                    path     = svc.path_prefix
+                    pathType = "Prefix"
+                    backend = {
+                      service = {
+                        name = name
+                        port = {
+                          number = svc.port
+                        }
+                      }
+                    }
+                  }
+                ],
+                local.managed_sync_path_prefix != "" ? [
+                  for route in local.managed_sync_routes : {
+                    path     = route.path == "/" ? local.managed_sync_path_prefix : "${local.managed_sync_path_prefix}${route.path}"
+                    pathType = "Prefix"
+                    backend = {
+                      service = {
+                        name = route.service
+                        port = {
+                          number = route.port
+                        }
+                      }
+                    }
+                  }
+                ] : [],
+                local.agent_os_path_prefix != "" ? [
+                  for route in local.agent_os_routes : {
+                    path     = "${local.agent_os_path_prefix}${route.path}"
+                    pathType = "Prefix"
+                    backend = {
+                      service = {
+                        name = route.service
+                        port = {
+                          number = route.port
+                        }
+                      }
+                    }
+                  }
+                ] : [],
+              )
+            }
+          }] : [],
+          var.managed_sync_enabled && local.managed_sync_path_prefix == "" ? [{
+            host = local.managed_sync_host
+            http = {
+              paths = [
+                for route in local.managed_sync_routes : {
+                  path     = route.path
+                  pathType = "Prefix"
+                  backend = {
+                    service = {
+                      name = route.service
+                      port = {
+                        number = route.port
+                      }
                     }
                   }
                 }
-              }
-            ]
-          }
-        }] : [],
-        var.agent_os_enabled ? [{
-          host = local.agent_os_host
-          http = {
-            paths = [
-              for route in local.agent_os_routes : {
-                path     = route.path
-                pathType = "Prefix"
-                backend = {
-                  service = {
-                    name = route.service
-                    port = {
-                      number = route.port
+              ]
+            }
+          }] : [],
+          var.agent_os_enabled && local.agent_os_path_prefix == "" ? [{
+            host = local.agent_os_host
+            http = {
+              paths = [
+                for route in local.agent_os_routes : {
+                  path     = route.path
+                  pathType = "Prefix"
+                  backend = {
+                    service = {
+                      name = route.service
+                      port = {
+                        number = route.port
+                      }
                     }
                   }
                 }
-              }
-            ]
-          }
-        }] : []
-      )
+              ]
+            }
+          }] : []
+          ) : {
+          for key, value in rule : key => value if value != null
+        }
+      ]
     }
   })
 
