@@ -12,9 +12,15 @@ NOTE: The credentials above may refer to a Workload Identity Pool account instea
 
 ## Shared-host path routing
 
-Set `path_based_routing_enabled = true` with `ingress_scheme = "external"`. Path-routed Paragon microservice `*_PUBLIC_URL` values include a non-root path on a shared external-proxy host. Public monitor URLs remain host-based and Managed Sync routing remains separate. Certs/DNS use `path-routing.<domain>` as the Paragon origin; the reverse proxy should target that name. Path prefixes must not collide with Managed Sync routes (`/api/syncs`, `/api/webhooks`, …).
+Publish the Paragon HTTP microservices and workers on one hostname, with a path per service, instead of a subdomain per service.
 
-Helm injects `HTTP_PATH_PREFIX` through the shared environment template without replacing the chart's default `envKeys`. LB health checks stay on `/healthz`. Host-based services must not reuse the shared external host or `path-routing.<domain>` origin. Uptime monitors use the external `public_url`; pause or retarget them until the proxy is ready.
+The load balancer selects the service by that path. The flag defaults to off. When enabled, those services' public URLs use the shared host and health checks stay on `/healthz`.
+
+```hcl
+path_based_routing_enabled = true
+```
+
+A public URL then looks like `https://proxy.example.com/paragon/zeus`.
 
 ## Agent OS
 
@@ -165,7 +171,7 @@ for examples and optional verify-full env flags.
 | <a name="input_openobserve_password"></a> [openobserve\_password](#input\_openobserve\_password) | OpenObserve admin login password. | `string` | `null` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
 | <a name="input_paragon_helm_repository"></a> [paragon\_helm\_repository](#input\_paragon\_helm\_repository) | Helm repository URL used to install Paragon-managed charts. Override to consume charts from another repository. | `string` | `"https://helm.useparagon.com"` | no |
-| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Enable shared-host path-prefixed public routes on the GCP shared ingress. Requires ingress\_scheme=external. Services without a path keep host-based routing. | `bool` | `false` | no |
+| <a name="input_path_based_routing_enabled"></a> [path\_based\_routing\_enabled](#input\_path\_based\_routing\_enabled) | Publish Paragon HTTP microservices and workers on one shared hostname, with a path per service, instead of a subdomain per service. Defaults to false. When enabled, those public URLs use the shared host and health checks stay on /healthz. | `bool` | `false` | no |
 | <a name="input_platform_version"></a> [platform\_version](#input\_platform\_version) | Platform release tag written to global.env.VERSION when set. Overrides the VERSION key in helm values YAML. | `string` | `null` | no |
 | <a name="input_private_services"></a> [private\_services](#input\_private\_services) | Services that get no Ingress. Removed from public\_microservices and public\_monitors on both external and internal load balancers. ingress\_scheme=internal is separate: remaining services keep an Ingress on the internal load balancer. When restrict\_public\_exposure is true, allowlisted services can still be listed here. | `list(string)` | `[]` | no |
 | <a name="input_region"></a> [region](#input\_region) | The region where to host Google Cloud Organization resources. | `string` | n/a | yes |

@@ -261,7 +261,7 @@ variable "ingress_scheme" {
 }
 
 variable "path_based_routing_enabled" {
-  description = "Enable shared-host path-prefixed public routes on the GCP shared ingress. Requires ingress_scheme=external. Services without a path keep host-based routing."
+  description = "Publish Paragon HTTP microservices and workers on one shared hostname, with a path per service, instead of a subdomain per service. Defaults to false. When enabled, those public URLs use the shared host and health checks stay on /healthz."
   type        = bool
   default     = false
 
