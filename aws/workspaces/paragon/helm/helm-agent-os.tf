@@ -1,7 +1,17 @@
 locals {
   agent_os_public_url = try(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
-  agent_os_host       = replace(replace(local.agent_os_public_url, "https://", ""), "http://", "")
+  agent_os_host       = replace(local.agent_os_public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
   agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
+  agent_os_path_prefix = (
+    var.path_based_routing_enabled &&
+    trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
+  ) ? "/${trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}" : ""
+  # Chart ingress stays on agentos.<domain> so it does not claim the shared host.
+  agent_os_ingress_host = local.agent_os_path_prefix != "" ? "agentos.${var.domain}" : local.agent_os_host
+  agent_os_path_routes = [
+    { path = "/api/context", service = "context-api", port = local.agent_os_port },
+    { path = "/api/tools", service = "tools-api", port = 3002 },
+  ]
 
   # The Agent OS chart owns Enterprise application defaults, migration hooks,
   # Kafka ACLs, Bifrost, models, tools features, scheduling and pod capacity.
@@ -27,7 +37,7 @@ locals {
           context-api = local.agent_os_port
         }
 
-        env = {
+        env = merge({
           HOST_ENV                              = "AWS_K8"
           PLATFORM_ENV                          = try(var.helm_values.global.env["PLATFORM_ENV"], "enterprise")
           PARAGON_ZEUS_URL                      = "http://zeus:${var.microservices["zeus"].port}"
@@ -37,7 +47,9 @@ locals {
           PARAGON_ACTIONKIT_URL                 = "http://worker-actionkit:${var.microservices["worker-actionkit"].port}"
           CAPABILITY_BROKER_ACTIONKIT_URL       = "http://worker-actionkit:${var.microservices["worker-actionkit"].port}"
           AGENT_OS_SECRET_REVISION              = var.secrets_revision
-        }
+          }, local.agent_os_path_prefix != "" ? {
+          HTTP_PATH_PREFIX = local.agent_os_path_prefix
+        } : {})
       }
     }
 
@@ -92,7 +104,7 @@ resource "helm_release" "agent_os" {
 
   set {
     name  = "ingress.host"
-    value = local.agent_os_host
+    value = local.agent_os_ingress_host
   }
 
   set {
@@ -131,4 +143,60 @@ resource "helm_release" "agent_os" {
     kubernetes_service_account.agent_os,
     kubernetes_storage_class_v1.gp3_encrypted,
   ]
+}
+
+# Hostless path rules on the shared ALB. The chart ingress stays on agentos.<domain>.
+resource "kubectl_manifest" "agent_os_path_ingress" {
+  count = var.agent_os_enabled && var.path_based_routing_enabled && local.agent_os_path_prefix != "" ? 1 : 0
+
+  yaml_body = yamlencode({
+    apiVersion = "networking.k8s.io/v1"
+    kind       = "Ingress"
+    metadata = {
+      name      = "agent-os-path"
+      namespace = local.paragon_namespace
+      annotations = merge(
+        {
+          "kubernetes.io/ingress.class"                                   = "alb"
+          "alb.ingress.kubernetes.io/group.name"                          = var.workspace
+          "alb.ingress.kubernetes.io/group.order"                         = "-100"
+          "alb.ingress.kubernetes.io/load-balancer-name"                  = var.workspace
+          "alb.ingress.kubernetes.io/scheme"                              = var.ingress_scheme
+          "alb.ingress.kubernetes.io/target-type"                         = "ip"
+          "alb.ingress.kubernetes.io/listen-ports"                        = "[{\"HTTP\": 80}, {\"HTTPS\": 443}]"
+          "alb.ingress.kubernetes.io/certificate-arn"                     = var.certificate
+          "alb.ingress.kubernetes.io/ssl-redirect"                        = "443"
+          "alb.ingress.kubernetes.io/healthcheck-path"                    = "/readyz"
+          "alb.ingress.kubernetes.io/success-codes"                       = "200"
+          "alb.ingress.kubernetes.io/manage-backend-security-group-rules" = "false"
+        },
+        var.waf_web_acl_arn != "" ? {
+          "alb.ingress.kubernetes.io/wafv2-acl-arn" = var.waf_web_acl_arn
+        } : {}
+      )
+    }
+    spec = {
+      ingressClassName = "alb"
+      rules = [{
+        http = {
+          paths = [
+            for route in local.agent_os_path_routes : {
+              path     = "${local.agent_os_path_prefix}${route.path}"
+              pathType = "Prefix"
+              backend = {
+                service = {
+                  name = route.service
+                  port = {
+                    number = route.port
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }]
+    }
+  })
+
+  depends_on = [helm_release.agent_os]
 }

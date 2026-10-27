@@ -175,14 +175,6 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || alltrue([
-      for config in local.public_microservices_base :
-      length(regexall("^https?://[^/?#]+(/[^?#]*)?$", config.public_url)) == 1
-    ])
-    error_message = "Public microservice URLs must be absolute HTTP(S) URLs without query strings or fragments."
-  }
-
-  validation {
     condition = var.path_based_routing_enabled || alltrue([
       for config in local.public_microservices_base :
       length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
@@ -191,20 +183,8 @@ variable "path_based_routing_enabled" {
   }
 
   validation {
-    condition = !var.path_based_routing_enabled || alltrue([
-      for config in local.public_monitors :
-      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
-    ])
-    error_message = "Path-based routing currently applies to Paragon services only; public monitor URLs must remain host-based."
-  }
-
-  validation {
-    condition = !var.path_based_routing_enabled || alltrue([
-      for service, config in local.public_microservices_base :
-      length(regexall("^https?://[^/?#]+/?$", config.public_url)) == 1
-      if contains(keys(local.managed_sync_microservices), service)
-    ])
-    error_message = "Managed Sync public URLs must remain host-based; Managed Sync path routing is configured separately."
+    condition     = var.path_based_routing_enabled || !var.agent_os_enabled || trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") == ""
+    error_message = "A path-bearing AGENT_OS_PUBLIC_URL requires path_based_routing_enabled=true."
   }
 
   validation {
@@ -222,6 +202,16 @@ variable "path_based_routing_enabled" {
       ]
     ]))
     error_message = "Path-based public route prefixes must not overlap; each service needs a distinct path namespace."
+  }
+
+  validation {
+    condition = !var.path_based_routing_enabled || !var.agent_os_enabled || local.agent_os_path_prefix == "" || alltrue([
+      for prefix in values(local.path_routed_public_prefixes) :
+      prefix != local.agent_os_path_prefix &&
+      !startswith(prefix, "${local.agent_os_path_prefix}/") &&
+      !startswith(local.agent_os_path_prefix, "${prefix}/")
+    ])
+    error_message = "The Agent OS path prefix must not overlap another path-routed service."
   }
 
   validation {
@@ -1062,20 +1052,15 @@ locals {
     )
   }
 
-  # Path mode cuts over every public Paragon HTTP microservice and HTTP
-  # worker, rather than a manually maintained allowlist of selected services.
-  # Managed Sync uses a different Helm chart and is managed independently.
+  # Path mode cuts over every public HTTP service, including Managed Sync.
   path_routed_public_prefixes = {
     for microservice, config in local.public_microservices_base :
     microservice => var.path_routing_base_path != "" ?
     "${var.path_routing_base_path}/${microservice}" :
     "/${trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}"
     if(
-      !contains(keys(local.managed_sync_microservices), microservice) &&
-      (
-        var.path_routing_base_path != "" ||
-        trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
-      )
+      var.path_routing_base_path != "" ||
+      trim(replace(config.public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != ""
     )
   }
 
@@ -1195,6 +1180,10 @@ locals {
   # for example AGENT_OS_PUBLIC_URL = "https://foobar-agentos.something.com".
   agent_os_public_url = try(local.helm_vars.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
   agent_os_port       = try(tonumber(local.helm_vars.global.env["AGENT_OS_PORT"]), 3000)
+  agent_os_path_prefix = var.path_routing_base_path != "" ? "${var.path_routing_base_path}/agentos" : (
+    trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/") != "" ?
+    "/${trim(replace(local.agent_os_public_url, "/^https?:\\/\\/[^\\/]+/", ""), "/")}" : ""
+  )
 
   agent_os_public_dns = var.agent_os_enabled ? {
     agentos = {
@@ -1476,10 +1465,13 @@ locals {
               "worker-auditlogs" = "WORKER_AUDIT_LOGS_PUBLIC_URL"
               "worker-eventlogs" = "WORKER_EVENT_LOGS_PUBLIC_URL"
             }, service, "${upper(replace(service, "-", "_"))}_PUBLIC_URL") => config.public_url
-            if contains(keys(local.monorepo_microservices), service)
+            if contains(keys(local.monorepo_microservices), service) || contains(keys(local.managed_sync_microservices), service)
           },
           contains(keys(local.public_microservices), "zeus") ? {
             PUBLIC_UPLOAD_PROXY_BASE_URL = "${local.public_microservices.zeus.public_url}/public-upload-proxy"
+          } : {},
+          var.agent_os_enabled ? {
+            AGENT_OS_PUBLIC_URL = "https://${var.path_routing_public_host}${var.path_routing_base_path}/agentos"
           } : {}
         ) : {},
         { VERSION = local.effective_platform_version },
