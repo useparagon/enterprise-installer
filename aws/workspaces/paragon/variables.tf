@@ -1056,7 +1056,10 @@ locals {
       env = {
         for key, value in local.helm_vars.global.env :
         key => value
-        if !contains(["REDIS_HOST", "REDIS_PORT", "REDIS_URL", "REDIS_CLUSTER", "REDIS_SSL"], key) &&
+        if !contains([
+          "REDIS_HOST", "REDIS_PORT", "REDIS_URL", "REDIS_CLUSTER", "REDIS_SSL",
+          "MONITOR_QUEUE_REDIS_TARGET",
+        ], key) &&
         !can(regex("^(CACHE|QUEUE|SYSTEM|WORKFLOW|MANAGED_SYNC)_REDIS_(URL|TLS_ENABLED|CLUSTER_ENABLED)$", key))
       }
     })
@@ -1287,7 +1290,7 @@ locals {
           MONITOR_POSTGRES_EXPORTER_SSL_MODE       = "require"
           MONITOR_PROMETHEUS_HOST                  = "http://prometheus"
           MONITOR_PROMETHEUS_PORT                  = try(local.monitors["prometheus"].port, null)
-          MONITOR_QUEUE_REDIS_TARGET               = try(local.infra_vars.redis.value.queue.host, local.infra_vars.redis.value.cache.host)
+          MONITOR_QUEUE_REDIS_TARGET               = try(local.active_redis_connections.queue.host, local.active_redis_connections.cache.host)
           MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_HOST = "http://monitor-queue-exporter"
           MONITOR_MANAGED_SYNC_QUEUE_EXPORTER_PORT = try(local.monitors["monitor-queue-exporter"].port, null)
           MONITOR_REDIS_EXPORTER_HOST              = "http://redis-exporter"
