@@ -102,7 +102,12 @@ locals {
         name           = "paragon-secrets"
         creationPolicy = "Owner"
       }
-      dataFrom = [{ extract = { key = var.env_secret_name } }]
+      # Later entries win duplicate keys. Infra stays first; Paragon overrides
+      # chart secrets and the selected cutover endpoints.
+      dataFrom = [
+        { extract = { key = var.env_secret_name } },
+        { extract = { key = var.env_paragon_secret_name } },
+      ]
     }
   })
 

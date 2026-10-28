@@ -1,9 +1,11 @@
 # Infra workspace owns base Secrets Manager secrets (PARA-21726). This workspace
-# reads them and writes overlay versions for chart-specific keys only.
+# reads them. Chart secret keys are published to a separate env-paragon secret
+# and merged in Kubernetes by External Secrets.
 
 locals {
   runtime_secret_names = {
     env          = "paragon/${local.workspace}/env"
+    env_paragon  = "paragon/${local.workspace}/env-paragon"
     docker_cfg   = "paragon/${local.workspace}/docker-cfg"
     managed_sync = "paragon/${local.workspace}/managed-sync"
     openobserve  = "paragon/${local.workspace}/openobserve"
@@ -35,20 +37,39 @@ data "aws_secretsmanager_secret_version" "env" {
   secret_id = data.aws_secretsmanager_secret.env.id
 }
 
-resource "aws_secretsmanager_secret_version" "env_paragon_overlay" {
-  secret_id = data.aws_secretsmanager_secret.env.id
-  # Start from the current env secret (infra base + prior overlays), then apply
-  # helm-mounted customer secrets last so LICENSE and other chart secretKeys from
-  # paragon-values.yaml can replace stale values (e.g. prepare.sh placeholder).
+locals {
+  runtime_env_document = jsondecode(data.aws_secretsmanager_secret_version.env.secret_string)
+  runtime_chart_only_secret_keys = toset([
+    for key in local.chart_secret_keys : key if !contains(local.chart_env_keys, key)
+  ])
+  # Main-era stacks kept chart secretKeys in the shared env document. Seed them on
+  # the first env-paragon write so keys that exist only in Secrets Manager survive.
+  runtime_env_paragon_seeded_from_env = {
+    for key in local.runtime_chart_only_secret_keys :
+    key => tostring(local.runtime_env_document[key])
+    if contains(keys(local.runtime_env_document), key) &&
+    trimspace(tostring(local.runtime_env_document[key])) != ""
+  }
+}
+
+# Infra owns paragon/<workspace>/env and replaces that document on every apply.
+# Paragon-owned keys live here so that replacement cannot drop them. External
+# Secrets reads env first and this secret second; duplicate keys use this value.
+resource "aws_secretsmanager_secret" "env_paragon" {
+  name                    = local.runtime_secret_names.env_paragon
+  description             = "Paragon chart secret keys for ${local.workspace}. Merged over the infra env secret by External Secrets."
+  recovery_window_in_days = 30
+}
+
+resource "aws_secretsmanager_secret_version" "env_paragon" {
+  secret_id = aws_secretsmanager_secret.env_paragon.id
+  # Do not copy the infra env document into this secret. helm_secret_values is
+  # the chart secretKey set (LICENSE, OAuth, SMTP, service tokens, and any
+  # secret endpoint the chart classifies). REDIS_URL is forced on cutover
+  # because it is not always present in service-inputs secretKeys.
   secret_string = jsonencode(merge(
-    # Keep the original Redis delivery contract for both backends. Terraform
-    # selects the physical endpoint before building helm_secret_values; the
-    # existing paragon-secrets consumer receives the selected values.
-    jsondecode(data.aws_secretsmanager_secret_version.env.secret_string),
+    local.runtime_env_paragon_seeded_from_env,
     local.helm_secret_values,
-    # REDIS_URL is a legacy shared application contract and may not appear in
-    # chart service-inputs secretKeys. Force the selected physical endpoint on
-    # cutover so the infra-owned Source value cannot survive the overlay.
     local.valkey_cutover ? { REDIS_URL = local.default_redis_url } : {}
   ))
 
@@ -157,37 +178,43 @@ resource "aws_secretsmanager_secret_version" "managed_sync_paragon_overlay" {
 
 # Agent OS reuses the effective Enterprise service-plane credentials.
 # In the Paragon and Managed Sync monorepos, these tokens fall back to LICENSE
-# when not explicitly provided. Reuse the deployed infra env secret if LICENSE
-# is provisioned there rather than repeated in .secure/values.yaml.
+# when not explicitly provided. Prefer chart values; the infra env secret remains
+# a fallback when LICENSE is set only in app_secrets.
 locals {
   agent_os_paragon_env_secret  = var.agent_os_enabled ? jsondecode(data.aws_secretsmanager_secret_version.env.secret_string) : {}
   agent_os_managed_sync_config = var.agent_os_enabled ? module.managed_sync_config[0].config : {}
 
+  # Chart values and the Paragon secret are the source for LICENSE. The infra
+  # env document is only a fallback for stacks that set it in app_secrets.
   agent_os_license = try(coalesce(
-    try(local.agent_os_paragon_env_secret.LICENSE, null),
-    try(local.agent_os_managed_sync_config.LICENSE, null),
+    try(local.helm_secret_values["LICENSE"], null),
     try(local.helm_vars.global.env["LICENSE"], null),
+    try(local.agent_os_managed_sync_config.LICENSE, null),
+    try(local.agent_os_paragon_env_secret.LICENSE, null),
   ), null)
 
   # Managed Sync's API_SYNC_ACCESS_TOKEN defaults to LICENSE on Enterprise.
   agent_os_managed_sync_token = try(coalesce(
+    try(local.helm_secret_values["API_SYNC_ACCESS_TOKEN"], null),
     try(local.agent_os_managed_sync_config.API_SYNC_ACCESS_TOKEN, null),
-    try(local.agent_os_paragon_env_secret.API_SYNC_ACCESS_TOKEN, null),
     try(local.helm_vars.global.env["API_SYNC_ACCESS_TOKEN"], null),
+    try(local.agent_os_paragon_env_secret.API_SYNC_ACCESS_TOKEN, null),
     local.agent_os_license,
   ), null)
 
   # Zeus and worker-actionkit independently accept explicit tokens and otherwise
   # use LICENSE in the Paragon monorepo. Never copy the monorepo's static dev fallback.
   agent_os_zeus_token = try(coalesce(
-    try(local.agent_os_paragon_env_secret.ZEUS_ACCESS_TOKEN, null),
+    try(local.helm_secret_values["ZEUS_ACCESS_TOKEN"], null),
     try(local.helm_vars.global.env["ZEUS_ACCESS_TOKEN"], null),
+    try(local.agent_os_paragon_env_secret.ZEUS_ACCESS_TOKEN, null),
     local.agent_os_license,
   ), null)
 
   agent_os_actionkit_token = try(coalesce(
-    try(local.agent_os_paragon_env_secret.WORKER_ACTIONKIT_ACCESS_TOKEN, null),
+    try(local.helm_secret_values["WORKER_ACTIONKIT_ACCESS_TOKEN"], null),
     try(local.helm_vars.global.env["WORKER_ACTIONKIT_ACCESS_TOKEN"], null),
+    try(local.agent_os_paragon_env_secret.WORKER_ACTIONKIT_ACCESS_TOKEN, null),
     local.agent_os_license,
   ), null)
 
@@ -261,6 +288,7 @@ data "aws_secretsmanager_secret_version" "openobserve" {
 
 locals {
   runtime_env_secret_name          = data.aws_secretsmanager_secret.env.name
+  runtime_env_paragon_secret_name  = aws_secretsmanager_secret.env_paragon.name
   runtime_docker_cfg_secret_name   = local.runtime_docker_cfg_sync_enabled ? data.aws_secretsmanager_secret.docker_cfg.name : null
   runtime_openobserve_secret_name  = data.aws_secretsmanager_secret.openobserve.name
   runtime_managed_sync_secret_name = var.managed_sync_enabled ? data.aws_secretsmanager_secret.managed_sync[0].name : null
@@ -272,7 +300,7 @@ locals {
 # Gate Helm/ESO until Secrets Manager values exist (not just secret metadata).
 resource "terraform_data" "runtime_secrets_populated" {
   input = {
-    env             = aws_secretsmanager_secret_version.env_paragon_overlay.version_id
+    env_paragon     = aws_secretsmanager_secret_version.env_paragon.version_id
     docker_cfg      = local.runtime_docker_cfg_sync_enabled ? local.runtime_docker_cfg_version_id : null
     openobserve     = data.aws_secretsmanager_secret_version.openobserve.version_id
     agent_os_app    = var.agent_os_enabled ? aws_secretsmanager_secret_version.agent_os_app_paragon_overlay[0].version_id : null
@@ -282,5 +310,16 @@ resource "terraform_data" "runtime_secrets_populated" {
     managed_sync = var.managed_sync_enabled ? (
       aws_secretsmanager_secret_version.managed_sync_paragon_overlay[0].version_id
     ) : null
+  }
+}
+
+# Existing stacks stored the Paragon overlay as a version of paragon/<workspace>/env.
+# Drop that resource from state without deleting the version. Deleting it would
+# move AWSCURRENT on the infra secret before External Secrets reads both sources.
+removed {
+  from = aws_secretsmanager_secret_version.env_paragon_overlay
+
+  lifecycle {
+    destroy = false
   }
 }

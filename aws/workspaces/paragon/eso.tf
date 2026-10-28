@@ -10,6 +10,7 @@ locals {
     var.valkey_enabled && var.redis_enabled ? data.aws_secretsmanager_secret.infra_redis_physical[0].arn : "",
     var.valkey_enabled ? data.aws_secretsmanager_secret.infra_valkey_physical[0].arn : "",
     data.aws_secretsmanager_secret.env.arn,
+    aws_secretsmanager_secret.env_paragon.arn,
     var.managed_sync_enabled ? data.aws_secretsmanager_secret.managed_sync[0].arn : "",
     data.aws_secretsmanager_secret.openobserve.arn,
   ])

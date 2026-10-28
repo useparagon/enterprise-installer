@@ -345,7 +345,12 @@ variable "install_external_secrets" {
 }
 
 variable "env_secret_name" {
-  description = "Secrets Manager secret name for Paragon env config synced by ESO."
+  description = "Secrets Manager secret name for Infra env config synced by ESO."
+  type        = string
+}
+
+variable "env_paragon_secret_name" {
+  description = "Secrets Manager secret name for Paragon-owned keys. External Secrets merges this over env_secret_name."
   type        = string
 }
 

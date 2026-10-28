@@ -56,6 +56,7 @@ module "helm" {
   create_docker_pull_secret     = var.create_docker_pull_secret
   docker_username               = var.docker_username
   env_secret_name               = local.runtime_env_secret_name
+  env_paragon_secret_name       = local.runtime_env_paragon_secret_name
   valkey_enabled                = var.valkey_enabled
   redis_enabled                 = var.redis_enabled
   eso_role_arn                  = local.eso_role_arn
