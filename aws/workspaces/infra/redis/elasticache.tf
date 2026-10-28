@@ -332,7 +332,8 @@ resource "aws_elasticache_replication_group" "valkey" {
   subnet_group_name          = aws_elasticache_subnet_group.valkey[each.key].name
   security_group_ids         = [aws_security_group.valkey[0].id]
   multi_az_enabled           = each.value.multi_az
-  automatic_failover_enabled = each.value.multi_az
+  # Cluster mode requires automatic failover even when multi_az is false.
+  automatic_failover_enabled = each.value.cluster_enabled ? true : each.value.multi_az
 
   num_node_groups         = each.value.cluster_enabled ? coalesce(each.value.num_node_groups, 1) : null
   replicas_per_node_group = each.value.cluster_enabled ? coalesce(each.value.replicas_per_node_group, each.value.multi_az ? 1 : 0) : null
