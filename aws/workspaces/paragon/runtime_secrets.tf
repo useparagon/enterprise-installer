@@ -45,10 +45,10 @@ locals {
   # Main-era stacks kept chart secretKeys in the shared env document. Seed them on
   # the first env-paragon write so keys that exist only in Secrets Manager survive.
   runtime_env_paragon_seeded_from_env = {
-    for key in local.runtime_chart_only_secret_keys :
-    key => tostring(local.runtime_env_document[key])
-    if contains(keys(local.runtime_env_document), key) &&
-    trimspace(tostring(local.runtime_env_document[key])) != ""
+    for key, value in local.runtime_env_document :
+    key => tostring(value)
+    if contains(local.runtime_chart_only_secret_keys, key) &&
+    value != null && trimspace(tostring(value)) != ""
   }
 }
 
