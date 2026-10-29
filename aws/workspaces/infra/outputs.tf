@@ -23,7 +23,7 @@ output "monitoring" {
 }
 
 output "redis" {
-  description = "Physical Redis 6 connections only; never switched to Valkey."
+  description = "Redis 6 connections only; never switched to Valkey."
   value       = local.redis_connections
   sensitive   = true
 }
@@ -116,7 +116,7 @@ output "secrets_manager_secret_arns" {
 }
 
 output "valkey" {
-  description = "Physical Valkey connections by instance name; sensitive when AUTH is configured."
+  description = "Valkey connections by instance name; sensitive when AUTH is configured."
   value       = module.redis.valkey
   sensitive   = true
 }

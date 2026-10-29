@@ -110,23 +110,23 @@ resource "aws_secretsmanager_secret_version" "env_paragon" {
         for role in local.active_redis_required_roles :
         try(local.active_redis_connections[role].host != "" && local.active_redis_connections[role].port > 0, false)
       ])
-      error_message = "Valkey cutover requires a valid physical Valkey endpoint for every active role, including shared Managed Sync."
+      error_message = "Valkey cutover requires a valid Valkey endpoint for every active role, including shared Managed Sync."
     }
 
     precondition {
-      # Migration pairs are physical instances, not logical application roles.
+      # Migration pairs are connections, not logical application roles.
       # Workflow aliases Cache and Agent OS has its own independent Valkey.
       condition = !var.valkey_migration || !var.redis_enabled || (
         length(setsubtract(
-          toset([for role in keys(local.physical_redis_connections) : role if contains(["cache", "queue", "system", "managed_sync"], role)]),
-          toset(keys(local.physical_valkey_connections))
+          toset([for role in keys(local.redis_connections) : role if contains(["cache", "queue", "system", "managed_sync"], role)]),
+          toset(keys(local.valkey_connections))
         )) == 0 &&
         length(setsubtract(
-          toset(keys(local.physical_valkey_connections)),
-          toset([for role in keys(local.physical_redis_connections) : role if contains(["cache", "queue", "system", "managed_sync"], role)])
+          toset(keys(local.valkey_connections)),
+          toset([for role in keys(local.redis_connections) : role if contains(["cache", "queue", "system", "managed_sync"], role)])
         )) == 0
       )
-      error_message = "Physical Redis and Valkey migration pairs must match one-to-one before cutover."
+      error_message = "Redis and Valkey migration pairs must match one-to-one before cutover."
     }
 
     precondition {

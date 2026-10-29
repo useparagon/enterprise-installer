@@ -111,9 +111,9 @@ locals {
     }
   })
 
-  # Physical connections are independent of the active service endpoint. Keep
+  # Connections are independent of the active service endpoint. Keep
   # both Secrets available for forward and reverse migration while Valkey exists.
-  external_secret_redis_physical_yaml = var.valkey_enabled && var.redis_enabled ? yamlencode({
+  external_secret_redis_connections_yaml = var.valkey_enabled && var.redis_enabled ? yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ExternalSecret"
     metadata   = { name = "valkey-migration-redis", namespace = local.paragon_namespace }
@@ -128,7 +128,7 @@ locals {
     }
   }) : null
 
-  external_secret_valkey_physical_yaml = var.valkey_enabled ? yamlencode({
+  external_secret_valkey_connections_yaml = var.valkey_enabled ? yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ExternalSecret"
     metadata   = { name = "valkey-migration-valkey", namespace = local.paragon_namespace }
@@ -366,14 +366,14 @@ resource "kubectl_manifest" "external_secret_agent_os_admin" {
 }
 
 
-resource "kubectl_manifest" "external_secret_redis_physical" {
+resource "kubectl_manifest" "external_secret_redis_connections" {
   count      = var.install_external_secrets && var.valkey_enabled && var.redis_enabled ? 1 : 0
-  yaml_body  = local.external_secret_redis_physical_yaml
+  yaml_body  = local.external_secret_redis_connections_yaml
   depends_on = [kubectl_manifest.secret_store[0], kubernetes_namespace.paragon]
 }
 
-resource "kubectl_manifest" "external_secret_valkey_physical" {
+resource "kubectl_manifest" "external_secret_valkey_connections" {
   count      = var.install_external_secrets && var.valkey_enabled ? 1 : 0
-  yaml_body  = local.external_secret_valkey_physical_yaml
+  yaml_body  = local.external_secret_valkey_connections_yaml
   depends_on = [kubectl_manifest.secret_store[0], kubernetes_namespace.paragon]
 }

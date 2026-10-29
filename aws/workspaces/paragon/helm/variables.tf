@@ -1,11 +1,11 @@
 variable "valkey_enabled" {
-  description = "Synchronize independent physical Redis and Valkey endpoint Secrets to Kubernetes."
+  description = "Synchronize independent Redis and Valkey connection Secrets to Kubernetes."
   type        = bool
   default     = false
 }
 
 variable "redis_enabled" {
-  description = "Mirrors infra's redis_enabled. False stops syncing the physical Redis Secret: Redis has been permanently decommissioned."
+  description = "Mirrors infra's redis_enabled. False stops syncing the Redis connection Secret: Redis has been permanently decommissioned."
   type        = bool
   default     = true
 }

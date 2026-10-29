@@ -20,7 +20,7 @@ agent_os_version     = "0.3.0-beta.3" # Use the compatible published chart for t
 
 The infra workspace requires `managed_sync_enabled = true` before
 `agent_os_enabled` can be true. Agent OS brings its own Valkey and does not
-use `valkey_enabled`. Set `platform_valkey_enabled = true` in infra to add
+use `valkey_enabled`. Set `paragon_valkey_on_agent_os = true` in infra to add
 the Paragon Valkey catalog on that same stack. In the paragon workspace,
 Managed Sync must also be enabled before Agent OS.
 

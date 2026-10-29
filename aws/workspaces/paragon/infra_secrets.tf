@@ -20,12 +20,12 @@ data "aws_secretsmanager_secret_version" "infra_redis" {
   secret_id = local.infra_secret_names.redis
 }
 
-data "aws_secretsmanager_secret" "infra_redis_physical" {
+data "aws_secretsmanager_secret" "infra_redis_connections" {
   count = var.valkey_enabled && var.redis_enabled ? 1 : 0
   name  = local.infra_secret_names.redis
 }
 
-data "aws_secretsmanager_secret" "infra_valkey_physical" {
+data "aws_secretsmanager_secret" "infra_valkey_connections" {
   count = var.valkey_enabled ? 1 : 0
   name  = local.infra_secret_names.valkey
 }
@@ -73,8 +73,8 @@ locals {
     data.aws_secretsmanager_secret_version.infra_agent_os[0].secret_string
   )) : null
 
-  physical_redis_connections  = !var.redis_enabled ? {} : (local.use_legacy_infra_json ? try(local.legacy_infra_vars.redis.value, {}) : jsondecode(data.aws_secretsmanager_secret_version.infra_redis[0].secret_string))
-  physical_valkey_connections = var.valkey_enabled ? jsondecode(data.aws_secretsmanager_secret_version.infra_valkey[0].secret_string) : {}
+  redis_connections  = !var.redis_enabled ? {} : (local.use_legacy_infra_json ? try(local.legacy_infra_vars.redis.value, {}) : jsondecode(data.aws_secretsmanager_secret_version.infra_redis[0].secret_string))
+  valkey_connections = var.valkey_enabled ? jsondecode(data.aws_secretsmanager_secret_version.infra_valkey[0].secret_string) : {}
 
   # Once Redis is permanently decommissioned (redis_enabled=false), there is no
   # backend left to fall back to: always resolve to Valkey regardless of
@@ -82,13 +82,13 @@ locals {
   active_redis_connections = local.valkey_cutover ? {
     for role in concat(["cache", "queue", "system", "workflow"], var.managed_sync_enabled ? ["managed_sync"] : []) :
     role => try(
-      local.physical_valkey_connections[role],
+      local.valkey_connections[role],
       (contains(["cache", "queue", "system", "workflow"], role) ||
-      (role == "managed_sync" && length(keys(local.physical_valkey_connections)) == 1)) ? try(local.physical_valkey_connections.cache, null) : null,
+      (role == "managed_sync" && length(keys(local.valkey_connections)) == 1)) ? try(local.valkey_connections.cache, null) : null,
     )
     } : {
     for role in concat(["cache", "queue", "system", "workflow"], var.managed_sync_enabled ? ["managed_sync"] : []) :
-    role => try(local.physical_redis_connections[role], local.physical_redis_connections.cache, null)
+    role => try(local.redis_connections[role], local.redis_connections.cache, null)
   }
 
   active_redis_required_roles = concat(["cache", "queue", "system", "workflow"], var.managed_sync_enabled ? ["managed_sync"] : [])

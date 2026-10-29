@@ -1,11 +1,11 @@
 variable "valkey_enabled" {
-  description = "Enable the two permanent physical Redis/Valkey migration Secrets in ESO. Set true after enabling Valkey in infra, independently of valkey_migration."
+  description = "Enable the two permanent Redis and Valkey connection Secrets in ESO. Set true after enabling Valkey in infra, independently of valkey_migration."
   type        = bool
   default     = false
 }
 
 variable "valkey_migration" {
-  description = "Application cutover only: false uses Redis, true uses Valkey. Both physical connection secrets remain unchanged."
+  description = "Application cutover only: false uses Redis, true uses Valkey. Both connection secrets remain unchanged."
   type        = bool
   default     = false
 
@@ -440,7 +440,7 @@ variable "helm_yaml" {
 }
 
 variable "redis_enabled" {
-  description = "Mirrors infra's redis_enabled. False means Redis 6 has been permanently decommissioned: the application always uses Valkey regardless of valkey_migration, and the Redis-side migration plumbing (physical secret sync, ESO grant) stops being created."
+  description = "Mirrors infra's redis_enabled. False means Redis 6 has been permanently decommissioned: the application always uses Valkey regardless of valkey_migration, and the Redis-side migration plumbing (connection secret sync, ESO grant) stops being created."
   type        = bool
   default     = true
 }
@@ -1047,8 +1047,8 @@ locals {
     "CLOUD_STORAGE_MICROSERVICE_PASS",
   ]
 
-  # Existing Redis and Managed Sync Helm consumers use the selected physical
-  # backend. Ignore only pinned Redis endpoints during a Valkey cutover; all
+  # Existing Redis and Managed Sync Helm consumers use the selected
+  # connection. Ignore only pinned Redis endpoints during a Valkey cutover; all
   # other customer Helm overrides continue working unchanged.
   valkey_cutover = var.valkey_enabled && (var.valkey_migration || !var.redis_enabled)
   selected_helm_vars = local.valkey_cutover ? merge(local.helm_vars, {
