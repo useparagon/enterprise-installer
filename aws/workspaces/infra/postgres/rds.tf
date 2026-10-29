@@ -7,7 +7,7 @@ locals {
   }
   postgres_gp3_custom = {
     for key, cfg in var.postgres_instances :
-    key => cfg.iops != null && cfg.storage_throughput != null
+    key => local.postgres_gp3_striped[key] && cfg.iops != null && cfg.storage_throughput != null
   }
   postgres_gp3_iops_effective = {
     for key, cfg in var.postgres_instances :

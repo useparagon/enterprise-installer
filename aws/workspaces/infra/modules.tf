@@ -146,6 +146,9 @@ locals {
   postgres_instances = {
     for name, cfg in local.postgres_instances_merged : name => merge(cfg, {
       availability_zone = cfg.multi_az ? null : coalesce(cfg.availability_zone, module.network.availability_zones.names[0])
+      # Below 400 GiB gp3 omits iops/throughput on the AWS API; do not keep workspace defaults in the catalog.
+      iops               = cfg.storage_type == "gp3" && cfg.allocated_storage >= 400 ? cfg.iops : null
+      storage_throughput = cfg.storage_type == "gp3" && cfg.allocated_storage >= 400 ? cfg.storage_throughput : null
     })
   }
 }
@@ -166,13 +169,10 @@ check "postgres_instances_config" {
       for _, cfg in local.postgres_instances :
       contains(["gp2", "gp3"], cfg.storage_type) &&
       (cfg.iops == null || cfg.storage_throughput == null) ? true : (
-        cfg.storage_type == "gp3" &&
-        cfg.allocated_storage >= 400 &&
-        cfg.iops >= 12000 &&
-        cfg.storage_throughput >= 500
+        cfg.iops >= 12000 && cfg.storage_throughput >= 500
       )
     ])
-    error_message = "Custom PostgreSQL gp3 performance requires >=400 GiB, >=12000 IOPS and >=500 MiB/s throughput."
+    error_message = "Custom PostgreSQL gp3 IOPS and throughput must be set together and require >=12000 IOPS and >=500 MiB/s (only applied at >=400 GiB allocated storage)."
   }
 
   assert {
