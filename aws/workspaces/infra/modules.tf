@@ -68,8 +68,6 @@ locals {
     backup_retention_days               = 7
     backup_window                       = "06:00-07:00"
     maintenance_window                  = "Tue:04:00-Tue:05:00"
-    log_statement                       = "ddl"
-    log_min_duration_statement          = 1000
     enabled_cloudwatch_logs_exports     = ["postgresql", "upgrade"]
     monitoring_interval                 = 15
     performance_insights_enabled        = true
@@ -123,7 +121,6 @@ locals {
       identifier            = "${local.workspace}-agent-os"
       database_name         = "postgres"
       instance_class        = "db.t4g.medium"
-      engine_version        = "16"
       allocated_storage     = 100
       max_allocated_storage = 1000
       kms_key_arn           = try(aws_kms_key.agent_os[0].arn, null)

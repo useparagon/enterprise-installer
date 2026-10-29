@@ -4,7 +4,7 @@ output "agent_os" {
     port           = aws_db_instance.postgres["agent_os"].port
     admin_database = aws_db_instance.postgres["agent_os"].db_name
     admin_user     = aws_db_instance.postgres["agent_os"].username
-    admin_password = random_password.postgres_root_password["agent_os"].result
+    admin_password = var.rds_restore_from_snapshot ? null : try(var.migrated_passwords["agent_os"], random_password.postgres_root_password["agent_os"].result)
     databases = {
       for name in local.agent_os_databases :
       name => {

@@ -54,8 +54,6 @@ variable "postgres_instances" {
     backup_retention_days               = number
     backup_window                       = string
     maintenance_window                  = string
-    log_statement                       = string
-    log_min_duration_statement          = number
     enabled_cloudwatch_logs_exports     = list(string)
     monitoring_interval                 = number
     performance_insights_enabled        = bool

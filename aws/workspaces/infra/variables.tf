@@ -485,6 +485,7 @@ variable "postgres_instances" {
   description = <<-EOT
     Per-instance PostgreSQL overrides keyed by logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon, agent_os).
     Omitted keys and null optional fields retain built-in defaults derived from workspace-level rds_* settings and rds_multiple_instances / feature flags.
+    Engine version and logging parameters are workspace-wide only (single shared DB parameter group); use rds_postgres_version for engine version.
   EOT
   type = map(object({
     identifier                          = optional(string)
@@ -493,7 +494,6 @@ variable "postgres_instances" {
     instance_class                      = optional(string)
     allocated_storage                   = optional(number)
     max_allocated_storage               = optional(number)
-    engine_version                      = optional(string)
     multi_az                            = optional(bool)
     availability_zone                   = optional(string)
     read_replica                        = optional(bool)
@@ -504,8 +504,6 @@ variable "postgres_instances" {
     backup_retention_days               = optional(number)
     backup_window                       = optional(string)
     maintenance_window                  = optional(string)
-    log_statement                       = optional(string)
-    log_min_duration_statement          = optional(number)
     enabled_cloudwatch_logs_exports     = optional(list(string))
     monitoring_interval                 = optional(number)
     performance_insights_enabled        = optional(bool)
