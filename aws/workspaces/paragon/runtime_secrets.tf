@@ -37,18 +37,44 @@ data "aws_secretsmanager_secret_version" "env" {
   secret_id = data.aws_secretsmanager_secret.env.id
 }
 
+# ListSecrets `name` is a prefix match. Keep only the exact env-paragon name.
+data "aws_secretsmanager_secrets" "env_paragon" {
+  filter {
+    name   = "name"
+    values = [local.runtime_secret_names.env_paragon]
+  }
+}
+
+data "aws_secretsmanager_secret_version" "env_paragon_current" {
+  count     = contains(data.aws_secretsmanager_secrets.env_paragon.names, local.runtime_secret_names.env_paragon) ? 1 : 0
+  secret_id = local.runtime_secret_names.env_paragon
+}
+
 locals {
   runtime_env_document = jsondecode(data.aws_secretsmanager_secret_version.env.secret_string)
   runtime_chart_only_secret_keys = toset([
     for key in local.chart_secret_keys : key if !contains(local.chart_env_keys, key)
   ])
-  # Main-era stacks kept chart secretKeys in the shared env document. Seed them on
-  # the first env-paragon write so keys that exist only in Secrets Manager survive.
+  runtime_env_paragon_current = length(data.aws_secretsmanager_secret_version.env_paragon_current) > 0 ? jsondecode(data.aws_secretsmanager_secret_version.env_paragon_current[0].secret_string) : {}
+  # Same merge as the old env overlay: start from the document already published,
+  # then let chart values replace stale keys. Read env-paragon, not infra env.
+  # REDIS_URL is omitted here and forced only during cutover so a rollback does
+  # not keep the Valkey endpoint in the secret that External Secrets prefers.
+  runtime_env_paragon_retained = {
+    for key, value in local.runtime_env_paragon_current :
+    key => tostring(value)
+    if key != "REDIS_URL" &&
+    contains(local.runtime_chart_only_secret_keys, key) &&
+    value != null && can(tostring(value)) && trimspace(tostring(value)) != ""
+  }
+  # Main-era stacks kept chart secretKeys in the shared env document. Copy those
+  # once they are still present. Later applies keep them via env-paragon itself.
   runtime_env_paragon_seeded_from_env = {
     for key, value in local.runtime_env_document :
     key => tostring(value)
-    if contains(local.runtime_chart_only_secret_keys, key) &&
-    value != null && trimspace(tostring(value)) != ""
+    if key != "REDIS_URL" &&
+    contains(local.runtime_chart_only_secret_keys, key) &&
+    value != null && can(tostring(value)) && trimspace(tostring(value)) != ""
   }
 }
 
@@ -68,12 +94,17 @@ resource "aws_secretsmanager_secret_version" "env_paragon" {
   # secret endpoint the chart classifies). REDIS_URL is forced on cutover
   # because it is not always present in service-inputs secretKeys.
   secret_string = jsonencode(merge(
+    local.runtime_env_paragon_retained,
     local.runtime_env_paragon_seeded_from_env,
-    local.helm_secret_values,
+    {
+      for key, value in local.helm_secret_values : key => value if key != "REDIS_URL"
+    },
     local.valkey_cutover ? { REDIS_URL = local.default_redis_url } : {}
   ))
 
   lifecycle {
+    create_before_destroy = true
+
     precondition {
       condition = !var.valkey_migration || alltrue([
         for role in local.active_redis_required_roles :
