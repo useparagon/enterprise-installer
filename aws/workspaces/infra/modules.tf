@@ -191,18 +191,16 @@ check "postgres_instances_config" {
 module "postgres" {
   source = "./postgres"
 
-  workspace                   = local.workspace
-  rds_postgres_version        = var.rds_postgres_version
-  rds_restore_from_snapshot   = var.rds_restore_from_snapshot
-  rds_final_snapshot_enabled  = var.rds_final_snapshot_enabled
-  disable_deletion_protection = var.disable_deletion_protection
-  agent_os_enabled            = var.agent_os_enabled
-  postgres_instances          = local.postgres_instances
-  migrated_passwords          = var.migrated_passwords
+  workspace                  = local.workspace
+  agent_os_enabled           = var.agent_os_enabled
+  migrated_passwords         = var.migrated_passwords
+  postgres_instances         = local.postgres_instances
+  rds_final_snapshot_enabled = var.rds_final_snapshot_enabled
+  rds_postgres_version       = var.rds_postgres_version
+  rds_restore_from_snapshot  = var.rds_restore_from_snapshot
 
   vpc            = module.network.vpc
   private_subnet = module.network.private_subnet
-  availability_zones = module.network.availability_zones
 }
 
 module "redis" {
