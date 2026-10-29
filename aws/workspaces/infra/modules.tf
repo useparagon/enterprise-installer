@@ -44,51 +44,164 @@ module "cloudtrail" {
   force_destroy               = var.disable_deletion_protection
 }
 
-# Materialize the generic PostgreSQL catalog in the root; the child
-# module does not decide whether Agent OS is enabled or what defaults to use.
+# Per-instance PostgreSQL catalog: defaults merged in the root; the child postgres
+# module receives a fully resolved map and manages aws_db_instance.postgres only.
 locals {
-  rds_postgres_instances = {
-    for name, cfg in var.rds_postgres : name => merge(cfg, {
-      identifier = cfg.identifier != null ? cfg.identifier : (
-        name == "agent_os" ? "${local.workspace}-agent-os" : "${local.workspace}-${replace(name, "_", "-")}"
-      )
-      kms_key_arn = cfg.kms_key_arn != null ? cfg.kms_key_arn : (
-        name == "agent_os" ? try(aws_kms_key.agent_os[0].arn, null) : null
-      )
-      deletion_protection = cfg.deletion_protection != null ? cfg.deletion_protection : !var.disable_deletion_protection
-      ingress_cidr_blocks = cfg.ingress_cidr_blocks != null ? cfg.ingress_cidr_blocks : module.network.private_subnet[*].cidr_block
-      availability_zone = cfg.availability_zone != null ? cfg.availability_zone : (
-        cfg.multi_az ? null : module.network.availability_zones.names[0]
-      )
+  postgres_instance_overrides = var.postgres_instances != null ? {
+    for name, override in var.postgres_instances : name => {
+      for key, value in override : key => value if value != null
+    }
+  } : {}
+
+  postgres_shared_defaults = {
+    port                                = 5432
+    allocated_storage                   = var.rds_allocated_storage
+    max_allocated_storage               = var.rds_max_allocated_storage
+    engine_version                      = var.rds_postgres_version
+    multi_az                            = var.rds_multi_az
+    availability_zone                   = null
+    read_replica                        = false
+    replica_instance_class              = "db.t4g.small"
+    storage_type                        = "gp3"
+    iops                                = var.rds_gp3_iops
+    storage_throughput                  = var.rds_gp3_storage_throughput
+    backup_retention_days               = 7
+    backup_window                       = "06:00-07:00"
+    maintenance_window                  = "Tue:04:00-Tue:05:00"
+    log_statement                       = "ddl"
+    log_min_duration_statement          = 1000
+    enabled_cloudwatch_logs_exports     = ["postgresql", "upgrade"]
+    monitoring_interval                 = 15
+    performance_insights_enabled        = true
+    performance_insights_retention_days = 31
+    ca_cert_identifier                  = "rds-ca-rsa2048-g1"
+    auto_minor_version_upgrade          = true
+    allow_major_version_upgrade         = false
+    apply_immediately                   = true
+    deletion_protection                 = !var.disable_deletion_protection
+    kms_key_arn                         = null
+    tags                                = {}
+  }
+
+  postgres_logical_defaults = {
+    cerberus = {
+      identifier     = "${local.workspace}-cerberus"
+      database_name  = "cerberus"
+      instance_class = "db.t4g.micro"
+    }
+    eventlogs = {
+      identifier     = "${local.workspace}-eventlogs"
+      database_name  = "eventlogs"
+      instance_class = "db.t4g.small"
+    }
+    hermes = {
+      identifier     = "${local.workspace}-hermes"
+      database_name  = "hermes"
+      instance_class = var.rds_instance_class
+    }
+    triggerkit = {
+      identifier     = "${local.workspace}-triggerkit"
+      database_name  = "triggerkit"
+      instance_class = "db.t4g.micro"
+    }
+    zeus = {
+      identifier     = "${local.workspace}-zeus"
+      database_name  = "zeus"
+      instance_class = "db.t4g.small"
+    }
+    managed_sync = {
+      identifier     = "${local.workspace}-managed-sync"
+      database_name  = "managed_sync"
+      instance_class = var.rds_managed_sync_instance_class
+    }
+    paragon = {
+      identifier     = local.workspace
+      database_name  = "postgres"
+      instance_class = var.rds_instance_class
+    }
+    agent_os = {
+      identifier            = "${local.workspace}-agent-os"
+      database_name         = "postgres"
+      instance_class        = "db.t4g.medium"
+      engine_version        = "16"
+      allocated_storage     = 100
+      max_allocated_storage = 1000
+      kms_key_arn           = try(aws_kms_key.agent_os[0].arn, null)
+    }
+  }
+
+  postgres_active_names = concat(
+    var.rds_multiple_instances ? concat(
+      ["cerberus", "eventlogs", "hermes", "triggerkit", "zeus"],
+      var.managed_sync_enabled ? ["managed_sync"] : [],
+    ) : ["paragon"],
+    var.agent_os_enabled ? ["agent_os"] : [],
+  )
+
+  postgres_instances_merged = {
+    for name in local.postgres_active_names : name => merge(
+      local.postgres_shared_defaults,
+      local.postgres_logical_defaults[name],
+      lookup(local.postgres_instance_overrides, name, {}),
+    )
+  }
+
+  postgres_instances = {
+    for name, cfg in local.postgres_instances_merged : name => merge(cfg, {
+      availability_zone = cfg.multi_az ? null : coalesce(cfg.availability_zone, module.network.availability_zones.names[0])
     })
-    if cfg.enabled && (name != "agent_os" || var.agent_os_enabled)
+  }
+}
+
+check "postgres_instances_config" {
+  assert {
+    condition = alltrue([
+      for _, cfg in local.postgres_instances :
+      cfg.allocated_storage >= 20 &&
+      cfg.max_allocated_storage >= 100 &&
+      cfg.max_allocated_storage >= ceil(cfg.allocated_storage * 1.1)
+    ])
+    error_message = "PostgreSQL allocated_storage must be at least 20 GiB; max_allocated_storage must be at least 100 GiB and 10% greater than allocated_storage."
+  }
+
+  assert {
+    condition = alltrue([
+      for _, cfg in local.postgres_instances :
+      contains(["gp2", "gp3"], cfg.storage_type) &&
+      (cfg.iops == null || cfg.storage_throughput == null) ? true : (
+        cfg.storage_type == "gp3" &&
+        cfg.allocated_storage >= 400 &&
+        cfg.iops >= 12000 &&
+        cfg.storage_throughput >= 500
+      )
+    ])
+    error_message = "Custom PostgreSQL gp3 performance requires >=400 GiB, >=12000 IOPS and >=500 MiB/s throughput."
+  }
+
+  assert {
+    condition = alltrue([
+      for _, cfg in local.postgres_instances :
+      cfg.backup_retention_days >= 0 && cfg.backup_retention_days <= 35 &&
+      (!cfg.multi_az || cfg.availability_zone == null)
+    ])
+    error_message = "PostgreSQL backup_retention_days must be 0-35 and availability_zone may only be set when multi_az=false."
   }
 }
 
 module "postgres" {
   source = "./postgres"
 
-  workspace                       = local.workspace
-  rds_instance_class              = var.rds_instance_class
-  rds_managed_sync_instance_class = var.rds_managed_sync_instance_class
-  rds_gp3_iops                    = var.rds_gp3_iops
-  rds_gp3_storage_throughput      = var.rds_gp3_storage_throughput
-  rds_allocated_storage           = var.rds_allocated_storage
-  rds_max_allocated_storage       = var.rds_max_allocated_storage
-  rds_multi_az                    = var.rds_multi_az
-  rds_multiple_instances          = var.rds_multiple_instances
-  rds_postgres_version            = var.rds_postgres_version
-  rds_restore_from_snapshot       = var.rds_restore_from_snapshot
-  rds_final_snapshot_enabled      = var.rds_final_snapshot_enabled
-  disable_deletion_protection     = var.disable_deletion_protection
-  managed_sync_enabled            = var.managed_sync_enabled
-  agent_os_enabled                = var.agent_os_enabled
-  rds_postgres                    = local.rds_postgres_instances
-  migrated_passwords              = var.migrated_passwords
+  workspace                   = local.workspace
+  rds_postgres_version        = var.rds_postgres_version
+  rds_restore_from_snapshot   = var.rds_restore_from_snapshot
+  rds_final_snapshot_enabled  = var.rds_final_snapshot_enabled
+  disable_deletion_protection = var.disable_deletion_protection
+  agent_os_enabled            = var.agent_os_enabled
+  postgres_instances          = local.postgres_instances
+  migrated_passwords          = var.migrated_passwords
 
-  vpc                = module.network.vpc
-  public_subnet      = module.network.public_subnet
-  private_subnet     = module.network.private_subnet
+  vpc            = module.network.vpc
+  private_subnet = module.network.private_subnet
   availability_zones = module.network.availability_zones
 }
 
