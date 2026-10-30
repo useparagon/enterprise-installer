@@ -39,7 +39,6 @@ variable "postgres_instances" {
   type = map(object({
     identifier                          = string
     database_name                       = string
-    port                                = number
     instance_class                      = string
     allocated_storage                   = number
     max_allocated_storage               = number

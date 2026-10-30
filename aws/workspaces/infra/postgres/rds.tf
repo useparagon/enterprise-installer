@@ -160,7 +160,7 @@ resource "aws_db_instance" "postgres" {
 
   identifier = each.value.identifier
   db_name    = each.value.database_name
-  port       = tostring(each.value.port)
+  port       = "5432"
   username   = var.rds_restore_from_snapshot ? null : random_string.postgres_root_username[each.key].result
   password   = var.rds_restore_from_snapshot ? null : try(var.migrated_passwords[each.key], random_password.postgres_root_password[each.key].result)
 

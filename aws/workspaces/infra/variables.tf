@@ -486,11 +486,11 @@ variable "postgres_instances" {
     Per-instance PostgreSQL overrides keyed by logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed_sync, paragon, agent_os).
     Omitted keys and null optional fields retain built-in defaults derived from workspace-level rds_* settings and rds_multiple_instances / feature flags.
     Engine version and logging parameters are workspace-wide only (single shared DB parameter group); use rds_postgres_version for engine version.
+    Port is fixed at 5432 (shared Postgres security group).
   EOT
   type = map(object({
     identifier                          = optional(string)
     database_name                       = optional(string)
-    port                                = optional(number)
     instance_class                      = optional(string)
     allocated_storage                   = optional(number)
     max_allocated_storage               = optional(number)
@@ -524,10 +524,9 @@ variable "postgres_instances" {
       for key, cfg in var.postgres_instances :
       contains(["cerberus", "eventlogs", "hermes", "triggerkit", "zeus", "managed_sync", "paragon", "agent_os"], key) &&
       (cfg.identifier == null || can(regex("^[a-z][a-z0-9-]*[a-z0-9]$", cfg.identifier))) &&
-      (cfg.port == null || (cfg.port >= 1 && cfg.port <= 65535)) &&
       (cfg.multi_az == null || cfg.availability_zone == null || !cfg.multi_az)
     ])
-    error_message = "postgres_instances keys must be known logical names; identifiers must be valid RDS identifiers; port must be 1-65535; availability_zone requires multi_az=false."
+    error_message = "postgres_instances keys must be known logical names; identifiers must be valid RDS identifiers; availability_zone requires multi_az=false."
   }
 
   validation {

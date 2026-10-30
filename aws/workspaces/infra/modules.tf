@@ -54,7 +54,6 @@ locals {
   } : {}
 
   postgres_shared_defaults = {
-    port                                = 5432
     allocated_storage                   = var.rds_allocated_storage
     max_allocated_storage               = var.rds_max_allocated_storage
     engine_version                      = var.rds_postgres_version

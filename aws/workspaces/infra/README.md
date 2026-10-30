@@ -10,7 +10,8 @@ eventlogs, hermes, triggerkit, zeus, managed_sync, paragon, agent_os) without
 changing siblings. All instances use the existing `aws_db_instance.postgres`
 resources and shared subnet group, parameter group, and security group.
 Postgres engine version and logging parameters are controlled by `rds_postgres_version`
-and the shared parameter group only—not per-instance overrides.
+and the shared parameter group only—not per-instance overrides. All instances listen on port 5432
+(shared security group).
 
 ```hcl
 postgres_instances = {
