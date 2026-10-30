@@ -6,7 +6,19 @@ locals {
     local.has_blacklist ? [local.blacklist_rule] : [],
     local.has_global_rate_limit ? [local.global_rate_rule] : [],
     local.path_rate_rules,
+    local.regex_rules,
   )
+}
+
+# Validate names locally: Azure rejects punctuation in WAF custom rule names.
+check "custom_rule_names" {
+  assert {
+    condition = (
+      alltrue([for rule in local.custom_rules : can(regex("^[A-Za-z0-9]{1,128}$", rule.name))]) &&
+      length(local.custom_rules) == length(distinct([for rule in local.custom_rules : rule.name]))
+    )
+    error_message = "Azure WAF custom rule names must be unique and alphanumeric (1-128 characters)."
+  }
 }
 
 resource "azurerm_web_application_firewall_policy" "this" {
@@ -71,6 +83,7 @@ resource "azurerm_web_application_firewall_policy" "this" {
         content {
           operator           = match_conditions.value.operator
           match_values       = match_conditions.value.matchValues
+          transforms         = try(match_conditions.value.transforms, null)
           negation_condition = try(match_conditions.value.negationCondition, false)
 
           dynamic "match_variables" {

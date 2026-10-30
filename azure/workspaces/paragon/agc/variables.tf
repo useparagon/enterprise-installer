@@ -88,6 +88,13 @@ variable "waf_policy_id" {
   default     = null
 }
 
+variable "diagnostics_storage_name" {
+  description = "Standard Storage Account from infra for AGC access and firewall diagnostics."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
 variable "alb_controller_version" {
   description = "ALB controller Helm chart version (requires AKS >= 1.27)."
   type        = string

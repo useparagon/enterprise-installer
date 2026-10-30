@@ -241,6 +241,15 @@ nsg_malicious_ips = [
 ]
 ```
 
+## AGC diagnostic log storage
+
+AGC access and firewall logs require Standard Azure Storage. When the main account is
+Standard, AGC reuses it. When the main account is Premium, infra creates a separate
+Standard StorageV2 account for AGC diagnostics without replacing application storage.
+The existing Key Vault `storage` secret publishes the selected diagnostics account;
+apply `infra` before `paragon`. The default log retention is 30 days and applies
+only to AGC access and firewall log containers.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -249,7 +258,6 @@ nsg_malicious_ips = [
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.0 |
 | <a name="requirement_cloudflare"></a> [cloudflare](#requirement\_cloudflare) | ~> 4.42 |
-| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
 
 ## Providers
 
@@ -294,6 +302,7 @@ nsg_malicious_ips = [
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_agc_logs_retention_days"></a> [agc\_logs\_retention\_days](#input\_agc\_logs\_retention\_days) | Days to retain AGC access and WAF logs in Standard Blob Storage. Defaults to 30; null disables. Active only with AGC subnet. | `number` | `30` | no |
 | <a name="input_agc_subnet_enabled"></a> [agc\_subnet\_enabled](#input\_agc\_subnet\_enabled) | Create a dedicated /24 subnet delegated to Microsoft.ServiceNetworking/trafficControllers for Application Gateway for Containers (AGC). Required before enabling agc\_enabled in the paragon workspace. | `bool` | `false` | no |
 | <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive. | `bool` | `false` | no |
 | <a name="input_agent_os_eventhub_message_retention"></a> [agent\_os\_eventhub\_message\_retention](#input\_agent\_os\_eventhub\_message\_retention) | Retention in days for the Managed Sync instance-status Event Hubs that Agent OS also uses. | `number` | `7` | no |

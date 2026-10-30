@@ -33,11 +33,12 @@ output "auditlogs_bucket" {
 output "storage" {
   description = "Object storage connection info."
   value = {
-    public_bucket       = module.storage.blob.public_container
-    private_bucket      = module.storage.blob.private_container
-    managed_sync_bucket = module.storage.blob.managed_sync_container
-    root_user           = module.storage.blob.name
-    root_password       = module.storage.blob.access_key
+    public_bucket           = module.storage.blob.public_container
+    private_bucket          = module.storage.blob.private_container
+    managed_sync_bucket     = module.storage.blob.managed_sync_container
+    root_user               = module.storage.blob.name
+    root_password           = module.storage.blob.access_key
+    agc_diagnostics_account = module.storage.blob.agc_diagnostics_account
   }
   sensitive = true
 }
