@@ -130,7 +130,7 @@ CAs and applies it to workloads and migration Jobs (`NODE_EXTRA_CA_CERTS`,
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_agc_alb_controller_version"></a> [agc\_alb\_controller\_version](#input\_agc\_alb\_controller\_version) | Helm chart version of the Application Gateway for Containers ALB controller (OCI: mcr.microsoft.com/application-lb/charts/alb-controller). Requires AKS >= 1.27. | `string` | `"1.11.3"` | no |
-| <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services (nginx Ingress disabled; controller stays). | `bool` | `false` | no |
+| <a name="input_agc_direct_routing"></a> [agc\_direct\_routing](#input\_agc\_direct\_routing) | Route AGC directly to application Services and remove ingress-nginx and its public IP. Defaults to false for phased cutover. | `bool` | `false` | no |
 | <a name="input_agc_dns_cutover"></a> [agc\_dns\_cutover](#input\_agc\_dns\_cutover) | Point Terraform-managed DNS (Cloudflare or Azure DNS) at agc\_fqdn instead of the nginx load balancer. Set once AGC is validated; implied by agc\_direct\_routing. | `bool` | `false` | no |
 | <a name="input_agc_enabled"></a> [agc\_enabled](#input\_agc\_enabled) | Deploy AGC in front of nginx (DNS stays on nginx until cutover to agc\_fqdn). false = nginx only. | `bool` | `false` | no |
 | <a name="input_agent_os_admin_config"></a> [agent\_os\_admin\_config](#input\_agent\_os\_admin\_config) | Additional Agent OS admin secret values populated by the paragon workspace on top of the infra-owned base payload. | `map(string)` | `{}` | no |

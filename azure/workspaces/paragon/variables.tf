@@ -120,7 +120,7 @@ variable "agc_enabled" {
 }
 
 variable "agc_direct_routing" {
-  description = "false = AGC -> ingress-nginx (DNS stays on nginx until cutover); true = AGC -> Services (nginx Ingress disabled; controller stays)."
+  description = "Route AGC directly to application Services and remove ingress-nginx and its public IP. Defaults to false for phased cutover."
   type        = bool
   default     = false
 }
@@ -722,11 +722,9 @@ locals {
 
   # AGC is only a public front door; internal-scheme stays nginx-only.
   agc_active = var.agc_enabled && var.ingress_scheme != "internal"
-  # Direct: AGC -> Services; nginx Ingress objects disabled (controller stays).
   agc_direct = local.agc_active && var.agc_direct_routing
-  # nginx keeps its controller and public LB through every AGC mode so no cutover
-  # apply can tear down the old public path before AGC routes are programmed.
-  nginx_public = var.ingress_scheme != "internal"
+  # Keep public NGINX for cutover/rollback; release its IP in direct mode.
+  nginx_public = var.ingress_scheme != "internal" && !local.agc_direct
   # Managed DNS only follows AGC once the cutover flag is set, so a Terraform-owned
   # zone never reverts records while AGC is still being validated.
   dns_target_agc = local.agc_active && (var.agc_dns_cutover || local.agc_direct)
