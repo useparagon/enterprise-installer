@@ -26,11 +26,13 @@ module "alb" {
   microservices            = local.microservices
   public_services          = local.public_services
   vpc_id                   = data.aws_eks_cluster.cluster.vpc_config[0].vpc_id
-  worker_security_group_ids = coalescelist(
+  # Security group IDs are AWS resource identifiers, not credentials. The
+  # secrets-backed infra JSON wrapper marks them sensitive as a side effect.
+  worker_security_group_ids = nonsensitive(coalescelist(
     try(compact(local.infra_vars.worker_security_group_ids.value), []),
     try(compact(local.infra_vars.karpenter.value.security_group_ids), []),
     [data.aws_eks_cluster.cluster.vpc_config[0].cluster_security_group_id],
-  )
+  ))
   workspace = local.workspace
 }
 
@@ -54,6 +56,9 @@ module "helm" {
   create_docker_pull_secret     = var.create_docker_pull_secret
   docker_username               = var.docker_username
   env_secret_name               = local.runtime_env_secret_name
+  env_paragon_secret_name       = local.runtime_env_paragon_secret_name
+  valkey_enabled                = var.valkey_enabled
+  redis_enabled                 = var.redis_enabled
   eso_role_arn                  = local.eso_role_arn
   feature_flags_content         = local.feature_flags_content
   flipt_options                 = local.flipt_options
@@ -84,21 +89,23 @@ module "helm" {
   public_monitors               = local.public_monitors
   restrict_public_exposure      = local.restrict_public_exposure
   waf_web_acl_arn               = local.waf_active ? module.waf[0].web_acl_arn : ""
-  enable_legacy_mng_pools       = try(local.infra_vars.enable_legacy_mng_pools.value, true)
-  karpenter_enabled             = try(local.infra_vars.enable_karpenter.value, false)
+  enable_legacy_mng_pools       = local.legacy_mng_pools_enabled
+  karpenter_enabled             = local.infra_karpenter_enabled
   karpenter_aws = (
-    try(local.infra_vars.enable_karpenter.value, false) &&
-    try(local.infra_vars.karpenter.value, null) != null
+    local.infra_karpenter_enabled && local.infra_karpenter_configured
     ) ? {
-    node_role_name     = local.infra_vars.karpenter.value.node_role_name
-    security_group_ids = local.infra_vars.karpenter.value.security_group_ids
-    ebs_kms_key_arn    = local.infra_vars.karpenter.value.ebs_kms_key_arn
+    node_role_name     = nonsensitive(local.infra_vars.karpenter.value.node_role_name)
+    security_group_ids = nonsensitive(local.infra_vars.karpenter.value.security_group_ids)
+    ebs_kms_key_arn    = nonsensitive(local.infra_vars.karpenter.value.ebs_kms_key_arn)
   } : null
   karpenter_node_os_volume_size_gib = var.karpenter_node_os_volume_size_gib
   karpenter_node_volume_size_gib    = var.karpenter_node_volume_size_gib
   karpenter_node_pools              = local.karpenter_node_pools
   karpenter_defaults                = var.karpenter_defaults
   workspace                         = local.workspace
+
+  # Only redis-exporter needs the Redis-compatible active cache URI.
+  redis_exporter_addr = nonsensitive("${try(local.active_redis_connections.cache.ssl, false) ? "rediss" : "redis"}://${local.active_redis_connections.cache.host}:${local.active_redis_connections.cache.port}")
 
   runtime_secrets_ready = terraform_data.runtime_secrets_populated.id
   # Hash SM version IDs (not terraform_data.id, which is stable across input updates).
@@ -125,7 +132,7 @@ module "managed_sync_config" {
   count  = var.managed_sync_enabled ? 1 : 0
 
   aws_region       = var.aws_region
-  base_helm_values = local.helm_vars
+  base_helm_values = local.selected_helm_vars
   infra_values     = local.infra_vars
   domain           = var.domain
   microservices    = local.microservices

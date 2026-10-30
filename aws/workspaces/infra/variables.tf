@@ -146,19 +146,19 @@ variable "rds_max_allocated_storage" {
 
 # elasticache
 variable "elasticache_node_type" {
-  description = "The ElastiCache node type used for Redis."
+  description = "ElastiCache node type for legacy Redis OSS only. Valkey sizing lives in valkey_instances."
   type        = string
   default     = "cache.r6g.large"
 }
 
 variable "elasticache_multiple_instances" {
-  description = "Whether or not to create multiple ElastiCache instances. Used for higher volume installations."
+  description = "ElastiCache topology for Valkey (and legacy Redis while redis_enabled). When true, separate cache (cluster), queue, system, and managed_sync instances; when false, one shared cache instance. Agent OS remains independent."
   type        = bool
   default     = true
 }
 
 variable "elasticache_multi_az" {
-  description = "Whether or not to enable multi-AZ in each ElastiCache instance."
+  description = "Multi-AZ for legacy Redis OSS replication groups only. Valkey multi-AZ is set per role in valkey_instances."
   type        = bool
   default     = true
 }
@@ -460,24 +460,25 @@ variable "managed_sync_enabled" {
 }
 
 variable "valkey_enabled" {
-  description = "Whether to enable creation of Valkey instances from valkey_instances. Independent from legacy Redis so both can run in parallel during migrations."
+  description = "Create the Paragon Valkey catalog (cache, queue, system, managed_sync) alongside legacy Redis. An existing Agent OS stack already sets this for its own Valkey; it does not add the Paragon catalog there."
+  type        = bool
+  default     = false
+}
+
+variable "paragon_valkey_on_agent_os" {
+  description = "On an Agent OS stack, also create the Paragon Valkey catalog (cache, queue, system, managed sync). Leave false on existing Agent OS installs. Ignored when agent_os_enabled is false; valkey_enabled selects the catalog there. elasticache_multiple_instances still chooses one shared instance or one per instance."
   type        = bool
   default     = false
 }
 
 variable "agent_os_enabled" {
-  description = "Whether to enable Agent OS. Requires managed_sync_enabled and valkey_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive."
+  description = "Whether to enable Agent OS. Requires managed_sync_enabled. Its Valkey is created from that flag and does not use valkey_enabled. Turning this off after apply is destructive."
   type        = bool
   default     = false
 
   validation {
     condition     = !var.agent_os_enabled || var.managed_sync_enabled
     error_message = "Agent OS requires Managed Sync. Set managed_sync_enabled = true when agent_os_enabled is true."
-  }
-
-  validation {
-    condition     = !var.agent_os_enabled || var.valkey_enabled
-    error_message = "Agent OS requires Valkey. Set valkey_enabled = true when agent_os_enabled is true."
   }
 }
 
@@ -538,11 +539,26 @@ variable "postgres_instances" {
   }
 }
 
+variable "redis_enabled" {
+  description = "Keep legacy Redis 6 instances. Only set false after a verified Valkey cutover and soak."
+  type        = bool
+  default     = true
+
+  validation {
+    # Same condition as local.paragon_valkey_catalog. Variable validation cannot read locals.
+    condition     = var.redis_enabled || (var.agent_os_enabled ? var.paragon_valkey_on_agent_os : var.valkey_enabled)
+    error_message = "Keep Redis until the Paragon valkey_migration=true cutover and soak finish. The Paragon Valkey catalog must exist (valkey_enabled, or paragon_valkey_on_agent_os when Agent OS is on) before deleting Redis."
+  }
+}
+
 variable "valkey_instances" {
   description = <<-EOT
-    Per-instance overrides for the shared Valkey catalog. Only agent_os is supported today.
-    Future Redis migrations can add cache, queue, system, and managed_sync to the catalog without changing the Valkey implementation.
-    Creation requires valkey_enabled plus the product feature flag; today agent_os is created only when both valkey_enabled and agent_os_enabled are true.
+    Overrides for Valkey instances (cache, queue, system, managed_sync, agent_os).
+    Merged per key with the built-in catalog (cache.r6g.large cache/managed sync, t4g.medium queue, t4g.micro system). Empty uses defaults only.
+    The catalog filter creates the instances: elasticache_multiple_instances selects one shared cache or separate instances; valkey_enabled creates the Paragon catalog except on an Agent OS stack, where paragon_valkey_on_agent_os is the opt-in; managed_sync_enabled and agent_os_enabled gate those instances.
+    TLS defaults to false except agent_os (true); other instances may set tls_enabled when the app secret contract supports AUTH.
+    kms_key_arn overrides at-rest encryption for that replication group only. CloudWatch logs stay on the workspace Valkey key.
+    snapshot_name applies only at creation. Setting or changing it later replaces the replication group.
   EOT
   type = map(object({
     node_type               = optional(string)
@@ -550,24 +566,49 @@ variable "valkey_instances" {
     cluster_enabled         = optional(bool)
     engine_version          = optional(string)
     tls_enabled             = optional(bool)
+    num_node_groups         = optional(number)
+    replicas_per_node_group = optional(number)
     snapshot_retention_days = optional(number)
     log_retention_days      = optional(number)
+    kms_key_arn             = optional(string)
+    snapshot_name           = optional(string)
   }))
   default = {}
 
   validation {
-    condition     = length(setsubtract(toset(keys(var.valkey_instances)), toset(["agent_os"]))) == 0
-    error_message = "valkey_instances currently supports only the agent_os key. cache, queue, system, and managed_sync will be added with the Redis-to-Valkey migration."
+    condition     = length(setsubtract(toset(keys(var.valkey_instances)), toset(["cache", "queue", "system", "managed_sync", "agent_os"]))) == 0
+    error_message = "Valkey catalog supports only cache, queue, system, managed_sync and agent_os."
   }
 
   validation {
     condition = alltrue([
-      for _, cfg in var.valkey_instances :
-      cfg.snapshot_retention_days == null || (
-        cfg.snapshot_retention_days >= 0 && cfg.snapshot_retention_days <= 35
-      )
+      for name, cfg in var.valkey_instances :
+      (cfg.node_type == null ? true : startswith(cfg.node_type, "cache.")) &&
+      (cfg.engine_version == null ? true : can(regex("^[0-9]+\\.[0-9]+$", cfg.engine_version))) &&
+      (cfg.snapshot_retention_days == null ? true : (cfg.snapshot_retention_days >= 0 && cfg.snapshot_retention_days <= 35)) &&
+      (cfg.log_retention_days == null ? true : cfg.log_retention_days >= 1) &&
+      (cfg.num_node_groups == null ? true : (cfg.num_node_groups >= 1 && cfg.num_node_groups <= 500)) &&
+      (cfg.replicas_per_node_group == null ? true : (cfg.replicas_per_node_group >= 0 && cfg.replicas_per_node_group <= 5)) &&
+      (cfg.kms_key_arn == null ? true : can(regex("^arn:aws[a-zA-Z-]*:kms:[a-z0-9-]+:[0-9]{12}:(key|alias)/.+$", cfg.kms_key_arn))) &&
+      (cfg.snapshot_name == null ? true : trimspace(cfg.snapshot_name) != "")
     ])
-    error_message = "Valkey snapshot_retention_days must be between 0 and 35 when set."
+    error_message = "Invalid Valkey instance settings (node type, engine, backups, topology, CMK ARN or snapshot)."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, cfg in var.valkey_instances :
+      name == "agent_os" || cfg.tls_enabled != true
+    ])
+    error_message = "TLS is supported only on agent_os. cache, queue, system and managed_sync stay TLS-off until the Redis secret contract carries AUTH."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, cfg in var.valkey_instances :
+      cfg.cluster_enabled != false || cfg.num_node_groups == null
+    ])
+    error_message = "num_node_groups requires cluster_enabled=true."
   }
 }
 
@@ -772,43 +813,111 @@ locals {
     [local.caller_arn]
   )))
 
-  # Shared Valkey catalog. Only Agent OS is enabled today. Future Redis migrations
-  # add cache/queue/system/managed_sync entries here and keep the same module/resources.
+  # Resolve Valkey in the root (like RDS). Sizing matches legacy Redis defaults but does not
+  # read elasticache_node_type or elasticache_multi_az; topology still uses elasticache_multiple_instances.
   valkey_instance_defaults = {
-    node_type               = "cache.t4g.medium"
-    multi_az                = true
+    node_type               = "cache.r6g.large"
+    multi_az                = false
     cluster_enabled         = false
     engine_version          = "7.2"
     tls_enabled             = false
-    snapshot_retention_days = 7
+    num_node_groups         = null
+    replicas_per_node_group = null
+    snapshot_retention_days = 5
     log_retention_days      = 30
+    kms_key_arn             = null
+    snapshot_name           = null
   }
 
-  valkey_instance_overrides = {
-    for name, override in var.valkey_instances :
-    name => { for key, value in override : key => value if value != null }
+  valkey_builtin_role_defaults = {
+    cache        = { node_type = "cache.r6g.large" }
+    queue        = { node_type = "cache.t4g.medium", cluster_enabled = false, multi_az = false }
+    system       = { node_type = "cache.t4g.micro", cluster_enabled = false, multi_az = false }
+    managed_sync = { node_type = "cache.r6g.large" }
+    # Keep the Agent OS node type and Multi-AZ. Snapshots match the other Valkey roles.
+    agent_os = {
+      node_type               = "cache.t4g.medium"
+      multi_az                = true
+      cluster_enabled         = false
+      snapshot_retention_days = 5
+      tls_enabled             = true
+    }
   }
 
-  valkey_catalog = {
-    agent_os = merge(
+  valkey_topology_role_defaults = {
+    cache = {
+      cluster_enabled = var.elasticache_multiple_instances
+      multi_az        = var.elasticache_multiple_instances
+    }
+    managed_sync = {
+      cluster_enabled = var.elasticache_multiple_instances
+      multi_az        = var.elasticache_multiple_instances
+    }
+  }
+
+  # Existing Agent OS stacks already set valkey_enabled for their own instance.
+  # paragon_valkey_on_agent_os is what adds the Paragon catalog there.
+  paragon_valkey_catalog = var.agent_os_enabled ? var.paragon_valkey_on_agent_os : var.valkey_enabled
+
+  # One catalog. tfvars only overrides a key; the filter decides which instances exist.
+  valkey_instances_config = {
+    for name, _ in local.valkey_builtin_role_defaults :
+    name => merge(
       local.valkey_instance_defaults,
-      {
-        # Agent OS already consumes an authenticated rediss:// connection.
-        tls_enabled = true
-      },
-      lookup(local.valkey_instance_overrides, "agent_os", {}),
+      local.valkey_builtin_role_defaults[name],
+      lookup(local.valkey_topology_role_defaults, name, {}),
+      { for key, value in try(var.valkey_instances[name], {}) : key => value if value != null }
     )
   }
 
-  valkey_instance_enabled = {
-    agent_os = var.agent_os_enabled
-  }
-
   valkey_instances = {
-    for name, config in local.valkey_catalog :
-    name => config
-    if var.valkey_enabled && local.valkey_instance_enabled[name]
+    for name, cfg in local.valkey_instances_config : name => cfg
+    if(
+      name == "agent_os" && var.agent_os_enabled && var.managed_sync_enabled
+      ) || (
+      name != "agent_os" &&
+      local.paragon_valkey_catalog &&
+      (var.elasticache_multiple_instances || name == "cache") &&
+      (var.managed_sync_enabled || name != "managed_sync")
+    )
   }
 
-  valkey_enabled = var.valkey_enabled && length(local.valkey_instances) > 0
+  # Shared mode has no queue, system, or managed_sync instance. Those Redis
+  # keys still migrate into the cache Valkey.
+  redis_migration_source = {
+    cache        = contains(keys(local.valkey_instances), "cache")
+    queue        = contains(keys(local.valkey_instances), "queue") || (!var.elasticache_multiple_instances && contains(keys(local.valkey_instances), "cache"))
+    system       = contains(keys(local.valkey_instances), "system") || (!var.elasticache_multiple_instances && contains(keys(local.valkey_instances), "cache"))
+    managed_sync = contains(keys(local.valkey_instances), "managed_sync") || (var.managed_sync_enabled && !var.elasticache_multiple_instances && contains(keys(local.valkey_instances), "cache"))
+  }
+
+  redis_kea_on_cluster = var.redis_enabled && var.elasticache_multiple_instances && (
+    local.redis_migration_source.cache || local.redis_migration_source.managed_sync
+  )
+  redis_kea_on_standalone = var.redis_enabled && (
+    (
+      !var.elasticache_multiple_instances && (
+        local.redis_migration_source.cache || local.redis_migration_source.queue || local.redis_migration_source.system || local.redis_migration_source.managed_sync
+      )
+      ) || (
+      var.elasticache_multiple_instances && (local.redis_migration_source.queue || local.redis_migration_source.system)
+    )
+  )
+  redis_kea_parameter_groups = toset(compact([
+    local.redis_kea_on_cluster ? "cluster" : "",
+    local.redis_kea_on_standalone ? "standalone" : "",
+  ]))
+
+  # Workflow always uses cache; shared mode maps queue, system and Managed Sync
+  # to the same cache Valkey. Agent OS always remains independent.
+  valkey_role_instances = {
+    for role in ["cache", "queue", "system", "workflow", "managed_sync", "agent_os"] :
+    role => (role == "workflow" || (!var.elasticache_multiple_instances && contains(["queue", "system", "managed_sync"], role)) ? "cache" : role)
+  }
+
+  # Redis 6 endpoints only (ElastiCache module keys). Workflow is a logical
+  # chart role that shares cache; app_env and paragon resolve it from cache.
+  redis_connections = var.redis_enabled ? module.redis.elasticache : {}
+
+  valkey_enabled = length(local.valkey_instances) > 0
 }

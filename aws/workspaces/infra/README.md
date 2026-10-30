@@ -27,6 +27,31 @@ postgres_instances = {
 The `agent_os` instance is provisioned when `agent_os_enabled = true` and uses
 the same catalog with Agent OS-specific defaults (including optional CMK).
 
+## Valkey instance catalog
+
+`valkey_instances` is empty by default. Set it only to override one instance.
+Built-in sizing mirrors legacy Redis (`cache.r6g.large` for cache and
+managed sync, `cache.t4g.medium` / `cache.t4g.micro` for queue and system).
+Agent OS stays `cache.t4g.medium` with Multi-AZ. Snapshots are 5 days, the same as the other Valkey instances.
+The module keeps that full catalog and creates a filtered copy, the same way
+Azure Managed Redis does. `elasticache_multiple_instances = false` creates
+cache only; `true` also creates queue and system. `managed_sync` is created
+only when `managed_sync_enabled` is true, and only in the separate-instance
+layout. `agent_os` is created when Agent OS is on, independent of that layout.
+`valkey_enabled` creates the Paragon catalog. An Agent OS install already
+has that flag set for its own Valkey, so set `paragon_valkey_on_agent_os = true`
+there to add cache, queue, system, and managed sync. Sizing does not read
+`elasticache_node_type` or `elasticache_multi_az`. Keyspace events are set
+on Redis only while that catalog is created.
+
+```hcl
+valkey_instances = {
+  cache = {
+    node_type = "cache.r6g.xlarge" # override default sizing only
+  }
+}
+```
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -72,6 +97,7 @@ the same catalog with Agent OS-specific defaults (including optional CMK).
 | [aws_secretsmanager_secret.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
+| [aws_secretsmanager_secret.runtime_valkey](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret) | resource |
 | [aws_secretsmanager_secret_version.runtime_agent_os](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_bastion](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_cluster](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
@@ -79,6 +105,7 @@ the same catalog with Agent OS-specific defaults (including optional CMK).
 | [aws_secretsmanager_secret_version.runtime_postgres](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_redis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_secretsmanager_secret_version.runtime_storage](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
+| [aws_secretsmanager_secret_version.runtime_valkey](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret_version) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_iam_policy_document.agent_os_kms](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.valkey_kms](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
@@ -88,7 +115,7 @@ the same catalog with Agent OS-specific defaults (including optional CMK).
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled and valkey\_enabled. Managed Sync remains independently deployable. Turning this off after apply is destructive. | `bool` | `false` | no |
+| <a name="input_agent_os_enabled"></a> [agent\_os\_enabled](#input\_agent\_os\_enabled) | Whether to enable Agent OS. Requires managed\_sync\_enabled. Its Valkey is created from that flag and does not use valkey\_enabled. Turning this off after apply is destructive. | `bool` | `false` | no |
 | <a name="input_agent_os_extract_cpu_limit"></a> [agent\_os\_extract\_cpu\_limit](#input\_agent\_os\_extract\_cpu\_limit) | Maximum aggregate vCPU capacity for the Agent OS extraction Karpenter NodePool. | `string` | `"256"` | no |
 | <a name="input_agent_os_extract_instance_types"></a> [agent\_os\_extract\_instance\_types](#input\_agent\_os\_extract\_instance\_types) | Extract node instance types. Default c6a.8xlarge for production; staging can override to c6a.4xlarge. | `list(string)` | <pre>[<br/>  "c6a.8xlarge"<br/>]</pre> | no |
 | <a name="input_agent_os_extract_max_count"></a> [agent\_os\_extract\_max\_count](#input\_agent\_os\_extract\_max\_count) | Max extract nodes / Karpenter nodes limit. Staging 3, production 8 (covers 30 pods at 4/node). | `number` | `8` | no |
@@ -134,9 +161,9 @@ the same catalog with Agent OS-specific defaults (including optional CMK).
 | <a name="input_eks_spot_instance_percent"></a> [eks\_spot\_instance\_percent](#input\_eks\_spot\_instance\_percent) | The percentage of spot instances to use for Kubernetes nodes. | `number` | `75` | no |
 | <a name="input_eks_spot_node_instance_type"></a> [eks\_spot\_node\_instance\_type](#input\_eks\_spot\_node\_instance\_type) | The compute instance type to use for Kubernetes spot nodes. | `string` | `"t3a.xlarge,t3.xlarge,m5a.xlarge,m5.xlarge,m6a.xlarge,m6i.xlarge,m7a.xlarge,m7i.xlarge,r5a.xlarge,m4.xlarge"` | no |
 | <a name="input_eks_system_managed_node_group"></a> [eks\_system\_managed\_node\_group](#input\_eks\_system\_managed\_node\_group) | System EKS managed node group for Karpenter controller and cluster add-on DaemonSets. Default node group and EC2 Name: <workspace>-node-default (e.g. paragon-admin-a1b2c3d4-node-default). | <pre>object({<br/>    map_key         = optional(string, "node-default")<br/>    name            = optional(string)<br/>    use_name_prefix = optional(bool, false)<br/>    ec2_name_tag    = optional(string)<br/>    instance_types  = optional(list(string))<br/>    min_size        = optional(number, 2)<br/>    max_size        = optional(number, 3)<br/>    desired_size    = optional(number, 2)<br/>    labels          = optional(map(string), { "karpenter.sh/controller" = "true" })<br/>  })</pre> | `{}` | no |
-| <a name="input_elasticache_multi_az"></a> [elasticache\_multi\_az](#input\_elasticache\_multi\_az) | Whether or not to enable multi-AZ in each ElastiCache instance. | `bool` | `true` | no |
-| <a name="input_elasticache_multiple_instances"></a> [elasticache\_multiple\_instances](#input\_elasticache\_multiple\_instances) | Whether or not to create multiple ElastiCache instances. Used for higher volume installations. | `bool` | `true` | no |
-| <a name="input_elasticache_node_type"></a> [elasticache\_node\_type](#input\_elasticache\_node\_type) | The ElastiCache node type used for Redis. | `string` | `"cache.r6g.large"` | no |
+| <a name="input_elasticache_multi_az"></a> [elasticache\_multi\_az](#input\_elasticache\_multi\_az) | Multi-AZ for legacy Redis OSS replication groups only. Valkey multi-AZ is set per role in valkey\_instances. | `bool` | `true` | no |
+| <a name="input_elasticache_multiple_instances"></a> [elasticache\_multiple\_instances](#input\_elasticache\_multiple\_instances) | ElastiCache topology for Valkey (and legacy Redis while redis\_enabled). When true, separate cache (cluster), queue, system, and managed\_sync instances; when false, one shared cache instance. Agent OS remains independent. | `bool` | `true` | no |
+| <a name="input_elasticache_node_type"></a> [elasticache\_node\_type](#input\_elasticache\_node\_type) | ElastiCache node type for legacy Redis OSS only. Valkey sizing lives in valkey\_instances. | `string` | `"cache.r6g.large"` | no |
 | <a name="input_enable_karpenter"></a> [enable\_karpenter](#input\_enable\_karpenter) | Enable Karpenter autoscaling (SQS, IAM, Helm controller, EC2NodeClass, NodePools). | `bool` | `false` | no |
 | <a name="input_enable_legacy_mng_pools"></a> [enable\_legacy\_mng\_pools](#input\_enable\_legacy\_mng\_pools) | Keep legacy on-demand and spot EKS managed node groups during Karpenter migration. | `bool` | `true` | no |
 | <a name="input_env_overrides"></a> [env\_overrides](#input\_env\_overrides) | Optional overrides for any infra-derived env key written to Secrets Manager (e.g. PARAGON\_DOMAIN, ACCOUNT\_PUBLIC\_URL, CERBERUS\_POSTGRES\_PORT). Merged on top of computed defaults; app\_secrets wins if the same key is set in both. Domain and *\_PUBLIC\_URL chart envKeys are owned by the paragon workspace `domain` variable — seed them here only for GitOps-only flows that read Secrets Manager without that workspace. | `map(string)` | `null` | no |
@@ -156,6 +183,7 @@ the same catalog with Agent OS-specific defaults (including optional CMK).
 | <a name="input_openobserve_email"></a> [openobserve\_email](#input\_openobserve\_email) | Optional OpenObserve root user email. When set, used instead of the generated random email. | `string` | `null` | no |
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
 | <a name="input_paragon_managed_sync_config"></a> [paragon\_managed\_sync\_config](#input\_paragon\_managed\_sync\_config) | Optional managed-sync secret data to write to Secrets Manager. Null when managed sync is disabled. | `map(string)` | `null` | no |
+| <a name="input_paragon_valkey_on_agent_os"></a> [paragon\_valkey\_on\_agent\_os](#input\_paragon\_valkey\_on\_agent\_os) | On an Agent OS stack, also create the Paragon Valkey catalog (cache, queue, system, managed sync). Leave false on existing Agent OS installs. Ignored when agent\_os\_enabled is false; valkey\_enabled selects the catalog there. elasticache\_multiple\_instances still chooses one shared instance or one per instance. | `bool` | `false` | no |
 | <a name="input_postgres_instances"></a> [postgres\_instances](#input\_postgres\_instances) | Per-instance PostgreSQL overrides keyed by logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed\_sync, paragon, agent\_os).<br/>Omitted keys and null optional fields retain built-in defaults derived from workspace-level rds\_* settings and rds\_multiple\_instances / feature flags.<br/>Engine version and logging parameters are workspace-wide only (single shared DB parameter group); use rds\_postgres\_version for engine version. | <pre>map(object({<br/>    identifier                          = optional(string)<br/>    database_name                       = optional(string)<br/>    port                                = optional(number)<br/>    instance_class                      = optional(string)<br/>    allocated_storage                   = optional(number)<br/>    max_allocated_storage               = optional(number)<br/>    multi_az                            = optional(bool)<br/>    availability_zone                   = optional(string)<br/>    read_replica                        = optional(bool)<br/>    replica_instance_class              = optional(string)<br/>    storage_type                        = optional(string)<br/>    iops                                = optional(number)<br/>    storage_throughput                  = optional(number)<br/>    backup_retention_days               = optional(number)<br/>    backup_window                       = optional(string)<br/>    maintenance_window                  = optional(string)<br/>    enabled_cloudwatch_logs_exports     = optional(list(string))<br/>    monitoring_interval                 = optional(number)<br/>    performance_insights_enabled        = optional(bool)<br/>    performance_insights_retention_days = optional(number)<br/>    ca_cert_identifier                  = optional(string)<br/>    auto_minor_version_upgrade          = optional(bool)<br/>    allow_major_version_upgrade         = optional(bool)<br/>    apply_immediately                   = optional(bool)<br/>    deletion_protection                 = optional(bool)<br/>    kms_key_arn                         = optional(string)<br/>    tags                                = optional(map(string))<br/>  }))</pre> | `null` | no |
 | <a name="input_rds_allocated_storage"></a> [rds\_allocated\_storage](#input\_rds\_allocated\_storage) | Initial allocated storage (GiB) for each Postgres RDS instance. | `number` | `20` | no |
 | <a name="input_rds_final_snapshot_enabled"></a> [rds\_final\_snapshot\_enabled](#input\_rds\_final\_snapshot\_enabled) | Specifies that RDS instances should perform a final snapshot before being deleted. | `bool` | `true` | no |
@@ -168,13 +196,14 @@ the same catalog with Agent OS-specific defaults (including optional CMK).
 | <a name="input_rds_multiple_instances"></a> [rds\_multiple\_instances](#input\_rds\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
 | <a name="input_rds_postgres_version"></a> [rds\_postgres\_version](#input\_rds\_postgres\_version) | Postgres version for the database. | `string` | `"14"` | no |
 | <a name="input_rds_restore_from_snapshot"></a> [rds\_restore\_from\_snapshot](#input\_rds\_restore\_from\_snapshot) | Specifies that RDS instances should be restored from a snapshot. | `bool` | `false` | no |
+| <a name="input_redis_enabled"></a> [redis\_enabled](#input\_redis\_enabled) | Keep legacy Redis 6 instances. Only set false after a verified Valkey cutover and soak. | `bool` | `true` | no |
 | <a name="input_s3_kms_encryption_enabled"></a> [s3\_kms\_encryption\_enabled](#input\_s3\_kms\_encryption\_enabled) | Encrypt the app, CDN, audit logs, and managed sync S3 buckets with AWS KMS (SSE-KMS) instead of S3-managed keys (SSE-S3). Existing deployments default to SSE-S3; enable for new installs or to migrate existing buckets to KMS. The logs bucket always uses SSE-S3 because ALB and S3 server access logs do not support SSE-KMS. | `bool` | `false` | no |
 | <a name="input_s3_kms_key_arn"></a> [s3\_kms\_key\_arn](#input\_s3\_kms\_key\_arn) | ARN of an existing KMS key to use for S3 bucket encryption. When null and s3\_kms\_encryption\_enabled is true, a dedicated KMS key is created and managed by Terraform. Ignored when s3\_kms\_encryption\_enabled is false. | `string` | `null` | no |
 | <a name="input_secrets_recovery_window_in_days"></a> [secrets\_recovery\_window\_in\_days](#input\_secrets\_recovery\_window\_in\_days) | Secrets Manager deletion recovery window for application secrets (env, docker-cfg, managed-sync, openobserve), MSK SCRAM credentials (AmazonMSK\_*), and runtime handoff secrets. Set to 0 for immediate deletion so names are free after destroy; use 7–30 in production for undo protection. | `number` | `30` | no |
 | <a name="input_ssh_whitelist"></a> [ssh\_whitelist](#input\_ssh\_whitelist) | An optional list of IP addresses to whitelist ssh access. | `string` | `""` | no |
 | <a name="input_use_latest_ami_release_version"></a> [use\_latest\_ami\_release\_version](#input\_use\_latest\_ami\_release\_version) | When true, resolve the latest AMI release version per node group ami\_type for the cluster Kubernetes version at plan/apply. | `bool` | `false` | no |
-| <a name="input_valkey_enabled"></a> [valkey\_enabled](#input\_valkey\_enabled) | Whether to enable creation of Valkey instances from valkey\_instances. Independent from legacy Redis so both can run in parallel during migrations. | `bool` | `false` | no |
-| <a name="input_valkey_instances"></a> [valkey\_instances](#input\_valkey\_instances) | Per-instance overrides for the shared Valkey catalog. Only agent\_os is supported today.<br/>Future Redis migrations can add cache, queue, system, and managed\_sync to the catalog without changing the Valkey implementation.<br/>Creation requires valkey\_enabled plus the product feature flag; today agent\_os is created only when both valkey\_enabled and agent\_os\_enabled are true. | <pre>map(object({<br/>    node_type               = optional(string)<br/>    multi_az                = optional(bool)<br/>    cluster_enabled         = optional(bool)<br/>    engine_version          = optional(string)<br/>    tls_enabled             = optional(bool)<br/>    snapshot_retention_days = optional(number)<br/>    log_retention_days      = optional(number)<br/>  }))</pre> | `{}` | no |
+| <a name="input_valkey_enabled"></a> [valkey\_enabled](#input\_valkey\_enabled) | Create the Paragon Valkey catalog (cache, queue, system, managed\_sync) alongside legacy Redis. An existing Agent OS stack already sets this for its own Valkey; it does not add the Paragon catalog there. | `bool` | `false` | no |
+| <a name="input_valkey_instances"></a> [valkey\_instances](#input\_valkey\_instances) | Overrides for Valkey instances (cache, queue, system, managed\_sync, agent\_os).<br/>Merged per key with the built-in catalog (cache.r6g.large cache/managed sync, t4g.medium queue, t4g.micro system). Empty uses defaults only.<br/>The catalog filter creates the instances: elasticache\_multiple\_instances selects one shared cache or separate instances; valkey\_enabled creates the Paragon catalog except on an Agent OS stack, where paragon\_valkey\_on\_agent\_os is the opt-in; managed\_sync\_enabled and agent\_os\_enabled gate those instances.<br/>TLS defaults to false except agent\_os (true); other instances may set tls\_enabled when the app secret contract supports AUTH.<br/>kms\_key\_arn overrides at-rest encryption for that replication group only. CloudWatch logs stay on the workspace Valkey key.<br/>snapshot\_name applies only at creation. Setting or changing it later replaces the replication group. | <pre>map(object({<br/>    node_type               = optional(string)<br/>    multi_az                = optional(bool)<br/>    cluster_enabled         = optional(bool)<br/>    engine_version          = optional(string)<br/>    tls_enabled             = optional(bool)<br/>    num_node_groups         = optional(number)<br/>    replicas_per_node_group = optional(number)<br/>    snapshot_retention_days = optional(number)<br/>    log_retention_days      = optional(number)<br/>    kms_key_arn             = optional(string)<br/>    snapshot_name           = optional(string)<br/>  }))</pre> | `{}` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR for the VPC. | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_vpc_cidr_newbits"></a> [vpc\_cidr\_newbits](#input\_vpc\_cidr\_newbits) | Newbits used for calculating subnets. | `number` | `3` | no |
 
@@ -190,6 +219,7 @@ the same catalog with Agent OS-specific defaults (including optional CMK).
 | <a name="output_k8s_version"></a> [k8s\_version](#output\_k8s\_version) | EKS control plane version. Consumed by paragon workspace for Karpenter drift tagging. |
 | <a name="output_kafka"></a> [kafka](#output\_kafka) | Connection info for Kafka. |
 | <a name="output_karpenter"></a> [karpenter](#output\_karpenter) | AWS resources created by infra for Karpenter worker nodes. Consumed by paragon workspace. |
+| <a name="output_legacy_redis"></a> [legacy\_redis](#output\_legacy\_redis) | Original Redis 6 connections for migration runner and rollback while redis\_enabled=true. |
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | The bucket used to store system logs. |
 | <a name="output_monitoring"></a> [monitoring](#output\_monitoring) | Non-sensitive monitoring settings (includes pg\_config.max\_storage\_bytes for Grafana storage alerts). |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
@@ -199,6 +229,8 @@ the same catalog with Agent OS-specific defaults (including optional CMK).
 | <a name="output_secrets_manager_secret_arns"></a> [secrets\_manager\_secret\_arns](#output\_secrets\_manager\_secret\_arns) | ARNs of application Secrets Manager secrets. |
 | <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. S3 access uses EKS Pod Identity (role\_arn); static access keys are no longer provisioned. |
 | <a name="output_tracking"></a> [tracking](#output\_tracking) | Non-sensitive deployment metadata for external environment tracking. |
+| <a name="output_valkey"></a> [valkey](#output\_valkey) | Valkey connections by instance name; sensitive when AUTH is configured. |
+| <a name="output_valkey_roles"></a> [valkey\_roles](#output\_valkey\_roles) | Logical roles mapped to Valkey connections including shared cache/queue/system. |
 | <a name="output_worker_security_group_ids"></a> [worker\_security\_group\_ids](#output\_worker\_security\_group\_ids) | Security groups attached to EKS worker nodes. Consumed by the paragon workspace for ALB-to-pod ingress safeguards. |
 | <a name="output_workspace"></a> [workspace](#output\_workspace) | The resource group that all resources are associated with. |
 <!-- END_TF_DOCS -->

@@ -1,3 +1,15 @@
+variable "valkey_enabled" {
+  description = "Synchronize independent Redis and Valkey connection Secrets to Kubernetes."
+  type        = bool
+  default     = false
+}
+
+variable "redis_enabled" {
+  description = "Mirrors infra's redis_enabled. False stops syncing the Redis connection Secret: Redis has been permanently decommissioned."
+  type        = bool
+  default     = true
+}
+
 variable "aws_region" {
   description = "The AWS region resources are created in."
   type        = string
@@ -159,6 +171,11 @@ variable "monitors_enabled" {
 
 variable "monitor_version" {
   description = "The version of the monitors to install."
+  type        = string
+}
+
+variable "redis_exporter_addr" {
+  description = "Redis-compatible URI for the active cache backend (Redis or Valkey), used only by redis-exporter."
   type        = string
 }
 
@@ -336,7 +353,12 @@ variable "install_external_secrets" {
 }
 
 variable "env_secret_name" {
-  description = "Secrets Manager secret name for Paragon env config synced by ESO."
+  description = "Secrets Manager secret name for Infra env config synced by ESO."
+  type        = string
+}
+
+variable "env_paragon_secret_name" {
+  description = "Secrets Manager secret name for Paragon-owned keys. External Secrets merges this over env_secret_name."
   type        = string
 }
 

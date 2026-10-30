@@ -207,6 +207,8 @@ module "redis" {
   elasticache_multi_az           = var.elasticache_multi_az
   elasticache_multiple_instances = var.elasticache_multiple_instances
   managed_sync_enabled           = var.managed_sync_enabled
+  redis_enabled                  = var.redis_enabled
+  redis_kea_parameter_groups     = local.redis_kea_parameter_groups
   valkey_instances               = local.valkey_instances
   valkey_kms_key_arn             = try(aws_kms_key.valkey[0].arn, null)
 
@@ -410,9 +412,8 @@ resource "aws_kms_alias" "agent_os" {
   target_key_id = aws_kms_key.agent_os[0].key_id
 }
 
-# One workspace-level KMS key protects every Valkey replication group and its
-# CloudWatch logs. Today only agent_os exists in the Valkey catalog; future
-# Redis migrations reuse this key for cache/queue/system/managed_sync.
+# One workspace-level KMS key encrypts every Valkey CloudWatch log group.
+# Replication groups use it unless a role sets kms_key_arn.
 data "aws_iam_policy_document" "valkey_kms" {
   count = local.valkey_enabled ? 1 : 0
 

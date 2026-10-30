@@ -2,6 +2,7 @@ locals {
   infra_secret_names = {
     postgres = "paragon/${local.workspace}/postgres"
     redis    = "paragon/${local.workspace}/redis"
+    valkey   = "paragon/${local.workspace}/valkey"
     storage  = "paragon/${local.workspace}/storage"
     kafka    = "paragon/${local.workspace}/kafka"
     cluster  = "paragon/${local.workspace}/cluster"
@@ -15,8 +16,23 @@ data "aws_secretsmanager_secret_version" "infra_postgres" {
 }
 
 data "aws_secretsmanager_secret_version" "infra_redis" {
-  count     = local.use_legacy_infra_json ? 0 : 1
+  count     = local.use_legacy_infra_json || !var.redis_enabled ? 0 : 1
   secret_id = local.infra_secret_names.redis
+}
+
+data "aws_secretsmanager_secret" "infra_redis_connections" {
+  count = var.valkey_enabled && var.redis_enabled ? 1 : 0
+  name  = local.infra_secret_names.redis
+}
+
+data "aws_secretsmanager_secret" "infra_valkey_connections" {
+  count = var.valkey_enabled ? 1 : 0
+  name  = local.infra_secret_names.valkey
+}
+
+data "aws_secretsmanager_secret_version" "infra_valkey" {
+  count     = var.valkey_enabled ? 1 : 0
+  secret_id = local.infra_secret_names.valkey
 }
 
 data "aws_secretsmanager_secret_version" "infra_storage" {
@@ -57,6 +73,26 @@ locals {
     data.aws_secretsmanager_secret_version.infra_agent_os[0].secret_string
   )) : null
 
+  redis_connections  = !var.redis_enabled ? {} : (local.use_legacy_infra_json ? try(local.legacy_infra_vars.redis.value, {}) : jsondecode(data.aws_secretsmanager_secret_version.infra_redis[0].secret_string))
+  valkey_connections = var.valkey_enabled ? jsondecode(data.aws_secretsmanager_secret_version.infra_valkey[0].secret_string) : {}
+
+  # Once Redis is permanently decommissioned (redis_enabled=false), there is no
+  # backend left to fall back to: always resolve to Valkey regardless of
+  # valkey_migration, so that flag does not need to stay true forever.
+  active_redis_connections = local.valkey_cutover ? {
+    for role in concat(["cache", "queue", "system", "workflow"], var.managed_sync_enabled ? ["managed_sync"] : []) :
+    role => try(
+      local.valkey_connections[role],
+      (contains(["cache", "queue", "system", "workflow"], role) ||
+      (role == "managed_sync" && length(keys(local.valkey_connections)) == 1)) ? try(local.valkey_connections.cache, null) : null,
+    )
+    } : {
+    for role in concat(["cache", "queue", "system", "workflow"], var.managed_sync_enabled ? ["managed_sync"] : []) :
+    role => try(local.redis_connections[role], local.redis_connections.cache, null)
+  }
+
+  active_redis_required_roles = concat(["cache", "queue", "system", "workflow"], var.managed_sync_enabled ? ["managed_sync"] : [])
+
   provider_infra_vars = merge(
     {
       workspace                 = { value = local.workspace }
@@ -64,7 +100,7 @@ locals {
       logs_bucket               = { value = local.logs_bucket }
       auditlogs_bucket          = { value = local.auditlogs_bucket }
       postgres                  = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_postgres[0].secret_string) }
-      redis                     = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_redis[0].secret_string) }
+      redis                     = { value = local.active_redis_connections }
       storage                   = { value = jsondecode(data.aws_secretsmanager_secret_version.infra_storage[0].secret_string) }
       monitoring                = { value = try(local.provider_cluster.monitoring, {}) }
       enable_karpenter          = { value = try(local.provider_cluster.enable_karpenter, false) }
@@ -78,7 +114,11 @@ locals {
     } : {}
   )
 
-  infra_vars = local.use_legacy_infra_json ? local.legacy_infra_vars : local.provider_infra_vars
+  # Decode after selecting the JSON representation to avoid Terraform trying
+  # to unify differently shaped legacy/provider objects in a conditional.
+  infra_vars = jsondecode(local.use_legacy_infra_json ? jsonencode(merge(local.legacy_infra_vars, {
+    redis = { value = local.active_redis_connections }
+  })) : jsonencode(local.provider_infra_vars))
 }
 
 data "aws_secretsmanager_secret" "agent_os_app" {

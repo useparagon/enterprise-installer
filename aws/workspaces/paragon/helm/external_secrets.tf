@@ -102,13 +102,46 @@ locals {
         name           = "paragon-secrets"
         creationPolicy = "Owner"
       }
-      dataFrom = [{
-        extract = {
-          key = var.env_secret_name
-        }
-      }]
+      # Later entries win duplicate keys. Infra stays first; Paragon overrides
+      # chart secrets and the selected cutover endpoints.
+      dataFrom = [
+        { extract = { key = var.env_secret_name } },
+        { extract = { key = var.env_paragon_secret_name } },
+      ]
     }
   })
+
+  # Connections are independent of the active service endpoint. Keep
+  # both Secrets available for forward and reverse migration while Valkey exists.
+  external_secret_redis_connections_yaml = var.valkey_enabled && var.redis_enabled ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata   = { name = "valkey-migration-redis", namespace = local.paragon_namespace }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef  = { name = "aws-secrets-manager", kind = "ClusterSecretStore" }
+      target          = { name = "valkey-migration-redis", creationPolicy = "Owner" }
+      data = [{
+        secretKey = "connections.json"
+        remoteRef = { key = "paragon/${var.workspace}/redis" }
+      }]
+    }
+  }) : null
+
+  external_secret_valkey_connections_yaml = var.valkey_enabled ? yamlencode({
+    apiVersion = "external-secrets.io/v1beta1"
+    kind       = "ExternalSecret"
+    metadata   = { name = "valkey-migration-valkey", namespace = local.paragon_namespace }
+    spec = {
+      refreshInterval = "5m"
+      secretStoreRef  = { name = "aws-secrets-manager", kind = "ClusterSecretStore" }
+      target          = { name = "valkey-migration-valkey", creationPolicy = "Owner" }
+      data = [{
+        secretKey = "connections.json"
+        remoteRef = { key = "paragon/${var.workspace}/valkey" }
+      }]
+    }
+  }) : null
 
   external_secret_docker_yaml = var.docker_cfg_secret_name != null ? yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
@@ -329,5 +362,18 @@ resource "kubectl_manifest" "external_secret_agent_os_admin" {
   count = var.install_external_secrets && var.agent_os_enabled ? 1 : 0
 
   yaml_body  = local.external_secret_agent_os_admin_yaml
+  depends_on = [kubectl_manifest.secret_store[0], kubernetes_namespace.paragon]
+}
+
+
+resource "kubectl_manifest" "external_secret_redis_connections" {
+  count      = var.install_external_secrets && var.valkey_enabled && var.redis_enabled ? 1 : 0
+  yaml_body  = local.external_secret_redis_connections_yaml
+  depends_on = [kubectl_manifest.secret_store[0], kubernetes_namespace.paragon]
+}
+
+resource "kubectl_manifest" "external_secret_valkey_connections" {
+  count      = var.install_external_secrets && var.valkey_enabled ? 1 : 0
+  yaml_body  = local.external_secret_valkey_connections_yaml
   depends_on = [kubectl_manifest.secret_store[0], kubernetes_namespace.paragon]
 }

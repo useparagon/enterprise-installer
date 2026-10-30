@@ -36,7 +36,32 @@ resource "aws_secretsmanager_secret" "runtime_redis" {
 
 resource "aws_secretsmanager_secret_version" "runtime_redis" {
   secret_id     = aws_secretsmanager_secret.runtime_redis.id
-  secret_string = jsonencode(module.redis.elasticache)
+  secret_string = jsonencode(local.redis_connections)
+}
+
+# Valkey connections do not change during cutover or rollback.
+# Agent OS has independent credentials and is excluded from migration secrets.
+# Count follows the Paragon catalog, so an Agent OS stack does not get an empty secret.
+resource "aws_secretsmanager_secret" "runtime_valkey" {
+  count                   = local.paragon_valkey_catalog ? 1 : 0
+  name                    = "${local.runtime_secret_prefix}/valkey"
+  description             = "Raw Valkey connections independent of the application cutover"
+  recovery_window_in_days = var.secrets_recovery_window_in_days
+
+  tags = {
+    Name         = "${local.runtime_secret_prefix}/valkey"
+    Organization = var.organization
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "runtime_valkey" {
+  count     = local.paragon_valkey_catalog ? 1 : 0
+  secret_id = aws_secretsmanager_secret.runtime_valkey[0].id
+
+  secret_string = jsonencode({
+    for name, config in module.redis.valkey :
+    name => config if contains(["cache", "queue", "system", "managed_sync"], name)
+  })
 }
 
 resource "aws_secretsmanager_secret" "runtime_storage" {
