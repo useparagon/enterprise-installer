@@ -104,17 +104,22 @@ Optional opt-in verification: `POSTGRES_SSL_REJECT_UNAUTHORIZED` in `global.env`
 is enabled. These stay off by default until the corresponding application release
 supports verify-full. See commented examples in `charts/values.placeholder.yaml`.
 
+## WAF URI regex rules
+
+Configure optional scanner-path rules with `waf_custom_rules` when `waf_enabled = true`.
+Rules inspect the URI path and support `block`, `allow`, or `log` (AWS Count).
+Defaults apply URL decoding and lowercase normalization before matching.
+
+```hcl
+waf_custom_rules = {
+  block-wordpress-probes = { pattern = "^/wp-admin(/|$)" }
+}
+```
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
-| Name | Version |
-| ---- | ------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | ~> 5.70 |
-| <a name="requirement_helm"></a> [helm](#requirement\_helm) | ~> 2.0 |
-| <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
-| <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 2.0 |
-| <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
+No requirements.
 
 ## Providers
 
@@ -250,6 +255,7 @@ supports verify-full. See commented examples in `charts/values.placeholder.yaml`
 | <a name="input_restrict_public_exposure"></a> [restrict\_public\_exposure](#input\_restrict\_public\_exposure) | When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private\_services to further restrict allowlisted endpoints. Removing many Ingresses from the shared ALB group requires elasticloadbalancing:SetRulePriorities on the load balancer controller IAM principal (see infra eks-worker-policy); without it, deleted Ingress objects can remain Terminating while ALB rules stay active until the controller reconciles. | `bool` | `false` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
 | <a name="input_uptime_company"></a> [uptime\_company](#input\_uptime\_company) | Optional pretty company name to include in BetterStack Uptime monitors. | `string` | `null` | no |
+| <a name="input_waf_custom_rules"></a> [waf\_custom\_rules](#input\_waf\_custom\_rules) | Optional WAF regex rules for URI paths. Supports block, allow, or count-only log actions; lower priorities run first. | <pre>map(object({<br/>    pattern    = string<br/>    action     = optional(string, "block")<br/>    priority   = optional(number)<br/>    transforms = optional(list(string), ["URL_DECODE", "LOWERCASE"])<br/>  }))</pre> | `{}` | no |
 | <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf\_enabled) | Enable AWS WAF v2 on the public ALB. false by default — set true and configure waf\_managed\_rule\_groups, rate limits, or IP lists in tfvars. | `bool` | `false` | no |
 | <a name="input_waf_ip_blacklist"></a> [waf\_ip\_blacklist](#input\_waf\_ip\_blacklist) | CIDRs to always block. Empty list = no blacklist rule. | `list(string)` | `[]` | no |
 | <a name="input_waf_ip_whitelist"></a> [waf\_ip\_whitelist](#input\_waf\_ip\_whitelist) | CIDRs to bypass WAF rules (office IPs). Empty list = no whitelist rule. | `list(string)` | `[]` | no |

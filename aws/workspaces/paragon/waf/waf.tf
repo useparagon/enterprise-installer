@@ -143,6 +143,54 @@ resource "aws_wafv2_web_acl" "this" {
     }
   }
 
+  # Custom URI patterns are evaluated before managed rule groups.
+  dynamic "rule" {
+    for_each = local.custom_rules
+    content {
+      name     = "regex-${rule.value.key}"
+      priority = rule.value.priority
+
+      action {
+        dynamic "block" {
+          for_each = rule.value.action == "block" ? [1] : []
+          content {}
+        }
+        dynamic "allow" {
+          for_each = rule.value.action == "allow" ? [1] : []
+          content {}
+        }
+        dynamic "count" {
+          for_each = rule.value.action == "log" ? [1] : []
+          content {}
+        }
+      }
+
+      statement {
+        regex_match_statement {
+          regex_string = rule.value.pattern
+
+          field_to_match {
+            uri_path {}
+          }
+
+          dynamic "text_transformation" {
+            for_each = rule.value.transforms
+            content {
+              priority = text_transformation.key
+              type     = text_transformation.value
+            }
+          }
+        }
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = "${var.workspace}-waf-regex-${rule.value.key}"
+        sampled_requests_enabled   = true
+      }
+    }
+  }
+
   dynamic "rule" {
     for_each = local.managed_rules
     content {
