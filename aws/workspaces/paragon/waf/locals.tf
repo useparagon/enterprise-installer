@@ -29,7 +29,18 @@ locals {
 
   rate_rule_count = (local.has_global_rate_limit ? 1 : 0) + length(local.sorted_path_limits)
 
-  managed_rules_offset = local.ip_custom_rule_count + local.rate_rule_count
+  custom_rule_keys = sort(keys(var.waf_custom_rules))
+  custom_rules = [
+    for idx, key in local.custom_rule_keys : {
+      key        = key
+      priority   = coalesce(var.waf_custom_rules[key].priority, local.ip_custom_rule_count + local.rate_rule_count + idx)
+      pattern    = var.waf_custom_rules[key].pattern
+      action     = var.waf_custom_rules[key].action
+      transforms = var.waf_custom_rules[key].transforms
+    }
+  ]
+
+  managed_rules_offset = local.ip_custom_rule_count + local.rate_rule_count + length(local.custom_rules)
 
   managed_rule_keys = sort(keys(var.waf_managed_rule_groups))
 
@@ -52,13 +63,21 @@ locals {
       priority = coalesce(var.waf_managed_rule_groups[key].priority, local.managed_rules_offset + idx)
     }
   ]
+  all_rule_priorities = concat(
+    local.has_whitelist ? [0] : [],
+    local.has_blacklist ? [local.has_whitelist ? 1 : 0] : [],
+    local.has_global_rate_limit ? [local.ip_custom_rule_count] : [],
+    [for item in local.sorted_path_limits : item.priority],
+    [for item in local.custom_rules : item.priority],
+    [for item in local.managed_rules : item.priority],
+  )
 }
 
 check "managed_rule_priority_range" {
   assert {
     condition = alltrue([
       for key in local.managed_rule_keys :
-      var.waf_managed_rule_groups[key].priority == null || var.waf_managed_rule_groups[key].priority >= local.managed_rules_offset
+      var.waf_managed_rule_groups[key].priority == null ? true : var.waf_managed_rule_groups[key].priority >= local.managed_rules_offset
     ])
     error_message = "Explicit waf_managed_rule_groups priority must be >= the number of IP and rate-limit rules to avoid collisions."
   }
@@ -68,5 +87,12 @@ check "managed_rule_priorities_unique" {
   assert {
     condition     = length(local.managed_rules) == length(distinct([for r in local.managed_rules : r.priority]))
     error_message = "waf_managed_rule_groups priorities must be unique within the Web ACL."
+  }
+}
+
+check "all_rule_priorities_unique" {
+  assert {
+    condition     = length(local.all_rule_priorities) == length(distinct(local.all_rule_priorities))
+    error_message = "AWS WAF rule priorities must be unique across IP, rate-limit, regex, and managed rules."
   }
 }

@@ -707,6 +707,32 @@ variable "waf_rate_limit_path_window_sec" {
   }
 }
 
+
+variable "waf_custom_rules" {
+  description = "Optional WAF regex rules for URI paths. Supports block, allow, or count-only log actions; lower priorities run first."
+  type = map(object({
+    pattern    = string
+    action     = optional(string, "block")
+    priority   = optional(number)
+    transforms = optional(list(string), ["URL_DECODE", "LOWERCASE"])
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for name, rule in var.waf_custom_rules :
+      can(regex("^[a-z0-9][a-z0-9-]{0,49}$", name)) &&
+      length(trimspace(rule.pattern)) > 0 && length(rule.pattern) <= 200 &&
+      contains(["block", "allow", "log"], rule.action) &&
+      (rule.priority == null ? true : rule.priority >= 0 && floor(rule.priority) == rule.priority) &&
+      length(rule.transforms) > 0 &&
+      alltrue([for transform in rule.transforms : contains(["URL_DECODE", "LOWERCASE", "NONE"], transform)]) &&
+      (!contains(rule.transforms, "NONE") || length(rule.transforms) == 1)
+    ])
+    error_message = "waf_custom_rules requires lowercase slug names, regex patterns of 1-200 characters, block/allow/log actions, nonnegative integer priorities, and URL_DECODE/LOWERCASE or NONE transformations."
+  }
+}
+
 variable "waf_managed_rule_groups" {
   description = <<-EOT
     Map of AWS WAF managed rule groups to attach to the Web ACL. Empty by default — you choose which groups to enable.

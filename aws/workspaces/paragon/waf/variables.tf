@@ -44,6 +44,17 @@ variable "waf_rate_limit_path_window_sec" {
   type        = number
 }
 
+
+variable "waf_custom_rules" {
+  description = "WAF URI-path regex rules with block, allow, or count-only log actions, optional priorities and text transforms."
+  type = map(object({
+    pattern    = string
+    action     = optional(string, "block")
+    priority   = optional(number)
+    transforms = optional(list(string), ["URL_DECODE", "LOWERCASE"])
+  }))
+}
+
 variable "waf_managed_rule_groups" {
   description = "Map of AWS WAF managed rule groups. See root variables.tf for field documentation."
   type = map(object({
