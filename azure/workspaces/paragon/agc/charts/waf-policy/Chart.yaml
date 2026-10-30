@@ -1,0 +1,5 @@
+apiVersion: v2
+name: agc-waf-policy
+version: 0.1.0
+description: Bind an Azure WAF policy to an Application Gateway for Containers Gateway
+type: application

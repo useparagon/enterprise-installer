@@ -265,6 +265,7 @@ module "waf" {
   waf_rate_limit_group_by        = var.waf_rate_limit_group_by
   waf_max_request_body_size_kb   = var.waf_max_request_body_size_kb
   waf_file_upload_limit_mb       = var.waf_file_upload_limit_mb
+  waf_custom_rules               = var.waf_custom_rules
   waf_managed_rule_sets          = var.waf_managed_rule_sets
 }
 
@@ -298,6 +299,7 @@ module "agc" {
   public_services            = merge(local.agc_public_routes, local.agent_os_agc_routes, local.managed_sync_agc_routes)
   waf_enabled                = local.waf_active
   waf_policy_id              = local.waf_active ? module.waf[0].policy_id : null
+  diagnostics_storage_name   = try(local.infra_vars.storage.value.root_user, null)
   alb_controller_version     = var.agc_alb_controller_version
   tags                       = local.default_tags
 }

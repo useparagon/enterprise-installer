@@ -83,6 +83,18 @@ variable "agc_subnet_enabled" {
   default     = false
 }
 
+variable "agc_logs_retention_days" {
+  description = "Days to retain AGC access and firewall logs in existing Blob Storage. Defaults to 30; null disables. Active only with the AGC subnet."
+  type        = number
+  default     = 30
+  nullable    = true
+
+  validation {
+    condition     = var.agc_logs_retention_days == null ? true : var.agc_logs_retention_days >= 1 && var.agc_logs_retention_days <= 3650 && floor(var.agc_logs_retention_days) == var.agc_logs_retention_days
+    error_message = "agc_logs_retention_days must be null or an integer between 1 and 3650."
+  }
+}
+
 variable "auditlogs_retention_days" {
   description = "The number of days to retain audit logs before deletion."
   type        = number

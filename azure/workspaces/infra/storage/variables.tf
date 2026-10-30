@@ -28,6 +28,13 @@ variable "agent_os_enabled" {
   type        = bool
 }
 
+variable "agc_logs_retention_days" {
+  description = "AGC access and WAF log retention in days (default 30; null disables)."
+  type        = number
+  default     = 30
+  nullable    = true
+}
+
 variable "auditlogs_retention_days" {
   description = "The number of days to retain audit logs before deletion."
   type        = number

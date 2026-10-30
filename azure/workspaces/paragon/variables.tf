@@ -351,6 +351,32 @@ variable "waf_file_upload_limit_mb" {
   default     = 100
 }
 
+
+variable "waf_custom_rules" {
+  description = "Optional AGC WAF regex rules matching RequestUri. Supports block, allow, or log actions and optional priorities and transforms."
+  type = map(object({
+    pattern    = string
+    action     = optional(string, "block")
+    priority   = optional(number)
+    transforms = optional(list(string), ["URL_DECODE", "LOWERCASE"])
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for name, rule in var.waf_custom_rules :
+      can(regex("^[a-z0-9][a-z0-9-]{0,49}$", name)) &&
+      length(trimspace(rule.pattern)) > 0 && length(rule.pattern) <= 200 &&
+      contains(["block", "allow", "log"], rule.action) &&
+      (rule.priority == null ? true : rule.priority >= 1 && rule.priority <= 100 && floor(rule.priority) == rule.priority) &&
+      length(rule.transforms) > 0 &&
+      alltrue([for transform in rule.transforms : contains(["URL_DECODE", "LOWERCASE", "NONE"], transform)]) &&
+      (!contains(rule.transforms, "NONE") || length(rule.transforms) == 1)
+    ])
+    error_message = "waf_custom_rules requires lowercase slug names, regex patterns of 1-200 characters, block/allow/log actions, integer priorities between 1 and 100, and URL_DECODE/LOWERCASE or NONE transformations."
+  }
+}
+
 variable "waf_managed_rule_sets" {
   description = "Managed rule sets to attach. Azure requires a primary rule set on every policy, and AGC only accepts DRS 2.1 (no CRS). Bot Manager 1.0/1.1 can be added alongside it. Per-rule actions go in rule_group_overrides (azurerm has no rule-set-level action)."
   type = map(object({

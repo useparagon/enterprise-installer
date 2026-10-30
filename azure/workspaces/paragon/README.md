@@ -46,6 +46,14 @@ CAs and applies it to workloads and migration Jobs (`NODE_EXTRA_CA_CERTS`,
 `PGSSLROOTCERT`). Examples and env flags are documented in
 `charts/values.placeholder.yaml`.
 
+## AGC + WAF rollout
+
+1. **Validate:** Enable AGC and WAF with `agc_direct_routing = false`; NGINX remains the backend and public rollback path.
+2. **DNS cutover:** Point public DNS to `agc_fqdn` after validating HTTPS and WAF. `agc_dns_cutover` only updates Terraform-managed DNS.
+3. **Direct routing:** After checking HTTPRoutes, certificate renewal, and rollback, set `agc_direct_routing = true` to remove ingress-nginx. Review the plan for the legacy NGINX public IP before applying.
+
+`waf_custom_rules` matches `RequestUri` after optional URL decoding and lowercase transforms. Actions are `block`, `allow`, and `log`. AGC access and firewall logs go to the existing infra Storage Account; the infra workspace defaults to 30-day lifecycle retention.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -57,8 +65,6 @@ CAs and applies it to workloads and migration Jobs (`NODE_EXTRA_CA_CERTS`,
 | <a name="requirement_hoop"></a> [hoop](#requirement\_hoop) | 0.0.21 |
 | <a name="requirement_kubectl"></a> [kubectl](#requirement\_kubectl) | >= 1.17.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | ~> 2.0 |
-| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
-| <a name="requirement_time"></a> [time](#requirement\_time) | >= 0.9.0 |
 
 ## Providers
 
@@ -187,6 +193,7 @@ CAs and applies it to workloads and migration Jobs (`NODE_EXTRA_CA_CERTS`,
 | <a name="input_restrict_public_exposure"></a> [restrict\_public\_exposure](#input\_restrict\_public\_exposure) | When true, deploys health-checker and limits internet-facing ingress and Better Stack uptime monitors to the default public allowlist (customer-facing microservices plus health-checker). Monitoring UIs such as Grafana stay cluster-internal (use Hoop or private access). Use private\_services to further restrict allowlisted endpoints. | `bool` | `false` | no |
 | <a name="input_uptime_api_token"></a> [uptime\_api\_token](#input\_uptime\_api\_token) | Optional API Token for setting up BetterStack Uptime monitors. | `string` | `null` | no |
 | <a name="input_uptime_company"></a> [uptime\_company](#input\_uptime\_company) | Optional pretty company name to include in BetterStack Uptime monitors. | `string` | `null` | no |
+| <a name="input_waf_custom_rules"></a> [waf\_custom\_rules](#input\_waf\_custom\_rules) | Optional AGC WAF regex rules matching RequestUri. Supports block, allow, or log actions and optional priorities and transforms. | <pre>map(object({<br/>    pattern    = string<br/>    action     = optional(string, "block")<br/>    priority   = optional(number)<br/>    transforms = optional(list(string), ["URL_DECODE", "LOWERCASE"])<br/>  }))</pre> | `{}` | no |
 | <a name="input_waf_enabled"></a> [waf\_enabled](#input\_waf\_enabled) | Attach Azure WAF to AGC when AGC is active. Opt-in; default Detection + DRS 2.1, no custom/rate-limit rules. Ignored when agc\_enabled=false. | `bool` | `false` | no |
 | <a name="input_waf_file_upload_limit_mb"></a> [waf\_file\_upload\_limit\_mb](#input\_waf\_file\_upload\_limit\_mb) | WAF file upload limit in MB. | `number` | `100` | no |
 | <a name="input_waf_ip_blacklist"></a> [waf\_ip\_blacklist](#input\_waf\_ip\_blacklist) | CIDRs blocked by a custom rule. Empty = no blacklist rule. | `list(string)` | `[]` | no |
