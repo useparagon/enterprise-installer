@@ -8,73 +8,14 @@ variable "vpc" {
   type        = any
 }
 
-variable "public_subnet" {
-  description = "The public subnets within the VPC."
-  type        = any
-}
-
 variable "private_subnet" {
   description = "The private subnets within the VPC."
-  type        = any
-}
-
-variable "availability_zones" {
-  description = "The AWS zones that are currently availabile."
   type        = any
 }
 
 variable "rds_postgres_version" {
   description = "Postgres version for the database."
   type        = string
-}
-
-variable "rds_instance_class" {
-  description = "The RDS instance class type used for Postgres."
-  type        = string
-}
-
-variable "rds_managed_sync_instance_class" {
-  description = "The RDS instance class type used for the managed sync Postgres instance."
-  type        = string
-}
-
-variable "rds_gp3_iops" {
-  description = "gp3 provisioned IOPS for all RDS instances. Null uses size-based baseline (3000 below 400 GiB, 12000 at/above)."
-  type        = number
-  default     = null
-  nullable    = true
-}
-
-variable "rds_gp3_storage_throughput" {
-  description = "gp3 throughput (MiB/s). Null uses size-based baseline (125 below 400 GiB, 500 at/above). Must form a valid pair with rds_gp3_iops when overriding."
-  type        = number
-  default     = null
-  nullable    = true
-}
-
-variable "rds_allocated_storage" {
-  description = "Initial allocated storage (GiB) for each Postgres RDS instance."
-  type        = number
-}
-
-variable "rds_max_allocated_storage" {
-  description = "Maximum storage (GiB) for autoscaling on each Postgres RDS instance."
-  type        = number
-}
-
-variable "disable_deletion_protection" {
-  description = "Whether to disable deletion protection."
-  type        = bool
-}
-
-variable "rds_multi_az" {
-  description = "Whether or not multi-az is enabled."
-  type        = bool
-}
-
-variable "rds_multiple_instances" {
-  description = "Whether or not to create multiple Postgres instances."
-  type        = bool
 }
 
 variable "rds_restore_from_snapshot" {
@@ -87,23 +28,17 @@ variable "rds_final_snapshot_enabled" {
   type        = bool
 }
 
-variable "managed_sync_enabled" {
-  description = "Whether to enable managed sync."
-  type        = bool
-}
-
 variable "agent_os_enabled" {
-  description = "Whether to create the Agent OS Postgres instances."
+  description = "Whether Agent OS is enabled (provisions logical context/tools databases on the agent_os instance)."
   type        = bool
 }
 
-# Fully resolved inputs from the root workspace; no defaults in child modules.
-variable "rds_postgres" {
-  description = "Independent PostgreSQL RDS instances, keyed by workload."
+# Fully resolved per-instance catalog from the root workspace; no defaults in this module.
+variable "postgres_instances" {
+  description = "PostgreSQL RDS instances keyed by logical workload name."
   type = map(object({
     identifier                          = string
     database_name                       = string
-    port                                = number
     instance_class                      = string
     allocated_storage                   = number
     max_allocated_storage               = number
@@ -118,8 +53,6 @@ variable "rds_postgres" {
     backup_retention_days               = number
     backup_window                       = string
     maintenance_window                  = string
-    log_statement                       = string
-    log_min_duration_statement          = number
     enabled_cloudwatch_logs_exports     = list(string)
     monitoring_interval                 = number
     performance_insights_enabled        = bool
@@ -130,7 +63,6 @@ variable "rds_postgres" {
     apply_immediately                   = bool
     deletion_protection                 = bool
     kms_key_arn                         = optional(string)
-    ingress_cidr_blocks                 = list(string)
     tags                                = map(string)
   }))
 }
@@ -139,46 +71,4 @@ variable "migrated_passwords" {
   description = "Override credentials to preserve complexity conventions when migrating from legacy workspaces"
   type        = map(string)
   default     = {}
-}
-
-locals {
-  postgres_instances = var.rds_multiple_instances ? merge({
-    cerberus = {
-      name = "${var.workspace}-cerberus"
-      size = "db.t4g.micro"
-      db   = "cerberus"
-    }
-    eventlogs = {
-      name = "${var.workspace}-eventlogs"
-      size = "db.t4g.small"
-      db   = "eventlogs"
-    }
-    hermes = {
-      name = "${var.workspace}-hermes"
-      size = var.rds_instance_class
-      db   = "hermes"
-    }
-    triggerkit = {
-      name = "${var.workspace}-triggerkit"
-      size = "db.t4g.micro"
-      db   = "triggerkit"
-    }
-    zeus = {
-      name = "${var.workspace}-zeus"
-      size = "db.t4g.small"
-      db   = "zeus"
-    }
-    }, var.managed_sync_enabled ? {
-    managed_sync = {
-      name = "${var.workspace}-managed-sync"
-      size = var.rds_managed_sync_instance_class
-      db   = "managed_sync"
-    }
-    } : {}) : {
-    paragon = {
-      name = var.workspace
-      size = var.rds_instance_class
-      db   = "postgres"
-    }
-  }
 }
