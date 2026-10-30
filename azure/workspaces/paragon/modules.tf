@@ -299,7 +299,7 @@ module "agc" {
   public_services            = merge(local.agc_public_routes, local.agent_os_agc_routes, local.managed_sync_agc_routes)
   waf_enabled                = local.waf_active
   waf_policy_id              = local.waf_active ? module.waf[0].policy_id : null
-  diagnostics_storage_name   = try(local.infra_vars.storage.value.root_user, null)
+  diagnostics_storage_name   = try(local.infra_vars.storage.value.agc_diagnostics_account, local.infra_vars.storage.value.root_user, null)
   alb_controller_version     = var.agc_alb_controller_version
   tags                       = local.default_tags
 }

@@ -88,6 +88,7 @@ module "storage" {
   managed_sync_enabled       = var.managed_sync_enabled
   agent_os_enabled           = var.agent_os_enabled
   storage_account_tier       = var.storage_account_tier
+  agc_diagnostics_enabled    = var.agc_subnet_enabled
   agc_logs_retention_days    = var.agc_subnet_enabled ? var.agc_logs_retention_days : null
   auditlogs_lock_enabled     = var.auditlogs_lock_enabled
   auditlogs_retention_days   = var.auditlogs_retention_days

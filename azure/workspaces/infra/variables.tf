@@ -84,7 +84,7 @@ variable "agc_subnet_enabled" {
 }
 
 variable "agc_logs_retention_days" {
-  description = "Days to retain AGC access and firewall logs in existing Blob Storage. Defaults to 30; null disables. Active only with the AGC subnet."
+  description = "Days to retain AGC access and WAF logs in Standard Blob Storage. Defaults to 30; null disables. Active only with AGC subnet."
   type        = number
   default     = 30
   nullable    = true

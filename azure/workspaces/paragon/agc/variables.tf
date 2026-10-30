@@ -89,7 +89,7 @@ variable "waf_policy_id" {
 }
 
 variable "diagnostics_storage_name" {
-  description = "Existing infra Storage Account receiving AGC access and firewall logs."
+  description = "Standard Storage Account from infra for AGC access and firewall diagnostics."
   type        = string
   default     = null
   nullable    = true

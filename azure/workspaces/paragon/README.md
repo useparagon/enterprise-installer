@@ -52,7 +52,7 @@ CAs and applies it to workloads and migration Jobs (`NODE_EXTRA_CA_CERTS`,
 2. **DNS cutover:** Point public DNS to `agc_fqdn` after validating HTTPS and WAF. `agc_dns_cutover` only updates Terraform-managed DNS.
 3. **Direct routing:** After checking HTTPRoutes, certificate renewal, and rollback, set `agc_direct_routing = true` to remove ingress-nginx. Review the plan for the legacy NGINX public IP before applying.
 
-`waf_custom_rules` matches `RequestUri` after optional URL decoding and lowercase transforms. Actions are `block`, `allow`, and `log`. AGC access and firewall logs go to the existing infra Storage Account; the infra workspace defaults to 30-day lifecycle retention.
+`waf_custom_rules` matches `RequestUri` after optional URL decoding and lowercase transforms. Actions are `block`, `allow`, and `log`. AGC logs use infra's Standard Storage Account (dedicated when application storage is Premium). Apply `infra` first; its lifecycle policy defaults to 30 days.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements

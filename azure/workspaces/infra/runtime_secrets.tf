@@ -112,6 +112,7 @@ resource "azurerm_key_vault_secret" "runtime_storage" {
     managed_sync_bucket         = module.storage.blob.managed_sync_container
     logs_container              = module.storage.blob.logs_container
     auditlogs_container         = module.storage.blob.auditlogs_container
+    agc_diagnostics_account     = module.storage.blob.agc_diagnostics_account
     root_user                   = module.storage.blob.name
     root_password               = module.storage.blob.access_key
   })
