@@ -1,14 +1,30 @@
 locals {
-  # One HTTPS listener per host, reusing the per-host certificates cert-manager already
-  # issues for nginx. This keeps AGC off the DNS-01 wildcard, so enabling it never waits
-  # on a DNS delegation and never touches live TLS.
-  https_listeners = {
+  # Legacy services keep one HTTPS listener per host. Path-routed services share
+  # a hostless listener so the external reverse proxy may preserve or rewrite Host.
+  host_public_services = {
     for name, svc in var.public_services :
+    name => svc
+    if try(svc.path_prefix, "") == ""
+  }
+
+  path_public_services = var.path_based_routing_enabled ? {
+    for name, svc in var.public_services :
+    name => svc
+    if try(svc.path_prefix, "") != ""
+  } : {}
+
+  https_listeners = {
+    for name, svc in local.host_public_services :
     name => {
       listener = "https-${name}"
       host     = svc.host
       secret   = "${name}-secret"
     }
+  }
+
+  path_listener = {
+    listener = "https-paths"
+    secret   = "path-routing-secret"
   }
 
   gateway_yaml = yamlencode({
@@ -52,6 +68,21 @@ locals {
             }
           }
         ],
+        length(local.path_public_services) > 0 ? [{
+          name     = local.path_listener.listener
+          port     = 443
+          protocol = "HTTPS"
+          tls = {
+            mode = "Terminate"
+            certificateRefs = [{
+              kind = "Secret"
+              name = local.path_listener.secret
+            }]
+          }
+          allowedRoutes = {
+            namespaces = { from = "Same" }
+          }
+        }] : [],
       )
     }
   })
@@ -126,7 +157,8 @@ locals {
     }
   })
 
-  # Direct: one HTTPRoute per public host to the workload Service.
+  # Direct routing: default services remain host-based. Path-routed services attach
+  # to the shared hostless listener and match only their configured PathPrefix.
   direct_route_yaml = {
     for name, svc in var.public_services :
     name => yamlencode({
@@ -136,34 +168,78 @@ locals {
         name      = "${local.gateway_name}-${name}"
         namespace = var.namespace
       }
-      spec = {
-        parentRefs = [{
-          name        = local.gateway_name
-          sectionName = local.https_listeners[name].listener
-        }]
-        hostnames = [svc.host]
-        rules = concat(
-          length(svc.routes) == 0 ? [{
-            backendRefs = [{
-              name = name
-              port = svc.port
+      spec = merge(
+        {
+          parentRefs = [{
+            name = local.gateway_name
+            sectionName = (
+              contains(keys(local.path_public_services), name)
+              ? local.path_listener.listener
+              : local.https_listeners[name].listener
+            )
+          }]
+          rules = concat(
+            length(svc.routes) == 0 ? [merge(
+              contains(keys(local.path_public_services), name) ? {
+                matches = [{ path = { type = "PathPrefix", value = svc.path_prefix } }]
+              } : {},
+              { backendRefs = [{ name = name, port = svc.port }] }
+            )] : [],
+            [for route in svc.routes : {
+              matches     = [{ path = { type = "PathPrefix", value = route.path } }]
+              backendRefs = [{ name = route.service, port = route.port }]
             }]
-          }] : [],
-          [
-            for route in svc.routes : {
-              matches = [{
-                path = {
-                  type  = "PathPrefix"
-                  value = route.path
-                }
-              }]
-              backendRefs = [{
-                name = route.service
-                port = route.port
-              }]
-            }
-          ]
-        )
+          )
+        },
+        contains(keys(local.path_public_services), name) ? {} : {
+          hostnames = [svc.host]
+        },
+      )
+    })
+  }
+
+  # Explicit probes keep the backend check on /healthz (or the service's existing
+  # healthcheck_path). AGC does not inherit HTTPRoute PathPrefix for probes.
+  # One policy per backend Service. Multi-route releases (Managed Sync, Agent OS)
+  # do not have a Service named after the route map key.
+  path_health_check_targets = length(local.path_public_services) == 0 ? {} : merge([
+    for name, svc in local.path_public_services : (
+      length(svc.routes) == 0 ? {
+        (name) = {
+          service = name
+          path    = svc.healthcheck_path
+        }
+        } : {
+        for service in distinct([for route in svc.routes : route.service]) :
+        service => {
+          service = service
+          path    = svc.healthcheck_path
+        }
+      }
+    )
+  ]...)
+
+  path_health_check_yaml = {
+    for name, target in local.path_health_check_targets :
+    name => yamlencode({
+      apiVersion = "alb.networking.azure.io/v1"
+      kind       = "HealthCheckPolicy"
+      metadata = {
+        name      = "${name}-health-check"
+        namespace = var.namespace
+      }
+      spec = {
+        targetRef = {
+          group     = ""
+          kind      = "Service"
+          name      = target.service
+          namespace = var.namespace
+        }
+        default = {
+          http = {
+            path = target.path
+          }
+        }
       }
     })
   }
@@ -193,6 +269,7 @@ resource "time_sleep" "gateway_programming" {
     kubectl_manifest.https_redirect_route,
     kubectl_manifest.nginx_route,
     kubectl_manifest.direct_route,
+    kubectl_manifest.path_health_check,
   ]
 }
 
@@ -255,4 +332,12 @@ resource "kubectl_manifest" "direct_route" {
 
   yaml_body  = each.value
   depends_on = [kubectl_manifest.gateway]
+}
+
+
+resource "kubectl_manifest" "path_health_check" {
+  for_each = local.direct_routes_enabled ? local.path_health_check_yaml : {}
+
+  yaml_body  = each.value
+  depends_on = [kubectl_manifest.direct_route]
 }

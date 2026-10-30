@@ -1,7 +1,7 @@
 locals {
   # api-sync is only in var.microservices when managed_sync_enabled is true, but locals
   # are always evaluated — use try() so plan succeeds when managed sync is disabled.
-  api_sync_host = replace(replace(try(var.microservices["api-sync"].public_url, ""), "https://", ""), "http://", "")
+  api_sync_host = replace(try(var.microservices["api-sync"].public_url, ""), "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
 
   # openfga-migrate is a post-install hook while the openfga ServiceAccount is normally
   # a regular resource. On first install, AKS can create the Job before the SA is
@@ -35,6 +35,9 @@ locals {
         # of whether Agent OS is enabled.
         { MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = "true" },
         var.agent_os_enabled ? { MANAGED_SYNC_STATUS_EVENTS_ENABLED = "true" } : {},
+        try(var.public_microservices["api-sync"].path_prefix, "") != "" ? {
+          HTTP_PATH_PREFIX = var.public_microservices["api-sync"].path_prefix
+        } : {},
       )
     }
     ingress = {

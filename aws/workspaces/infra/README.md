@@ -2,33 +2,30 @@
 
 See [setup-policy.json](../../setup-policy.json) for permissions that are required to execute this. Note that `<AWS_ACCOUNT_ID>` must be replaced to match target account.
 
-## PostgreSQL RDS instance catalog
+## PostgreSQL per-instance overrides
 
-The root workspace's `rds_postgres` map defines independent RDS PostgreSQL
-instances. Defaults and the Agent OS enablement condition live in the root,
-not in the `postgres` child module. Each map entry can override its
-instance class, database name, Multi-AZ, storage type/size, performance,
-replicas, encryption, monitoring, access CIDRs, backups and maintenance.
+Workspace-level `rds_*` variables remain the defaults for every RDS instance.
+Use `postgres_instances` to override individual logical databases (cerberus,
+eventlogs, hermes, triggerkit, zeus, managed_sync, paragon, agent_os) without
+changing siblings. All instances use the existing `aws_db_instance.postgres`
+resources and shared subnet group, parameter group, and security group.
+Postgres engine version and logging parameters are controlled by `rds_postgres_version`
+and the shared parameter group only—not per-instance overrides. All instances listen on port 5432
+(shared security group).
 
 ```hcl
-rds_postgres = {
-  agent_os = {
-    multi_az = false # Temporary single-AZ test override
-  }
-  # Future standalone workload, opt-in:
-  airflow = {
-    enabled        = false
-    database_name  = "airflow"
-    instance_class = "db.t4g.small"
-    multi_az       = true
+postgres_instances = {
+  hermes = {
+    instance_class        = "db.t4g.large"
+    allocated_storage     = 400
+    iops                  = 12000
+    storage_throughput    = 500
   }
 }
 ```
 
-The `agent_os` entry is gated by `agent_os_enabled` and retains the
-existing Agent OS secret handoff and logical `context`/`tools` databases.
-The legacy Paragon/Managed Sync RDS resources continue unchanged; adding
-a legacy workload to the new map is **not** an automatic migration.
+The `agent_os` instance is provisioned when `agent_os_enabled = true` and uses
+the same catalog with Agent OS-specific defaults (including optional CMK).
 
 ## Valkey instance catalog
 
@@ -187,6 +184,7 @@ valkey_instances = {
 | <a name="input_organization"></a> [organization](#input\_organization) | Name of organization to include in resource names. | `string` | n/a | yes |
 | <a name="input_paragon_managed_sync_config"></a> [paragon\_managed\_sync\_config](#input\_paragon\_managed\_sync\_config) | Optional managed-sync secret data to write to Secrets Manager. Null when managed sync is disabled. | `map(string)` | `null` | no |
 | <a name="input_paragon_valkey_on_agent_os"></a> [paragon\_valkey\_on\_agent\_os](#input\_paragon\_valkey\_on\_agent\_os) | On an Agent OS stack, also create the Paragon Valkey catalog (cache, queue, system, managed sync). Leave false on existing Agent OS installs. Ignored when agent\_os\_enabled is false; valkey\_enabled selects the catalog there. elasticache\_multiple\_instances still chooses one shared instance or one per instance. | `bool` | `false` | no |
+| <a name="input_postgres_instances"></a> [postgres\_instances](#input\_postgres\_instances) | Per-instance PostgreSQL overrides keyed by logical name (cerberus, eventlogs, hermes, triggerkit, zeus, managed\_sync, paragon, agent\_os).<br/>Omitted keys and null optional fields retain built-in defaults derived from workspace-level rds\_* settings and rds\_multiple\_instances / feature flags.<br/>Engine version and logging parameters are workspace-wide only (single shared DB parameter group); use rds\_postgres\_version for engine version. | <pre>map(object({<br/>    identifier                          = optional(string)<br/>    database_name                       = optional(string)<br/>    port                                = optional(number)<br/>    instance_class                      = optional(string)<br/>    allocated_storage                   = optional(number)<br/>    max_allocated_storage               = optional(number)<br/>    multi_az                            = optional(bool)<br/>    availability_zone                   = optional(string)<br/>    read_replica                        = optional(bool)<br/>    replica_instance_class              = optional(string)<br/>    storage_type                        = optional(string)<br/>    iops                                = optional(number)<br/>    storage_throughput                  = optional(number)<br/>    backup_retention_days               = optional(number)<br/>    backup_window                       = optional(string)<br/>    maintenance_window                  = optional(string)<br/>    enabled_cloudwatch_logs_exports     = optional(list(string))<br/>    monitoring_interval                 = optional(number)<br/>    performance_insights_enabled        = optional(bool)<br/>    performance_insights_retention_days = optional(number)<br/>    ca_cert_identifier                  = optional(string)<br/>    auto_minor_version_upgrade          = optional(bool)<br/>    allow_major_version_upgrade         = optional(bool)<br/>    apply_immediately                   = optional(bool)<br/>    deletion_protection                 = optional(bool)<br/>    kms_key_arn                         = optional(string)<br/>    tags                                = optional(map(string))<br/>  }))</pre> | `null` | no |
 | <a name="input_rds_allocated_storage"></a> [rds\_allocated\_storage](#input\_rds\_allocated\_storage) | Initial allocated storage (GiB) for each Postgres RDS instance. | `number` | `20` | no |
 | <a name="input_rds_final_snapshot_enabled"></a> [rds\_final\_snapshot\_enabled](#input\_rds\_final\_snapshot\_enabled) | Specifies that RDS instances should perform a final snapshot before being deleted. | `bool` | `true` | no |
 | <a name="input_rds_gp3_iops"></a> [rds\_gp3\_iops](#input\_rds\_gp3\_iops) | gp3 IOPS for Postgres; null uses size-based baseline (3000 below 400 GiB, 12000 at/above). Set with rds\_gp3\_storage\_throughput to override; only valid when rds\_allocated\_storage >= 400 GiB. | `number` | `null` | no |
@@ -196,7 +194,6 @@ valkey_instances = {
 | <a name="input_rds_max_allocated_storage"></a> [rds\_max\_allocated\_storage](#input\_rds\_max\_allocated\_storage) | Maximum storage (GiB) for autoscaling on each Postgres RDS instance. | `number` | `1000` | no |
 | <a name="input_rds_multi_az"></a> [rds\_multi\_az](#input\_rds\_multi\_az) | Whether or not to enable multi-AZ in each RDS instance. | `bool` | `true` | no |
 | <a name="input_rds_multiple_instances"></a> [rds\_multiple\_instances](#input\_rds\_multiple\_instances) | Whether or not to create multiple Postgres instances. Used for higher volume installations. | `bool` | `true` | no |
-| <a name="input_rds_postgres"></a> [rds\_postgres](#input\_rds\_postgres) | Independent PostgreSQL RDS instances keyed by workload (agent\_os, airflow, etc.). Legacy Paragon/Managed Sync databases remain managed by rds\_multiple\_instances until explicitly migrated. | <pre>map(object({<br/>    enabled                             = optional(bool, true)<br/>    identifier                          = optional(string)<br/>    database_name                       = optional(string, "postgres")<br/>    port                                = optional(number, 5432)<br/>    instance_class                      = optional(string, "db.t4g.medium")<br/>    allocated_storage                   = optional(number, 100)<br/>    max_allocated_storage               = optional(number, 1000)<br/>    engine_version                      = optional(string, "16")<br/>    multi_az                            = optional(bool, true)<br/>    availability_zone                   = optional(string)<br/>    read_replica                        = optional(bool, false)<br/>    replica_instance_class              = optional(string, "db.t4g.small")<br/>    storage_type                        = optional(string, "gp3")<br/>    iops                                = optional(number)<br/>    storage_throughput                  = optional(number)<br/>    backup_retention_days               = optional(number, 7)<br/>    backup_window                       = optional(string, "06:00-07:00")<br/>    maintenance_window                  = optional(string, "Tue:04:00-Tue:05:00")<br/>    log_statement                       = optional(string, "ddl")<br/>    log_min_duration_statement          = optional(number, 1000)<br/>    enabled_cloudwatch_logs_exports     = optional(list(string), ["postgresql", "upgrade"])<br/>    monitoring_interval                 = optional(number, 15)<br/>    performance_insights_enabled        = optional(bool, true)<br/>    performance_insights_retention_days = optional(number, 31)<br/>    ca_cert_identifier                  = optional(string, "rds-ca-rsa2048-g1")<br/>    auto_minor_version_upgrade          = optional(bool, true)<br/>    allow_major_version_upgrade         = optional(bool, false)<br/>    apply_immediately                   = optional(bool, true)<br/>    deletion_protection                 = optional(bool)<br/>    kms_key_arn                         = optional(string)<br/>    ingress_cidr_blocks                 = optional(list(string))<br/>    tags                                = optional(map(string), {})<br/>  }))</pre> | <pre>{<br/>  "agent_os": {}<br/>}</pre> | no |
 | <a name="input_rds_postgres_version"></a> [rds\_postgres\_version](#input\_rds\_postgres\_version) | Postgres version for the database. | `string` | `"14"` | no |
 | <a name="input_rds_restore_from_snapshot"></a> [rds\_restore\_from\_snapshot](#input\_rds\_restore\_from\_snapshot) | Specifies that RDS instances should be restored from a snapshot. | `bool` | `false` | no |
 | <a name="input_redis_enabled"></a> [redis\_enabled](#input\_redis\_enabled) | Keep legacy Redis 6 instances. Only set false after a verified Valkey cutover and soak. | `bool` | `true` | no |
@@ -226,8 +223,8 @@ valkey_instances = {
 | <a name="output_logs_bucket"></a> [logs\_bucket](#output\_logs\_bucket) | The bucket used to store system logs. |
 | <a name="output_monitoring"></a> [monitoring](#output\_monitoring) | Non-sensitive monitoring settings (includes pg\_config.max\_storage\_bytes for Grafana storage alerts). |
 | <a name="output_postgres"></a> [postgres](#output\_postgres) | Connection info for Postgres. |
-| <a name="output_rds_postgres"></a> [rds\_postgres](#output\_rds\_postgres) | Independently configured PostgreSQL RDS connections (agent\_os and future workloads). Does not change the legacy postgres output. |
-| <a name="output_redis"></a> [redis](#output\_redis) | Redis 6 connections only; never switched to Valkey. |
+| <a name="output_rds_postgres"></a> [rds\_postgres](#output\_rds\_postgres) | Deprecated alias of postgres; per-instance connections including optional read replicas. |
+| <a name="output_redis"></a> [redis](#output\_redis) | Connection information for Redis. |
 | <a name="output_secrets_manager_env_secret"></a> [secrets\_manager\_env\_secret](#output\_secrets\_manager\_env\_secret) | Name of the Secrets Manager secret containing Paragon env config. |
 | <a name="output_secrets_manager_secret_arns"></a> [secrets\_manager\_secret\_arns](#output\_secrets\_manager\_secret\_arns) | ARNs of application Secrets Manager secrets. |
 | <a name="output_storage"></a> [storage](#output\_storage) | Object storage connection info. S3 access uses EKS Pod Identity (role\_arn); static access keys are no longer provisioned. |

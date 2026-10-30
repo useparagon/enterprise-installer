@@ -159,6 +159,8 @@ variable "public_microservices" {
     port             = number
     healthcheck_path = string
     public_url       = string
+    public_host      = string
+    path_prefix      = string
   }))
 }
 
@@ -196,6 +198,12 @@ variable "public_monitors" {
 variable "ingress_scheme" {
   description = "Whether the load balancer is 'internet-facing' (public) or 'internal' (private)"
   type        = string
+}
+
+variable "path_based_routing_enabled" {
+  description = "Enable path-prefixed public routes for services whose public URL contains a non-root path."
+  type        = bool
+  default     = false
 }
 
 variable "k8s_version" {

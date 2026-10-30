@@ -48,15 +48,22 @@ locals {
     }
   }
 
+  managed_sync_extra_env = merge(
+    var.agent_os_enabled ? {
+      MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = "false"
+      MANAGED_SYNC_STATUS_EVENTS_ENABLED             = "true"
+    } : {},
+    try(var.public_microservices["api-sync"].path_prefix, "") != "" ? {
+      HTTP_PATH_PREFIX = var.public_microservices["api-sync"].path_prefix
+    } : {}
+  )
+
   # Managed Sync owns Context topic creation in Google Managed Kafka.
-  managed_sync_agent_os_values = var.agent_os_enabled ? {
+  managed_sync_agent_os_values = length(local.managed_sync_extra_env) == 0 ? {} : {
     global = {
-      env = {
-        MANAGED_SYNC_KAFKA_SKIP_CONTEXT_TOPIC_CREATION = "false"
-        MANAGED_SYNC_STATUS_EVENTS_ENABLED             = "true"
-      }
+      env = local.managed_sync_extra_env
     }
-  } : {}
+  }
 
   # Chart pods all use this KSA. Per-service serviceAccount values are ignored.
   managed_sync_workload_identity_values = var.storage_service_account != null ? {

@@ -70,6 +70,7 @@ module "helm" {
     agent_os_vendor = var.agent_os_enabled ? google_secret_manager_secret_version.agent_os_vendor[0].name : null
   }))
   ingress_scheme              = var.ingress_scheme
+  path_based_routing_enabled  = var.path_based_routing_enabled
   k8s_version                 = var.k8s_version
   logs_bucket                 = local.logs_bucket
   managed_sync_enabled        = var.managed_sync_enabled

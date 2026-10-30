@@ -10,8 +10,8 @@ output "postgres" {
 }
 
 output "rds_postgres" {
-  description = "Independently configured PostgreSQL RDS connections (agent_os and future workloads). Does not change the legacy postgres output."
-  value       = module.postgres.rds_postgres
+  description = "Deprecated alias of postgres; per-instance connections including optional read replicas."
+  value       = module.postgres.rds
   sensitive   = true
 }
 
