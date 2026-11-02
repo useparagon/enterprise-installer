@@ -559,6 +559,7 @@ variable "valkey_instances" {
     TLS defaults to false except agent_os (true); other instances may set tls_enabled when the app secret contract supports AUTH.
     kms_key_arn overrides at-rest encryption for that replication group only. CloudWatch logs stay on the workspace Valkey key.
     snapshot_name applies only at creation. Setting or changing it later replaces the replication group.
+    Cluster mode defaults replicas_per_node_group to 1. An explicit 0 is rejected unless cluster_enabled is false.
   EOT
   type = map(object({
     node_type               = optional(string)
@@ -609,6 +610,16 @@ variable "valkey_instances" {
       cfg.cluster_enabled != false || cfg.num_node_groups == null
     ])
     error_message = "num_node_groups requires cluster_enabled=true."
+  }
+
+  validation {
+    # replicas 0 is only meaningful when this override turns cluster mode off.
+    # A null cluster_enabled still follows the catalog, which may enable it.
+    condition = alltrue([
+      for name, cfg in var.valkey_instances :
+      cfg.replicas_per_node_group == null || cfg.replicas_per_node_group >= 1 || cfg.cluster_enabled == false
+    ])
+    error_message = "Cluster mode requires replicas_per_node_group of at least 1. Set cluster_enabled=false to keep a non-cluster instance."
   }
 }
 
