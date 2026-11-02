@@ -11,6 +11,7 @@ module "waf" {
   waf_rate_limit_global_window_sec = var.waf_rate_limit_global_window_sec
   waf_rate_limit_paths             = var.waf_rate_limit_paths
   waf_rate_limit_path_window_sec   = var.waf_rate_limit_path_window_sec
+  waf_custom_rules                 = var.waf_custom_rules
   waf_managed_rule_groups          = var.waf_managed_rule_groups
 }
 
