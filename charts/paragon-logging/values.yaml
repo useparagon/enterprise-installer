@@ -5,6 +5,15 @@ subchart:
   openobserve:
     enabled: true
 
+# Parent values replace subchart tolerations entirely — keep the subchart
+# catch-all plus Agent OS (logging chart v1.0.1).
+fluent-bit:
+  tolerations:
+    - operator: Exists
+    - key: useparagon.com/workload
+      operator: Exists
+      effect: NoSchedule
+
 global:
   # Optional private registry / Artifactory proxy (prepended to image repository paths).
   imageRegistry: ""
