@@ -329,9 +329,9 @@ resource "aws_elasticache_replication_group" "valkey" {
   snapshot_window          = "12:00-13:00"
   maintenance_window       = "tue:16:00-tue:17:00"
 
-  subnet_group_name          = aws_elasticache_subnet_group.valkey[each.key].name
-  security_group_ids         = [aws_security_group.valkey[0].id]
-  multi_az_enabled           = each.value.multi_az
+  subnet_group_name  = aws_elasticache_subnet_group.valkey[each.key].name
+  security_group_ids = [aws_security_group.valkey[0].id]
+  multi_az_enabled   = each.value.multi_az
   # Cluster mode requires automatic failover even when multi_az is false.
   automatic_failover_enabled = each.value.cluster_enabled ? true : each.value.multi_az
 
