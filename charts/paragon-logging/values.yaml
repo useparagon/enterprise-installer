@@ -5,9 +5,11 @@ subchart:
   openobserve:
     enabled: true
 
-# Aligns with useparagon-internal/logging paragon-logging chart v1.0.1 (Agent OS taints).
+# Parent values replace subchart tolerations entirely — keep the subchart
+# catch-all plus Agent OS (logging chart v1.0.1).
 fluent-bit:
   tolerations:
+    - operator: Exists
     - key: useparagon.com/workload
       operator: Exists
       effect: NoSchedule
