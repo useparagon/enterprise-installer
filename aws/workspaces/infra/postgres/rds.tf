@@ -19,6 +19,13 @@ locals {
   }
 
   agent_os_databases = var.agent_os_enabled && contains(keys(var.postgres_instances), "agent_os") ? toset(["context", "tools"]) : toset([])
+
+  # Multi-AZ RDS cannot change DBSubnetGroupName in place (even to a group with the
+  # same subnets). Agent OS keeps its legacy subnet group name in AWS.
+  postgres_db_subnet_group_name = {
+    for key, cfg in var.postgres_instances :
+    key => key == "agent_os" ? aws_db_subnet_group.agent_os["agent_os"].name : aws_db_subnet_group.postgres.name
+  }
 }
 
 resource "random_string" "postgres_root_username" {
@@ -105,6 +112,16 @@ resource "aws_db_subnet_group" "postgres" {
   }
 }
 
+resource "aws_db_subnet_group" "agent_os" {
+  for_each = contains(keys(var.postgres_instances), "agent_os") ? { agent_os = var.postgres_instances["agent_os"] } : {}
+
+  name        = "${var.workspace}-agent-os-subnet"
+  description = "Agent OS Postgres subnet group"
+  subnet_ids  = var.private_subnet[*].id
+
+  tags = merge({ Name = "${var.workspace}-agent-os-subnet" }, each.value.tags)
+}
+
 resource "aws_db_parameter_group" "postgres" {
   name   = "${var.workspace}-${local.postgres_family}"
   family = local.postgres_family
@@ -187,7 +204,7 @@ resource "aws_db_instance" "postgres" {
   monitoring_role_arn         = aws_iam_role.rds_enhanced_monitoring.arn
   multi_az                    = each.value.multi_az
 
-  db_subnet_group_name      = aws_db_subnet_group.postgres.id
+  db_subnet_group_name      = local.postgres_db_subnet_group_name[each.key]
   deletion_protection       = each.value.deletion_protection
   snapshot_identifier       = var.rds_restore_from_snapshot ? data.aws_db_snapshot.postgres[each.key].id : null
   skip_final_snapshot       = !var.rds_final_snapshot_enabled
