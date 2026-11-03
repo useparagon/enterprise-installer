@@ -6,9 +6,11 @@
 # the legacy Agent OS–scoped resources before the instance is repointed (see
 # InvalidDBSubnetGroupStateFault / dependency errors on SG and param groups).
 #
-# destroy = false drops them from state without a delete call; the instance
-# update in the same apply switches to the shared resources. Orphaned AWS objects
-# can be removed manually once every stack has applied this release.
+# removed blocks must address the whole resource (no ["key"]); that drops every
+# instance of the old for_each from state. Only agent_os used rds_postgres
+# subnet/param/SG on live stacks. destroy = false skips AWS delete so the
+# instance can repoint to shared resources in the same apply. Orphaned AWS
+# objects can be removed manually once every stack has applied this release.
 #
 # Remove this file after all infra stacks have applied the release that includes it.
 
@@ -33,7 +35,7 @@ moved {
 }
 
 removed {
-  from = aws_db_subnet_group.rds_postgres["agent_os"]
+  from = aws_db_subnet_group.rds_postgres
 
   lifecycle {
     destroy = false
@@ -41,7 +43,7 @@ removed {
 }
 
 removed {
-  from = aws_db_parameter_group.rds_postgres["agent_os"]
+  from = aws_db_parameter_group.rds_postgres
 
   lifecycle {
     destroy = false
@@ -49,7 +51,7 @@ removed {
 }
 
 removed {
-  from = aws_security_group.rds_postgres["agent_os"]
+  from = aws_security_group.rds_postgres
 
   lifecycle {
     destroy = false
