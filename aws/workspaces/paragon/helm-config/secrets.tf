@@ -135,7 +135,7 @@ locals {
 
       MANAGED_SYNC_REDIS_URL             = try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], "${local.redis_config.host}:${local.redis_config.port}")
       MANAGED_SYNC_REDIS_CLUSTER_ENABLED = local.redis_config.cluster_enabled
-      MANAGED_SYNC_REDIS_TLS_ENABLED     = false
+      MANAGED_SYNC_REDIS_TLS_ENABLED     = try(var.infra_values.redis.value.managed_sync.ssl, var.infra_values.redis.value.cache.ssl, false)
 
       SYNC_INSTANCE_POSTGRES_HOST        = local.postgres_config.sync_instance.host
       SYNC_INSTANCE_POSTGRES_PORT        = local.postgres_config.sync_instance.port
