@@ -5,9 +5,7 @@ resource "aws_iam_service_linked_role" "autoscaling" {
   # Account-wide SLR; do not delete via Terraform when other stacks or ASGs still use it.
   # To set create_autoscaling_linked_role = false, state-rm this instance first so apply
   # does not call iam:DeleteServiceLinkedRole (customer policies often omit aws-service-role/*).
-  lifecycle {
-    prevent_destroy = true
-  }
+  # For infra destroy when the SLR must remain: retain-autoscaling-slr-state.sh (this branch).
 }
 
 locals {

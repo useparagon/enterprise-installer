@@ -10,7 +10,8 @@ resource "aws_flow_log" "main" {
 }
 
 resource "aws_s3_bucket" "flow_logs" {
-  bucket = "${var.workspace}-vpc-logs"
+  bucket        = "${var.workspace}-vpc-logs"
+  force_destroy = var.force_destroy
 }
 
 resource "aws_s3_bucket_versioning" "flow_logs" {

@@ -313,7 +313,7 @@ variable "disable_cloudtrail" {
 }
 
 variable "disable_deletion_protection" {
-  description = "Used to disable deletion protection on RDS and S3 resources."
+  description = "Teardown mode: disables deletion protection on RDS and enables S3 force_destroy (including VPC flow log bucket). Run disable-eks-deletion-protection.sh before destroy until the EKS module pin exposes cluster deletion_protection."
   type        = bool
   default     = false
 }

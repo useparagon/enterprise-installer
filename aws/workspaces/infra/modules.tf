@@ -31,6 +31,7 @@ module "network" {
   network_firewall_enabled = var.network_firewall.enabled
   logs_bucket_name         = module.storage.logs_bucket_name
   network_firewall         = var.network_firewall
+  force_destroy            = var.disable_deletion_protection
 }
 
 module "cloudtrail" {
@@ -255,6 +256,8 @@ module "bastion" {
 
   # Workloads that bootstrap over the internet must wait for egress routing (NFW or NAT).
   egress_ready = module.network.egress_ready
+
+  disable_deletion_protection = var.disable_deletion_protection
 }
 
 module "cluster" {

@@ -3,6 +3,12 @@ variable "workspace" {
   type        = string
 }
 
+variable "force_destroy" {
+  description = "When true, S3 buckets may be destroyed even when non-empty (teardown)."
+  type        = bool
+  default     = false
+}
+
 variable "aws_region" {
   description = "The AWS region resources are created in."
   type        = string

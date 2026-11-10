@@ -89,6 +89,12 @@ variable "egress_ready" {
   type        = string
 }
 
+variable "disable_deletion_protection" {
+  description = "When true, the bastion logs S3 bucket is created with force_destroy for teardown."
+  type        = bool
+  default     = false
+}
+
 locals {
   # TODO: update to random port
   ssh_port = 22
