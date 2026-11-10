@@ -7,6 +7,8 @@
 #
 #   DRY_RUN=1 ./retain-app-bucket-state.sh
 #   ./retain-app-bucket-state.sh
+#
+# Reverse: import-app-bucket-state.sh (APP_BUCKET_NAME or WORKSPACE).
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
