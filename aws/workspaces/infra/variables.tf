@@ -608,9 +608,10 @@ variable "valkey_instances" {
   validation {
     # replicas 0 is only meaningful when this override turns cluster mode off.
     # A null cluster_enabled still follows the catalog, which may enable it.
+    # coalesce: `null >= 1` errors even behind ||, so an omitted replica count must become the catalog default first.
     condition = alltrue([
       for name, cfg in var.valkey_instances :
-      cfg.replicas_per_node_group == null || cfg.replicas_per_node_group >= 1 || cfg.cluster_enabled == false
+      coalesce(cfg.replicas_per_node_group, 1) >= 1 || cfg.cluster_enabled == false
     ])
     error_message = "Cluster mode requires replicas_per_node_group of at least 1. Set cluster_enabled=false to keep a non-cluster instance."
   }
