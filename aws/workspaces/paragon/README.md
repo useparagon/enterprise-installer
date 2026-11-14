@@ -30,9 +30,11 @@ agent_os_enabled     = false # Switch to true after infra and Managed Sync are r
 agent_os_version     = "0.3.0-beta.3" # Use the compatible published chart for this environment
 ```
 
-The infra workspace requires both `managed_sync_enabled = true` and
-`valkey_enabled = true` before `agent_os_enabled` can be true. In the paragon
-workspace, Managed Sync must also be enabled before Agent OS.
+The infra workspace requires `managed_sync_enabled = true` before
+`agent_os_enabled` can be true. Agent OS brings its own Valkey and does not
+use `valkey_enabled`. Set `paragon_valkey_on_agent_os = true` in infra to add
+the Paragon Valkey catalog on that same stack. In the paragon workspace,
+Managed Sync must also be enabled before Agent OS.
 
 On AWS Enterprise, enabling Agent OS also configures Managed Sync to create its
 context Kafka topics and publish sync lifecycle events. Specifically,

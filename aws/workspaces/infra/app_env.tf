@@ -6,14 +6,25 @@
 
 locals {
   argocd_postgres = module.postgres.rds
-  argocd_redis    = module.redis.elasticache
-  argocd_storage  = module.storage.s3
+  # Redis 6 while it still exists. After decommission the env secret must carry
+  # the logical Valkey roles; an empty map makes the URL keys null and the
+  # replace drops them. Agent OS keeps its own Valkey and stays out of this map.
+  argocd_redis = var.redis_enabled ? local.redis_connections : {
+    for role, instance in local.valkey_role_instances :
+    role => module.redis.valkey[instance]
+    if contains(keys(module.redis.valkey), instance) && role != "agent_os"
+  }
+  argocd_storage = module.storage.s3
 
   argocd_cloud_storage_type = "S3"
 
   argocd_redis_cache = try(local.argocd_redis.cache, null)
 
-  argocd_default_redis_url = local.argocd_redis_cache != null ? "${local.argocd_redis_cache.host}:${local.argocd_redis_cache.port}" : null
+  argocd_default_redis_url = local.argocd_redis_cache != null ? (
+    try(local.argocd_redis_cache.ssl, false) && try(local.argocd_redis_cache.password, null) != null
+    ? ":${urlencode(local.argocd_redis_cache.password)}@${local.argocd_redis_cache.host}:${local.argocd_redis_cache.port}"
+    : "${local.argocd_redis_cache.host}:${local.argocd_redis_cache.port}"
+  ) : null
 
   # Map chart Redis roles to ElastiCache instances. workflow shares cache —
   # there is no dedicated workflow cluster (see charts/example.yaml).
@@ -26,7 +37,7 @@ locals {
 
   argocd_redis_endpoint = {
     for role, source in local.argocd_redis_role_source :
-    role => try(local.argocd_redis[source], local.argocd_redis_cache, null)
+    role => try(local.argocd_redis[role], local.argocd_redis[source], local.argocd_redis_cache, null)
   }
 
   argocd_redis_cluster_enabled = {
@@ -40,8 +51,12 @@ locals {
   }
 
   argocd_redis_url = {
-    for role in keys(local.argocd_redis_endpoint) :
-    role => local.argocd_redis_endpoint[role] != null ? "${local.argocd_redis_endpoint[role].host}:${local.argocd_redis_endpoint[role].port}" : local.argocd_default_redis_url
+    for role, endpoint in local.argocd_redis_endpoint :
+    role => endpoint != null ? (
+      try(endpoint.ssl, false) && try(endpoint.password, null) != null
+      ? ":${urlencode(endpoint.password)}@${endpoint.host}:${endpoint.port}"
+      : "${endpoint.host}:${endpoint.port}"
+    ) : local.argocd_default_redis_url
   }
 
   # *_PUBLIC_URL / PARAGON_DOMAIN are chart envKeys owned by the paragon workspace
