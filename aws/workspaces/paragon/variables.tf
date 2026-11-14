@@ -1307,10 +1307,29 @@ locals {
     "false"
   )
 
+  # Same address shape for every role. A TLS instance puts the AUTH token in
+  # the URL; a plain instance stays host:port. One shared cache and separate
+  # instances use this same rule.
+  redis_role_endpoint = {
+    cache    = try(local.infra_vars.redis.value.cache, null)
+    queue    = try(local.infra_vars.redis.value.queue, local.infra_vars.redis.value.cache, null)
+    system   = try(local.infra_vars.redis.value.system, local.infra_vars.redis.value.cache, null)
+    workflow = try(local.infra_vars.redis.value.workflow, local.infra_vars.redis.value.cache, null)
+  }
+
+  redis_role_url = {
+    for role, endpoint in local.redis_role_endpoint :
+    role => endpoint == null ? null : (
+      try(endpoint.ssl, false) && try(endpoint.password, null) != null
+      ? ":${urlencode(endpoint.password)}@${endpoint.host}:${endpoint.port}"
+      : "${endpoint.host}:${endpoint.port}"
+    )
+  }
+
   default_redis_url = try(
     local.selected_helm_vars.global.env["REDIS_URL"],
     "${local.selected_helm_vars.global.env["REDIS_HOST"]}:${local.selected_helm_vars.global.env["REDIS_PORT"]}",
-    "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}"
+    local.redis_role_url.cache
   )
 
   pg_config = try(local.infra_vars.monitoring.value.pg_config, {})
@@ -1466,16 +1485,16 @@ locals {
 
           CACHE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
           CACHE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
-          CACHE_REDIS_URL                = try("${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
+          CACHE_REDIS_URL                = coalesce(local.redis_role_url.cache, local.default_redis_url)
           QUEUE_REDIS_CLUSTER_ENABLED    = try(local.infra_vars.redis.value.queue.cluster, local.default_redis_cluster)
           QUEUE_REDIS_TLS_ENABLED        = try(local.infra_vars.redis.value.queue.ssl, local.default_redis_ssl)
-          QUEUE_REDIS_URL                = try("${local.infra_vars.redis.value.queue.host}:${local.infra_vars.redis.value.queue.port}", local.default_redis_url)
+          QUEUE_REDIS_URL                = coalesce(local.redis_role_url.queue, local.default_redis_url)
           SYSTEM_REDIS_CLUSTER_ENABLED   = try(local.infra_vars.redis.value.system.cluster, local.default_redis_cluster)
           SYSTEM_REDIS_TLS_ENABLED       = try(local.infra_vars.redis.value.system.ssl, local.default_redis_ssl)
-          SYSTEM_REDIS_URL               = try("${local.infra_vars.redis.value.system.host}:${local.infra_vars.redis.value.system.port}", local.default_redis_url)
+          SYSTEM_REDIS_URL               = coalesce(local.redis_role_url.system, local.default_redis_url)
           WORKFLOW_REDIS_CLUSTER_ENABLED = try(local.infra_vars.redis.value.workflow.cluster, local.infra_vars.redis.value.cache.cluster, local.default_redis_cluster)
           WORKFLOW_REDIS_TLS_ENABLED     = try(local.infra_vars.redis.value.workflow.ssl, local.infra_vars.redis.value.cache.ssl, local.default_redis_ssl)
-          WORKFLOW_REDIS_URL             = try("${local.infra_vars.redis.value.workflow.host}:${local.infra_vars.redis.value.workflow.port}", "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}", local.default_redis_url)
+          WORKFLOW_REDIS_URL             = coalesce(local.redis_role_url.workflow, local.default_redis_url)
 
           # Cloud Storage configurations (S3 auth via EKS Pod Identity; no static access keys)
           CLOUD_STORAGE_PUBLIC_BUCKET = try(local.storage_output.public_bucket, "${local.workspace}-cdn")

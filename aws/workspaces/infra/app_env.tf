@@ -20,7 +20,11 @@ locals {
 
   argocd_redis_cache = try(local.argocd_redis.cache, null)
 
-  argocd_default_redis_url = local.argocd_redis_cache != null ? "${local.argocd_redis_cache.host}:${local.argocd_redis_cache.port}" : null
+  argocd_default_redis_url = local.argocd_redis_cache != null ? (
+    try(local.argocd_redis_cache.ssl, false) && try(local.argocd_redis_cache.password, null) != null
+    ? ":${urlencode(local.argocd_redis_cache.password)}@${local.argocd_redis_cache.host}:${local.argocd_redis_cache.port}"
+    : "${local.argocd_redis_cache.host}:${local.argocd_redis_cache.port}"
+  ) : null
 
   # Map chart Redis roles to ElastiCache instances. workflow shares cache —
   # there is no dedicated workflow cluster (see charts/example.yaml).
@@ -47,8 +51,12 @@ locals {
   }
 
   argocd_redis_url = {
-    for role in keys(local.argocd_redis_endpoint) :
-    role => local.argocd_redis_endpoint[role] != null ? "${local.argocd_redis_endpoint[role].host}:${local.argocd_redis_endpoint[role].port}" : local.argocd_default_redis_url
+    for role, endpoint in local.argocd_redis_endpoint :
+    role => endpoint != null ? (
+      try(endpoint.ssl, false) && try(endpoint.password, null) != null
+      ? ":${urlencode(endpoint.password)}@${endpoint.host}:${endpoint.port}"
+      : "${endpoint.host}:${endpoint.port}"
+    ) : local.argocd_default_redis_url
   }
 
   # *_PUBLIC_URL / PARAGON_DOMAIN are chart envKeys owned by the paragon workspace

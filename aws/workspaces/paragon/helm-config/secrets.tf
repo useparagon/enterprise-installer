@@ -52,11 +52,23 @@ locals {
     host            = try(var.base_helm_values.global.env["REDIS_HOST"], var.infra_values.redis.value.managed_sync.host, var.infra_values.redis.value.cache.host)
     port            = try(var.base_helm_values.global.env["REDIS_PORT"], var.infra_values.redis.value.managed_sync.port, var.infra_values.redis.value.cache.port)
     cluster_enabled = try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_CLUSTER_ENABLED"], var.infra_values.redis.value.managed_sync.cluster, var.infra_values.redis.value.cache.cluster, false)
+    password        = try(var.infra_values.redis.value.managed_sync.password, var.infra_values.redis.value.cache.password, null)
+    ssl             = try(var.infra_values.redis.value.managed_sync.ssl, var.infra_values.redis.value.cache.ssl, false)
   }
+
+  redis_config_url = (
+    try(local.redis_config.ssl, false) && try(local.redis_config.password, null) != null
+    ? ":${urlencode(local.redis_config.password)}@${local.redis_config.host}:${local.redis_config.port}"
+    : "${local.redis_config.host}:${local.redis_config.port}"
+  )
 
   # Workflow Redis shares cache when there is no dedicated workflow instance (matches monorepo chart).
   workflow_redis_from_infra = try(var.infra_values.redis.value.workflow, var.infra_values.redis.value.cache, null)
-  workflow_redis_url        = local.workflow_redis_from_infra != null ? "${local.workflow_redis_from_infra.host}:${local.workflow_redis_from_infra.port}" : null
+  workflow_redis_url = local.workflow_redis_from_infra != null ? (
+    try(local.workflow_redis_from_infra.ssl, false) && try(local.workflow_redis_from_infra.password, null) != null
+    ? ":${urlencode(local.workflow_redis_from_infra.password)}@${local.workflow_redis_from_infra.host}:${local.workflow_redis_from_infra.port}"
+    : "${local.workflow_redis_from_infra.host}:${local.workflow_redis_from_infra.port}"
+  ) : null
 
   # Backward compatible with infra workspaces that still emit the legacy "minio" output
   # instead of the renamed "storage" output.
@@ -133,9 +145,9 @@ locals {
       MANAGED_SYNC_KAFKA_SASL_MECHANISM = local.kafka_config.sasl_mechanism
       MANAGED_SYNC_KAFKA_SSL_ENABLED    = local.kafka_config.ssl_enabled
 
-      MANAGED_SYNC_REDIS_URL             = try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], "${local.redis_config.host}:${local.redis_config.port}")
+      MANAGED_SYNC_REDIS_URL             = try(var.base_helm_values.global.env["MANAGED_SYNC_REDIS_URL"], local.redis_config_url)
       MANAGED_SYNC_REDIS_CLUSTER_ENABLED = local.redis_config.cluster_enabled
-      MANAGED_SYNC_REDIS_TLS_ENABLED     = try(var.infra_values.redis.value.managed_sync.ssl, var.infra_values.redis.value.cache.ssl, false)
+      MANAGED_SYNC_REDIS_TLS_ENABLED     = local.redis_config.ssl
 
       SYNC_INSTANCE_POSTGRES_HOST        = local.postgres_config.sync_instance.host
       SYNC_INSTANCE_POSTGRES_PORT        = local.postgres_config.sync_instance.port

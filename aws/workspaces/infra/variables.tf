@@ -521,8 +521,9 @@ variable "postgres_instances" {
   nullable = true
 
   validation {
-    condition = var.postgres_instances == null || alltrue([
-      for key, cfg in var.postgres_instances :
+    # coalesce: Terraform still evaluates the for when the variable is null, so || does not protect it.
+    condition = alltrue([
+      for key, cfg in coalesce(var.postgres_instances, {}) :
       contains(["cerberus", "eventlogs", "hermes", "triggerkit", "zeus", "managed_sync", "paragon", "agent_os"], key) &&
       (cfg.identifier == null || can(regex("^[a-z][a-z0-9-]*[a-z0-9]$", cfg.identifier))) &&
       (cfg.multi_az == null || cfg.availability_zone == null || !cfg.multi_az)
@@ -531,8 +532,8 @@ variable "postgres_instances" {
   }
 
   validation {
-    condition = var.postgres_instances == null || alltrue([
-      for _, cfg in var.postgres_instances :
+    condition = alltrue([
+      for _, cfg in coalesce(var.postgres_instances, {}) :
       (cfg.iops == null) == (cfg.storage_throughput == null)
     ])
     error_message = "postgres_instances iops and storage_throughput must be set together."
@@ -556,7 +557,7 @@ variable "valkey_instances" {
     Overrides for Valkey instances (cache, queue, system, managed_sync, agent_os).
     Merged per key with the built-in catalog (cache.r6g.large cache/managed sync, t4g.medium queue, t4g.micro system). Empty uses defaults only.
     The catalog filter creates the instances: elasticache_multiple_instances selects one shared cache or separate instances; valkey_enabled creates the Paragon catalog except on an Agent OS stack, where paragon_valkey_on_agent_os is the opt-in; managed_sync_enabled and agent_os_enabled gate those instances.
-    TLS defaults to false except agent_os (true); other instances may set tls_enabled when the app secret contract supports AUTH.
+    Every role has tls_enabled. It defaults to false for cache, queue, system, and managed sync, whether they share one instance or run as separate instances. Set it on a role to turn on transit encryption and AUTH for that instance. Agent OS defaults to true.
     kms_key_arn overrides at-rest encryption for that replication group only. CloudWatch logs stay on the workspace Valkey key.
     snapshot_name applies only at creation. Setting or changing it later replaces the replication group.
     Cluster mode defaults replicas_per_node_group to 1. An explicit 0 is rejected unless cluster_enabled is false.
@@ -594,14 +595,6 @@ variable "valkey_instances" {
       (cfg.snapshot_name == null ? true : trimspace(cfg.snapshot_name) != "")
     ])
     error_message = "Invalid Valkey instance settings (node type, engine, backups, topology, CMK ARN or snapshot)."
-  }
-
-  validation {
-    condition = alltrue([
-      for name, cfg in var.valkey_instances :
-      name == "agent_os" || cfg.tls_enabled != true
-    ])
-    error_message = "TLS is supported only on agent_os. cache, queue, system and managed_sync stay TLS-off until the Redis secret contract carries AUTH."
   }
 
   validation {
