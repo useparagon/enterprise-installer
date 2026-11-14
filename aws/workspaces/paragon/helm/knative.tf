@@ -45,6 +45,7 @@ locals {
     length(data.kubernetes_secret.docker_cfg) > 0 ||
     length(kubernetes_secret.docker_login) > 0
   )
+  knative_serving_upgrade_spec = yamldecode(file("${path.module}/../../../../scripts/knative_serving_cr_spec.yaml"))
 }
 
 # Same docker-cfg as paragon workloads. Knative's revision controller lives in
@@ -116,6 +117,7 @@ resource "kubectl_manifest" "knative_serving" {
           },
         ]
       },
+      local.knative_serving_upgrade_spec,
       local.knative_serving_pull_secret ? {
         registry = {
           imagePullSecrets = [{

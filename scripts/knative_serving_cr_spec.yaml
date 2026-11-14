@@ -1,0 +1,13 @@
+# KnativeServing spec fragments applied on all clouds (PARA-27985).
+# Default Knative PDBs use minAvailable: 80%, which yields allowedDisruptions: 0
+# at a single replica and blocks node drain during cluster upgrades.
+# maxUnavailable: 1 keeps the default single-replica footprint but allows voluntary
+# eviction during cordon/drain (brief unavailability on those components is OK).
+
+podDisruptionBudgets:
+  - name: activator-pdb
+    maxUnavailable: 1
+  - name: webhook-pdb
+    maxUnavailable: 1
+  - name: 3scale-kourier-gateway-pdb
+    maxUnavailable: 1
