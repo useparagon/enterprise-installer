@@ -4,6 +4,8 @@ description: A Helm chart for Kubernetes
 type: application
 version: __PARAGON_VERSION__
 appVersion: 'v1'
+annotations:
+  paragon.useparagon.com/upstream-logging-chart-semver: "1.0.1"
 
 dependencies:
   - name: paragon-templates
