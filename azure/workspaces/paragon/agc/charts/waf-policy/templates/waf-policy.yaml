@@ -1,0 +1,13 @@
+apiVersion: alb.networking.azure.io/v1
+kind: WebApplicationFirewallPolicy
+metadata:
+  name: {{ printf "%s-waf" .Values.gatewayName | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: {{ required "gatewayName is required" .Values.gatewayName | quote }}
+    namespace: {{ .Release.Namespace | quote }}
+  webApplicationFirewall:
+    id: {{ required "wafPolicyId is required" .Values.wafPolicyId | quote }}

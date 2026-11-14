@@ -28,6 +28,19 @@ variable "agent_os_enabled" {
   type        = bool
 }
 
+variable "agc_diagnostics_enabled" {
+  description = "Use Standard storage for AGC diagnostics when the AGC subnet is enabled."
+  type        = bool
+  default     = false
+}
+
+variable "agc_logs_retention_days" {
+  description = "AGC access and WAF log retention in days (default 30; null disables)."
+  type        = number
+  default     = 30
+  nullable    = true
+}
+
 variable "auditlogs_retention_days" {
   description = "The number of days to retain audit logs before deletion."
   type        = number

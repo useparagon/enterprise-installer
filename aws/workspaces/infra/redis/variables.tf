@@ -29,7 +29,7 @@ variable "elasticache_multi_az" {
 }
 
 variable "elasticache_multiple_instances" {
-  description = "Whether or not to create multiple Redis instances."
+  description = "Legacy Redis topology selector (parent workspace elasticache_multiple_instances)."
   type        = bool
 }
 
@@ -38,8 +38,19 @@ variable "managed_sync_enabled" {
   type        = bool
 }
 
+variable "redis_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "redis_kea_parameter_groups" {
+  description = "Redis parameter group families (cluster, standalone) that enable notify-keyspace-events=KEA. Only families whose Redis instances are migration sources."
+  type        = set(string)
+  default     = []
+}
+
 variable "valkey_kms_key_arn" {
-  description = "KMS key ARN shared by all Valkey instances for at-rest encryption and CloudWatch logs."
+  description = "Workspace KMS key ARN. Encrypts every Valkey CloudWatch log group, and each replication group that does not set kms_key_arn."
   type        = string
 }
 
@@ -53,6 +64,11 @@ variable "valkey_instances" {
     tls_enabled             = bool
     snapshot_retention_days = number
     log_retention_days      = number
+    # Null means unset. The replication group coalesces these at create time.
+    num_node_groups         = optional(number)
+    replicas_per_node_group = optional(number)
+    kms_key_arn             = optional(string)
+    snapshot_name           = optional(string)
   }))
 }
 
@@ -89,7 +105,7 @@ locals {
   cache_autoscaling_supports_size = contains(["large", "xlarge", "2xlarge"], element(split(".", lower(var.elasticache_node_type)), 2))
   cache_autoscaling_enabled       = var.elasticache_multiple_instances && local.cache_autoscaling_supports_family && local.cache_autoscaling_supports_size
 
-  cache_autoscaling_targets = local.cache_autoscaling_enabled ? merge({
+  cache_autoscaling_targets = var.redis_enabled && local.cache_autoscaling_enabled ? merge({
     cache = {
       resource_id = "replication-group/${aws_elasticache_replication_group.redis[0].replication_group_id}"
     }
