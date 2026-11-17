@@ -23,6 +23,8 @@ IGNORED_SERVICES = [
     "alb-log-parser",
     "minio",
     "ocs-code-runner",
+    # Developer MCP has no on-prem chart yet; remove this entry when its subchart lands.
+    "developer-mcp",
 ]
 
 CHART_CATEGORIES = {

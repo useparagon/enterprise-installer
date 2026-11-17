@@ -24,6 +24,8 @@ const ignoredServices = [
   'minio',
   // On-prem OCS knative runner; not a platform-monorepo atlas service.
   'ocs-code-runner',
+  // Developer MCP has no on-prem chart yet; remove this entry when its subchart lands.
+  'developer-mcp',
 ];
 
 /**
