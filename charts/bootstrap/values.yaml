@@ -4,6 +4,8 @@ namespace: paragon
 ingress-nginx:
   enabled: true
   controller:
+    config:
+      proxy-body-size: "10m"
     service:
       type: LoadBalancer
       annotations:

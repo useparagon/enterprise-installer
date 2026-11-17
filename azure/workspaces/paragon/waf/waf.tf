@@ -32,6 +32,7 @@ resource "azurerm_web_application_firewall_policy" "this" {
     request_body_check               = true
     max_request_body_size_in_kb      = var.waf_max_request_body_size_kb
     request_body_inspect_limit_in_kb = var.waf_max_request_body_size_kb
+    request_body_enforcement         = var.waf_request_body_enforcement
     file_upload_limit_in_mb          = var.waf_file_upload_limit_mb
   }
 

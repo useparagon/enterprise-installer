@@ -335,7 +335,7 @@ variable "waf_rate_limit_group_by" {
 }
 
 variable "waf_max_request_body_size_kb" {
-  description = "WAF max request body size in KB. 2000 is the DRS 2.1 engine maximum and avoids HTTP 413 on large Paragon payloads."
+  description = "WAF request body inspection limit in KB (DRS 2.1 maximum is 2000). When waf_request_body_enforcement is false, payloads larger than this are not rejected but only the first N KB are inspected."
   type        = number
   default     = 2000
 
@@ -343,6 +343,12 @@ variable "waf_max_request_body_size_kb" {
     condition     = var.waf_max_request_body_size_kb >= 8 && var.waf_max_request_body_size_kb <= 2000
     error_message = "waf_max_request_body_size_kb must be between 8 and 2000."
   }
+}
+
+variable "waf_request_body_enforcement" {
+  description = "When true, WAF returns 413 for bodies larger than waf_max_request_body_size_kb. Default false so AGC+WAF matches Paragon cloud (~10 MB app limit) while still inspecting up to the DRS body-size cap."
+  type        = bool
+  default     = false
 }
 
 variable "waf_file_upload_limit_mb" {

@@ -156,6 +156,12 @@ resource "helm_release" "ingress" {
     value = "16k"
   }
 
+  # Match Paragon cloud ActionKit/proxy JSON parsers (~10 MB); nginx defaults to 1m (HTTP 413).
+  set {
+    name  = "controller.config.proxy-body-size"
+    value = "10m"
+  }
+
   # Trust X-Forwarded-* only from the AGC subnet (never without proxy-real-ip-cidr).
   dynamic "set" {
     for_each = var.agc_active && var.agc_subnet_cidr != null ? [1] : []
