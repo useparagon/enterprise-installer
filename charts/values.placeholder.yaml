@@ -49,6 +49,20 @@ global:
   # Managed Sync (when enabled): set verify flags in global.env; keys containing SYNC
   # are forwarded to the managed-sync release (e.g. MANAGED_SYNC_POSTGRES_SSL_REJECT_UNAUTHORIZED).
 
+# Developer MCP on-prem (optional; secrets go in global.env; URLs come from Terraform + domain).
+# developer-mcp:
+#   image:
+#     tag: "2026.1118.0845-afd028e5"  # when newer than global.env.VERSION
+# global:
+#   env:
+#     DEVELOPER_MCP_ALLOWED_ORIGINS: "https://dashboard.<domain>"
+#     DEVELOPER_MCP_ZEUS_CLIENT_SECRET: "<same as LICENSE for smoke tests>"
+#     ZEUS_MCP_OAUTH_RESOURCE_URL: "https://developer-mcp.<domain>/mcp"
+#     ZEUS_MCP_OAUTH_RESOURCE_CLIENT_SECRET_SHA256: "<sha256 hex of DEVELOPER_MCP_ZEUS_CLIENT_SECRET>"
+#     ZEUS_MCP_DELEGATED_TOKEN_SECRET: "<LICENSE>:developer-mcp-delegated-token"
+#     ZEUS_MCP_OAUTH_JWKS_KEY_ID: "paragon-developer-mcp"
+#     ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY: "<RSA PKCS#8 PEM with \\n>"
+
 # Optional examples. Uncomment to customize per chart.
 # subchart:
 #   cache-replay:

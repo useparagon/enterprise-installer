@@ -147,7 +147,7 @@ resource "helm_release" "agent_os" {
 
 # Hostless path rules on the shared ALB. The chart ingress stays on agentos.<domain>.
 resource "kubectl_manifest" "agent_os_path_ingress" {
-  count = var.agent_os_enabled && var.path_based_routing_enabled && local.agent_os_path_prefix != "" ? 1 : 0
+  count = var.agent_os_enabled ? (var.path_based_routing_enabled && local.agent_os_path_prefix != "" ? 1 : 0) : 0
 
   yaml_body = yamlencode({
     apiVersion = "networking.k8s.io/v1"

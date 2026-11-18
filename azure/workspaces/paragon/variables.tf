@@ -790,6 +790,11 @@ locals {
       "port"             = try(local.helm_vars.global.env["DASHBOARD_PORT"], 1704)
       "public_url"       = try(local.helm_vars.global.env["DASHBOARD_PUBLIC_URL"], "https://dashboard.${var.domain}")
     }
+    "developer-mcp" = {
+      "healthcheck_path" = "/healthz"
+      "port"             = try(local.helm_vars.global.env["DEVELOPER_MCP_PORT"], 1730)
+      "public_url"       = try(local.helm_vars.global.env["DEVELOPER_MCP_PUBLIC_URL"], "https://developer-mcp.${var.domain}")
+    }
     "flipt" = {
       "healthcheck_path" = "/health"
       "port"             = try(local.helm_vars.global.env["FLIPT_PORT"], 1722)
@@ -932,6 +937,7 @@ locals {
     "api-triggerkit",
     "connect",
     "dashboard",
+    "developer-mcp",
     "health-checker",
     "hermes",
     "worker-proxy",
@@ -1185,6 +1191,7 @@ locals {
         CERBERUS_PORT           = try(local.microservices.cerberus.port, null)
         CONNECT_PORT            = try(local.microservices.connect.port, null)
         DASHBOARD_PORT          = try(local.microservices.dashboard.port, null)
+        DEVELOPER_MCP_PORT      = try(local.microservices["developer-mcp"].port, null)
         HADES_PORT              = try(local.microservices.hades.port, null)
         HEALTH_CHECKER_PORT     = try(local.microservices["health-checker"].port, null)
         HERMES_PORT             = try(local.microservices.hermes.port, null)
@@ -1211,6 +1218,7 @@ locals {
         CERBERUS_PRIVATE_URL           = try("http://cerberus:${local.microservices.cerberus.port}", null)
         CONNECT_PRIVATE_URL            = try("http://connect:${local.microservices.connect.port}", null)
         DASHBOARD_PRIVATE_URL          = try("http://dashboard:${local.microservices.dashboard.port}", null)
+        DEVELOPER_MCP_PRIVATE_URL      = try("http://developer-mcp:${local.microservices["developer-mcp"].port}", null)
         HADES_PRIVATE_URL              = try("http://hades:${local.microservices.hades.port}", null)
         HERMES_PRIVATE_URL             = try("http://hermes:${local.microservices.hermes.port}", null)
         HEALTH_CHECKER_PRIVATE_URL     = try("http://health-checker:${local.microservices["health-checker"].port}", null)
@@ -1236,6 +1244,7 @@ locals {
         CERBERUS_PUBLIC_URL           = try(local.microservices.cerberus.public_url, null)
         CONNECT_PUBLIC_URL            = try(local.microservices.connect.public_url, null)
         DASHBOARD_PUBLIC_URL          = try(local.microservices.dashboard.public_url, null)
+        DEVELOPER_MCP_PUBLIC_URL      = try(local.microservices["developer-mcp"].public_url, null)
         HADES_PUBLIC_URL              = try(local.microservices.hades.public_url, null)
         HEALTH_CHECKER_PUBLIC_URL     = try(local.microservices["health-checker"].public_url, null)
         HERMES_PUBLIC_URL             = try(local.microservices.hermes.public_url, null)

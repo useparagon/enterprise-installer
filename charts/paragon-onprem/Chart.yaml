@@ -30,6 +30,10 @@ dependencies:
     repository: file://charts/dashboard
     version: __PARAGON_VERSION__
     condition: subchart.dashboard.enabled
+  - name: developer-mcp
+    repository: file://charts/developer-mcp
+    version: __PARAGON_VERSION__
+    condition: subchart.developer-mcp.enabled
   - name: hades
     repository: file://charts/hades
     version: __PARAGON_VERSION__
