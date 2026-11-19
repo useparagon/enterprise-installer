@@ -4,6 +4,9 @@ namespace: paragon
 ingress-nginx:
   enabled: true
   controller:
+    config:
+      # Mitigate NGINX HTTP/2 RCE (CVE-2026-123007, CVE-2026-123633) until ingress is migrated.
+      use-http2: "false"
     service:
       type: LoadBalancer
       annotations:
