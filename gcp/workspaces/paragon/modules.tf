@@ -41,6 +41,8 @@ module "waf" {
 module "helm" {
   source = "./helm"
 
+  developer_mcp_chart_values = local.developer_mcp_chart_values
+
   cluster_host                           = local.gke_connect_gateway_host
   cluster_name                           = local.cluster_name
   docker_cfg_secret_name                 = var.create_docker_pull_secret && var.docker_username != null && var.docker_password != null ? local.runtime_secret_names.docker_cfg : null

@@ -1,6 +1,8 @@
 module "helm" {
   source = "./helm"
 
+  developer_mcp_chart_values = local.developer_mcp_chart_values
+
   cluster_name               = local.cluster_name
   docker_cfg_secret_name     = var.create_docker_pull_secret && length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].name : null
   docker_pull_secret_name    = var.docker_pull_secret_name

@@ -1768,9 +1768,37 @@ locals {
   chart_env_keys = toset(flatten([
     for s in local.chart_service_inputs : try(s.envKeys, [])
   ]))
-  chart_secret_keys = toset(flatten([
+  chart_secret_keys = toset(concat(flatten([
     for s in local.chart_service_inputs : try(s.secretKeys, [])
-  ]))
+  ]), tolist(local.developer_mcp_secret_keys)))
+  # Zeus MCP OAuth keys are not in the monorepo service-inputs.json yet. Classify
+  # them as secrets here so they stay out of the Helm release. developer_mcp_chart_values
+  # wires them to the zeus and developer-mcp charts, because env.standard renders
+  # only keys listed in a chart's envKeys/secretKeys.
+  developer_mcp_secret_keys = toset([
+    "DEVELOPER_MCP_ZEUS_CLIENT_SECRET",
+    "ZEUS_MCP_DELEGATED_TOKEN_SECRET",
+    "ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY",
+    "ZEUS_MCP_OAUTH_RESOURCE_CLIENT_SECRET_SHA256",
+  ])
+  developer_mcp_env_keys = toset([
+    "DEVELOPER_MCP_ALLOWED_ORIGINS",
+    "ZEUS_MCP_OAUTH_JWKS_KEY_ID",
+    "ZEUS_MCP_OAUTH_RESOURCE_URL",
+  ])
+  # The zeus chart verifies MCP tokens, so it gets the JWKS private key.
+  # developer-mcp does not need that key.
+  developer_mcp_chart_values = yamlencode({
+    zeus = {
+      envKeys    = tolist(local.developer_mcp_env_keys)
+      secretKeys = tolist(local.developer_mcp_secret_keys)
+    }
+    developer-mcp = {
+      envKeys    = tolist(local.developer_mcp_env_keys)
+      secretKeys = tolist(setsubtract(local.developer_mcp_secret_keys, toset(["ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY"])))
+    }
+  })
+
   helm_is_secret_env_key = {
     for key, _ in local.helm_values.global.env :
     key => contains(local.chart_secret_keys, key) && !contains(local.chart_env_keys, key)
