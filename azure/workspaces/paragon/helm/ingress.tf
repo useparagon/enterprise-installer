@@ -156,8 +156,7 @@ resource "helm_release" "ingress" {
     value = "16k"
   }
 
-  # Mitigate NGINX HTTP/2 RCE (CVE-2026-123007, CVE-2026-123633) until ingress-nginx is
-  # removed or replaced; upstream EOL controller cannot ship patched nginx.
+  # Mitigate NGINX HTTP/2 RCE (CVE-2026-123007, CVE-2026-123633) until ingress is migrated.
   set {
     name  = "controller.config.use-http2"
     value = "false"
