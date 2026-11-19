@@ -16,10 +16,10 @@ service:
 
 resources:
   limits:
-    memory: 500Mi
+    memory: 768Mi
   requests:
     cpu: 100m
-    memory: 500Mi
+    memory: 768Mi
 
 autoscaling:
   enabled: true
