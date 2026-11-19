@@ -18,10 +18,10 @@ service:
 
 resources:
   limits:
-    memory: 1Gi
+    memory: 1536Mi
   requests:
     cpu: 100m
-    memory: 512Mi
+    memory: 768Mi
 
 autoscaling:
   enabled: false
