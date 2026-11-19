@@ -156,6 +156,12 @@ resource "helm_release" "ingress" {
     value = "16k"
   }
 
+  # Mitigate NGINX HTTP/2 RCE (CVE-2026-123007, CVE-2026-123633) until ingress is migrated.
+  set {
+    name  = "controller.config.use-http2"
+    value = "false"
+  }
+
   # Trust X-Forwarded-* only from the AGC subnet (never without proxy-real-ip-cidr).
   dynamic "set" {
     for_each = var.agc_active && var.agc_subnet_cidr != null ? [1] : []
