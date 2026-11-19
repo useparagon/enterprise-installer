@@ -5,6 +5,7 @@ ingress-nginx:
   enabled: true
   controller:
     config:
+      proxy-body-size: "10m"
       # Mitigate NGINX HTTP/2 RCE (CVE-2026-123007, CVE-2026-123633) until ingress is migrated.
       use-http2: "false"
     service:

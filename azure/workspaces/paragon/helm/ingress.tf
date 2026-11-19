@@ -156,6 +156,12 @@ resource "helm_release" "ingress" {
     value = "16k"
   }
 
+  # Match Paragon cloud ActionKit/proxy JSON parsers (~10 MB); nginx defaults to 1m (HTTP 413).
+  set {
+    name  = "controller.config.proxy-body-size"
+    value = "10m"
+  }
+
   # Mitigate NGINX HTTP/2 RCE (CVE-2026-123007, CVE-2026-123633) until ingress is migrated.
   set {
     name  = "controller.config.use-http2"

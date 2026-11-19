@@ -264,6 +264,7 @@ module "waf" {
   waf_rate_limit_path_duration   = var.waf_rate_limit_path_duration
   waf_rate_limit_group_by        = var.waf_rate_limit_group_by
   waf_max_request_body_size_kb   = var.waf_max_request_body_size_kb
+  waf_request_body_enforcement   = var.waf_request_body_enforcement
   waf_file_upload_limit_mb       = var.waf_file_upload_limit_mb
   waf_custom_rules               = var.waf_custom_rules
   waf_managed_rule_sets          = var.waf_managed_rule_sets

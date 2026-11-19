@@ -57,6 +57,10 @@ variable "waf_max_request_body_size_kb" {
   type = number
 }
 
+variable "waf_request_body_enforcement" {
+  type = bool
+}
+
 variable "waf_file_upload_limit_mb" {
   type = number
 }
