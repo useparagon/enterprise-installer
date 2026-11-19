@@ -27,8 +27,8 @@ resource "kubernetes_namespace" "knative_serving" {
 }
 
 locals {
-  knative_image_pull_data     = try(data.kubernetes_secret.docker_cfg[0].data, tomap({}))
-  knative_serving_pull_secret = var.create_docker_pull_secret && var.docker_cfg_secret_name != null
+  knative_image_pull_data      = try(data.kubernetes_secret.docker_cfg[0].data, tomap({}))
+  knative_serving_pull_secret  = var.create_docker_pull_secret && var.docker_cfg_secret_name != null
   knative_serving_upgrade_spec = yamldecode(file("${path.module}/../../../../scripts/knative_serving_cr_spec.yaml"))
 }
 
