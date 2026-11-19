@@ -1497,6 +1497,26 @@ locals {
     ZEUS_POSTGRES_MAX_STORAGE_BYTES       = tostring(try(local.pg_config.zeus.max_storage_bytes, local.pg_config.paragon.max_storage_bytes))
   } : {}
 
+  # Developer MCP OAuth. values.yaml can still override any of these keys.
+  developer_mcp_license = try(local.helm_vars.global.env["LICENSE"], null)
+  developer_mcp_public_url = try(
+    local.public_microservices["developer-mcp"].public_url,
+    local.microservices["developer-mcp"].public_url,
+  )
+  developer_mcp_dashboard_url = try(
+    local.public_microservices["dashboard"].public_url,
+    local.microservices.dashboard.public_url,
+  )
+  developer_mcp_env = {
+    DEVELOPER_MCP_ALLOWED_ORIGINS                = local.developer_mcp_dashboard_url
+    ZEUS_MCP_OAUTH_RESOURCE_URL                  = "${local.developer_mcp_public_url}/mcp"
+    DEVELOPER_MCP_ZEUS_CLIENT_SECRET             = local.developer_mcp_license
+    ZEUS_MCP_OAUTH_RESOURCE_CLIENT_SECRET_SHA256 = local.developer_mcp_license == null ? null : sha256(local.developer_mcp_license)
+    ZEUS_MCP_DELEGATED_TOKEN_SECRET              = local.developer_mcp_license == null ? null : "${local.developer_mcp_license}:developer-mcp-delegated-token"
+    ZEUS_MCP_OAUTH_JWKS_KEY_ID                   = "paragon-developer-mcp"
+    ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY              = replace(tls_private_key.developer_mcp_oauth.private_key_pem, "\n", "\\n")
+  }
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       # Redis CA certificate configuration
@@ -1722,6 +1742,7 @@ locals {
         MONITOR_REDIS_INSIGHT_PORT              = try(local.monitors["redis-insight"].port, null)
         },
         local.postgres_max_storage_env,
+        local.developer_mcp_env,
         {
           for key, value in local.helm_vars.global.env :
           key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
@@ -1795,4 +1816,11 @@ locals {
     key => value
     if key != null && startswith(key, "FLIPT_") && value != null && value != ""
   }
+}
+
+# RSA key for Zeus MCP OAuth. Generated once and stored in state, then injected
+# into developer_mcp_env above. Same pattern as the Managed Sync signing key.
+resource "tls_private_key" "developer_mcp_oauth" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
 }
