@@ -1341,7 +1341,12 @@ locals {
   pg_config = try(local.infra_vars.monitoring.value.pg_config, {})
 
   # Developer MCP OAuth. values.yaml can still override any of these keys.
-  developer_mcp_license = try(local.helm_vars.global.env["LICENSE"], null)
+  # values.yaml wins. Stacks that keep LICENSE only in the infra env secret
+  # (app_secrets) still need it to derive the MCP client secret and token.
+  developer_mcp_license = try(coalesce(
+    try(trimspace(tostring(local.helm_vars.global.env["LICENSE"])) != "" ? trimspace(tostring(local.helm_vars.global.env["LICENSE"])) : null, null),
+    try(trimspace(tostring(local.runtime_env_document["LICENSE"])) != "" ? trimspace(tostring(local.runtime_env_document["LICENSE"])) : null, null),
+  ), null)
   developer_mcp_public_url = try(
     local.public_microservices["developer-mcp"].public_url,
     local.microservices["developer-mcp"].public_url,
