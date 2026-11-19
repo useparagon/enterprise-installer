@@ -1176,14 +1176,16 @@ locals {
   developer_mcp_public_url = try(
     local.public_microservices["developer-mcp"].public_url,
     local.microservices["developer-mcp"].public_url,
+    null,
   )
   developer_mcp_dashboard_url = try(
     local.public_microservices["dashboard"].public_url,
     local.microservices.dashboard.public_url,
+    null,
   )
   developer_mcp_env = {
     DEVELOPER_MCP_ALLOWED_ORIGINS                = local.developer_mcp_dashboard_url
-    ZEUS_MCP_OAUTH_RESOURCE_URL                  = "${local.developer_mcp_public_url}/mcp"
+    ZEUS_MCP_OAUTH_RESOURCE_URL                  = local.developer_mcp_public_url == null ? null : "${local.developer_mcp_public_url}/mcp"
     DEVELOPER_MCP_ZEUS_CLIENT_SECRET             = local.developer_mcp_license
     ZEUS_MCP_OAUTH_RESOURCE_CLIENT_SECRET_SHA256 = local.developer_mcp_license == null ? null : sha256(local.developer_mcp_license)
     ZEUS_MCP_DELEGATED_TOKEN_SECRET              = local.developer_mcp_license == null ? null : "${local.developer_mcp_license}:developer-mcp-delegated-token"

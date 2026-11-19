@@ -1,5 +1,6 @@
 locals {
-  agent_os_public_url = try(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
+  # Public URL only: nonsensitive so the sensitive helm_values (Developer MCP key) does not taint counts.
+  agent_os_public_url = try(nonsensitive(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"]), format("https://agentos.%s", var.domain))
   agent_os_host       = replace(local.agent_os_public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
   agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
   agent_os_path_prefix = (
