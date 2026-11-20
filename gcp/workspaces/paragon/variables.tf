@@ -1498,7 +1498,9 @@ locals {
   } : {}
 
   # Developer MCP OAuth. values.yaml can still override any of these keys.
-  developer_mcp_license = try(local.helm_vars.global.env["LICENSE"], null)
+  # Blank LICENSE is missing. An empty string still hashes and builds a delegated
+  # token, while the client secret is dropped, so Zeus and developer-mcp diverge.
+  developer_mcp_license = try(trimspace(tostring(local.helm_vars.global.env["LICENSE"])) != "" ? trimspace(tostring(local.helm_vars.global.env["LICENSE"])) : null, null)
   developer_mcp_public_url = try(
     local.public_microservices["developer-mcp"].public_url,
     local.microservices["developer-mcp"].public_url,
