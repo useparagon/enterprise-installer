@@ -796,6 +796,11 @@ locals {
       "port"             = try(local.helm_vars.global.env["DASHBOARD_PORT"], 1704)
       "public_url"       = try(local.helm_vars.global.env["DASHBOARD_PUBLIC_URL"], "https://dashboard.${var.domain}")
     }
+    "developer-mcp" = {
+      "healthcheck_path" = "/healthz"
+      "port"             = try(local.helm_vars.global.env["DEVELOPER_MCP_PORT"], 1730)
+      "public_url"       = try(local.helm_vars.global.env["DEVELOPER_MCP_PUBLIC_URL"], "https://developer-mcp.${var.domain}")
+    }
     "flipt" = {
       "healthcheck_path" = "/health"
       "port"             = try(local.helm_vars.global.env["FLIPT_PORT"], 1722)
@@ -938,6 +943,7 @@ locals {
     "api-triggerkit",
     "connect",
     "dashboard",
+    "developer-mcp",
     "health-checker",
     "hermes",
     "worker-proxy",
@@ -1171,6 +1177,30 @@ locals {
     )
   )
 
+  # Developer MCP OAuth. values.yaml can still override any of these keys.
+  # Blank LICENSE is missing. An empty string still hashes and builds a delegated
+  # token, while the client secret is dropped, so Zeus and developer-mcp diverge.
+  developer_mcp_license = try(trimspace(tostring(local.helm_vars.global.env["LICENSE"])) != "" ? trimspace(tostring(local.helm_vars.global.env["LICENSE"])) : null, null)
+  developer_mcp_public_url = try(
+    local.public_microservices["developer-mcp"].public_url,
+    local.microservices["developer-mcp"].public_url,
+    null,
+  )
+  developer_mcp_dashboard_url = try(
+    local.public_microservices["dashboard"].public_url,
+    local.microservices.dashboard.public_url,
+    null,
+  )
+  developer_mcp_env = {
+    DEVELOPER_MCP_ALLOWED_ORIGINS                = local.developer_mcp_dashboard_url == null ? null : regex("^https?://[^/?#]+", local.developer_mcp_dashboard_url)
+    ZEUS_MCP_OAUTH_RESOURCE_URL                  = local.developer_mcp_public_url == null ? null : "${local.developer_mcp_public_url}/mcp"
+    DEVELOPER_MCP_ZEUS_CLIENT_SECRET             = local.developer_mcp_license
+    ZEUS_MCP_OAUTH_RESOURCE_CLIENT_SECRET_SHA256 = local.developer_mcp_license == null ? null : sha256(local.developer_mcp_license)
+    ZEUS_MCP_DELEGATED_TOKEN_SECRET              = local.developer_mcp_license == null ? null : "${local.developer_mcp_license}:developer-mcp-delegated-token"
+    ZEUS_MCP_OAUTH_JWKS_KEY_ID                   = "paragon-developer-mcp"
+    ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY              = replace(tls_private_key.developer_mcp_oauth.private_key_pem, "\n", "\\n")
+  }
+
   helm_values = merge(local.helm_vars, {
     global = merge(local.helm_vars.global, {
       env = merge({
@@ -1191,6 +1221,7 @@ locals {
         CERBERUS_PORT           = try(local.microservices.cerberus.port, null)
         CONNECT_PORT            = try(local.microservices.connect.port, null)
         DASHBOARD_PORT          = try(local.microservices.dashboard.port, null)
+        DEVELOPER_MCP_PORT      = try(local.microservices["developer-mcp"].port, null)
         HADES_PORT              = try(local.microservices.hades.port, null)
         HEALTH_CHECKER_PORT     = try(local.microservices["health-checker"].port, null)
         HERMES_PORT             = try(local.microservices.hermes.port, null)
@@ -1217,6 +1248,7 @@ locals {
         CERBERUS_PRIVATE_URL           = try("http://cerberus:${local.microservices.cerberus.port}", null)
         CONNECT_PRIVATE_URL            = try("http://connect:${local.microservices.connect.port}", null)
         DASHBOARD_PRIVATE_URL          = try("http://dashboard:${local.microservices.dashboard.port}", null)
+        DEVELOPER_MCP_PRIVATE_URL      = try("http://developer-mcp:${local.microservices["developer-mcp"].port}", null)
         HADES_PRIVATE_URL              = try("http://hades:${local.microservices.hades.port}", null)
         HERMES_PRIVATE_URL             = try("http://hermes:${local.microservices.hermes.port}", null)
         HEALTH_CHECKER_PRIVATE_URL     = try("http://health-checker:${local.microservices["health-checker"].port}", null)
@@ -1242,6 +1274,7 @@ locals {
         CERBERUS_PUBLIC_URL           = try(local.microservices.cerberus.public_url, null)
         CONNECT_PUBLIC_URL            = try(local.microservices.connect.public_url, null)
         DASHBOARD_PUBLIC_URL          = try(local.microservices.dashboard.public_url, null)
+        DEVELOPER_MCP_PUBLIC_URL      = try(local.microservices["developer-mcp"].public_url, null)
         HADES_PUBLIC_URL              = try(local.microservices.hades.public_url, null)
         HEALTH_CHECKER_PUBLIC_URL     = try(local.microservices["health-checker"].public_url, null)
         HERMES_PUBLIC_URL             = try(local.microservices.hermes.public_url, null)
@@ -1383,9 +1416,11 @@ locals {
         MONITOR_REDIS_STREAMS_EXPORTER_PORT      = try(local.monitors["redis-streams-exporter"].port, null)
         MONITOR_REDIS_INSIGHT_HOST               = "http://redis-insight"
         MONITOR_REDIS_INSIGHT_PORT               = try(local.monitors["redis-insight"].port, null)
-        }, {
-        for key, value in local.helm_vars.global.env :
-        key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
+        },
+        local.developer_mcp_env,
+        {
+          for key, value in local.helm_vars.global.env :
+          key => value if value != null && key != "VERSION" && !contains(local.helm_keys_to_remove, key) && !startswith(key, "FLIPT_")
         },
         var.managed_sync_enabled ? module.managed_sync_config[0].config : {},
         { VERSION = local.effective_platform_version },
@@ -1406,9 +1441,37 @@ locals {
   chart_env_keys = toset(flatten([
     for s in local.chart_service_inputs : try(s.envKeys, [])
   ]))
-  chart_secret_keys = toset(flatten([
+  chart_secret_keys = toset(concat(flatten([
     for s in local.chart_service_inputs : try(s.secretKeys, [])
-  ]))
+  ]), tolist(local.developer_mcp_secret_keys)))
+  # Zeus MCP OAuth keys are not in the monorepo service-inputs.json yet. Classify
+  # them as secrets here so they stay out of the Helm release. developer_mcp_chart_values
+  # wires them to the zeus and developer-mcp charts, because env.standard renders
+  # only keys listed in a chart's envKeys/secretKeys.
+  developer_mcp_secret_keys = toset([
+    "DEVELOPER_MCP_ZEUS_CLIENT_SECRET",
+    "ZEUS_MCP_DELEGATED_TOKEN_SECRET",
+    "ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY",
+    "ZEUS_MCP_OAUTH_RESOURCE_CLIENT_SECRET_SHA256",
+  ])
+  developer_mcp_env_keys = toset([
+    "DEVELOPER_MCP_ALLOWED_ORIGINS",
+    "ZEUS_MCP_OAUTH_JWKS_KEY_ID",
+    "ZEUS_MCP_OAUTH_RESOURCE_URL",
+  ])
+  # The zeus chart verifies MCP tokens, so it gets the JWKS private key.
+  # developer-mcp does not need that key.
+  developer_mcp_chart_values = yamlencode({
+    zeus = {
+      envKeys    = tolist(local.developer_mcp_env_keys)
+      secretKeys = tolist(local.developer_mcp_secret_keys)
+    }
+    developer-mcp = {
+      envKeys    = tolist(local.developer_mcp_env_keys)
+      secretKeys = tolist(setsubtract(local.developer_mcp_secret_keys, toset(["ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY"])))
+    }
+  })
+
   helm_is_secret_env_key = {
     for key, _ in local.helm_values.global.env :
     key => contains(local.chart_secret_keys, key) && !contains(local.chart_env_keys, key)
@@ -1456,4 +1519,11 @@ locals {
     key => value
     if key != null && startswith(key, "FLIPT_") && value != null && value != ""
   }
+}
+
+# RSA key for Zeus MCP OAuth. Generated once and stored in state, then injected
+# into developer_mcp_env above. Same pattern as the Managed Sync signing key.
+resource "tls_private_key" "developer_mcp_oauth" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
 }

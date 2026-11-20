@@ -1,0 +1,92 @@
+# Default values for developer-mcp.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 2
+
+image:
+  repository: useparagon/developer-mcp
+  pullPolicy: IfNotPresent
+  tag: 'latest'
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/scheme: "http"
+  prometheus.io/path: "/stats/metrics"
+  prometheus.io/port: "1730"
+
+podSecurityContext:
+  {}
+  # fsGroup: 2000
+
+service:
+  type: ClusterIP
+  port: 1730
+
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 150m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 75
+
+secretName: "paragon-secrets"
+
+imagePullSecrets: []
+nameOverride: ''
+fullnameOverride: 'developer-mcp'
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ''
+
+  # fsGroup: 2000
+
+securityContext:
+  {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+ingress:
+  certificate: ''
+  enabled: true
+  className: ''
+  host: '' # When empty, will use chart name + domain
+  healthcheck_path: /healthz
+
+probes:
+  liveness:
+    failureThreshold: 12
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 1
+      preference:
+        matchExpressions:
+        - key: useparagon.com/capacityType
+          operator: In
+          values:
+          - spot
+
+tls_secret: ''

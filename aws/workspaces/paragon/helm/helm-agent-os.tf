@@ -1,5 +1,6 @@
 locals {
-  agent_os_public_url = try(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"], format("https://agentos.%s", var.domain))
+  # Public URL only: nonsensitive so the sensitive helm_values (Developer MCP key) does not taint counts.
+  agent_os_public_url = try(nonsensitive(var.helm_values.global.env["AGENT_OS_PUBLIC_URL"]), format("https://agentos.%s", var.domain))
   agent_os_host       = replace(local.agent_os_public_url, "/^https?:\\/\\/([^\\/?#]+).*$/", "$1")
   agent_os_port       = try(tonumber(var.helm_values.global.env["AGENT_OS_PORT"]), 3000)
   agent_os_path_prefix = (
@@ -147,7 +148,7 @@ resource "helm_release" "agent_os" {
 
 # Hostless path rules on the shared ALB. The chart ingress stays on agentos.<domain>.
 resource "kubectl_manifest" "agent_os_path_ingress" {
-  count = var.agent_os_enabled && var.path_based_routing_enabled && local.agent_os_path_prefix != "" ? 1 : 0
+  count = var.agent_os_enabled ? (var.path_based_routing_enabled && local.agent_os_path_prefix != "" ? 1 : 0) : 0
 
   yaml_body = yamlencode({
     apiVersion = "networking.k8s.io/v1"
