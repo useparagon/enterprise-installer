@@ -1773,11 +1773,7 @@ locals {
   chart_secret_keys = toset(concat(flatten([
     for s in local.chart_service_inputs : try(s.secretKeys, [])
   ]), tolist(local.developer_mcp_secret_keys)))
-  # Zeus MCP OAuth keys. When a release lists them in a chart's service-inputs.json,
-  # that chart already has the monorepo env/secret split and nothing is added.
-  # Older tags do not list them. For those, Terraform classifies the keys as
-  # secrets and developer_mcp_chart_values wires them to the zeus and
-  # developer-mcp charts, because env.standard only renders listed keys.
+  # Zeus MCP OAuth keys, wired for tags whose service-inputs.json lacks them.
   developer_mcp_secret_keys = toset([
     "DEVELOPER_MCP_ZEUS_CLIENT_SECRET",
     "ZEUS_MCP_DELEGATED_TOKEN_SECRET",
@@ -1797,8 +1793,7 @@ locals {
     zeus          = local.developer_mcp_keys
     developer-mcp = setsubtract(local.developer_mcp_keys, toset(["ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY"]))
   }
-  # Listing a name as both env and secret renders the variable twice, and
-  # Kubernetes rejects the patch. Skip any chart that already lists an MCP key.
+  # Skip charts that already list an MCP key, or Helm renders it twice.
   developer_mcp_fallback_charts = {
     for chart, keys in local.developer_mcp_fallback_keys : chart => keys
     if length(setintersection(
