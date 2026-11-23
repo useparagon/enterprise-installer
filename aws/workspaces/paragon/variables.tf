@@ -1630,10 +1630,7 @@ locals {
   chart_secret_keys = toset(concat(flatten([
     for s in local.chart_service_inputs : try(s.secretKeys, [])
   ]), tolist(local.developer_mcp_secret_keys)))
-  # Zeus MCP OAuth keys are not in the monorepo service-inputs.json yet. Classify
-  # them as secrets here so they stay out of the Helm release. helm.tf wires them
-  # to the zeus and developer-mcp charts because env.standard only renders keys
-  # listed in a chart's envKeys/secretKeys.
+  # Zeus MCP OAuth keys, wired for tags whose service-inputs.json lacks them.
   developer_mcp_secret_keys = toset([
     "DEVELOPER_MCP_ZEUS_CLIENT_SECRET",
     "ZEUS_MCP_DELEGATED_TOKEN_SECRET",
@@ -1645,16 +1642,35 @@ locals {
     "ZEUS_MCP_OAUTH_JWKS_KEY_ID",
     "ZEUS_MCP_OAUTH_RESOURCE_URL",
   ])
+  developer_mcp_keys           = setunion(local.developer_mcp_env_keys, local.developer_mcp_secret_keys)
+  chart_service_inputs_by_name = { for s in local.chart_service_inputs : s.name => s if try(s.name, null) != null }
   # The zeus chart verifies MCP tokens, so it gets the JWKS private key.
   # developer-mcp does not need that key.
+  developer_mcp_fallback_keys = {
+    zeus          = local.developer_mcp_keys
+    developer-mcp = setsubtract(local.developer_mcp_keys, toset(["ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY"]))
+  }
+  # Skip charts that already list an MCP key, or Helm renders it twice.
+  developer_mcp_fallback_charts = {
+    for chart, keys in local.developer_mcp_fallback_keys : chart => keys
+    if length(setintersection(
+      toset(concat(
+        try(local.chart_service_inputs_by_name[chart].envKeys, []),
+        try(local.chart_service_inputs_by_name[chart].secretKeys, []),
+      )),
+      local.developer_mcp_keys,
+    )) == 0
+  }
   developer_mcp_chart_values = yamlencode({
-    zeus = {
-      envKeys    = tolist(local.developer_mcp_env_keys)
-      secretKeys = tolist(local.developer_mcp_secret_keys)
-    }
-    developer-mcp = {
-      envKeys    = tolist(local.developer_mcp_env_keys)
-      secretKeys = tolist(setsubtract(local.developer_mcp_secret_keys, toset(["ZEUS_MCP_OAUTH_JWKS_PRIVATE_KEY"])))
+    for chart, keys in local.developer_mcp_fallback_charts : chart => {
+      envKeys = tolist([
+        for key in keys : key
+        if !(contains(local.chart_secret_keys, key) && !contains(local.chart_env_keys, key))
+      ])
+      secretKeys = tolist([
+        for key in keys : key
+        if contains(local.chart_secret_keys, key) && !contains(local.chart_env_keys, key)
+      ])
     }
   })
 
