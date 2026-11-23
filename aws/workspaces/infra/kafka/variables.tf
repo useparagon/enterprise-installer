@@ -24,8 +24,13 @@ variable "msk_kafka_version" {
 }
 
 variable "msk_kafka_num_broker_nodes" {
-  description = "The number of broker nodes for the MSK cluster."
+  description = "The number of broker nodes for the MSK cluster. Must be at least 2 so default.replication.factor and min.insync.replicas stay valid."
   type        = number
+
+  validation {
+    condition     = var.msk_kafka_num_broker_nodes >= 2
+    error_message = "msk_kafka_num_broker_nodes must be at least 2 so min.insync.replicas cannot be 0."
+  }
 }
 
 variable "msk_autoscaling_enabled" {
