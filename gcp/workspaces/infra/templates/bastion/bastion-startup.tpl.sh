@@ -18,7 +18,9 @@ sudo systemctl stop unattended-upgrades
 
 writeLog "upgrading installed packages"
 sudo apt-get update -y
-sudo apt-get upgrade -y
+sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get upgrade -y \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold"
 
 # install misc tools
 writeLog "installing misc tools"
