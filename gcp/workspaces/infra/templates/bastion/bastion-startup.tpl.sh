@@ -14,7 +14,7 @@ function retry() {
         if [ "$attempts" -le 0 ]; then
             return 1
         fi
-        writeLog "retrying after $${delay}s ($$attempts left): $*"
+        writeLog "retrying after $${delay}s ($${attempts} left): $*"
         sleep "$delay"
     done
 }
@@ -31,19 +31,37 @@ function wait_for_apt() {
             writeLog "ERROR: timed out waiting for apt/dpkg locks"
             return 1
         fi
-        writeLog "waiting for apt/dpkg lock ($$attempts left)"
+        writeLog "waiting for apt/dpkg lock ($${attempts} left)"
         sleep "$delay"
     done
 }
 
-# Restrict unattended-upgrades to Ubuntu security + ESM channels only (PARA-28392).
-# Origins-Pattern merges with Allowed-Origins on jammy, so comment active entries in
-# 50unattended-upgrades then install our Allowed-Origins drop-in.
+# Persist only our drop-in. Never permanently edit the packaged 50unattended-upgrades
+# conffile (GCP re-runs startup scripts; a dirty conffile can break later apt installs).
 function configure_security_only_origins() {
-    local uu_conf=/etc/apt/apt.conf.d/50unattended-upgrades
     local drop_in=/etc/apt/apt.conf.d/51paragon-security-origins
 
+    sudo tee "$drop_in" > /dev/null <<'EOF'
+// Paragon bastion: security-only unattended upgrades (PARA-28392)
+Unattended-Upgrade::Allowed-Origins {
+        "$${distro_id}:$${distro_codename}-security";
+        "$${distro_id}ESMApps:$${distro_codename}-apps-security";
+        "$${distro_id}ESM:$${distro_codename}-infra-security";
+};
+Unattended-Upgrade::Automatic-Reboot "false";
+EOF
+}
+
+# Comment active Allowed-Origins in 50 for the duration of one unattended-upgrade run,
+# then restore the packaged file so dpkg never sees a modified conffile.
+function with_security_only_origins() {
+    local uu_conf=/etc/apt/apt.conf.d/50unattended-upgrades
+    local backup=""
+    local rc=0
+
     if [ -f "$uu_conf" ]; then
+        backup=$(mktemp)
+        sudo cp -a "$uu_conf" "$backup"
         sudo python3 - <<'PY'
 from pathlib import Path
 path = Path("/etc/apt/apt.conf.d/50unattended-upgrades")
@@ -70,15 +88,14 @@ path.write_text("".join(out))
 PY
     fi
 
-    sudo tee "$drop_in" > /dev/null <<'EOF'
-// Paragon bastion: security-only unattended upgrades (PARA-28392)
-Unattended-Upgrade::Allowed-Origins {
-        "$${distro_id}:$${distro_codename}-security";
-        "$${distro_id}ESMApps:$${distro_codename}-apps-security";
-        "$${distro_id}ESM:$${distro_codename}-infra-security";
-};
-Unattended-Upgrade::Automatic-Reboot "false";
-EOF
+    "$@"
+    rc=$?
+
+    if [ -n "$backup" ]; then
+        sudo cp -a "$backup" "$uu_conf"
+        rm -f "$backup"
+    fi
+    return "$rc"
 }
 
 function apply_security_updates() {
@@ -94,7 +111,11 @@ function apply_security_updates() {
         exit 1
     fi
 
-    if ! retry sudo apt-get install -y unattended-upgrades; then
+    # force-confold avoids interactive conffile prompts if the package is upgraded later
+    if ! retry sudo apt-get install -y \
+        -o Dpkg::Options::="--force-confdef" \
+        -o Dpkg::Options::="--force-confold" \
+        unattended-upgrades; then
         writeLog "ERROR: failed to install unattended-upgrades"
         exit 1
     fi
@@ -103,7 +124,7 @@ function apply_security_updates() {
     writeLog "security-only origins config"
     sudo cat /etc/apt/apt.conf.d/51paragon-security-origins
 
-    if ! retry sudo unattended-upgrade --verbose; then
+    if ! retry with_security_only_origins sudo unattended-upgrade --verbose; then
         writeLog "ERROR: unattended-upgrade failed"
         exit 1
     fi
