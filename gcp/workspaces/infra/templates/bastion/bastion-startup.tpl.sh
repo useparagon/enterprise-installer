@@ -5,6 +5,120 @@ function writeLog() {
     echo -e "\n\n$(date -Iseconds) ##### $1\n"
 }
 
+function retry() {
+    local attempts=12
+    local delay=10
+
+    until "$@"; do
+        attempts=$((attempts - 1))
+        if [ "$attempts" -le 0 ]; then
+            return 1
+        fi
+        writeLog "retrying after $${delay}s ($$attempts left): $*"
+        sleep "$delay"
+    done
+}
+
+function wait_for_apt() {
+    local attempts=30
+    local delay=10
+
+    while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+        || sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1 \
+        || sudo fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
+        attempts=$((attempts - 1))
+        if [ "$attempts" -le 0 ]; then
+            writeLog "ERROR: timed out waiting for apt/dpkg locks"
+            return 1
+        fi
+        writeLog "waiting for apt/dpkg lock ($$attempts left)"
+        sleep "$delay"
+    done
+}
+
+# Restrict unattended-upgrades to Ubuntu security + ESM channels only (PARA-28392).
+# Origins-Pattern merges with Allowed-Origins on jammy, so comment active entries in
+# 50unattended-upgrades then install our Allowed-Origins drop-in.
+function configure_security_only_origins() {
+    local uu_conf=/etc/apt/apt.conf.d/50unattended-upgrades
+    local drop_in=/etc/apt/apt.conf.d/51paragon-security-origins
+
+    if [ -f "$uu_conf" ]; then
+        sudo python3 - <<'PY'
+from pathlib import Path
+path = Path("/etc/apt/apt.conf.d/50unattended-upgrades")
+text = path.read_text()
+out = []
+in_origins = False
+for line in text.splitlines(True):
+    stripped = line.lstrip()
+    if "Unattended-Upgrade::Allowed-Origins" in line:
+        in_origins = True
+        out.append(line)
+        continue
+    if in_origins:
+        if stripped.startswith("}"):
+            in_origins = False
+            out.append(line)
+            continue
+        if stripped.startswith('"'):
+            indent = line[: len(line) - len(stripped)]
+            out.append(f"{indent}// {stripped}")
+            continue
+    out.append(line)
+path.write_text("".join(out))
+PY
+    fi
+
+    sudo tee "$drop_in" > /dev/null <<'EOF'
+// Paragon bastion: security-only unattended upgrades (PARA-28392)
+Unattended-Upgrade::Allowed-Origins {
+        "$${distro_id}:$${distro_codename}-security";
+        "$${distro_id}ESMApps:$${distro_codename}-apps-security";
+        "$${distro_id}ESM:$${distro_codename}-infra-security";
+};
+Unattended-Upgrade::Automatic-Reboot "false";
+EOF
+}
+
+function apply_security_updates() {
+    writeLog "applying Ubuntu security updates (unattended-upgrades)"
+
+    if ! wait_for_apt; then
+        writeLog "ERROR: apt/dpkg locks blocked security updates"
+        exit 1
+    fi
+
+    if ! retry sudo apt-get update -y; then
+        writeLog "ERROR: apt-get update failed before security updates"
+        exit 1
+    fi
+
+    if ! retry sudo apt-get install -y unattended-upgrades; then
+        writeLog "ERROR: failed to install unattended-upgrades"
+        exit 1
+    fi
+
+    configure_security_only_origins
+    writeLog "security-only origins config"
+    sudo cat /etc/apt/apt.conf.d/51paragon-security-origins
+
+    if ! retry sudo unattended-upgrade --verbose; then
+        writeLog "ERROR: unattended-upgrade failed"
+        exit 1
+    fi
+
+    writeLog "recent unattended-upgrades log"
+    sudo tail -n 80 /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null || true
+
+    if [ -f /var/run/reboot-required ]; then
+        writeLog "WARNING: reboot required after security updates (not rebooting during bootstrap)"
+        sudo cat /var/run/reboot-required.pkgs 2>/dev/null || true
+    else
+        writeLog "no reboot required after security updates"
+    fi
+}
+
 writeLog "paragon setup starting as $(whoami) from $0"
 sudo mkdir -p /etc/apt/keyrings
 
@@ -12,9 +126,13 @@ sudo mkdir -p /etc/apt/keyrings
 export HISTTIMEFORMAT="%F %T "
 echo 'export HISTTIMEFORMAT="%F %T "' >> /home/ubuntu/.bashrc
 
-# unattended support
+# Stop background apt jobs so bootstrap and the explicit security update pass do not
+# contend for dpkg locks. Do not disable/mask timers. GCP may re-run this on later boots.
 export DEBIAN_FRONTEND=noninteractive
-sudo systemctl stop unattended-upgrades
+sudo systemctl stop unattended-upgrades.service 2>/dev/null || true
+sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+
+apply_security_updates
 
 # install misc tools
 writeLog "installing misc tools"
