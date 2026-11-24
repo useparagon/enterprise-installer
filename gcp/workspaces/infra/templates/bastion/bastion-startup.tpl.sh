@@ -36,28 +36,20 @@ function wait_for_apt() {
     done
 }
 
-# Stop background apt jobs, wait for locks, and retry. Use for all bootstrap apt-get
-# calls after the security-update pass so a queued apt-daily job cannot win the lock
-# and leave later installs failing under set +e.
-function run_apt_get() {
-    sudo systemctl stop unattended-upgrades.service 2>/dev/null || true
-    sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
-    if ! wait_for_apt; then
-        writeLog "ERROR: apt/dpkg locks blocked: apt-get $*"
-        exit 1
-    fi
-    if ! retry sudo apt-get "$@"; then
-        writeLog "ERROR: apt-get $* failed"
-        exit 1
-    fi
-}
+# Ubuntu's packaged origins also include the main archive, and a second Allowed-Origins
+# block is merged rather than replaced. Move that file out of apt.conf.d so only the
+# security origins below apply. dpkg-divert keeps later package upgrades from putting
+# it back or prompting on the conffile (GCP re-runs this script).
+function use_security_only_origins() {
+    local packaged=/etc/apt/apt.conf.d/50unattended-upgrades
+    local diverted=/usr/share/unattended-upgrades/50unattended-upgrades.paragon-orig
 
-# Persist only our drop-in. Never permanently edit the packaged 50unattended-upgrades
-# conffile (GCP re-runs startup scripts; a dirty conffile can break later apt installs).
-function configure_security_only_origins() {
-    local drop_in=/etc/apt/apt.conf.d/51paragon-security-origins
+    if ! sudo dpkg-divert --list "$packaged" | grep -q "$packaged"; then
+        sudo mkdir -p /usr/share/unattended-upgrades
+        sudo dpkg-divert --local --rename --divert "$diverted" --add "$packaged"
+    fi
 
-    sudo tee "$drop_in" > /dev/null <<'EOF'
+    sudo tee /etc/apt/apt.conf.d/51paragon-security-origins > /dev/null <<'EOF'
 // Paragon bastion: security-only unattended upgrades (PARA-28392)
 Unattended-Upgrade::Allowed-Origins {
         "$${distro_id}:$${distro_codename}-security";
@@ -68,52 +60,6 @@ Unattended-Upgrade::Automatic-Reboot "false";
 EOF
 }
 
-# Comment active Allowed-Origins in 50 for the duration of one unattended-upgrade run,
-# then restore the packaged file so dpkg never sees a modified conffile.
-function with_security_only_origins() {
-    local uu_conf=/etc/apt/apt.conf.d/50unattended-upgrades
-    local backup=""
-    local rc=0
-
-    if [ -f "$uu_conf" ]; then
-        backup=$(mktemp)
-        sudo cp -a "$uu_conf" "$backup"
-        sudo python3 - <<'PY'
-from pathlib import Path
-path = Path("/etc/apt/apt.conf.d/50unattended-upgrades")
-text = path.read_text()
-out = []
-in_origins = False
-for line in text.splitlines(True):
-    stripped = line.lstrip()
-    if "Unattended-Upgrade::Allowed-Origins" in line:
-        in_origins = True
-        out.append(line)
-        continue
-    if in_origins:
-        if stripped.startswith("}"):
-            in_origins = False
-            out.append(line)
-            continue
-        if stripped.startswith('"'):
-            indent = line[: len(line) - len(stripped)]
-            out.append(f"{indent}// {stripped}")
-            continue
-    out.append(line)
-path.write_text("".join(out))
-PY
-    fi
-
-    "$@"
-    rc=$?
-
-    if [ -n "$backup" ]; then
-        sudo cp -a "$backup" "$uu_conf"
-        rm -f "$backup"
-    fi
-    return "$rc"
-}
-
 function apply_security_updates() {
     writeLog "applying Ubuntu security updates (unattended-upgrades)"
 
@@ -121,33 +67,22 @@ function apply_security_updates() {
         writeLog "ERROR: apt/dpkg locks blocked security updates"
         exit 1
     fi
-
     if ! retry sudo apt-get update -y; then
         writeLog "ERROR: apt-get update failed before security updates"
         exit 1
     fi
-
-    # force-confold avoids interactive conffile prompts if the package is upgraded later
-    if ! retry sudo apt-get install -y \
-        -o Dpkg::Options::="--force-confdef" \
-        -o Dpkg::Options::="--force-confold" \
-        unattended-upgrades; then
+    if ! retry sudo apt-get install -y unattended-upgrades; then
         writeLog "ERROR: failed to install unattended-upgrades"
         exit 1
     fi
 
-    configure_security_only_origins
-    writeLog "security-only origins config"
-    sudo cat /etc/apt/apt.conf.d/51paragon-security-origins
-
-    if ! retry with_security_only_origins sudo unattended-upgrade --verbose; then
+    use_security_only_origins
+    if ! retry sudo unattended-upgrade --verbose; then
         writeLog "ERROR: unattended-upgrade failed"
         exit 1
     fi
 
-    writeLog "recent unattended-upgrades log"
-    sudo tail -n 80 /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null || true
-
+    sudo tail -n 40 /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null || true
     if [ -f /var/run/reboot-required ]; then
         writeLog "WARNING: reboot required after security updates (not rebooting during bootstrap)"
         sudo cat /var/run/reboot-required.pkgs 2>/dev/null || true
@@ -163,18 +98,20 @@ sudo mkdir -p /etc/apt/keyrings
 export HISTTIMEFORMAT="%F %T "
 echo 'export HISTTIMEFORMAT="%F %T "' >> /home/ubuntu/.bashrc
 
-# Stop background apt jobs so bootstrap and the explicit security update pass do not
-# contend for dpkg locks. Do not disable/mask timers. GCP may re-run this on later boots.
+# Hold apt timers for the whole bootstrap so they cannot take the dpkg lock between
+# installs. Stop only; timers are started again on exit and are not disabled.
+# GCP may re-run this on later boots.
 export DEBIAN_FRONTEND=noninteractive
-sudo systemctl stop unattended-upgrades.service 2>/dev/null || true
-sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+trap 'sudo systemctl start apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true' EXIT
+sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer \
+    unattended-upgrades.service apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
 
 apply_security_updates
 
 # install misc tools
 writeLog "installing misc tools"
-run_apt_get update -y
-run_apt_get install -y \
+sudo apt-get update -y
+sudo apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -255,31 +192,31 @@ fi
 writeLog "installing gcp cli"
 curl -sSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
 echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-run_apt_get update -y
-run_apt_get install -y google-cloud-cli
+sudo apt-get update -y
+sudo apt-get install -y google-cloud-cli
 gcloud version
 
 # authenticating gcp cli
 writeLog "authenticating gcp cli"
 gcloud auth activate-service-account -q --key-file=/home/${admin_user}/auth_token.json
 gcloud config set project ${project} -q
-run_apt_get install -y google-cloud-cli-gke-gcloud-auth-plugin
+sudo apt-get install -y google-cloud-cli-gke-gcloud-auth-plugin
 
 # install kubectl
 KUBECTL_MINOR=${cluster_version}
 writeLog "installing kubectl $KUBECTL_MINOR"
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v$KUBECTL_MINOR/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes.gpg] https://pkgs.k8s.io/core:/stable:/v$KUBECTL_MINOR/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-run_apt_get update -y
-run_apt_get install -y kubectl
+sudo apt-get update -y
+sudo apt-get install -y kubectl
 kubectl version
 
 # install helm
 writeLog "installing helm"
 curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | sudo gpg --dearmor -o /etc/apt/keyrings/helm.gpg
 echo "deb [signed-by=/etc/apt/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-run_apt_get update -y
-run_apt_get install -y helm
+sudo apt-get update -y
+sudo apt-get install -y helm
 helm version
 
 # install nodejs
@@ -288,8 +225,8 @@ writeLog "installing node $NODE_MAJOR"
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list
-run_apt_get update -y
-run_apt_get install -y nodejs
+sudo apt-get update -y
+sudo apt-get install -y nodejs
 sudo npm install -g npx
 node --version
 
@@ -299,8 +236,8 @@ if [[ ! -z "${tfc_agent_token}" ]]; then
     writeLog "installing docker"
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
-    run_apt_get update -y
-    run_apt_get install -y \
+    sudo apt-get update -y
+    sudo apt-get install -y \
         containerd.io \
         docker-ce \
         docker-ce-cli \
