@@ -5,92 +5,6 @@ function writeLog() {
     echo -e "\n\n$(date -Iseconds) ##### $1\n"
 }
 
-function retry() {
-    local attempts=12
-    local delay=10
-
-    until "$@"; do
-        attempts=$((attempts - 1))
-        if [ "$attempts" -le 0 ]; then
-            return 1
-        fi
-        writeLog "retrying after $${delay}s ($${attempts} left): $*"
-        sleep "$delay"
-    done
-}
-
-function wait_for_apt() {
-    local attempts=30
-    local delay=10
-
-    while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
-        || sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1 \
-        || sudo fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do
-        attempts=$((attempts - 1))
-        if [ "$attempts" -le 0 ]; then
-            writeLog "ERROR: timed out waiting for apt/dpkg locks"
-            return 1
-        fi
-        writeLog "waiting for apt/dpkg lock ($${attempts} left)"
-        sleep "$delay"
-    done
-}
-
-# Ubuntu's packaged origins also include the main archive, and a second Allowed-Origins
-# block is merged rather than replaced. Move that file out of apt.conf.d so only the
-# security origins below apply. dpkg-divert keeps later package upgrades from putting
-# it back or prompting on the conffile (GCP re-runs this script).
-function use_security_only_origins() {
-    local packaged=/etc/apt/apt.conf.d/50unattended-upgrades
-    local diverted=/usr/share/unattended-upgrades/50unattended-upgrades.paragon-orig
-
-    if ! sudo dpkg-divert --list "$packaged" | grep -q "$packaged"; then
-        sudo mkdir -p /usr/share/unattended-upgrades
-        sudo dpkg-divert --local --rename --divert "$diverted" --add "$packaged"
-    fi
-
-    sudo tee /etc/apt/apt.conf.d/51paragon-security-origins > /dev/null <<'EOF'
-// Paragon bastion: security-only unattended upgrades (PARA-28392)
-Unattended-Upgrade::Allowed-Origins {
-        "$${distro_id}:$${distro_codename}-security";
-        "$${distro_id}ESMApps:$${distro_codename}-apps-security";
-        "$${distro_id}ESM:$${distro_codename}-infra-security";
-};
-Unattended-Upgrade::Automatic-Reboot "false";
-EOF
-}
-
-function apply_security_updates() {
-    writeLog "applying Ubuntu security updates (unattended-upgrades)"
-
-    if ! wait_for_apt; then
-        writeLog "ERROR: apt/dpkg locks blocked security updates"
-        exit 1
-    fi
-    if ! retry sudo apt-get update -y; then
-        writeLog "ERROR: apt-get update failed before security updates"
-        exit 1
-    fi
-    if ! retry sudo apt-get install -y unattended-upgrades; then
-        writeLog "ERROR: failed to install unattended-upgrades"
-        exit 1
-    fi
-
-    use_security_only_origins
-    if ! retry sudo unattended-upgrade --verbose; then
-        writeLog "ERROR: unattended-upgrade failed"
-        exit 1
-    fi
-
-    sudo tail -n 40 /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null || true
-    if [ -f /var/run/reboot-required ]; then
-        writeLog "WARNING: reboot required after security updates (not rebooting during bootstrap)"
-        sudo cat /var/run/reboot-required.pkgs 2>/dev/null || true
-    else
-        writeLog "no reboot required after security updates"
-    fi
-}
-
 writeLog "paragon setup starting as $(whoami) from $0"
 sudo mkdir -p /etc/apt/keyrings
 
@@ -98,15 +12,13 @@ sudo mkdir -p /etc/apt/keyrings
 export HISTTIMEFORMAT="%F %T "
 echo 'export HISTTIMEFORMAT="%F %T "' >> /home/ubuntu/.bashrc
 
-# Hold apt timers for the whole bootstrap so they cannot take the dpkg lock between
-# installs. Stop only; timers are started again on exit and are not disabled.
-# GCP may re-run this on later boots.
+# unattended support
 export DEBIAN_FRONTEND=noninteractive
-trap 'sudo systemctl start apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true' EXIT
-sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer \
-    unattended-upgrades.service apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+sudo systemctl stop unattended-upgrades
 
-apply_security_updates
+writeLog "upgrading installed packages"
+sudo apt-get update -y
+sudo apt-get upgrade -y
 
 # install misc tools
 writeLog "installing misc tools"
