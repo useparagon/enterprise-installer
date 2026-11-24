@@ -36,6 +36,22 @@ function wait_for_apt() {
     done
 }
 
+# Stop background apt jobs, wait for locks, and retry. Use for all bootstrap apt-get
+# calls after the security-update pass so a queued apt-daily job cannot win the lock
+# and leave later installs failing under set +e.
+function run_apt_get() {
+    sudo systemctl stop unattended-upgrades.service 2>/dev/null || true
+    sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+    if ! wait_for_apt; then
+        writeLog "ERROR: apt/dpkg locks blocked: apt-get $*"
+        exit 1
+    fi
+    if ! retry sudo apt-get "$@"; then
+        writeLog "ERROR: apt-get $* failed"
+        exit 1
+    fi
+}
+
 # Persist only our drop-in. Never permanently edit the packaged 50unattended-upgrades
 # conffile (GCP re-runs startup scripts; a dirty conffile can break later apt installs).
 function configure_security_only_origins() {
@@ -157,8 +173,8 @@ apply_security_updates
 
 # install misc tools
 writeLog "installing misc tools"
-sudo apt-get update -y
-sudo apt-get install -y \
+run_apt_get update -y
+run_apt_get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -207,7 +223,7 @@ fi
 
 # install aws cli v2
 writeLog "installing aws cli v2"
-sudo apt-get remove -y awscli
+run_apt_get remove -y awscli
 curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip -q awscliv2.zip
 sudo ./aws/install
@@ -218,8 +234,8 @@ KUBECTL_MINOR=${cluster_version}
 writeLog "installing kubectl $KUBECTL_MINOR"
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v$KUBECTL_MINOR/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes.gpg] https://pkgs.k8s.io/core:/stable:/v$KUBECTL_MINOR/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-sudo apt-get update -y
-sudo apt-get install -y kubectl
+run_apt_get update -y
+run_apt_get install -y kubectl
 
 # install eksctl
 writeLog "installing eksctl"
@@ -231,8 +247,8 @@ eksctl version
 writeLog "installing helm"
 curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | sudo gpg --dearmor -o /etc/apt/keyrings/helm.gpg
 echo "deb [signed-by=/etc/apt/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-sudo apt-get update -y
-sudo apt-get install -y helm
+run_apt_get update -y
+run_apt_get install -y helm
 
 # install nodejs
 NODE_MAJOR=18
@@ -240,8 +256,8 @@ writeLog "installing node $NODE_MAJOR"
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list
-sudo apt-get update -y
-sudo apt-get install -y nodejs
+run_apt_get update -y
+run_apt_get install -y nodejs
 sudo npm install -g npx
 
 # configure aws, eksctl and kubectl
