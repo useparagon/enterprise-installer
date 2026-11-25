@@ -201,6 +201,13 @@ variable "monitors" {
   }))
 }
 
+variable "redis_exporter_targets" {
+  description = "Redis/Valkey endpoints Prometheus scrapes through redis-exporter (Cache plus Managed Sync). Sent as Prometheus CACHE_REDIS_URL only when managed_sync_enabled is true."
+  type        = list(string)
+  default     = []
+  sensitive   = true
+}
+
 variable "public_monitors" {
   description = "The monitors running within the system exposed to the load balancer"
   type = map(object({

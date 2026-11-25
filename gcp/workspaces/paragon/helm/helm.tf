@@ -457,6 +457,16 @@ resource "helm_release" "paragon_monitoring" {
     local.secret_hash
   ]
 
+  # Prometheus reads Cache/Queue/System/Workflow from paragon-secrets. With Managed Sync, add its
+  # endpoint to the Cache slot as a comma list. URLs can carry AUTH, so they go in a Secret.
+  dynamic "set_sensitive" {
+    for_each = var.managed_sync_enabled ? [1] : []
+    content {
+      name  = "prometheus.secrets.CACHE_REDIS_URL"
+      value = replace(join(",", var.redis_exporter_targets), ",", "\\,")
+    }
+  }
+
   depends_on = [
     helm_release.paragon_on_prem,
     data.kubernetes_secret.paragon_secrets,

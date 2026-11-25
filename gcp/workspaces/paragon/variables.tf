@@ -1763,6 +1763,20 @@ locals {
     })
   })
 
+  # Prometheus scrapes each Redis/Valkey endpoint through redis-exporter. Cache, Queue, System and
+  # Workflow already reach Prometheus through paragon-secrets. Managed Sync can run on its own
+  # instance, so it is added here. Endpoints are deduplicated by host:port, so a shared instance
+  # yields one target. The first URL for an endpoint wins, because only the cache URL carries the
+  # rediss:// scheme that TLS needs.
+  redis_exporter_targets = [
+    for endpoint, urls in {
+      for url in compact([
+        try(local.helm_values.global.env["CACHE_REDIS_URL"], null),
+        var.managed_sync_enabled ? try(local.helm_values.global.env["MANAGED_SYNC_REDIS_URL"], null) : null,
+      ]) : replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "") => url...
+    } : urls[0]
+  ]
+
   monitor_version = var.monitor_version != null ? var.monitor_version : try(local.helm_values.global.env["VERSION"], "latest")
 
   feature_flags_content = var.feature_flags != null ? file(var.feature_flags) : null

@@ -86,6 +86,7 @@ module "helm" {
   microservices               = local.microservices
   monitor_version             = local.monitor_version
   monitors                    = local.monitors
+  redis_exporter_targets      = local.redis_exporter_targets
   monitors_enabled            = var.monitors_enabled
   openobserve_email           = local.openobserve_email
   openobserve_gcs_secret_name = local.openobserve_gcs_enabled ? local.runtime_secret_names.openobserve_gcs : null
