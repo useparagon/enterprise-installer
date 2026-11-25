@@ -181,7 +181,7 @@ variable "monitor_version" {
 }
 
 variable "redis_exporter_addr" {
-  description = "Redis-compatible URI for the active cache backend (Redis or Valkey), used only by redis-exporter."
+  description = "Redis-compatible URI for the active cache backend (Redis or Valkey), used only by redis-exporter. Includes AUTH userinfo when the cache uses TLS+AUTH."
   type        = string
 }
 

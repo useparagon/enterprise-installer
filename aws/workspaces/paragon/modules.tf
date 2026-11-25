@@ -107,8 +107,13 @@ module "helm" {
   karpenter_defaults                = var.karpenter_defaults
   workspace                         = local.workspace
 
-  # Only redis-exporter needs the Redis-compatible active cache URI.
-  redis_exporter_addr = nonsensitive("${try(local.active_redis_connections.cache.ssl, false) ? "rediss" : "redis"}://${local.active_redis_connections.cache.host}:${local.active_redis_connections.cache.port}")
+  # redis-exporter REDIS_ADDR. Prefer the Cache URL (includes AUTH when Valkey TLS
+  # is on). A bare rediss://host:port hits NOAUTH on AUTH-enabled instances.
+  # Fallback keeps the old host-only form for stacks without CACHE_REDIS_URL yet.
+  redis_exporter_addr = nonsensitive(coalesce(
+    local.redis_exporter_cache_target,
+    "${try(local.active_redis_connections.cache.ssl, false) ? "rediss" : "redis"}://${local.active_redis_connections.cache.host}:${local.active_redis_connections.cache.port}",
+  ))
 
   # Prometheus scrape targets: Cache plus Managed Sync and Agent OS when they have their own.
   redis_exporter_targets = local.redis_exporter_targets
