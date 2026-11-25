@@ -1624,11 +1624,31 @@ locals {
   # microservices). Managed Sync and Agent OS can have their own instance, so they are added
   # to the Cache slot, which accepts a comma-separated list. Endpoints are deduplicated by
   # host:port, so a shared instance yields one target. The first URL for an endpoint wins.
+  # The AWS cache and Managed Sync URLs have no scheme, even with TLS. redis-exporter treats a
+  # schemeless target as redis://, so add rediss:// when the role has TLS enabled.
+  redis_exporter_cache_tls        = try(local.infra_vars.redis.value.cache.ssl, false)
+  redis_exporter_managed_sync_tls = try(local.infra_vars.redis.value.managed_sync.ssl, local.infra_vars.redis.value.cache.ssl, false)
+
+  redis_exporter_cache_url        = try(local.helm_values.global.env["CACHE_REDIS_URL"], null)
+  redis_exporter_managed_sync_url = var.managed_sync_enabled ? try(local.helm_values.global.env["MANAGED_SYNC_REDIS_URL"], null) : null
+
+  redis_exporter_cache_target = local.redis_exporter_cache_url == null ? null : (
+    local.redis_exporter_cache_tls && !can(regex("^rediss?://", local.redis_exporter_cache_url))
+    ? "rediss://${local.redis_exporter_cache_url}"
+    : local.redis_exporter_cache_url
+  )
+
+  redis_exporter_managed_sync_target = local.redis_exporter_managed_sync_url == null ? null : (
+    local.redis_exporter_managed_sync_tls && !can(regex("^rediss?://", local.redis_exporter_managed_sync_url))
+    ? "rediss://${local.redis_exporter_managed_sync_url}"
+    : local.redis_exporter_managed_sync_url
+  )
+
   redis_exporter_targets = [
     for endpoint, urls in {
       for url in compact([
-        try(local.helm_values.global.env["CACHE_REDIS_URL"], null),
-        var.managed_sync_enabled ? try(local.helm_values.global.env["MANAGED_SYNC_REDIS_URL"], null) : null,
+        local.redis_exporter_cache_target,
+        local.redis_exporter_managed_sync_target,
         local.agent_os_redis_url,
       ]) : nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
     } : urls[0]
