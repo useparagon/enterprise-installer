@@ -1612,6 +1612,31 @@ locals {
     })
   })
 
+  # Agent OS keeps its own Valkey outside the Cache/Queue/System/Workflow roles. This URL is
+  # only for redis-exporter, which assumes redis:// when the target has no scheme, so TLS needs
+  # an explicit rediss://. The password (if any) goes in the userinfo part.
+  agent_os_redis = var.agent_os_enabled ? try(local.valkey_connections.agent_os, null) : null
+  agent_os_redis_url = local.agent_os_redis == null ? null : join("", [
+    try(local.agent_os_redis.ssl, false) ? "rediss://" : "",
+    try(local.agent_os_redis.password, null) != null ? ":${urlencode(local.agent_os_redis.password)}@" : "",
+    "${local.agent_os_redis.host}:${local.agent_os_redis.port}",
+  ])
+
+  # Endpoints Prometheus scrapes through redis-exporter. Prometheus already gets
+  # CACHE/QUEUE/SYSTEM/WORKFLOW_REDIS_URL from paragon-secrets (the same values as the
+  # microservices). Managed Sync and Agent OS can have their own instance, so they are added
+  # to the Cache slot, which accepts a comma-separated list. Endpoints are deduplicated by
+  # host:port, so a shared instance yields one target. The first URL for an endpoint wins.
+  redis_exporter_targets = [
+    for endpoint, urls in {
+      for url in compact([
+        try(local.helm_values.global.env["CACHE_REDIS_URL"], null),
+        var.managed_sync_enabled ? try(local.helm_values.global.env["MANAGED_SYNC_REDIS_URL"], null) : null,
+        local.agent_os_redis_url,
+      ]) : replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "") => url...
+    } : urls[0]
+  ]
+
   monitor_version = var.monitor_version != null ? var.monitor_version : try(local.helm_values.global.env["VERSION"], "latest")
 
   feature_flags_content = (

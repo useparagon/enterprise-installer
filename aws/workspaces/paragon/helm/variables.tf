@@ -179,6 +179,13 @@ variable "redis_exporter_addr" {
   type        = string
 }
 
+variable "redis_exporter_targets" {
+  description = "Redis/Valkey endpoints Prometheus scrapes through redis-exporter: Cache plus Managed Sync and Agent OS when they have their own. Used as Prometheus' CACHE_REDIS_URL (comma-separated) only when Managed Sync is enabled; Queue, System and Workflow still come from paragon-secrets."
+  type        = list(string)
+  default     = []
+  sensitive   = true
+}
+
 variable "monitors" {
   description = "The monitors running within the system."
   type = map(object({
