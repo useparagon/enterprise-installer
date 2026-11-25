@@ -5,16 +5,29 @@ function writeLog() {
     echo -e "\n\n$(date -Iseconds) ##### $1\n"
 }
 
+# Prefer the host Ubuntu suite for Docker when published; otherwise fall back to noble.
+function resolve_docker_dist() {
+    local dist
+    dist=$(lsb_release -cs)
+    if curl -fsSL "https://download.docker.com/linux/ubuntu/dists/${dist}/InRelease" >/dev/null 2>&1; then
+        echo "$dist"
+        return 0
+    fi
+    echo "noble"
+}
+
 writeLog "paragon setup starting as $(whoami) from $0"
 sudo mkdir -p /etc/apt/keyrings
 
 # enable timestamps in shell history
 export HISTTIMEFORMAT="%F %T "
-echo 'export HISTTIMEFORMAT="%F %T "' >> /home/ubuntu/.bashrc
+if ! grep -qF 'HISTTIMEFORMAT=' /home/ubuntu/.bashrc 2>/dev/null; then
+    echo 'export HISTTIMEFORMAT="%F %T "' >> /home/ubuntu/.bashrc
+fi
 
 # unattended support
 export DEBIAN_FRONTEND=noninteractive
-sudo systemctl stop unattended-upgrades
+sudo systemctl stop unattended-upgrades || true
 
 # install misc tools
 writeLog "installing misc tools"
@@ -32,14 +45,13 @@ sudo apt-get install -y \
 
 # install cloudflare zero trust and register tunnel
 # see https://blog.cloudflare.com/automating-cloudflare-tunnel-with-terraform/
-if [[ ! -z "${tunnel_id}" ]]; then
+if [[ -n "${tunnel_id}" ]]; then
     writeLog "installing cloudflare tunnel"
-    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    curl -fsSL --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
     sudo dpkg -i cloudflared.deb
 
     sudo mkdir -p /etc/cloudflared
-
-    cat > /etc/cloudflared/cert.json << EOF
+    sudo tee /etc/cloudflared/cert.json > /dev/null << EOF
 {
     "AccountTag"   : "${account_id}",
     "TunnelID"     : "${tunnel_id}",
@@ -47,12 +59,13 @@ if [[ ! -z "${tunnel_id}" ]]; then
     "TunnelSecret" : "${tunnel_secret}"
 }
 EOF
+    sudo chmod 600 /etc/cloudflared/cert.json
 
-    sudo cat > /etc/cloudflared/config.yml << EOF
+    sudo tee /etc/cloudflared/config.yml > /dev/null << EOF
 tunnel: ${tunnel_id}
 credentials-file: /etc/cloudflared/cert.json
 logfile: /var/log/cloudflared.log
-loglevel: debug
+loglevel: info
 
 ingress:
   - hostname: ${tunnel_name}
@@ -62,33 +75,43 @@ EOF
 
     sudo cloudflared service install
     sudo systemctl start cloudflared
-    
-    # Ensure SSH is running and configured for tunnel access
+
+    # Ensure SSH is running and configured for tunnel access (keys only)
     writeLog "configuring SSH for tunnel access"
-    sudo systemctl enable ssh
-    sudo systemctl start ssh
-    
+    if systemctl list-unit-files --type=service 2>/dev/null | grep -q '^ssh\.service'; then
+        sudo systemctl enable --now ssh
+    else
+        sudo systemctl enable --now ssh.socket
+    fi
+
     # Ensure SSH directory and authorized_keys file exist with proper permissions
     sudo mkdir -p /home/ubuntu/.ssh
     sudo chmod 700 /home/ubuntu/.ssh
     sudo chown ubuntu:ubuntu /home/ubuntu/.ssh
-    
+
     # Wait for GCP metadata service to populate SSH keys
     writeLog "waiting for SSH keys from metadata service"
     sleep 10
-    
+
     # Ensure authorized_keys file exists and has proper permissions
     sudo touch /home/ubuntu/.ssh/authorized_keys
     sudo chmod 600 /home/ubuntu/.ssh/authorized_keys
     sudo chown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys
-    
-    # Configure SSH to allow connections through tunnel
-    sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    sudo sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-    sudo systemctl restart ssh
-    
+
+    # Keep pubkey auth enabled; do not enable password authentication
+    if grep -qE '^[#[:space:]]*PubkeyAuthentication' /etc/ssh/sshd_config; then
+        sudo sed -i 's/^[#[:space:]]*PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+    else
+        echo 'PubkeyAuthentication yes' | sudo tee -a /etc/ssh/sshd_config > /dev/null
+    fi
+    if systemctl list-unit-files --type=service 2>/dev/null | grep -q '^ssh\.service'; then
+        sudo systemctl restart ssh
+    else
+        sudo systemctl restart ssh.socket
+    fi
+
     # Verify services are running and SSH keys are present
-    sudo systemctl status ssh --no-pager
+    sudo systemctl status ssh --no-pager || sudo systemctl status ssh.socket --no-pager || true
     sudo systemctl status cloudflared --no-pager
     writeLog "SSH authorized_keys content:"
     sudo cat /home/ubuntu/.ssh/authorized_keys
@@ -98,8 +121,8 @@ fi
 
 # install gcp cli
 writeLog "installing gcp cli"
-curl -sSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/cloud.google.gpg
+echo "deb [signed-by=/etc/apt/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
 sudo apt-get update -y
 sudo apt-get install -y google-cloud-cli
 gcloud version
@@ -117,7 +140,7 @@ curl -fsSL https://pkgs.k8s.io/core:/stable:/v$KUBECTL_MINOR/deb/Release.key | s
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes.gpg] https://pkgs.k8s.io/core:/stable:/v$KUBECTL_MINOR/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 sudo apt-get update -y
 sudo apt-get install -y kubectl
-kubectl version
+kubectl version --client
 
 # install helm
 writeLog "installing helm"
@@ -128,22 +151,23 @@ sudo apt-get install -y helm
 helm version
 
 # install nodejs
-NODE_MAJOR=22
+NODE_MAJOR=24
 writeLog "installing node $NODE_MAJOR"
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list
 sudo apt-get update -y
 sudo apt-get install -y nodejs
-sudo npm install -g npx
 node --version
 
 # install docker and terraform agent when tfc_agent_token is set
-if [[ ! -z "${tfc_agent_token}" ]]; then
+if [[ -n "${tfc_agent_token}" ]]; then
     # install docker
     writeLog "installing docker"
+    DOCKER_DIST=$(resolve_docker_dist)
+    writeLog "using docker apt suite: $DOCKER_DIST"
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${DOCKER_DIST} stable" | sudo tee /etc/apt/sources.list.d/docker.list
     sudo apt-get update -y
     sudo apt-get install -y \
         containerd.io \

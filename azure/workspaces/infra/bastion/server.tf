@@ -82,8 +82,8 @@ resource "azurerm_linux_virtual_machine_scale_set" "bastion" {
 
   source_image_reference {
     publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts"
+    offer     = "ubuntu-26_04-lts"
+    sku       = "server"
     version   = "latest"
   }
 

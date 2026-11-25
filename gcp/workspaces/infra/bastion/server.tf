@@ -29,7 +29,7 @@ resource "google_compute_instance_template" "bastion_v2" {
   project      = var.gcp_project_id
 
   disk {
-    source_image = "ubuntu-os-cloud/ubuntu-2204-lts"
+    source_image = "ubuntu-os-cloud/ubuntu-2604-lts"
     auto_delete  = true
     boot         = true
     disk_size_gb = 40

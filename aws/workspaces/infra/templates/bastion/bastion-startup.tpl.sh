@@ -10,11 +10,13 @@ sudo mkdir -p /etc/apt/keyrings
 
 # enable timestamps in shell history
 export HISTTIMEFORMAT="%F %T "
-echo 'export HISTTIMEFORMAT="%F %T "' >> /home/ubuntu/.bashrc
+if ! grep -qF 'HISTTIMEFORMAT=' /home/ubuntu/.bashrc 2>/dev/null; then
+    echo 'export HISTTIMEFORMAT="%F %T "' >> /home/ubuntu/.bashrc
+fi
 
 # unattended support
 export DEBIAN_FRONTEND=noninteractive
-sudo systemctl stop unattended-upgrades
+sudo systemctl stop unattended-upgrades || true
 
 # install misc tools
 writeLog "installing misc tools"
@@ -31,14 +33,13 @@ sudo apt-get install -y \
 
 # install cloudflare zero trust and register tunnel
 # see https://blog.cloudflare.com/automating-cloudflare-tunnel-with-terraform/
-if [[ ! -z "${tunnel_id}" ]]; then
+if [[ -n "${tunnel_id}" ]]; then
     writeLog "installing cloudflare tunnel"
-    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    curl -fsSL --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
     sudo dpkg -i cloudflared.deb
 
     sudo mkdir -p /etc/cloudflared
-
-    cat > /etc/cloudflared/cert.json << EOF
+    sudo tee /etc/cloudflared/cert.json > /dev/null << EOF
 {
     "AccountTag"   : "${account_id}",
     "TunnelID"     : "${tunnel_id}",
@@ -46,8 +47,9 @@ if [[ ! -z "${tunnel_id}" ]]; then
     "TunnelSecret" : "${tunnel_secret}"
 }
 EOF
+    sudo chmod 600 /etc/cloudflared/cert.json
 
-    sudo cat > /etc/cloudflared/config.yml << EOF
+    sudo tee /etc/cloudflared/config.yml > /dev/null << EOF
 tunnel: ${tunnel_id}
 credentials-file: /etc/cloudflared/cert.json
 logfile: /var/log/cloudflared.log
@@ -56,8 +58,7 @@ loglevel: info
 ingress:
   - hostname: ${tunnel_name}
     service: ssh://localhost:22
-  - hostname: "*"
-    service: hello-world
+  - service: http_status:404
 EOF
 
     sudo cloudflared service install
@@ -68,7 +69,7 @@ fi
 
 # install aws cli v2
 writeLog "installing aws cli v2"
-sudo apt-get remove -y awscli
+sudo apt-get remove -y awscli || true
 curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip -q awscliv2.zip
 sudo ./aws/install
@@ -84,7 +85,7 @@ sudo apt-get install -y kubectl
 
 # install eksctl
 writeLog "installing eksctl"
-curl -fsSL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+curl -fsSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
 sudo mv /tmp/eksctl /usr/local/bin
 eksctl version
 
@@ -96,14 +97,13 @@ sudo apt-get update -y
 sudo apt-get install -y helm
 
 # install nodejs
-NODE_MAJOR=18
+NODE_MAJOR=24
 writeLog "installing node $NODE_MAJOR"
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list
 sudo apt-get update -y
 sudo apt-get install -y nodejs
-sudo npm install -g npx
 
 # configure aws, eksctl and kubectl
 # note that cluster may be still CREATING so wait up to 5 min for that to complete
@@ -111,17 +111,18 @@ writeLog "configuring k8s tools as root"
 aws configure set region ${aws_region}
 max_loops=10
 current_loop=0
-while [ $current_loop -lt $max_loops ]; do
-    # aws eks --region ${aws_region} update-kubeconfig --name ${cluster_name}
-    output=$(aws eks --region ${aws_region} update-kubeconfig --name ${cluster_name} 2>&1)
+while [ "$current_loop" -lt "$max_loops" ]; do
+    output=$(aws eks --region ${aws_region} update-kubeconfig --name ${cluster_name} 2>&1) || true
     if [[ ! $output =~ "CREATING" ]]; then
         break
     fi
     echo "Cluster still creating. Waiting for 30s."
     sleep 30
-    ((current_loop++))
+    current_loop=$((current_loop + 1))
 done
-$(eksctl get iamidentitymapping --cluster ${cluster_name} --arn arn:aws:iam::${aws_account_id}:role/${bastion_role} || eksctl create iamidentitymapping --cluster ${cluster_name} --arn arn:aws:iam::${aws_account_id}:role/${bastion_role} --group system:masters --username ${bastion_role})
+if ! eksctl get iamidentitymapping --cluster ${cluster_name} --arn arn:aws:iam::${aws_account_id}:role/${bastion_role}; then
+    eksctl create iamidentitymapping --cluster ${cluster_name} --arn arn:aws:iam::${aws_account_id}:role/${bastion_role} --group system:masters --username ${bastion_role}
+fi
 kubectl config set-context --current --namespace=paragon
 
 # Create and configure aliases file

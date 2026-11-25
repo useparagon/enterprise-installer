@@ -18,16 +18,35 @@ function retry() {
     done
 }
 
+# Prefer the host Ubuntu suite for azure-cli when it publishes packages; otherwise fall back.
+function resolve_azure_cli_dist() {
+    local dist candidate
+    dist=$(lsb_release -cs)
+    if curl -fsSL "https://packages.microsoft.com/repos/azure-cli/dists/${dist}/main/binary-amd64/Packages" 2>/dev/null | grep -q '^Package: azure-cli$'; then
+        echo "$dist"
+        return 0
+    fi
+    for candidate in noble jammy; do
+        if curl -fsSL "https://packages.microsoft.com/repos/azure-cli/dists/${candidate}/main/binary-amd64/Packages" 2>/dev/null | grep -q '^Package: azure-cli$'; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    echo "$dist"
+}
+
 writeLog "paragon setup starting as $(whoami) from $0"
 sudo mkdir -p /etc/apt/keyrings
 
 # enable timestamps in shell history
 export HISTTIMEFORMAT="%F %T "
-echo 'export HISTTIMEFORMAT="%F %T "' >> /home/ubuntu/.bashrc
+if ! grep -qF 'HISTTIMEFORMAT=' /home/ubuntu/.bashrc 2>/dev/null; then
+    echo 'export HISTTIMEFORMAT="%F %T "' >> /home/ubuntu/.bashrc
+fi
 
 # unattended support
 export DEBIAN_FRONTEND=noninteractive
-sudo systemctl stop unattended-upgrades
+sudo systemctl stop unattended-upgrades || true
 
 # install misc tools
 writeLog "installing misc tools"
@@ -45,14 +64,13 @@ sudo apt-get install -y \
 
 # install cloudflare zero trust and register tunnel
 # see https://blog.cloudflare.com/automating-cloudflare-tunnel-with-terraform/
-if [[ ! -z "${tunnel_id}" ]]; then
+if [[ -n "${tunnel_id}" ]]; then
     writeLog "installing cloudflare tunnel"
-    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    curl -fsSL --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
     sudo dpkg -i cloudflared.deb
 
     sudo mkdir -p /etc/cloudflared
-
-    cat > /etc/cloudflared/cert.json << EOF
+    sudo tee /etc/cloudflared/cert.json > /dev/null << EOF
 {
     "AccountTag"   : "${account_id}",
     "TunnelID"     : "${tunnel_id}",
@@ -60,8 +78,9 @@ if [[ ! -z "${tunnel_id}" ]]; then
     "TunnelSecret" : "${tunnel_secret}"
 }
 EOF
+    sudo chmod 600 /etc/cloudflared/cert.json
 
-    sudo cat > /etc/cloudflared/config.yml << EOF
+    sudo tee /etc/cloudflared/config.yml > /dev/null << EOF
 tunnel: ${tunnel_id}
 credentials-file: /etc/cloudflared/cert.json
 logfile: /var/log/cloudflared.log
@@ -70,8 +89,7 @@ loglevel: info
 ingress:
   - hostname: ${tunnel_name}
     service: ssh://localhost:22
-  - hostname: "*"
-    service: hello-world
+  - service: http_status:404
 EOF
 
     sudo cloudflared service install
@@ -82,8 +100,10 @@ fi
 
 # install azure cli
 writeLog "installing azure cli"
-curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/azure-cli.list
+AZ_DIST=$(resolve_azure_cli_dist)
+writeLog "using azure-cli apt suite: $AZ_DIST"
+curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ ${AZ_DIST} main" | sudo tee /etc/apt/sources.list.d/azure-cli.list
 sudo apt-get update -y
 sudo apt-get install -y azure-cli
 az version
@@ -95,7 +115,7 @@ curl -fsSL https://pkgs.k8s.io/core:/stable:/v$KUBECTL_MINOR/deb/Release.key | s
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes.gpg] https://pkgs.k8s.io/core:/stable:/v$KUBECTL_MINOR/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 sudo apt-get update -y
 sudo apt-get install -y kubectl
-kubectl version
+kubectl version --client
 
 # install helm
 writeLog "installing helm"
@@ -105,14 +125,13 @@ sudo apt-get update -y
 sudo apt-get install -y helm
 
 # install nodejs
-NODE_MAJOR=18
+NODE_MAJOR=24
 writeLog "installing node $NODE_MAJOR"
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list
 sudo apt-get update -y
 sudo apt-get install -y nodejs
-sudo npm install -g npx
 node --version
 
 # Create and configure aliases file
