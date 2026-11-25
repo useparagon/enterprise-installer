@@ -40,6 +40,8 @@ module "alb" {
 module "helm" {
   source = "./helm"
 
+  developer_mcp_chart_values = local.developer_mcp_chart_values
+
   certificate                   = module.alb.certificate
   domain                        = var.domain
   alb_backend_security_group_id = module.alb.backend_security_group_id

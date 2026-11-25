@@ -353,6 +353,7 @@ resource "helm_release" "paragon_on_prem" {
     local.microservice_values,
     local.public_microservice_values,
     local.unexposed_microservice_values,
+    var.developer_mcp_chart_values,
     local.secret_hash
   ]
 

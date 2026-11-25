@@ -65,8 +65,9 @@ resource "azurerm_kubernetes_cluster" "cluster" {
   # We're intentionally setting very low settings.
   # This way, we can instead reconfigure the node pools using `azurerm_kubernetes_cluster_node_pool` resource.
   default_node_pool {
-    name       = "default"
-    node_count = 1
+    name                 = "default"
+    node_count           = 1
+    orchestrator_version = var.k8s_version
     # intentionally setting cheapest usable node pool which costs ~ $30 / mo
     # while there are cheaper options, the minimum requirements for this are 2 cpu and 4gb memory
     # https://azureprice.net/

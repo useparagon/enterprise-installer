@@ -1,6 +1,8 @@
 module "helm" {
   source = "./helm"
 
+  developer_mcp_chart_values = local.developer_mcp_chart_values
+
   cluster_name               = local.cluster_name
   docker_cfg_secret_name     = var.create_docker_pull_secret && length(azurerm_key_vault_secret.docker_cfg) > 0 ? azurerm_key_vault_secret.docker_cfg[0].name : null
   docker_pull_secret_name    = var.docker_pull_secret_name
@@ -264,6 +266,7 @@ module "waf" {
   waf_rate_limit_path_duration   = var.waf_rate_limit_path_duration
   waf_rate_limit_group_by        = var.waf_rate_limit_group_by
   waf_max_request_body_size_kb   = var.waf_max_request_body_size_kb
+  waf_request_body_enforcement   = var.waf_request_body_enforcement
   waf_file_upload_limit_mb       = var.waf_file_upload_limit_mb
   waf_custom_rules               = var.waf_custom_rules
   waf_managed_rule_sets          = var.waf_managed_rule_sets

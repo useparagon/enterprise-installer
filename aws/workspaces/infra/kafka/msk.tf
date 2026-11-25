@@ -181,8 +181,8 @@ auto.create.topics.enable = true
 delete.topic.enable = true
 log.retention.hours = 168
 num.partitions = 3
-default.replication.factor = ${ceil(var.msk_kafka_num_broker_nodes / 2)}
-min.insync.replicas = ${ceil(var.msk_kafka_num_broker_nodes / 2)}
+default.replication.factor = ${min(var.msk_kafka_num_broker_nodes, 3)}
+min.insync.replicas = ${min(var.msk_kafka_num_broker_nodes, 3) - 1}
 PROPERTIES
 
   lifecycle {

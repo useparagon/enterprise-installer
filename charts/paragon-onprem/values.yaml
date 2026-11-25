@@ -11,6 +11,8 @@ subchart:
     enabled: true
   dashboard:
     enabled: true
+  developer-mcp:
+    enabled: true
   flipt:
     enabled: true
   hades:

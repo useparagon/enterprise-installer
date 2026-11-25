@@ -82,6 +82,12 @@ variable "logs_bucket" {
   type        = string
 }
 
+variable "developer_mcp_chart_values" {
+  description = "YAML that lists Developer MCP OAuth keys per chart (envKeys and secretKeys for zeus and developer-mcp)."
+  type        = string
+  default     = "{}"
+}
+
 variable "helm_values" {
   description = "Object containing values to pass to the helm chart."
   type        = any
