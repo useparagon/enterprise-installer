@@ -1612,15 +1612,12 @@ locals {
     })
   })
 
-  # Agent OS keeps its own Valkey outside the Cache/Queue/System/Workflow roles. This URL is
-  # only for redis-exporter, which assumes redis:// when the target has no scheme, so TLS needs
-  # an explicit rediss://. The password (if any) goes in the userinfo part.
-  agent_os_redis = var.agent_os_enabled ? try(local.valkey_connections.agent_os, null) : null
-  agent_os_redis_url = local.agent_os_redis == null ? null : join("", [
-    try(local.agent_os_redis.ssl, false) ? "rediss://" : "",
-    try(local.agent_os_redis.password, null) != null ? ":${urlencode(local.agent_os_redis.password)}@" : "",
-    "${local.agent_os_redis.host}:${local.agent_os_redis.port}",
-  ])
+  # Agent OS has its own Valkey, which is not in the paragon/<workspace>/valkey secret. Its
+  # AOS_REDIS_URL (with scheme and password) is written to the Agent OS app secret by infra.
+  agent_os_redis_url = var.agent_os_enabled ? try(
+    jsondecode(data.aws_secretsmanager_secret_version.agent_os_app[0].secret_string).AOS_REDIS_URL,
+    null,
+  ) : null
 
   # Endpoints Prometheus scrapes through redis-exporter. Prometheus already gets
   # CACHE/QUEUE/SYSTEM/WORKFLOW_REDIS_URL from paragon-secrets (the same values as the
@@ -1633,7 +1630,7 @@ locals {
         try(local.helm_values.global.env["CACHE_REDIS_URL"], null),
         var.managed_sync_enabled ? try(local.helm_values.global.env["MANAGED_SYNC_REDIS_URL"], null) : null,
         local.agent_os_redis_url,
-      ]) : replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "") => url...
+      ]) : nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
     } : urls[0]
   ]
 
