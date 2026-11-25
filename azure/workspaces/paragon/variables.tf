@@ -1440,7 +1440,7 @@ locals {
         try(local.helm_values.global.env["CACHE_REDIS_URL"], null),
         var.managed_sync_enabled ? try(local.helm_values.global.env["MANAGED_SYNC_REDIS_URL"], null) : null,
         try(local.agent_os_handoff.app_config.AOS_REDIS_URL, null),
-      ]) : replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "") => url...
+      ]) : nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
     } : urls[0]
   ]
 
