@@ -1472,7 +1472,9 @@ locals {
   # redis-exporter REDIS_ADDR: the Cache URL (scheme and AUTH included), same as the AWS stack.
   redis_exporter_addr = nonsensitive(coalesce(try(local.redis_instance_urls["cache"], null), local.default_redis_url))
 
-  # Managed Sync Redis (infra key "managed_sync"), only when Managed Sync is enabled. Agent OS is not scraped here.
+  # Managed Sync Redis (infra key "managed_sync"), only when Managed Sync is enabled.
+  # Agent OS Valkey is NOT scraped on GCP: it authenticates with IAM (AOS_REDIS_AUTH_MODE = "iam", no password),
+  # which redis-exporter cannot use. Scraping it would report redis_up = 0 and trip redis-instance-down.
   redis_exporter_managed_sync_target = var.managed_sync_enabled ? try(local.redis_instance_urls["managed_sync"], local.redis_instance_urls["cache"], null) : null
 
   # redis-exporter scrape list (Prometheus CACHE_REDIS_URL): Cache, Queue and System with the same
