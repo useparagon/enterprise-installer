@@ -1162,11 +1162,17 @@ locals {
   # redis-exporter REDIS_ADDR: the Cache URL (scheme and AUTH included), same as the AWS stack.
   redis_exporter_addr = nonsensitive(coalesce(try(local.redis_instance_urls["cache"], null), local.default_redis_url))
 
+  # Managed Sync Redis (infra key "managed-sync"), only when Managed Sync is enabled. Agent OS is not scraped here.
+  redis_exporter_managed_sync_target = var.managed_sync_enabled ? try(local.redis_instance_urls["managed-sync"], local.redis_instance_urls["cache"], null) : null
+
   # redis-exporter scrape list (Prometheus CACHE_REDIS_URL): Cache, Queue and System with the same
-  # role rule as the services. A shared instance collapses to one target (deduplicated by host:port).
+  # role rule as the services, plus Managed Sync when enabled. A shared instance collapses to one target (deduplicated by host:port).
   redis_exporter_targets = [
     for endpoint, urls in {
-      for url in [for role in ["cache", "queue", "system"] : try(local.redis_instance_urls[role], local.redis_instance_urls["cache"])] :
+      for url in compact(concat(
+        [for role in ["cache", "queue", "system"] : try(local.redis_instance_urls[role], local.redis_instance_urls["cache"])],
+        [local.redis_exporter_managed_sync_target]
+      )) :
       nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
     } : urls[0]
   ]
