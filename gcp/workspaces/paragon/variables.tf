@@ -1469,6 +1469,32 @@ locals {
     try(local.redis_instance_urls["cache"], local.infra_vars.redis.value.cache.connection_string, "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}")
   )
 
+  # redis-exporter REDIS_ADDR: the Cache URL (scheme and AUTH included), same as the AWS stack.
+  redis_exporter_addr = coalesce(try(local.redis_instance_urls["cache"], null), local.default_redis_url)
+
+  # Managed Sync Redis (infra key "managed_sync"), only when Managed Sync is enabled.
+  # Agent OS Valkey is NOT scraped on GCP: it authenticates with IAM (AOS_REDIS_AUTH_MODE = "iam", no password),
+  # which redis-exporter cannot use. Scraping it would report redis_up = 0 and trip redis-instance-down.
+  redis_exporter_managed_sync_target = var.managed_sync_enabled ? try(local.redis_instance_urls["managed_sync"], local.redis_instance_urls["cache"], null) : null
+
+  # Prometheus also reads QUEUE/SYSTEM/WORKFLOW_REDIS_URL from paragon-secrets. Override those slots with
+  # the same per-role URL as the Cache-slot list so they never diverge from it (a shared instance repeats Cache).
+  redis_exporter_role_target_by_role = {
+    for role in ["queue", "system", "workflow"] : role => try(local.redis_instance_urls[role], local.redis_instance_urls["cache"])
+  }
+
+  # redis-exporter scrape list (Prometheus CACHE_REDIS_URL): Cache, Queue and System with the same
+  # role rule as the services, plus Managed Sync when enabled. A shared instance collapses to one target (deduplicated by host:port).
+  redis_exporter_targets = [
+    for endpoint, urls in {
+      for url in compact(concat(
+        [for role in ["cache", "queue", "system"] : try(local.redis_instance_urls[role], local.redis_instance_urls["cache"])],
+        [local.redis_exporter_managed_sync_target]
+      )) :
+      nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
+    } : urls[0]
+  ]
+
   # Iterate the instances infra actually created. redis_multiple_instances=false
   # emits only `cache`, and naming queue/system directly errors the whole
   # expression, so the CA bundle silently stayed unmounted and every TLS Redis

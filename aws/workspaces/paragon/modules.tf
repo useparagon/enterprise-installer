@@ -107,8 +107,18 @@ module "helm" {
   karpenter_defaults                = var.karpenter_defaults
   workspace                         = local.workspace
 
-  # Only redis-exporter needs the Redis-compatible active cache URI.
-  redis_exporter_addr = nonsensitive("${try(local.active_redis_connections.cache.ssl, false) ? "rediss" : "redis"}://${local.active_redis_connections.cache.host}:${local.active_redis_connections.cache.port}")
+  # redis-exporter REDIS_ADDR. Prefer the Cache URL (includes AUTH when Valkey TLS
+  # is on). A bare rediss://host:port hits NOAUTH on AUTH-enabled instances.
+  # Fallback keeps the old host-only form for stacks without CACHE_REDIS_URL yet.
+  redis_exporter_addr = coalesce(
+    local.redis_exporter_cache_target,
+    "${try(local.active_redis_connections.cache.ssl, false) ? "rediss" : "redis"}://${local.active_redis_connections.cache.host}:${local.active_redis_connections.cache.port}",
+  )
+
+  # Prometheus scrape targets: Cache, Queue and System (same role rule as the services), plus
+  # Managed Sync and Agent OS when they have their own instance.
+  redis_exporter_targets      = local.redis_exporter_targets
+  redis_exporter_role_targets = local.redis_exporter_role_target_by_role
 
   runtime_secrets_ready = terraform_data.runtime_secrets_populated.id
   # Hash SM version IDs (not terraform_data.id, which is stable across input updates).

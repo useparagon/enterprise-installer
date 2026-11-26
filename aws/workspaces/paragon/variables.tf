@@ -1694,6 +1694,65 @@ locals {
     })
   })
 
+  # Agent OS has its own Valkey, which is not in the paragon/<workspace>/valkey secret. Its
+  # AOS_REDIS_URL (with scheme and password) is written to the Agent OS app secret by infra.
+  agent_os_redis_url = var.agent_os_enabled ? try(
+    jsondecode(data.aws_secretsmanager_secret_version.agent_os_app[0].secret_string).AOS_REDIS_URL,
+    null,
+  ) : null
+
+  # Endpoints Prometheus scrapes through redis-exporter (/scrape?target=...). Same role rule as
+  # the services (redis_role_url): one shared ElastiCache (single) gives one target; separate
+  # instances (multiple) give cache, queue and system. Managed Sync and Agent OS are added when
+  # they have their own instance. Endpoints are deduplicated by host:port. The first URL for an
+  # endpoint wins. Cache, Queue and System URLs have no scheme, even with TLS. redis-exporter
+  # treats a schemeless target as redis://, so add rediss:// when the role has TLS enabled.
+  redis_exporter_cache_tls        = try(local.infra_vars.redis.value.cache.ssl, false)
+  redis_exporter_managed_sync_tls = try(local.infra_vars.redis.value.managed_sync.ssl, local.infra_vars.redis.value.cache.ssl, false)
+
+  redis_exporter_cache_url        = try(local.helm_values.global.env["CACHE_REDIS_URL"], null)
+  redis_exporter_managed_sync_url = var.managed_sync_enabled ? try(local.helm_values.global.env["MANAGED_SYNC_REDIS_URL"], null) : null
+
+  redis_exporter_cache_target = local.redis_exporter_cache_url == null ? null : (
+    local.redis_exporter_cache_tls && !can(regex("^rediss?://", local.redis_exporter_cache_url))
+    ? "rediss://${local.redis_exporter_cache_url}"
+    : local.redis_exporter_cache_url
+  )
+
+  redis_exporter_managed_sync_target = local.redis_exporter_managed_sync_url == null ? null : (
+    local.redis_exporter_managed_sync_tls && !can(regex("^rediss?://", local.redis_exporter_managed_sync_url))
+    ? "rediss://${local.redis_exporter_managed_sync_url}"
+    : local.redis_exporter_managed_sync_url
+  )
+
+  redis_exporter_role_targets = [
+    for role in ["cache", "queue", "system"] : (
+      try(local.redis_role_endpoint[role].ssl, false) && !can(regex("^rediss?://", local.redis_role_url[role]))
+      ? "rediss://${local.redis_role_url[role]}"
+      : local.redis_role_url[role]
+    ) if local.redis_role_url[role] != null
+  ]
+
+  # Prometheus also reads QUEUE/SYSTEM/WORKFLOW_REDIS_URL from paragon-secrets, scheme-less on TLS,
+  # so they would stay down next to the rediss:// targets above. Override those slots with the same
+  # per-role URL (identical when the role shares the Cache instance).
+  redis_exporter_role_target_by_role = {
+    for role in ["queue", "system", "workflow"] : role => (
+      try(local.redis_role_endpoint[role].ssl, false) && !can(regex("^rediss?://", local.redis_role_url[role]))
+      ? "rediss://${local.redis_role_url[role]}"
+      : local.redis_role_url[role]
+    ) if nonsensitive(local.redis_role_url[role] != null)
+  }
+
+  redis_exporter_targets = [
+    for endpoint, urls in {
+      for url in compact(concat(local.redis_exporter_role_targets, [
+        local.redis_exporter_managed_sync_target,
+        local.agent_os_redis_url,
+      ])) : nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
+    } : urls[0]
+  ]
+
   monitor_version = var.monitor_version != null ? var.monitor_version : try(local.helm_values.global.env["VERSION"], "latest")
 
   feature_flags_content = (

@@ -140,11 +140,10 @@ locals {
       }
       }, {
       # Add Redis exporter settings without changing values for other monitors.
+      # REDIS_ADDR can carry the cache AUTH token, so it is read from a Secret
+      # (redis-exporter.secrets.REDIS_ADDR, set below with set_sensitive), not a plain env value.
       for key, value in {
-        envKeys = ["REDIS_ADDR"]
-        env = {
-          REDIS_ADDR = var.redis_exporter_addr
-        }
+        secretKeys = ["REDIS_ADDR"]
       } : key => value if monitor_name == "redis-exporter"
     })
   })
@@ -626,6 +625,39 @@ resource "helm_release" "paragon_monitoring" {
   set {
     name  = "grafana.secrets.MONITOR_GRAFANA_ALB_ARN"
     value = data.aws_lb.load_balancer.arn_suffix
+  }
+
+  # Prometheus scrape list for redis-exporter: Cache, plus Queue and System when they are
+  # separate instances, plus Managed Sync and Agent OS when enabled. Passed as the Cache slot
+  # (comma list). The URLs can carry the AUTH token, so they go in a Secret, never a ConfigMap
+  # or target label.
+  dynamic "set_sensitive" {
+    for_each = nonsensitive(length(var.redis_exporter_targets)) > 0 ? [1] : []
+    content {
+      name  = "prometheus.secrets.CACHE_REDIS_URL"
+      value = replace(join(",", var.redis_exporter_targets), ",", "\\,")
+    }
+  }
+
+  # redis-exporter's own default address (REDIS_ADDR). It includes the cache AUTH token when the cache
+  # uses AUTH, so it goes in a Secret and stays out of the plan and the pod spec. It only affects
+  # redis-exporter's default target; the other instances are scraped through /scrape?target=...
+  dynamic "set_sensitive" {
+    for_each = nonsensitive(var.redis_exporter_addr != "") ? [1] : []
+    content {
+      name  = "redis-exporter.secrets.REDIS_ADDR"
+      value = var.redis_exporter_addr
+    }
+  }
+
+  # Same URLs per role for the QUEUE/SYSTEM/WORKFLOW slots, so they match the Cache-slot targets
+  # (rediss:// on TLS) instead of the scheme-less values in paragon-secrets.
+  dynamic "set_sensitive" {
+    for_each = nonsensitive(toset(keys(var.redis_exporter_role_targets)))
+    content {
+      name  = "prometheus.secrets.${upper(set_sensitive.value)}_REDIS_URL"
+      value = var.redis_exporter_role_targets[set_sensitive.value]
+    }
   }
 
   depends_on = [

@@ -181,8 +181,23 @@ variable "monitor_version" {
 }
 
 variable "redis_exporter_addr" {
-  description = "Redis-compatible URI for the active cache backend (Redis or Valkey), used only by redis-exporter."
+  description = "Redis-compatible URI for the Cache backend, used only by redis-exporter as REDIS_ADDR. Includes AUTH userinfo when the cache uses AUTH, so it is sensitive and delivered through a Secret."
   type        = string
+  sensitive   = true
+}
+
+variable "redis_exporter_targets" {
+  description = "Redis/Valkey endpoints Prometheus scrapes through redis-exporter, deduplicated by host:port: Cache, Queue and System (same role rule as the services; one target when they share an instance), plus Managed Sync and Agent OS when they have their own. Used as Prometheus' CACHE_REDIS_URL (comma-separated) whenever the list is non-empty."
+  type        = list(string)
+  default     = []
+  sensitive   = true
+}
+
+variable "redis_exporter_role_targets" {
+  description = "Queue, System and Workflow Redis/Valkey URLs (same scheme and AUTH as the Cache-slot list). Overrides Prometheus' QUEUE/SYSTEM/WORKFLOW_REDIS_URL slots so they match the Cache-slot targets instead of the scheme-less paragon-secrets values."
+  type        = map(string)
+  default     = {}
+  sensitive   = true
 }
 
 variable "monitors" {
