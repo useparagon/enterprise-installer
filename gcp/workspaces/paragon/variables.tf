@@ -1470,7 +1470,7 @@ locals {
   )
 
   # redis-exporter REDIS_ADDR: the Cache URL (scheme and AUTH included), same as the AWS stack.
-  redis_exporter_addr = nonsensitive(coalesce(try(local.redis_instance_urls["cache"], null), local.default_redis_url))
+  redis_exporter_addr = coalesce(try(local.redis_instance_urls["cache"], null), local.default_redis_url)
 
   # Managed Sync Redis (infra key "managed_sync"), only when Managed Sync is enabled.
   # Agent OS Valkey is NOT scraped on GCP: it authenticates with IAM (AOS_REDIS_AUTH_MODE = "iam", no password),

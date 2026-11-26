@@ -110,10 +110,10 @@ module "helm" {
   # redis-exporter REDIS_ADDR. Prefer the Cache URL (includes AUTH when Valkey TLS
   # is on). A bare rediss://host:port hits NOAUTH on AUTH-enabled instances.
   # Fallback keeps the old host-only form for stacks without CACHE_REDIS_URL yet.
-  redis_exporter_addr = nonsensitive(coalesce(
+  redis_exporter_addr = coalesce(
     local.redis_exporter_cache_target,
     "${try(local.active_redis_connections.cache.ssl, false) ? "rediss" : "redis"}://${local.active_redis_connections.cache.host}:${local.active_redis_connections.cache.port}",
-  ))
+  )
 
   # Prometheus scrape targets: Cache, Queue and System (same role rule as the services), plus
   # Managed Sync and Agent OS when they have their own instance.

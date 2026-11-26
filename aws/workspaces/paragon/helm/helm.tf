@@ -140,11 +140,10 @@ locals {
       }
       }, {
       # Add Redis exporter settings without changing values for other monitors.
+      # REDIS_ADDR can carry the cache AUTH token, so it is read from a Secret
+      # (redis-exporter.secrets.REDIS_ADDR, set below with set_sensitive), not a plain env value.
       for key, value in {
-        envKeys = ["REDIS_ADDR"]
-        env = {
-          REDIS_ADDR = var.redis_exporter_addr
-        }
+        secretKeys = ["REDIS_ADDR"]
       } : key => value if monitor_name == "redis-exporter"
     })
   })
@@ -637,6 +636,17 @@ resource "helm_release" "paragon_monitoring" {
     content {
       name  = "prometheus.secrets.CACHE_REDIS_URL"
       value = replace(join(",", var.redis_exporter_targets), ",", "\\,")
+    }
+  }
+
+  # redis-exporter's own default address (REDIS_ADDR). It includes the cache AUTH token when the cache
+  # uses AUTH, so it goes in a Secret and stays out of the plan and the pod spec. It only affects
+  # redis-exporter's default target; the other instances are scraped through /scrape?target=...
+  dynamic "set_sensitive" {
+    for_each = nonsensitive(var.redis_exporter_addr != "") ? [1] : []
+    content {
+      name  = "redis-exporter.secrets.REDIS_ADDR"
+      value = var.redis_exporter_addr
     }
   }
 
