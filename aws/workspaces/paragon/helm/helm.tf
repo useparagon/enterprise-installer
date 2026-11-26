@@ -650,6 +650,16 @@ resource "helm_release" "paragon_monitoring" {
     }
   }
 
+  # Same URLs per role for the QUEUE/SYSTEM/WORKFLOW slots, so they match the Cache-slot targets
+  # (rediss:// on TLS) instead of the scheme-less values in paragon-secrets.
+  dynamic "set_sensitive" {
+    for_each = nonsensitive(toset(keys(var.redis_exporter_role_targets)))
+    content {
+      name  = "prometheus.secrets.${upper(set_sensitive.value)}_REDIS_URL"
+      value = var.redis_exporter_role_targets[set_sensitive.value]
+    }
+  }
+
   depends_on = [
     module.karpenter,
     helm_release.ingress,

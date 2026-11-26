@@ -1477,6 +1477,12 @@ locals {
   # which redis-exporter cannot use. Scraping it would report redis_up = 0 and trip redis-instance-down.
   redis_exporter_managed_sync_target = var.managed_sync_enabled ? try(local.redis_instance_urls["managed_sync"], local.redis_instance_urls["cache"], null) : null
 
+  # Prometheus also reads QUEUE/SYSTEM/WORKFLOW_REDIS_URL from paragon-secrets. Override those slots with
+  # the same per-role URL as the Cache-slot list so they never diverge from it (a shared instance repeats Cache).
+  redis_exporter_role_target_by_role = {
+    for role in ["queue", "system", "workflow"] : role => try(local.redis_instance_urls[role], local.redis_instance_urls["cache"])
+  }
+
   # redis-exporter scrape list (Prometheus CACHE_REDIS_URL): Cache, Queue and System with the same
   # role rule as the services, plus Managed Sync when enabled. A shared instance collapses to one target (deduplicated by host:port).
   redis_exporter_targets = [

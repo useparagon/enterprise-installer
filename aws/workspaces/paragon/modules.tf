@@ -117,7 +117,8 @@ module "helm" {
 
   # Prometheus scrape targets: Cache, Queue and System (same role rule as the services), plus
   # Managed Sync and Agent OS when they have their own instance.
-  redis_exporter_targets = local.redis_exporter_targets
+  redis_exporter_targets      = local.redis_exporter_targets
+  redis_exporter_role_targets = local.redis_exporter_role_target_by_role
 
   runtime_secrets_ready = terraform_data.runtime_secrets_populated.id
   # Hash SM version IDs (not terraform_data.id, which is stable across input updates).

@@ -1169,6 +1169,12 @@ locals {
   # Managed Sync, so agent_os_enabled alone gates it.
   redis_exporter_agent_os_target = var.agent_os_enabled ? try(local.agent_os_handoff.app_config.AOS_REDIS_URL, null) : null
 
+  # Prometheus also reads QUEUE/SYSTEM/WORKFLOW_REDIS_URL from paragon-secrets. Override those slots with
+  # the same per-role URL as the Cache-slot list so they never diverge from it (a shared instance repeats Cache).
+  redis_exporter_role_target_by_role = {
+    for role in ["queue", "system", "workflow"] : role => try(local.redis_instance_urls[role], local.redis_instance_urls["cache"])
+  }
+
   # redis-exporter scrape list (Prometheus CACHE_REDIS_URL): Cache, Queue and System with the same
   # role rule as the services, plus Managed Sync and Agent OS when enabled. A shared instance collapses to one target (deduplicated by host:port).
   redis_exporter_targets = [

@@ -193,6 +193,13 @@ variable "redis_exporter_targets" {
   sensitive   = true
 }
 
+variable "redis_exporter_role_targets" {
+  description = "Queue, System and Workflow Redis/Valkey URLs (same scheme and AUTH as the Cache-slot list). Overrides Prometheus' QUEUE/SYSTEM/WORKFLOW_REDIS_URL slots so they match the Cache-slot targets instead of the scheme-less paragon-secrets values."
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+}
+
 variable "monitors" {
   description = "The monitors running within the system."
   type = map(object({

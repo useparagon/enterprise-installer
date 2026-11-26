@@ -1733,6 +1733,17 @@ locals {
     ) if local.redis_role_url[role] != null
   ]
 
+  # Prometheus also reads QUEUE/SYSTEM/WORKFLOW_REDIS_URL from paragon-secrets, scheme-less on TLS,
+  # so they would stay down next to the rediss:// targets above. Override those slots with the same
+  # per-role URL (identical when the role shares the Cache instance).
+  redis_exporter_role_target_by_role = {
+    for role in ["queue", "system", "workflow"] : role => (
+      try(local.redis_role_endpoint[role].ssl, false) && !can(regex("^rediss?://", local.redis_role_url[role]))
+      ? "rediss://${local.redis_role_url[role]}"
+      : local.redis_role_url[role]
+    ) if nonsensitive(local.redis_role_url[role] != null)
+  }
+
   redis_exporter_targets = [
     for endpoint, urls in {
       for url in compact(concat(local.redis_exporter_role_targets, [

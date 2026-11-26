@@ -1,8 +1,9 @@
 module "helm" {
   source = "./helm"
 
-  redis_exporter_addr    = local.redis_exporter_addr
-  redis_exporter_targets = local.redis_exporter_targets
+  redis_exporter_addr         = local.redis_exporter_addr
+  redis_exporter_targets      = local.redis_exporter_targets
+  redis_exporter_role_targets = local.redis_exporter_role_target_by_role
 
   developer_mcp_chart_values = local.developer_mcp_chart_values
 
