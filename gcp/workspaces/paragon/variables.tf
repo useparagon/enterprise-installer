@@ -1469,6 +1469,18 @@ locals {
     try(local.redis_instance_urls["cache"], local.infra_vars.redis.value.cache.connection_string, "${local.infra_vars.redis.value.cache.host}:${local.infra_vars.redis.value.cache.port}")
   )
 
+  # redis-exporter REDIS_ADDR: the Cache URL (scheme and AUTH included), same as the AWS stack.
+  redis_exporter_addr = nonsensitive(coalesce(try(local.redis_instance_urls["cache"], null), local.default_redis_url))
+
+  # redis-exporter scrape list (Prometheus CACHE_REDIS_URL): Cache, Queue and System with the same
+  # role rule as the services. A shared instance collapses to one target (deduplicated by host:port).
+  redis_exporter_targets = [
+    for endpoint, urls in {
+      for url in [for role in ["cache", "queue", "system"] : try(local.redis_instance_urls[role], local.redis_instance_urls["cache"])] :
+      nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
+    } : urls[0]
+  ]
+
   # Iterate the instances infra actually created. redis_multiple_instances=false
   # emits only `cache`, and naming queue/system directly errors the whole
   # expression, so the CA bundle silently stayed unmounted and every TLS Redis

@@ -70,11 +70,19 @@ locals {
   })
 
   monitor_values = yamlencode({
-    for monitor_name, monitor_config in var.monitors : monitor_name => {
+    for monitor_name, monitor_config in var.monitors : monitor_name => merge({
       image = {
         tag = var.monitor_version
       }
-    }
+      }, {
+      # Add Redis exporter settings without changing values for other monitors.
+      for key, value in {
+        envKeys = ["REDIS_ADDR"]
+        env = {
+          REDIS_ADDR = var.redis_exporter_addr
+        }
+      } : key => value if monitor_name == "redis-exporter"
+    })
   })
 
   public_monitor_values = yamlencode({
@@ -361,6 +369,16 @@ resource "helm_release" "paragon_monitoring" {
     local.unexposed_monitor_values,
     local.secret_hash
   ]
+
+  # Prometheus scrape list for redis-exporter (Cache, Queue and System when separate instances).
+  # Passed as the Cache slot (comma list). Contains AUTH, so it goes in a Secret.
+  dynamic "set_sensitive" {
+    for_each = nonsensitive(length(var.redis_exporter_targets)) > 0 ? [1] : []
+    content {
+      name  = "prometheus.secrets.CACHE_REDIS_URL"
+      value = replace(join(",", var.redis_exporter_targets), ",", "\\,")
+    }
+  }
 
   depends_on = [
     helm_release.ingress,

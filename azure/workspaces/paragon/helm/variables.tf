@@ -143,6 +143,18 @@ variable "monitor_version" {
   type        = string
 }
 
+variable "redis_exporter_addr" {
+  description = "Redis-compatible URI for the Cache backend, used only by redis-exporter as REDIS_ADDR. Includes AUTH userinfo when the cache uses AUTH."
+  type        = string
+}
+
+variable "redis_exporter_targets" {
+  description = "Redis/Valkey endpoints Prometheus scrapes through redis-exporter: Cache, Queue and System (one target when they share an instance). Used as Prometheus' CACHE_REDIS_URL (comma-separated) whenever the list is non-empty."
+  type        = list(string)
+  default     = []
+  sensitive   = true
+}
+
 variable "monitors" {
   description = "The monitors running within the system."
   type = map(object({

@@ -41,6 +41,9 @@ module "waf" {
 module "helm" {
   source = "./helm"
 
+  redis_exporter_addr    = local.redis_exporter_addr
+  redis_exporter_targets = local.redis_exporter_targets
+
   developer_mcp_chart_values = local.developer_mcp_chart_values
 
   cluster_host                           = local.gke_connect_gateway_host

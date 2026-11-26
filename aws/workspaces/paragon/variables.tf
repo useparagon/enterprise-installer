@@ -1701,13 +1701,12 @@ locals {
     null,
   ) : null
 
-  # Endpoints Prometheus scrapes through redis-exporter. Prometheus already gets
-  # CACHE/QUEUE/SYSTEM/WORKFLOW_REDIS_URL from paragon-secrets (the same values as the
-  # microservices). Managed Sync and Agent OS can have their own instance, so they are added
-  # to the Cache slot, which accepts a comma-separated list. Endpoints are deduplicated by
-  # host:port, so a shared instance yields one target. The first URL for an endpoint wins.
-  # The AWS cache and Managed Sync URLs have no scheme, even with TLS. redis-exporter treats a
-  # schemeless target as redis://, so add rediss:// when the role has TLS enabled.
+  # Endpoints Prometheus scrapes through redis-exporter (/scrape?target=...). Same role rule as
+  # the services (redis_role_url): one shared ElastiCache (single) gives one target; separate
+  # instances (multiple) give cache, queue and system. Managed Sync and Agent OS are added when
+  # they have their own instance. Endpoints are deduplicated by host:port. The first URL for an
+  # endpoint wins. Cache, Queue and System URLs have no scheme, even with TLS. redis-exporter
+  # treats a schemeless target as redis://, so add rediss:// when the role has TLS enabled.
   redis_exporter_cache_tls        = try(local.infra_vars.redis.value.cache.ssl, false)
   redis_exporter_managed_sync_tls = try(local.infra_vars.redis.value.managed_sync.ssl, local.infra_vars.redis.value.cache.ssl, false)
 
@@ -1726,13 +1725,20 @@ locals {
     : local.redis_exporter_managed_sync_url
   )
 
+  redis_exporter_role_targets = [
+    for role in ["cache", "queue", "system"] : (
+      try(local.redis_role_endpoint[role].ssl, false) && !can(regex("^rediss?://", local.redis_role_url[role]))
+      ? "rediss://${local.redis_role_url[role]}"
+      : local.redis_role_url[role]
+    ) if local.redis_role_url[role] != null
+  ]
+
   redis_exporter_targets = [
     for endpoint, urls in {
-      for url in compact([
-        local.redis_exporter_cache_target,
+      for url in compact(concat(local.redis_exporter_role_targets, [
         local.redis_exporter_managed_sync_target,
         local.agent_os_redis_url,
-      ]) : nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
+      ])) : nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
     } : urls[0]
   ]
 

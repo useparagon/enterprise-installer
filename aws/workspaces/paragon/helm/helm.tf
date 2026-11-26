@@ -628,11 +628,12 @@ resource "helm_release" "paragon_monitoring" {
     value = data.aws_lb.load_balancer.arn_suffix
   }
 
-  # Prometheus reads Cache/Queue/System/Workflow from paragon-secrets. With Managed Sync (and
-  # Agent OS, which requires it) add their endpoints to the Cache slot as a comma list. The
-  # URLs can carry the AUTH token, so they go in a Secret, never a ConfigMap or target label.
+  # Prometheus scrape list for redis-exporter: Cache, plus Queue and System when they are
+  # separate instances, plus Managed Sync and Agent OS when enabled. Passed as the Cache slot
+  # (comma list). The URLs can carry the AUTH token, so they go in a Secret, never a ConfigMap
+  # or target label.
   dynamic "set_sensitive" {
-    for_each = var.managed_sync_enabled ? [1] : []
+    for_each = nonsensitive(length(var.redis_exporter_targets)) > 0 ? [1] : []
     content {
       name  = "prometheus.secrets.CACHE_REDIS_URL"
       value = replace(join(",", var.redis_exporter_targets), ",", "\\,")

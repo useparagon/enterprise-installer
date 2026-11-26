@@ -1159,6 +1159,18 @@ locals {
     )
   }
 
+  # redis-exporter REDIS_ADDR: the Cache URL (scheme and AUTH included), same as the AWS stack.
+  redis_exporter_addr = nonsensitive(coalesce(try(local.redis_instance_urls["cache"], null), local.default_redis_url))
+
+  # redis-exporter scrape list (Prometheus CACHE_REDIS_URL): Cache, Queue and System with the same
+  # role rule as the services. A shared instance collapses to one target (deduplicated by host:port).
+  redis_exporter_targets = [
+    for endpoint, urls in {
+      for url in [for role in ["cache", "queue", "system"] : try(local.redis_instance_urls[role], local.redis_instance_urls["cache"])] :
+      nonsensitive(replace(replace(url, "/^rediss?:\\/\\//", ""), "/^.*@/", "")) => url...
+    } : urls[0]
+  ]
+
   # Prefer an explicitly schemed helm REDIS_URL; otherwise use rebuilt cache URL.
   default_redis_url = (
     try(

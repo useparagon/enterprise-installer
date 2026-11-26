@@ -115,7 +115,8 @@ module "helm" {
     "${try(local.active_redis_connections.cache.ssl, false) ? "rediss" : "redis"}://${local.active_redis_connections.cache.host}:${local.active_redis_connections.cache.port}",
   ))
 
-  # Prometheus scrape targets: Cache plus Managed Sync and Agent OS when they have their own.
+  # Prometheus scrape targets: Cache, Queue and System (same role rule as the services), plus
+  # Managed Sync and Agent OS when they have their own instance.
   redis_exporter_targets = local.redis_exporter_targets
 
   runtime_secrets_ready = terraform_data.runtime_secrets_populated.id
